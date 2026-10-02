@@ -7,9 +7,10 @@
  * - Smart intents: "gastos <mês|semana|viagem|categoria|viagem>" → money summary,
  *   "livros" → books by status, "estudo <trilha>" → that track's study items.
  */
-import type { Book, BookStatus, DateKey, DB, Expense, ID, StudyItem, StudyStatus } from '@/data/types'
+import type { Book, BookStatus, DateKey, DB, Expense, ID, PlanType, Recurrence, StudyItem, StudyStatus } from '@/data/types'
 import { ROUTES } from '@/app/routes'
 import { categoryOf, modalityOf, sumCents } from '@/data/selectors'
+import { PERIOD_LABEL } from '@/data/planning'
 import {
   addDays,
   diffDays,
@@ -20,6 +21,7 @@ import {
   relativeDay,
   startOfMonth,
   startOfWeek,
+  WEEKDAY_LONG,
 } from '@/lib/date'
 import { formatBRL } from '@/lib/money'
 import { normalize } from '@/lib/text'
@@ -48,6 +50,7 @@ export type SearchDomain =
   | 'luna'
   | 'goal'
   | 'routine'
+  | 'planning'
 
 export interface SearchResult {
   /** Unique across domains: `${domain}:${entityId}`. */
@@ -108,6 +111,7 @@ export const DOMAIN_META: Record<SearchDomain, { label: string; emoji: string }>
   luna: { label: 'Luna', emoji: '🐾' },
   goal: { label: 'Metas', emoji: '🎯' },
   routine: { label: 'Rotinas', emoji: '☀️' },
+  planning: { label: 'Planejamento', emoji: '🧭' },
 }
 
 /** Words that make a workout findable by the way Marina talks about it. */
@@ -143,6 +147,53 @@ export const STUDY_STATUS_LABEL: Record<StudyStatus, string> = {
 
 const STOPWORDS = new Set(['de', 'da', 'do', 'das', 'dos', 'e', 'a', 'o', 'as', 'os', 'em', 'no', 'na', 'nos', 'nas', 'pra', 'para', 'com', 'um', 'uma'])
 
+/**
+ * Common airport codes → how places are written in Marina's data (and back). Generic geography,
+ * not personal data: "JNB" finds "Johannesburg", "CPT" finds "Cape Town", "joanesburgo" finds "JNB".
+ */
+export const PLACE_ALIASES: Record<string, string[]> = {
+  jnb: ['johannesburg', 'joanesburgo', 'or tambo'],
+  cpt: ['cape town', 'cidade do cabo'],
+  dur: ['durban'],
+  gru: ['guarulhos', 'sao paulo'],
+  cgh: ['congonhas', 'sao paulo'],
+  vcp: ['viracopos', 'campinas'],
+  gig: ['galeao', 'rio de janeiro'],
+  sdu: ['santos dumont', 'rio de janeiro'],
+  rec: ['recife'],
+  ssa: ['salvador'],
+  ios: ['ilheus', 'itacare'],
+  fln: ['florianopolis'],
+  bsb: ['brasilia'],
+  cnf: ['confins', 'belo horizonte'],
+  poa: ['porto alegre'],
+  cwb: ['curitiba'],
+  lis: ['lisboa', 'lisbon'],
+  opo: ['porto'],
+  mad: ['madrid'],
+  bcn: ['barcelona'],
+  cdg: ['paris'],
+  lhr: ['londres', 'london', 'heathrow'],
+  jfk: ['nova york', 'new york'],
+  mia: ['miami'],
+  eze: ['buenos aires'],
+  scl: ['santiago'],
+  dxb: ['dubai'],
+  doh: ['doha'],
+}
+
+/** Other ways of writing the same query token (airport code ↔ city). */
+export function tokenAliases(token: string): string[] {
+  const direct = PLACE_ALIASES[token]
+  if (direct) return direct
+  const out: string[] = []
+  if (token.length < 4) return out
+  for (const [code, names] of Object.entries(PLACE_ALIASES)) {
+    if (names.includes(token)) out.push(code, ...names.filter((n) => n !== token))
+  }
+  return out
+}
+
 // ─── Tokenizing / matching ──────────────────────────────────────────────────
 
 export function tokenize(text: string): string[] {
@@ -174,6 +225,27 @@ function tokenScore(f: Field, token: string, primary: boolean): number {
   if (f.words.some((w) => w.startsWith(token))) return primary ? 10 : 4
   if (token.length > 2 && f.norm.includes(token)) return primary ? 6 : 2
   return 0
+}
+
+/** Like tokenScore, but also tries the token's aliases (airport codes, city names). Alias hits score a bit lower. */
+function tokenScoreAliased(f: Field, token: string, primary: boolean): number {
+  let best = tokenScore(f, token, primary)
+  if (best >= (primary ? 12 : 5)) return best
+  for (const alias of tokenAliases(token)) {
+    const s = alias.includes(' ')
+      ? ` ${f.words.join(' ')} `.includes(` ${alias} `)
+        ? primary
+          ? 12
+          : 5
+        : 0
+      : f.words.includes(alias)
+        ? primary
+          ? 12
+          : 5
+        : 0
+    best = Math.max(best, s ? s - 1 : 0)
+  }
+  return best
 }
 
 // ─── Documents ──────────────────────────────────────────────────────────────
@@ -232,6 +304,15 @@ const CONTENT_STAGE: Record<string, string> = {
   publicado: 'publicado',
 }
 
+const PLAN_LABEL: Record<PlanType, string> = { fixo: 'fixo', base: 'base', flexivel: 'flexível', a_confirmar: 'a confirmar' }
+
+function recurrenceWords(r: Recurrence): string {
+  if (r.kind === 'daily') return 'todo dia'
+  if (r.kind === 'weekly') return r.weekdays.map((d) => WEEKDAY_LONG[d]).join(' e ')
+  if (r.kind === 'monthly') return r.dayOfMonth === 'last' ? 'último dia do mês' : `todo dia ${r.dayOfMonth}`
+  return `a cada ${r.days} dias`
+}
+
 function when(date: DateKey | undefined, today: DateKey): string | undefined {
   if (!date) return undefined
   return Math.abs(diffDays(today, date)) < 7 ? relativeDay(date, today) : formatShortDate(date)
@@ -267,7 +348,7 @@ function buildDocs(db: DB, today: DateKey): Doc[] {
         t.group,
       ),
       primary: field(t.title),
-      secondary: field(t.notes, t.group, proj, trip?.name, trip?.place, TASK_CONTEXT_WORDS[t.context ?? 'geral'], t.lifeAdminCategory, t.waiting?.who),
+      secondary: field(t.notes, t.group, proj, trip?.name, trip?.place, TASK_CONTEXT_WORDS[t.context ?? 'geral'], t.lifeAdminCategory, t.adminKind, t.waiting?.who, t.planType && PLAN_LABEL[t.planType]),
       date: t.date ?? t.dueDate,
       inactive: t.status === 'done',
       action: sheetAction('task', { id: t.id }),
@@ -282,7 +363,17 @@ function buildDocs(db: DB, today: DateKey): Doc[] {
       emoji: p.emoji,
       subtitle: p.nextAction ? `Próximo: ${p.nextAction}` : (p.role ?? p.description),
       primary: field(p.name),
-      secondary: field(p.role, p.description, p.objective, p.nextAction, p.notes, p.people.map((x) => x.name).join(' '), p.kind === 'creator' && 'ugc conteudo creator'),
+      secondary: field(
+        p.role,
+        p.description,
+        p.objective,
+        p.nextAction,
+        p.notes,
+        p.people.map((x) => `${x.name} ${x.role ?? ''}`).join(' '),
+        p.sections?.join(' '),
+        p.categories?.join(' '),
+        p.kind === 'creator' && 'ugc conteudo creator',
+      ),
       date: p.nextDelivery?.date ?? p.deadline,
       inactive: p.status === 'concluido',
       action: routeAction(ROUTES.project(p.id)),
@@ -296,9 +387,9 @@ function buildDocs(db: DB, today: DateKey): Doc[] {
       id: m.id,
       title: m.title,
       emoji: m.done ? '✅' : '🏁',
-      subtitle: join(proj, when(m.date, today)),
+      subtitle: join(proj, m.group, when(m.date, today)),
       primary: field(m.title),
-      secondary: field(proj),
+      secondary: field(proj, m.group, m.status === 'roadmap' ? 'roadmap' : m.status === 'em_andamento' ? 'em andamento' : undefined),
       date: m.date,
       inactive: m.done,
       action: routeAction(ROUTES.project(m.projectId)),
@@ -387,9 +478,9 @@ function buildDocs(db: DB, today: DateKey): Doc[] {
       id: tr.id,
       title: tr.name,
       emoji: tr.emoji,
-      subtitle: 'Trilha de estudo',
+      subtitle: join('Trilha de estudo', tr.formats?.slice(0, 3).join(', ')),
       primary: field(tr.name),
-      secondary: field('trilha estudo'),
+      secondary: field('trilha estudo', tr.formats?.join(' '), tr.notes, tr.status),
       inactive: tr.archived,
       action: routeAction(ROUTES.study),
     })
@@ -445,9 +536,9 @@ function buildDocs(db: DB, today: DateKey): Doc[] {
       id: i.id,
       title: i.title,
       emoji: trip?.flag ?? '🧳',
-      subtitle: join(trip?.name, i.group, TRIP_ITEM_STATUS[i.status]),
+      subtitle: join(trip?.name, i.group, i.status === 'a_confirmar' ? 'revisar' : TRIP_ITEM_STATUS[i.status]),
       primary: field(i.title),
-      secondary: field(i.group, i.notes, trip?.name, trip?.place, TRIP_SECTION_LABEL[i.section]),
+      secondary: field(i.group, i.notes, trip?.name, trip?.place, TRIP_SECTION_LABEL[i.section], TRIP_ITEM_STATUS[i.status]),
       date: i.date,
       inactive: i.status === 'cancelado',
       action: sheetAction('tripItem', { id: i.id, tripId: i.tripId }),
@@ -462,7 +553,7 @@ function buildDocs(db: DB, today: DateKey): Doc[] {
       emoji: '🎬',
       subtitle: join(CONTENT_STAGE[c.stage], c.platform, c.format),
       primary: field(c.title),
-      secondary: field(c.hook, c.platform, c.format, c.category, c.cta, 'ugc conteudo'),
+      secondary: field(c.hook, c.platform, c.format, c.category, c.cta, c.projectId && projectName.get(c.projectId), 'ugc conteudo'),
       date: c.deadline ?? c.publishedAt,
       action: sheetAction('content', { id: c.id }),
     })
@@ -509,7 +600,7 @@ function buildDocs(db: DB, today: DateKey): Doc[] {
       emoji: m.emoji,
       subtitle: join(w.title ? m.label : undefined, when(w.date, today), w.status === 'planejado' ? 'planejado' : w.status),
       primary: field(title),
-      secondary: field(m.label, w.modality, (MODALITY_SYNONYMS[w.modality] ?? []).join(' '), w.goal, w.notes),
+      secondary: field(m.label, w.modality, (MODALITY_SYNONYMS[w.modality] ?? []).join(' '), w.goal, w.notes, w.planType && PLAN_LABEL[w.planType], w.period && PERIOD_LABEL[w.period]),
       date: w.date,
       action: sheetAction('workout', { id: w.id }),
     })
@@ -521,9 +612,13 @@ function buildDocs(db: DB, today: DateKey): Doc[] {
       id: e.id,
       title: e.title,
       emoji: '📅',
-      subtitle: join(when(e.date, today), e.allDay ? 'dia todo' : e.startTime, e.location),
+      subtitle: join(
+        e.recurrence ? recurrenceWords(e.recurrence) : when(e.date, today),
+        e.allDay ? 'dia todo' : (e.startTime ?? (e.period && PERIOD_LABEL[e.period])),
+        e.category ?? e.location,
+      ),
       primary: field(e.title),
-      secondary: field(e.location, e.notes),
+      secondary: field(e.location, e.notes, e.category, e.kind, e.planType && PLAN_LABEL[e.planType], e.period && PERIOD_LABEL[e.period], e.template?.join(' ')),
       date: e.date,
       action: sheetAction('event', { id: e.id }),
     })
@@ -582,9 +677,67 @@ function buildDocs(db: DB, today: DateKey): Doc[] {
       emoji: r.emoji ?? '☀️',
       subtitle: routine,
       primary: field(r.title),
-      secondary: field(routine),
+      secondary: field(routine, r.steps?.join(' '), r.hint, r.essentialLabel),
       inactive: !r.active,
       action: sheetAction('routineEditor', { routineId: r.routineId }),
+    })
+  }
+
+  for (const g of db.workoutGoals) {
+    const m = g.modality ? modalityOf(db, g.modality) : undefined
+    docs.push({
+      domain: 'goal',
+      id: g.id,
+      title: g.title,
+      emoji: m?.emoji ?? '🎯',
+      subtitle: join('objetivo de treino', g.planType && PLAN_LABEL[g.planType], g.deadline && formatShortDate(g.deadline)),
+      primary: field(g.title),
+      secondary: field(m?.label, g.modality, g.modality && (MODALITY_SYNONYMS[g.modality] ?? []).join(' '), g.notes, g.preparation),
+      date: g.deadline,
+      inactive: g.status !== 'ativa',
+      action: sheetAction('workoutGoal', { id: g.id }),
+    })
+  }
+
+  for (const c of db.constraints) {
+    const proj = c.projectId ? projectName.get(c.projectId) : undefined
+    const mods = (c.modalities ?? []).map((id) => modalityOf(db, id))
+    docs.push({
+      domain: 'planning',
+      id: c.id,
+      title: c.name,
+      emoji: c.kind === 'max_checkins_per_day' ? '🎟️' : '⏱️',
+      subtitle: join('Regra de planejamento', mods.length ? mods.map((m) => m.label).join(', ') : proj),
+      primary: field(c.name),
+      secondary: field(c.notes, proj, mods.map((m) => `${m.label} ${m.id}`).join(' '), 'regra check-in limite'),
+      inactive: !c.active,
+      action: routeAction(c.projectId ? ROUTES.project(c.projectId) : ROUTES.weekPlanner),
+    })
+  }
+
+  for (const t of db.weekTemplate) {
+    const mods = t.modalities.map((id) => modalityOf(db, id))
+    const what =
+      t.choice === 'rest'
+        ? (t.title ?? 'Descanso')
+        : (t.title ?? mods.map((m) => `${m.emoji} ${m.label}`).join(t.choice === 'one_of' ? ' ou ' : ', '))
+    const day = WEEKDAY_LONG[t.weekday]
+    const title = `${day[0].toUpperCase()}${day.slice(1)} · ${what}`
+    docs.push({
+      domain: 'planning',
+      id: t.id,
+      title,
+      emoji: mods[0]?.emoji ?? '🌿',
+      subtitle: join('Semana base', t.time ?? (t.period && PERIOD_LABEL[t.period]), PLAN_LABEL[t.planType], t.notes),
+      primary: field(title),
+      secondary: field(
+        mods.map((m) => `${m.label} ${(MODALITY_SYNONYMS[m.id] ?? []).join(' ')}`).join(' '),
+        t.notes,
+        PLAN_LABEL[t.planType],
+        'semana base template treino',
+      ),
+      inactive: !t.active,
+      action: routeAction(ROUTES.weekPlanner),
     })
   }
 
@@ -594,12 +747,12 @@ function buildDocs(db: DB, today: DateKey): Doc[] {
 function scoreDoc(doc: Doc, tokens: string[], phrase: string, today: DateKey): number {
   let s = 0
   for (const t of tokens) {
-    const p = tokenScore(doc.primary, t, true)
+    const p = tokenScoreAliased(doc.primary, t, true)
     if (p) {
       s += p
       continue
     }
-    const sec = tokenScore(doc.secondary, t, false)
+    const sec = tokenScoreAliased(doc.secondary, t, false)
     if (!sec) return 0
     s += sec
   }

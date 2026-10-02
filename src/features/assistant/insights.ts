@@ -2,13 +2,14 @@
  * 2–4 gentle, deterministic observations for the top of the Mari page.
  * Facts + a next step. Never scores, never guilt.
  */
-import type { DateKey, DB, Tone } from '@/data/types'
+import type { DateKey, DB, Tone, Trip } from '@/data/types'
 import { ROUTES } from '@/app/routes'
-import { isTaskOpen, petTasksDue, prioritiesFor, upcomingTrips, waitingFor } from '@/data/selectors'
-import { addDays, diffDays } from '@/lib/date'
+import { conflictsBetween, isPresencial } from '@/data/planning'
+import { isTaskOpen, modalityOf, petTasksDue, prioritiesFor, upcomingTrips, waitingFor } from '@/data/selectors'
+import { addDays, diffDays, endOfWeek, relativeDay, weekDays } from '@/lib/date'
 import { routeAction, sheetAction, type ResultAction } from '@/features/search/actions'
 import { projectsNeedingCare } from './agents/WorkAgent'
-import { plural } from './agents/common'
+import { capitalize, plural } from './agents/common'
 
 export interface Insight {
   id: string
@@ -21,7 +22,7 @@ export interface Insight {
 }
 
 export function buildInsights(db: DB, today: DateKey, minutes: number, max = 4): Insight[] {
-  const out: Insight[] = []
+  const out: Insight[] = [...planningInsights(db, today, minutes)]
 
   // Waiting on someone for a while.
   const oldWaiting = waitingFor(db).filter((t) => t.waiting && diffDays(t.waiting.since, today) > 7)
@@ -34,21 +35,9 @@ export function buildInsights(db: DB, today: DateKey, minutes: number, max = 4):
       ask: 'O que estou esperando?',
     })
 
-  // A trip coming up with things to confirm.
-  const trip = upcomingTrips(db, today).find((t) => t.startDate && diffDays(today, t.startDate) <= 60)
-  if (trip) {
-    const open = db.tripItems.filter((i) => i.tripId === trip.id && (i.status === 'a_confirmar' || i.status === 'a_fazer')).length
-    const days = diffDays(today, trip.startDate!)
-    const when = days <= 0 ? 'é agora' : days === 1 ? 'é amanhã' : `é em ${days} dias`
-    out.push({
-      id: `trip:${trip.id}`,
-      emoji: trip.flag,
-      tone: 'ocean',
-      text: open ? `${trip.name} ${when} — ${plural(open, 'item a confirmar', 'itens a confirmar')}` : `${trip.name} ${when} — tudo certinho ✨`,
-      ask: open ? `O que tenho pendente antes de ${trip.name}?` : undefined,
-      action: routeAction(ROUTES.trip(trip.id)),
-    })
-  }
+  // A trip coming up with things to review (the ≤ 7 days case is a planning insight above).
+  const trip = upcomingTrips(db, today).find((t) => t.startDate && t.startDate >= today && diffDays(today, t.startDate) <= 60)
+  if (trip && !out.some((i) => i.id === `trip:${trip.id}`)) out.push(tripInsight(db, trip, today))
 
   // Things needing Marina at work.
   const needsMe = db.tasks.filter((t) => isTaskOpen(t) && t.needsMe)
@@ -94,4 +83,62 @@ export function buildInsights(db: DB, today: DateKey, minutes: number, max = 4):
     out.push({ id: 'calm', emoji: '✨', tone: 'sage', text: 'Tudo calmo por aqui. Pergunte o que quiser — eu cruzo seus dados pra você.' })
 
   return out.slice(0, max)
+}
+
+function tripInsight(db: DB, trip: Trip, today: DateKey): Insight {
+  const open = db.tripItems.filter((i) => i.tripId === trip.id && (i.status === 'a_confirmar' || i.status === 'a_fazer')).length
+  const days = diffDays(today, trip.startDate!)
+  const when = days <= 0 ? 'é hoje' : days === 1 ? 'é amanhã' : `é em ${days} dias`
+  return {
+    id: `trip:${trip.id}`,
+    emoji: trip.flag,
+    tone: 'ocean',
+    text: open ? `${trip.name} ${when} — ${plural(open, 'item pra revisar', 'itens pra revisar')}` : `${trip.name} ${when} — tudo certinho ✨`,
+    ask: open ? `O que falta pra ${trip.name}?` : undefined,
+    action: routeAction(ROUTES.trip(trip.id)),
+  }
+}
+
+/**
+ * Gentle planning observations, all from data: tomorrow presencial (evening), a check-in conflict
+ * this week, a flexible weekly intention without a place yet, a trip in ≤ 7 days with things to review.
+ */
+export function planningInsights(db: DB, today: DateKey, minutes: number): Insight[] {
+  const out: Insight[] = []
+  const tomorrow = addDays(today, 1)
+
+  if (minutes >= db.profile.dayParts.eveningStart * 60 && isPresencial(db.profile, tomorrow))
+    out.push({ id: 'presencial-tomorrow', emoji: '👜', tone: 'sand', text: 'Amanhã é presencial. Quer preparar as coisas hoje?', ask: 'O que levar amanhã?' })
+
+  const checkin = conflictsBetween(db, today, endOfWeek(today)).find((c) => c.kind === 'checkin_limit')
+  if (checkin)
+    out.push({
+      id: `conflict:${checkin.key}`,
+      emoji: '⚠️',
+      tone: 'sand',
+      text: `${capitalize(relativeDay(checkin.date, today))}: ${checkin.refs.length === 2 ? 'dois treinos podem' : 'treinos podem'} competir pelo mesmo check-in`,
+      ask: 'Tem conflito essa semana?',
+    })
+
+  const soon = upcomingTrips(db, today).find((t) => t.startDate && t.startDate >= today && diffDays(today, t.startDate) <= 7)
+  if (soon) out.push(tripInsight(db, soon, today))
+
+  const week = weekDays(today)
+  if (week.some((d) => d >= today)) {
+    for (const g of db.workoutGoals) {
+      if (g.status !== 'ativa' || g.planType !== 'flexivel' || !g.perWeek || !g.modality || g.obligation === false) continue
+      const placed = db.workouts.filter((w) => w.modality === g.modality && week.includes(w.date) && w.status !== 'pulado' && w.status !== 'descanso').length
+      if (placed >= g.perWeek) continue
+      const m = modalityOf(db, g.modality)
+      out.push({
+        id: `flex:${g.id}`,
+        emoji: m.emoji,
+        tone: 'plum',
+        text: `${m.label} ainda não tem lugar essa semana — quer que eu ache uma janela?`,
+        ask: `Quando consigo encaixar ${m.label.toLowerCase()}?`,
+      })
+      break
+    }
+  }
+  return out
 }

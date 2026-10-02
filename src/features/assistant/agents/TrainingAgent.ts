@@ -1,91 +1,134 @@
 import { ROUTES } from '@/app/routes'
+import { trainingWeekSummary, workMode } from '@/data/planning'
 import { modalityOf } from '@/data/selectors'
-import { addDays, endOfWeek, minutesToHM, startOfWeek, WEEKDAY_LONG, weekday } from '@/lib/date'
-import { routeAction, sheetAction } from '@/features/search/actions'
-import { durationLabel, findWorkoutSlots, slotLabel } from '../freeSlots'
+import { addDays, endOfWeek, startOfWeek, weekday, WEEKDAY_LONG } from '@/lib/date'
+import { createWorkoutAction, routeAction, sheetAction } from '@/features/search/actions'
 import { has } from '../parse'
 import type { Agent, AgentContext, AnswerBlock, AnswerItem } from '../types'
+import { fitWindows } from '../windows'
 import { capitalize, dayLabel, listJoin, plural } from './common'
 
 const FIT_WORDS = ['encaixar', 'encaixo', 'encaixa', 'consigo', 'horario*', 'livre', 'tempo', 'espaco', 'janela', 'brecha']
+const CONFLICT_WORDS = ['conflito*', 'choque', 'competir', 'compete*', 'sobrepo*']
 
+/** "hoje", "amanhã", "quinta" (this/next 6 days) or "9 de out.". */
 function dayName(date: string, today: string): string {
-  if (date === today) return 'hoje'
-  if (date === addDays(today, 1)) return 'amanhã'
-  return WEEKDAY_LONG[weekday(date)]
+  return dayLabel(date, today)
 }
 
 function fit({ db, today, minutes, q }: AgentContext): AnswerBlock[] {
   const modality = q.modalities[0] ?? 'musculacao'
   const m = modalityOf(db, modality)
   const label = m.label.toLowerCase()
-  const res = findWorkoutSlots(db, today, minutes, modality)
-  const items: AnswerItem[] = res.days.slice(0, 5).map((d) => {
-    const best = d.slots.reduce((a, b) => (b.end - b.start > a.end - a.start ? b : a))
+  const res = fitWindows(db, today, minutes, modality)
+  const goalLine = res.goal?.perWeek ? `${res.goal.title}${res.goal.planType === 'flexivel' ? ' (flexível)' : ''}` : undefined
+  const done = res.goal?.perWeek ? res.alreadyThisWeek.length >= res.goal.perWeek : false
+
+  const items: AnswerItem[] = res.windows.map((w) => {
+    const day = dayName(w.date, today)
+    const presencial = workMode(db.profile, w.date) === 'presencial'
     return {
-      id: `slot:${d.date}`,
+      id: `fit:${w.date}:${w.start}`,
       emoji: m.emoji,
-      title: `${capitalize(dayName(d.date, today))} · ${slotLabel(best)}`,
-      subtitle: d.slots.length > 1 ? `${durationLabel(best.end - best.start)} livres · +${plural(d.slots.length - 1, 'outra janela', 'outras janelas')}` : `${durationLabel(best.end - best.start)} livres`,
-      action: sheetAction('workout', { date: d.date }),
+      title: `${capitalize(day)} · ${w.start}–${w.end}`,
+      subtitle: [w.reason, presencial && !w.reason.includes('presencial') ? 'dia presencial' : undefined].filter(Boolean).join(' · '),
+      trailing: '+ planejar',
+      action: createWorkoutAction(
+        {
+          date: w.date,
+          time: w.start,
+          modality,
+          status: 'planejado',
+          planType: 'flexivel',
+          plannedDurationMin: res.durationMin,
+          workoutGoalId: res.goal?.id,
+          order: db.workouts.filter((x) => x.date === w.date).length,
+        },
+        `${m.emoji} ${m.label} no plano: ${day}, ${w.start} ✓`,
+      ),
     }
   })
-  const lastDay = res.days.at(-1)?.date
-  const range = !res.extended ? 'essa semana' : lastDay ? `até ${dayName(lastDay, today)}` : 'nos próximos dias'
-  if (!items.length)
-    return [
-      { kind: 'headline', text: `A agenda está cheia ${range} entre 6h e 21h 😅 Talvez um treino curto de 30 min caiba — quer planejar mesmo assim?` },
-      { kind: 'list', title: 'Planejar', emoji: m.emoji, items: [{ id: 'plan', emoji: m.emoji, title: `Planejar ${label}`, action: sheetAction('workout', { date: today }) }] },
-    ]
-  const first = res.days[0]
-  const firstBest = first.slots.reduce((a, b) => (b.end - b.start > a.end - a.start ? b : a))
-  const blocks: AnswerBlock[] = [
-    {
-      kind: 'headline',
-      text: `Dá pra encaixar ${label} em ${plural(res.days.length, 'dia', 'dias')} ${range} — a primeira janela boa é ${dayName(first.date, today)}, ${minutesToHM(firstBest.start)}.`,
-    },
-    { kind: 'list', title: 'Janelas livres (60 min ou mais)', emoji: '🕐', items },
-  ]
-  if (res.skipped.length)
+
+  const blocks: AnswerBlock[] = []
+  if (!items.length) {
+    blocks.push(
+      { kind: 'headline', text: `A semana está cheia pra ${label} de ${res.durationMin} min sem competir com nada 😅 Quer escolher um horário mesmo assim?` },
+      {
+        kind: 'list',
+        title: 'Planejar',
+        emoji: m.emoji,
+        items: [{ id: 'plan', emoji: '➕', title: `Planejar ${label}`, action: sheetAction('workout', { date: today, defaults: { modality, planType: 'flexivel' } }) }],
+      },
+    )
+  } else {
+    const preferred = res.windows.find((w) => res.goal?.preferredWeekdays?.includes(weekday(w.date)))
+    const first = preferred ?? res.windows[0]
     blocks.push({
-      kind: 'text',
-      text: `Deixei de fora ${listJoin(res.skipped.map((d) => dayName(d, today)))} porque já tem ${label} por lá.`,
+      kind: 'headline',
+      text: done
+        ? `${m.label} já tem lugar essa semana (${listJoin(res.alreadyThisWeek.map((d) => dayName(d, today)))}) ✓ Se quiser mais uma, ${dayName(first.date, today)} ${first.start} funciona.`
+        : `Dá pra encaixar ${label} ${dayName(first.date, today)}, ${first.start}${preferred ? ' — o dia que você costuma preferir' : ' — sem competir com nada'}.`,
     })
+    blocks.push({
+      kind: 'list',
+      title: 'Toque pra planejar',
+      emoji: '🕐',
+      items,
+      more: { label: 'Escolher outro horário', action: sheetAction('workout', { date: first.date, defaults: { modality, planType: 'flexivel' } }) },
+    })
+  }
+
+  const notes: string[] = []
+  if (goalLine) notes.push(`${goalLine}: eu sugiro, você decide.`)
+  if (res.blocked.length) {
+    const byRule = new Map<string, string[]>()
+    for (const b of res.blocked) byRule.set(b.constraint.name, [...(byRule.get(b.constraint.name) ?? []), dayName(b.date, today)])
+    for (const [rule, days] of byRule) notes.push(`Deixei de fora ${listJoin(days)}: o check-in do dia já está em uso (${rule}).`)
+  }
+  if (notes.length) blocks.push({ kind: 'text', text: notes.join(' ') })
   return blocks
 }
 
 function week({ db, today }: AgentContext): AnswerBlock[] {
   const from = startOfWeek(today)
   const to = endOfWeek(today)
-  const list = db.workouts.filter((w) => w.date >= from && w.date <= to && w.status !== 'descanso').sort((a, b) => a.date.localeCompare(b.date))
-  const done = list.filter((w) => w.status === 'feito' || w.status === 'adaptado')
-  const planned = list.filter((w) => w.status === 'planejado' && w.date >= today)
-  const tomorrow = db.workouts.filter((w) => w.date === addDays(today, 1) && w.status === 'planejado')
-  const parts = [done.length && `${plural(done.length, 'treino feito', 'treinos feitos')}`, planned.length && `${plural(planned.length, 'planejado', 'planejados')}`].filter(Boolean) as string[]
-  const blocks: AnswerBlock[] = [
-    {
-      kind: 'headline',
-      text: parts.length ? `Essa semana: ${listJoin(parts)} 💪${tomorrow.length ? '' : ' Nada planejado pra amanhã ainda.'}` : 'Nenhum treino nessa semana ainda — sem pressa, quer planejar um?',
-    },
-  ]
-  if (list.length)
-    blocks.push({
-      kind: 'list',
-      title: 'Treinos da semana',
-      emoji: '🏃‍♀️',
-      items: list.map((w) => {
-        const m = modalityOf(db, w.modality)
-        return {
-          id: `workout:${w.id}`,
-          emoji: m.emoji,
-          title: w.title || m.label,
-          subtitle: [dayLabel(w.date, today), w.time, w.status === 'feito' ? 'feito ✓' : w.status].filter(Boolean).join(' · '),
-          action: sheetAction('workout', { id: w.id }),
-        }
-      }),
-      more: { label: 'Abrir Corpo', action: routeAction(ROUTES.body) },
-    })
-  else blocks.push({ kind: 'list', title: 'Planejar', emoji: '🏃‍♀️', items: [{ id: 'plan', emoji: '➕', title: 'Planejar treino', action: sheetAction('workout', { date: addDays(today, 1) }) }] })
+  const summary = trainingWeekSummary(db, today)
+  const list = db.workouts
+    .filter((w) => w.date >= from && w.date <= to && w.status !== 'pulado')
+    .sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '99').localeCompare(b.time ?? '99'))
+  const doneCount = Object.values(summary.done).reduce((a, b) => a + b, 0)
+  if (!summary.line)
+    return [
+      { kind: 'headline', text: 'Nenhum treino nessa semana ainda — sem pressa. Quer montar a semana?' },
+      {
+        kind: 'list',
+        title: 'Planejar',
+        emoji: '🏃‍♀️',
+        items: [
+          { id: 'planner', emoji: '🧭', title: 'Montar minha semana', action: routeAction(ROUTES.weekPlanner) },
+          { id: 'plan', emoji: '➕', title: 'Planejar um treino', action: sheetAction('workout', { date: addDays(today, 1) }) },
+        ],
+      },
+    ]
+  const blocks: AnswerBlock[] = [{ kind: 'headline', text: `Esta semana: ${summary.line}.` }]
+  if (doneCount) blocks.push({ kind: 'text', text: `${capitalize(plural(doneCount, 'treino feito', 'treinos feitos'))} até agora; o resto está no plano 💛` })
+  blocks.push({
+    kind: 'list',
+    title: 'Treinos da semana',
+    emoji: '🏃‍♀️',
+    items: list.map((w) => {
+      const m = modalityOf(db, w.modality)
+      const status = w.status === 'feito' || w.status === 'adaptado' ? 'feito ✓' : w.status === 'descanso' ? 'descanso' : 'planejado'
+      return {
+        id: `workout:${w.id}`,
+        emoji: m.emoji,
+        title: w.title || m.label,
+        subtitle: [capitalize(w.date === today ? 'hoje' : WEEKDAY_LONG[weekday(w.date)]), w.time, status].filter(Boolean).join(' · '),
+        action: sheetAction('workout', { id: w.id }),
+      }
+    }),
+    more: { label: 'Montar minha semana', action: routeAction(ROUTES.weekPlanner) },
+  })
   return blocks
 }
 
@@ -95,12 +138,13 @@ export const TrainingAgent: Agent = {
   emoji: '🏃‍♀️',
   match(q) {
     const sporty = q.modalities.length > 0 || has(q, 'treino*', 'treinar', 'exercicio*', 'malhar', 'academia')
+    if (sporty && has(q, ...CONFLICT_WORDS)) return 0.5
     if (sporty && has(q, ...FIT_WORDS)) return 0.95
     if (sporty) return 0.85
     return 0
   },
   answer(ctx) {
-    if (has(ctx.q, ...FIT_WORDS) || has(ctx.q, 'quando')) return fit(ctx)
+    if (has(ctx.q, ...FIT_WORDS) || (has(ctx.q, 'quando') && ctx.q.modalities.length)) return fit(ctx)
     return week(ctx)
   },
 }

@@ -10,6 +10,10 @@ import { parseQuestion } from './parse'
 import type { Agent, AnswerBlock, AnswerItem, MariAnswer } from './types'
 
 export const EXAMPLE_QUESTIONS = [
+  'Amanhã é presencial?',
+  'Tem conflito essa semana?',
+  'Quando consigo encaixar yoga?',
+  'Como está minha semana de treino?',
   'Tenho alguma coisa urgente hoje?',
   'Qual foi meu gasto essa semana?',
   'Que projeto está ficando para trás?',
