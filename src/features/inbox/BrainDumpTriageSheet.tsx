@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Archive, ArrowUpRight, Undo2 } from 'lucide-react'
+import { Archive, ArrowUpRight, Sparkles, Undo2 } from 'lucide-react'
 import { closeSheet, toast } from '@/app/ui-store'
 import { removeWithUndo } from '@/app/undo'
 import type { SheetProps } from '@/app/sheet-types'
@@ -12,21 +12,26 @@ import { cn } from '@/lib/cn'
 import { haptic } from '@/lib/haptics'
 import { normalize } from '@/lib/text'
 import { applyConversion, CONVERTED_LABEL, TARGETS, targetMeta } from './triage'
-import { openEntity } from './open'
+import { openCreated } from './open'
+import { applyIntent, INTENT_DONE, suggestionFor } from './nl'
 
 const NEW_TRIP = '__new__'
 
 export default function BrainDumpTriageSheet({ id }: SheetProps<'brainDumpTriage'>) {
-  const item = useDB((db) => db.brainDump.find((b) => b.id === id))
-  const allTrips = useDB((db) => db.trips)
+  const db = useDB()
+  const item = useMemo(() => db.brainDump.find((b) => b.id === id), [db.brainDump, id])
+  const allTrips = db.trips
   const today = todayKey()
+  // Parsed once from the captured text: a suggestion, never a decision.
+  const [intent] = useState(() => (item ? suggestionFor(db, item.text, today) : undefined))
   const trips = useMemo(() => allTrips.filter((t) => t.status !== 'concluida').sort((a, b) => a.order - b.order), [allTrips])
 
   const [text, setText] = useState(item?.text ?? '')
   const [pending, setPending] = useState<BrainDumpTarget | undefined>()
-  const [date, setDate] = useState<string | undefined>(addDays(today, 1))
-  const [who, setWho] = useState('')
+  const [date, setDate] = useState<string | undefined>(intent?.fields.date ?? addDays(today, 1))
+  const [who, setWho] = useState(intent?.fields.who ?? '')
   const [tripId, setTripId] = useState<ID>(() => {
+    if (intent?.fields.tripId) return intent.fields.tripId
     const hay = normalize(`${item?.group ?? ''} ${item?.text ?? ''}`)
     const match = trips.find((t) => hay.includes(normalize(t.name)) || (t.place && hay.includes(normalize(t.place))))
     return match?.id ?? trips[0]?.id ?? NEW_TRIP
@@ -55,7 +60,7 @@ export default function BrainDumpTriageSheet({ id }: SheetProps<'brainDumpTriage
     })
     if (!res) return
     haptic('success')
-    toast(targetMeta(target).done, { action: { label: 'Abrir', run: () => openEntity(res.type, res.id) } })
+    toast(targetMeta(target).done, { action: { label: 'Abrir', run: () => openCreated(res.type, res.id) } })
     closeSheet()
   }
 
@@ -72,6 +77,16 @@ export default function BrainDumpTriageSheet({ id }: SheetProps<'brainDumpTriage
     persistText()
     actions.update('brainDump', item.id, { status: 'arquivado' })
     toast('Arquivado', { action: { label: 'Desfazer', run: () => actions.update('brainDump', item.id, { status: 'inbox' }) } })
+    closeSheet()
+  }
+
+  const acceptIntent = () => {
+    if (!intent) return
+    persistText()
+    const res = applyIntent(item.id, intent, today)
+    if (!res) return
+    haptic('success')
+    toast(INTENT_DONE[intent.type], { action: { label: 'Abrir', run: () => openCreated(res.type, res.id) } })
     closeSheet()
   }
 
@@ -125,7 +140,7 @@ export default function BrainDumpTriageSheet({ id }: SheetProps<'brainDumpTriage
                 variant="soft"
                 icon={<ArrowUpRight size={16} />}
                 onClick={() => {
-                  if (openEntity(item.convertedTo!.type, item.convertedTo!.id)) closeSheet()
+                  if (openCreated(item.convertedTo!.type, item.convertedTo!.id)) closeSheet()
                 }}
               >
                 Abrir
@@ -145,6 +160,20 @@ export default function BrainDumpTriageSheet({ id }: SheetProps<'brainDumpTriage
         </div>
       ) : (
         <>
+          {intent && (
+            <div className="rounded-2xl bg-accent-soft p-3.5">
+              <div className="flex items-center gap-2 text-[12.5px] text-muted">
+                <Sparkles size={14} className="text-accent" /> Parece
+              </div>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="flex-1 min-w-0 font-medium text-[15.5px] leading-snug">{intent.label}</span>
+                <Button variant="primary" size="sm" onClick={acceptIntent}>
+                  Criar
+                </Button>
+              </div>
+              <p className="text-[12px] text-muted mt-1">Não é isso? Escolhe outro aqui embaixo.</p>
+            </div>
+          )}
           <div className="grid grid-cols-3 gap-2">
             {TARGETS.map((t, i) => (
               <motion.button
@@ -158,6 +187,7 @@ export default function BrainDumpTriageSheet({ id }: SheetProps<'brainDumpTriage
                 className={cn(
                   'h-[72px] rounded-2xl flex flex-col items-center justify-center gap-1 transition active:scale-[0.97]',
                   pending === t.target ? 'bg-ink text-bg' : 'bg-surface-2 text-ink',
+                  intent?.type === t.target && pending !== t.target && 'ring-2 ring-accent/50',
                 )}
               >
                 <span className="text-[20px] leading-none" aria-hidden>

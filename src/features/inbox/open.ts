@@ -38,3 +38,12 @@ export function openEntity(type: EntityType, id: ID): boolean {
       return false
   }
 }
+
+/** Like openEntity, plus workouts (created from a training intention). */
+export function openCreated(type: EntityType, id: ID): boolean {
+  if (type === 'workout') {
+    openSheet('workout', { id })
+    return true
+  }
+  return openEntity(type, id)
+}

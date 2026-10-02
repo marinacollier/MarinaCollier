@@ -5,6 +5,7 @@ import { createMemoryAdapter } from '@/data/storage'
 import { defaultCategories, emptyDB } from '@/data/defaults'
 import { buildSeed } from '@/data/seed'
 import { ENTITY_COLLECTION, type BrainDumpTarget, type DB } from '@/data/types'
+import { INBOX_GROUPS } from './seed'
 import { applyConversion, buildConversion, captureText, splitLines, splitTitle, TARGETS } from './triage'
 
 const TODAY = '2026-10-02'
@@ -94,11 +95,14 @@ describe('triage conversion', () => {
 })
 
 describe('inbox seed', () => {
-  it('groups Marina’s brain dump and phrases unproven trip items as review', () => {
+  it('is short, uses the §41 groups, stable ids and no technical labels', () => {
     const seed = buildSeed(TODAY)
-    const groups = new Set(seed.brainDump.map((b) => b.group))
-    expect(groups).toEqual(new Set(['África do Sul', 'Projetos', 'Vida']))
-    expect(seed.brainDump.filter((b) => b.group === 'África do Sul').every((b) => b.text.startsWith('Revisar/confirmar'))).toBe(true)
-    expect(seed.brainDump.every((b) => b.status === 'inbox')).toBe(true)
+    expect(seed.brainDump.length).toBeGreaterThan(0)
+    expect(seed.brainDump.length).toBeLessThanOrEqual(10)
+    expect(seed.brainDump.every((b) => (INBOX_GROUPS as readonly string[]).includes(b.group!))).toBe(true)
+    expect(seed.brainDump.every((b) => b.id.startsWith('seed:inbox:') && b.status === 'inbox')).toBe(true)
+    expect(new Set(seed.brainDump.map((b) => b.id)).size).toBe(seed.brainDump.length)
+    expect(seed.brainDump.some((b) => /seed/i.test(b.text))).toBe(false)
+    expect(seed.brainDump.map((b) => b.text)).toContain('Recife: confirmar voo e logística (dia 22)')
   })
 })

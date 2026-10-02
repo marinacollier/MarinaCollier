@@ -8,6 +8,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronDown, PenLine, Pencil } from 'lucide-react'
 import { openSheet, toast } from '@/app/ui-store'
 import { Checkbox, IconButton } from '@/components/ui'
+import { modalityOf } from '@/data/selectors'
 import type { DateKey, DB, Routine, RoutineItem } from '@/data/types'
 import { cn } from '@/lib/cn'
 import { haptic } from '@/lib/haptics'
@@ -24,6 +25,7 @@ import {
   toggleStep,
   type RoutineMode,
 } from '../routine'
+import { trainingMorning } from '../training'
 
 /** ▮▮▮▯▯ — one segment per item, no percentages. */
 export function SegmentBar({ done, total, tone = 'sand' }: { done: number; total: number; tone?: 'sand' | 'sage' | 'plum' }) {
@@ -63,7 +65,7 @@ function ItemRow({ db, item, date, mode }: { db: DB; item: RoutineItem; date: Da
       <div className="flex items-center gap-3 min-h-[48px]">
         <Checkbox checked={done} onChange={onToggle} label={`Marcar ${label}`} className="ml-0.5" />
         <button type="button" onClick={onToggle} className="flex-1 min-w-0 text-left py-1.5 flex items-center gap-2.5">
-          <span className={cn('w-11 shrink-0 text-[12px] tabular-nums', item.time ? 'text-muted' : 'text-transparent')}>{item.time ?? '·'}</span>
+          {item.time && <span className="shrink-0 text-[12px] tabular-nums text-muted">{item.time}</span>}
           <span className="text-[16px] shrink-0" aria-hidden>
             {item.emoji ?? '•'}
           </span>
@@ -102,7 +104,7 @@ function ItemRow({ db, item, date, mode }: { db: DB; item: RoutineItem; date: Da
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="pl-[52px] pb-2">
+            <div className="pl-[38px] pb-2">
               {steps.length > 0 && (
                 <ul>
                   {steps.map((s, i) => {
@@ -154,6 +156,24 @@ function ItemRow({ db, item, date, mode }: { db: DB; item: RoutineItem; date: Da
   )
 }
 
+/** Info row for a fuel stage: shows only registered guidance, links to the training's strategy. */
+function FuelRow({ label, detail, workoutId }: { label: string; detail?: string; workoutId: string }) {
+  return (
+    <li>
+      <button type="button" onClick={() => openSheet('fuel', { workoutId })} className="w-full flex items-center gap-3 min-h-[48px] text-left active:opacity-70">
+        <span className="w-6 shrink-0 ml-0.5 text-center text-[15px]" aria-hidden>
+          🍌
+        </span>
+        <span className="flex-1 min-w-0">
+          <span className="block text-[15px] leading-snug">{label}</span>
+          {detail && <span className="block text-[12.5px] text-muted leading-snug line-clamp-2">{detail}</span>}
+        </span>
+        <span className="text-[12.5px] text-accent font-medium shrink-0 pr-0.5">estratégia</span>
+      </button>
+    </li>
+  )
+}
+
 export interface RoutineCardProps {
   db: DB
   routine: Routine
@@ -171,6 +191,7 @@ export function RoutineCard({ db, routine, date, widgetId, tone = 'sand', doneTo
   const suggestion = useMemo(() => essentialSuggestion(db, routine, date), [db, routine, date])
   const [expanded, setExpanded] = useState(false)
   const essential = view.mode === 'essential'
+  const tm = useMemo(() => (routine.period === 'manha' ? trainingMorning(db, date, view.items) : undefined), [db, date, routine.period, view.items])
 
   // A small celebration when the routine gets complete (only on the transition).
   const [wasComplete, setWasComplete] = useState(view.complete)
@@ -209,6 +230,7 @@ export function RoutineCard({ db, routine, date, widgetId, tone = 'sand', doneTo
             <span className="block mt-2">
               <SegmentBar done={view.done} total={view.total} tone={view.complete ? 'sage' : tone} />
             </span>
+            {tm && !view.complete && <span className="block text-[12.5px] text-muted mt-1.5">{tm.title} primeiro — o resto vem depois</span>}
           </span>
           <ChevronDown size={18} className={cn('text-muted shrink-0 transition-transform', expanded && 'rotate-180')} />
         </div>
@@ -238,6 +260,30 @@ export function RoutineCard({ db, routine, date, widgetId, tone = 'sand', doneTo
             <div className="border-t border-line/60 px-4 pt-1.5 pb-2">
               {view.items.length === 0 ? (
                 <p className="text-[14px] text-muted py-3">Nada nessa rotina hoje. Dia livre 🌿</p>
+              ) : tm ? (
+                <ul>
+                  {tm.before.map((it) => (
+                    <ItemRow key={it.id} db={db} item={it} date={date} mode={view.mode} />
+                  ))}
+                  <FuelRow label="Pré-treino" detail={tm.pre.detail} workoutId={tm.workout.id} />
+                  <li>
+                    <button
+                      type="button"
+                      onClick={() => openSheet('workout', { id: tm.workout.id })}
+                      className="w-full flex items-center gap-3 my-1 rounded-2xl bg-ocean-soft px-3.5 min-h-[48px] text-left active:opacity-80"
+                    >
+                      <span className="text-[18px]" aria-hidden>
+                        {modalityOf(db, tm.workout.modality).emoji}
+                      </span>
+                      <span className="flex-1 min-w-0 text-[15px] font-medium truncate">{tm.title}</span>
+                    </button>
+                  </li>
+                  <li className="eyebrow pt-3 pb-0.5">Depois do treino</li>
+                  <FuelRow label="Pós-treino · banho · café" detail={tm.pos.detail} workoutId={tm.workout.id} />
+                  {tm.after.map((it) => (
+                    <ItemRow key={it.id} db={db} item={it} date={date} mode={view.mode} />
+                  ))}
+                </ul>
               ) : (
                 <ul>
                   {view.items.map((it) => (

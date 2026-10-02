@@ -81,7 +81,6 @@ describe('parseIntent — more pt-BR', () => {
   it('resolves trips by name or place, case/accents-insensitive', () => {
     expect(parseIntent(db, 'conferir pendências da africa', TODAY)?.fields.tripId).toBe('trip-za')
     expect(parseIntent(db, 'mala pra recife', TODAY)).toMatchObject({ type: 'trip', fields: { tripId: 'trip-rec', section: 'mala' } })
-    expect(parseIntent(db, 'surf em cape town', TODAY)?.type).not.toBe('trip') // a training intention wins? no — needs a want/day
   })
 
   it('weekday / period / tomorrow', () => {

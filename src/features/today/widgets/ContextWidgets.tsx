@@ -18,6 +18,7 @@ import { haptic } from '@/lib/haptics'
 import { ensureCheckin } from '../closing'
 import { daySummary, ENERGY_OPTIONS, weekWrap, type Energy } from '../context'
 import { morningRoutine } from '../routine'
+import { keySessionCard } from '../training'
 import { HeaderLink, Widget, type WidgetCtx } from './shared'
 
 // ─── HOJE line ──────────────────────────────────────────────────────────────
@@ -117,10 +118,11 @@ export function AmanhaWidget({ ctx }: { ctx: WidgetCtx }) {
   // Ephemeral on purpose: a light prep aid, not another list to maintain.
   const [checked, setChecked] = useState<Set<number>>(() => new Set())
 
+  const keyCard = useMemo(() => keySessionCard(db, today), [db, today])
   const lines = useMemo(() => {
     const out: { key: string; text: string }[] = []
     const w = workoutsOn(db, tomorrow).find((x) => x.status === 'planejado')
-    if (w) {
+    if (w && w.id !== keyCard?.workout.id) {
       const m = modalityOf(db, w.modality)
       const when = w.time ?? (w.period ? PERIOD_LABEL[w.period] : undefined)
       out.push({ key: `w-${w.id}`, text: `${m.emoji} ${w.title || m.label}${when ? ` · ${when}` : ''}` })
@@ -129,9 +131,9 @@ export function AmanhaWidget({ ctx }: { ctx: WidgetCtx }) {
       out.push({ key: `e-${e.id}`, text: `${e.approx ? '' : `${e.time} · `}${e.title}${e.approx && e.subtitle ? ` (${e.subtitle.split(' · ')[0]})` : ''}` })
     }
     return out
-  }, [db, tomorrow])
+  }, [db, tomorrow, keyCard])
 
-  if (!presencial && lines.length === 0) return null
+  if (!presencial && !keyCard && lines.length === 0) return null
   const morning = morningRoutine(db)
 
   const toggle = (i: number) => {
@@ -148,6 +150,19 @@ export function AmanhaWidget({ ctx }: { ctx: WidgetCtx }) {
   return (
     <section id="w-amanha" className="card scroll-mt-4 p-4" aria-label="Amanhã">
       <div className="eyebrow">Amanhã</div>
+      {keyCard && (
+        <div className={cn('mt-1.5', presencial && 'pb-3 mb-1 border-b border-line/60')}>
+          <div className="font-display text-[18px] leading-snug">{keyCard.line}</div>
+          <p className="text-[13.5px] text-ink-2 mt-0.5">Confira sua estratégia para hoje à noite e amanhã cedo.</p>
+          <button
+            type="button"
+            onClick={() => openSheet('fuel', { workoutId: keyCard.workout.id })}
+            className="mt-2.5 h-10 px-4 rounded-full bg-surface-2 text-[13.5px] font-medium active:scale-[0.98] transition"
+          >
+            Ver estratégia
+          </button>
+        </div>
+      )}
       {presencial ? (
         <>
           <div className="font-display text-[20px] leading-snug mt-1">Amanhã é presencial 👜</div>
