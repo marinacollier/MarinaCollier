@@ -42,7 +42,7 @@ export default function BooksPage() {
   return (
     <Page>
       <PageHeader
-        eyebrow="mente"
+        eyebrow="📚 learning os"
         title="Livros"
         subtitle={readThisYear ? `${pluralize(readThisYear, 'livro lido', 'livros lidos')} em ${year} 📚` : 'sua estante, no seu ritmo.'}
         actions={
@@ -57,110 +57,146 @@ export default function BooksPage() {
         }
       />
 
-      <SectionTitle className="mt-1">Lendo agora</SectionTitle>
-      {reading.length ? (
-        <div className="space-y-3">
-          {reading.map((b, i) => (
-            <motion.div key={b.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
-              <Card onPress={() => open(b)} className="flex gap-4 p-4">
-                <BookCover book={b} width={112} />
-                <div className="flex-1 min-w-0 flex flex-col py-1">
-                  <div className="font-display text-[22px] leading-[1.1] tracking-tight">{b.title}</div>
-                  {b.author && <div className="text-[14px] text-muted mt-1">{b.author}</div>}
-                  <div className="mt-auto pt-4">
-                    <div className="flex items-baseline justify-between mb-1.5">
-                      <span className="text-[12.5px] text-muted">{b.startDate ? `desde ${formatShortDate(b.startDate)}` : 'lendo'}</span>
-                      <span className="font-display text-[18px] tabular-nums">{b.progress}%</span>
+      {books.length === 0 ? (
+        <EmptyLibrary />
+      ) : (
+        <>
+          <SectionTitle className="mt-1">Lendo agora</SectionTitle>
+          {reading.length ? (
+            <div className="space-y-3">
+              {reading.map((b, i) => (
+                <motion.div key={b.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
+                  <Card onPress={() => open(b)} className="flex gap-4 p-4">
+                    <BookCover book={b} width={112} />
+                    <div className="flex-1 min-w-0 flex flex-col py-1">
+                      <div className="font-display text-[22px] leading-[1.1] tracking-tight">{b.title}</div>
+                      {b.author && <div className="text-[14px] text-muted mt-1">{b.author}</div>}
+                      <div className="mt-auto pt-4">
+                        <div className="flex items-baseline justify-between mb-1.5">
+                          <span className="text-[12.5px] text-muted">{b.startDate ? `desde ${formatShortDate(b.startDate)}` : 'lendo'}</span>
+                          <span className="font-display text-[18px] tabular-nums">{b.progress}%</span>
+                        </div>
+                        <ProgressBar value={b.progress} tone="accent" className="h-2" />
+                      </div>
                     </div>
-                    <ProgressBar value={b.progress} tone="accent" className="h-2" />
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <Card className="p-0">
+              <EmptyState compact emoji="📚" title="Nenhum livro aberto agora." text="Que tal o próximo? 📖" className="pb-3" />
+              {upNext[0] && (
+                <div className="flex items-center gap-3 mx-4 mb-4 p-3 rounded-2xl bg-surface-2">
+                  <BookCover book={upNext[0]} width={44} />
+                  <button type="button" className="flex-1 min-w-0 text-left" onClick={() => open(upNext[0])}>
+                    <div className="text-[15px] font-medium truncate">{upNext[0].title}</div>
+                    {upNext[0].author && <div className="text-[12.5px] text-muted truncate">{upNext[0].author}</div>}
+                  </button>
+                  <Button size="sm" variant="accent" onClick={() => start(upNext[0])}>
+                    comecei
+                  </Button>
+                </div>
+              )}
+            </Card>
+          )}
+
+          <SectionTitle
+            action={
+              <AddLink onClick={() => openSheet('book', { status: 'proximo' })}>adicionar</AddLink>
+            }
+          >
+            Próximos
+          </SectionTitle>
+          {upNext.length ? (
+            <SortableList
+              items={upNext}
+              className="space-y-2"
+              onReorder={(ids) => actions.reorder('books', ids)}
+              renderItem={(b, handle) => (
+                <div className="card flex items-center gap-3 pl-1 pr-3 py-2.5">
+                  {handle}
+                  <BookCover book={b} width={40} />
+                  <button type="button" className="flex-1 min-w-0 text-left" onClick={() => open(b)}>
+                    <span className="block text-[15px] font-medium truncate">{b.title}</span>
+                    {b.author && <span className="block text-[12.5px] text-muted truncate">{b.author}</span>}
+                  </button>
+                  <Button size="sm" variant="soft" onClick={() => start(b)}>
+                    comecei
+                  </Button>
+                </div>
+              )}
+            />
+          ) : (
+            <p className="text-[14px] text-muted px-1">Nenhum na fila. Escolhe um da lista “quero ler” quando der.</p>
+          )}
+
+          <SectionTitle action={<AddLink onClick={() => openSheet('book', { status: 'quero' })}>adicionar</AddLink>}>Quero ler</SectionTitle>
+          <Shelf books={wishlist} onOpen={open} onAdd={() => openSheet('book', { status: 'quero' })} />
+
+          <SectionTitle>Finalizados</SectionTitle>
+          {finished.length ? (
+            <div className="space-y-5">
+              {finished.map((g) => (
+                <div key={g.year}>
+                  <div className="flex items-baseline gap-2 px-1 mb-2">
+                    <span className="font-display text-[24px] leading-none">{g.year}</span>
+                    <span className="text-[13px] text-muted">{pluralize(g.books.length, 'livro', 'livros')}</span>
+                  </div>
+                  <div className="card overflow-hidden divide-y divide-line/70">
+                    {g.books.map((b) => (
+                      <button key={b.id} type="button" onClick={() => open(b)} className="w-full flex items-center gap-3 px-4 py-3 text-left active:bg-surface-2">
+                        <BookCover book={b} width={40} />
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-[15px] font-medium truncate">{b.title}</span>
+                          {b.author && <span className="block text-[12.5px] text-muted truncate">{b.author}</span>}
+                          <span className="flex items-center gap-2 mt-1">
+                            <Stars value={b.rating} size={12} />
+                            {b.endDate && <span className="text-[12px] text-muted">{formatShortDate(b.endDate)}</span>}
+                          </span>
+                        </span>
+                      </button>
+                    ))}
                   </div>
                 </div>
-              </Card>
-            </motion.div>
-          ))}
-        </div>
-      ) : (
-        <Card className="p-0">
-          <EmptyState compact emoji="📚" title="Nenhum livro aberto agora." text="Que tal o próximo? 📖" className="pb-3" />
-          {upNext[0] && (
-            <div className="flex items-center gap-3 mx-4 mb-4 p-3 rounded-2xl bg-surface-2">
-              <BookCover book={upNext[0]} width={44} />
-              <button type="button" className="flex-1 min-w-0 text-left" onClick={() => open(upNext[0])}>
-                <div className="text-[15px] font-medium truncate">{upNext[0].title}</div>
-                {upNext[0].author && <div className="text-[12.5px] text-muted truncate">{upNext[0].author}</div>}
-              </button>
-              <Button size="sm" variant="accent" onClick={() => start(upNext[0])}>
-                comecei
-              </Button>
+              ))}
             </div>
+          ) : (
+            <p className="text-[14px] text-muted px-1">Os livros que você terminar aparecem aqui, com estrelinhas. ✨</p>
           )}
-        </Card>
-      )}
-
-      <SectionTitle
-        action={
-          <AddLink onClick={() => openSheet('book', { status: 'proximo' })}>adicionar</AddLink>
-        }
-      >
-        Próximos
-      </SectionTitle>
-      {upNext.length ? (
-        <SortableList
-          items={upNext}
-          className="space-y-2"
-          onReorder={(ids) => actions.reorder('books', ids)}
-          renderItem={(b, handle) => (
-            <div className="card flex items-center gap-3 pl-1 pr-3 py-2.5">
-              {handle}
-              <BookCover book={b} width={40} />
-              <button type="button" className="flex-1 min-w-0 text-left" onClick={() => open(b)}>
-                <span className="block text-[15px] font-medium truncate">{b.title}</span>
-                {b.author && <span className="block text-[12.5px] text-muted truncate">{b.author}</span>}
-              </button>
-              <Button size="sm" variant="soft" onClick={() => start(b)}>
-                comecei
-              </Button>
-            </div>
-          )}
-        />
-      ) : (
-        <p className="text-[14px] text-muted px-1">Nenhum na fila. Escolhe um da lista “quero ler” quando der.</p>
-      )}
-
-      <SectionTitle action={<AddLink onClick={() => openSheet('book', { status: 'quero' })}>adicionar</AddLink>}>Quero ler</SectionTitle>
-      <Shelf books={wishlist} onOpen={open} onAdd={() => openSheet('book', { status: 'quero' })} />
-
-      <SectionTitle>Finalizados</SectionTitle>
-      {finished.length ? (
-        <div className="space-y-5">
-          {finished.map((g) => (
-            <div key={g.year}>
-              <div className="flex items-baseline gap-2 px-1 mb-2">
-                <span className="font-display text-[24px] leading-none">{g.year}</span>
-                <span className="text-[13px] text-muted">{pluralize(g.books.length, 'livro', 'livros')}</span>
-              </div>
-              <div className="card overflow-hidden divide-y divide-line/70">
-                {g.books.map((b) => (
-                  <button key={b.id} type="button" onClick={() => open(b)} className="w-full flex items-center gap-3 px-4 py-3 text-left active:bg-surface-2">
-                    <BookCover book={b} width={40} />
-                    <span className="flex-1 min-w-0">
-                      <span className="block text-[15px] font-medium truncate">{b.title}</span>
-                      {b.author && <span className="block text-[12.5px] text-muted truncate">{b.author}</span>}
-                      <span className="flex items-center gap-2 mt-1">
-                        <Stars value={b.rating} size={12} />
-                        {b.endDate && <span className="text-[12px] text-muted">{formatShortDate(b.endDate)}</span>}
-                      </span>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="text-[14px] text-muted px-1">Os livros que você terminar aparecem aqui, com estrelinhas. ✨</p>
+        </>
       )}
     </Page>
+  )
+}
+
+/** First visit: no invented books — an empty shelf waiting for her first one. */
+function EmptyLibrary() {
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="card px-5 pt-7 pb-5 mt-1 text-center">
+      <div className="flex items-end justify-center gap-2.5 px-2" aria-hidden>
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="rounded-[3px_8px_8px_3px] border border-dashed border-line"
+            style={{ width: 54, height: i === 1 ? 84 : 76, transform: i === 2 ? 'rotate(4deg) translateX(-2px)' : undefined }}
+          />
+        ))}
+      </div>
+      <div className="h-2 rounded-[3px] bg-line shadow-[0_8px_12px_-6px_rgb(60_40_20/0.35)] mx-6" aria-hidden />
+      <div className="font-display text-[24px] leading-tight mt-6">Sua estante começa aqui</div>
+      <p className="text-[14.5px] text-muted mt-1.5 max-w-[290px] mx-auto">
+        Do teu jeito: só entram os livros que você colocar. Viu um que parece massa? Guarda aqui. 📖
+      </p>
+      <div className="flex justify-center gap-2 mt-5">
+        <Button size="sm" variant="primary" icon={<Plus size={14} />} onClick={() => openSheet('book', { status: 'quero' })}>
+          quero ler
+        </Button>
+        <Button size="sm" variant="soft" onClick={() => openSheet('book', { status: 'lendo' })}>
+          estou lendo
+        </Button>
+      </div>
+    </motion.div>
   )
 }
 
