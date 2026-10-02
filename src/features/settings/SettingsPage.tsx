@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Bell, Database, Plug, SlidersHorizontal } from 'lucide-react'
+import { Bell, CalendarRange, Database, Plug, SlidersHorizontal } from 'lucide-react'
 import { Card, ListCard, ListRow, Page, PageHeader, SectionTitle, Segmented, TextInput } from '@/components/ui'
 import { actions, useDB } from '@/data/store'
 import { ROUTES } from '@/app/routes'
 import { toast } from '@/app/ui-store'
 import { Hint, Stepper } from './components'
+import { AboutSection, RhythmSection, WorkSection } from './ProfileSections'
 import { THEME_OPTIONS } from './labels'
 
 const hour = (h: number) => `${String(h).padStart(2, '0')}h`
@@ -52,6 +53,10 @@ export default function SettingsPage() {
           </div>
         </Card>
 
+        <RhythmSection />
+        <AboutSection />
+        <WorkSection />
+
         <SectionTitle>Corpo</SectionTitle>
         <Card>
           <div className="flex items-center justify-between gap-3">
@@ -73,6 +78,7 @@ export default function SettingsPage() {
 
         <SectionTitle>Mais ajustes</SectionTitle>
         <ListCard>
+          <ListRow leading={<CalendarRange size={19} className="text-ocean" />} title="Montar minha semana" subtitle="treinos, estudos, entregas e vida, em 7 passos" chevron onPress={() => nav(ROUTES.weekPlanner)} />
           <ListRow leading={<SlidersHorizontal size={19} className="text-accent" />} title="Personalizar meu MARINA OS" chevron onPress={() => nav(ROUTES.customize)} />
           <ListRow leading={<Bell size={19} className="text-sand" />} title="Notificações" chevron onPress={() => nav(ROUTES.notifications)} />
           <ListRow leading={<Plug size={19} className="text-ocean" />} title="Integrações" chevron onPress={() => nav(ROUTES.integrations)} />
