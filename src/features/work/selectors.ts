@@ -11,11 +11,12 @@ import type {
   NewItem,
   ProfessionalWin,
   Project,
+  SchedulingConstraint,
   Task,
   WorkInboxItem,
 } from '@/data/types'
 import { isTaskOpen, tasksForDay } from '@/data/selectors'
-import { diffDays, endOfWeek, formatShortDate, MONTHS, relativeDay, toDateKey } from '@/lib/date'
+import { addDays, diffDays, endOfWeek, formatShortDate, MONTHS, relativeDay, toDateKey } from '@/lib/date'
 import { PROJECT_STATUS, PRIORITY } from './constants'
 
 const byOrder = <T extends { order: number }>(a: T, b: T) => a.order - b.order
@@ -297,4 +298,75 @@ export function resumeBullets(wins: ProfessionalWin[], projects: Project[], from
       return `• ${w.title.trim()}${detail ? ` — ${detail}` : ''} (${ctx})`
     })
     .join('\n')
+}
+
+// ─── Project home (§21: Hoje, Esta semana, Waiting For, Reuniões, Decisões, Wins) ───
+
+/** Project tasks for today + open tasks of this project that need Marina. No waiting items. */
+export function projectTodayTasks(db: DB, projectId: ID, today: DateKey): Task[] {
+  const day = tasksForDay(db, today).filter((t) => t.projectId === projectId && t.status !== 'waiting')
+  const ids = new Set(day.map((t) => t.id))
+  const needs = db.tasks.filter(
+    (t) => t.projectId === projectId && t.needsMe && !t.recurrence && isTaskOpen(t) && t.status !== 'waiting' && !ids.has(t.id),
+  )
+  return [...needs, ...day]
+}
+
+/** This week for a project: dated items until Sunday (minus what is already in Hoje) + open "semana" tasks without a date. */
+export function projectWeek(db: DB, projectId: ID, today: DateKey): { dated: DatedItem[]; tasks: Task[] } {
+  const todayIds = new Set(projectTodayTasks(db, projectId, today).map((t) => t.id))
+  const dated = thisWeekItems(db, today).filter((i) => i.projectId === projectId && !(i.kind === 'tarefa' && todayIds.has(i.refId)))
+  const datedIds = new Set(dated.map((i) => i.refId))
+  const tasks = db.tasks
+    .filter(
+      (t) =>
+        t.projectId === projectId &&
+        t.bucket === 'semana' &&
+        isTaskOpen(t) &&
+        t.status !== 'waiting' &&
+        !t.recurrence &&
+        !t.date &&
+        !todayIds.has(t.id) &&
+        !datedIds.has(t.id),
+    )
+    .sort(byOrder)
+  return { dated, tasks }
+}
+
+// ─── Time caps ("até 1h/dia") ───────────────────────────────────────────────
+
+export function projectTimeCap(db: DB, projectId: ID): SchedulingConstraint | undefined {
+  return db.constraints.find((c) => c.active && c.kind === 'max_minutes_per_day' && c.projectId === projectId)
+}
+
+/** "1h", "1h30", "45 min" */
+export function minutesLabel(min: number): string {
+  if (min < 60) return `${min} min`
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  return m ? `${h}h${String(m).padStart(2, '0')}` : `${h}h`
+}
+
+/** Days (from `from`, next `days` days) where open tasks of the project add up to more than the cap. */
+export function capOverloads(db: DB, projectId: ID, from: DateKey, days = 14): { date: DateKey; minutes: number; limit: number }[] {
+  const cap = projectTimeCap(db, projectId)
+  if (!cap) return []
+  const until = addDays(from, days - 1)
+  const perDay = new Map<DateKey, number>()
+  for (const t of db.tasks) {
+    if (t.projectId !== projectId || !t.date || !isTaskOpen(t) || t.recurrence) continue
+    if (t.date < from || t.date > until) continue
+    perDay.set(t.date, (perDay.get(t.date) ?? 0) + (t.durationMin ?? 0))
+  }
+  return [...perDay.entries()]
+    .filter(([, m]) => m > cap.limit)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, minutes]) => ({ date, minutes, limit: cap.limit }))
+}
+
+/** Sections offered as task filters: the project's own sections + any group used by its tasks. */
+export function projectSections(db: DB, projectId: ID): string[] {
+  const own = projectById(db, projectId)?.sections ?? []
+  const used = db.tasks.filter((t) => t.projectId === projectId && t.group?.trim()).map((t) => t.group!.trim())
+  return [...new Set([...own, ...used])]
 }

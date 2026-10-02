@@ -216,6 +216,7 @@ export const CONVERTED_LABEL: Partial<Record<EntityType, string>> = {
   book: 'virou livro',
   content: 'virou conteúdo',
   goal: 'virou meta',
+  workout: 'virou treino',
 }
 
 /** Capture first, organize later. Nothing to choose, nothing to categorize. Returns how many items were saved. */

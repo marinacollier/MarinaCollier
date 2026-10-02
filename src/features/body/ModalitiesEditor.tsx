@@ -6,16 +6,19 @@ import type { Modality } from '@/data/types'
 import { TONES, tone } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { uniqueModalityId } from './selectors'
+import { GROUP_LABEL, GROUP_ORDER, modalityGroup } from '@/data/planning'
+import { GROUP_EMOJI } from './planner'
 
 /** Add / rename / emoji / favorite / active for profile.modalities. Collapsed by default. */
 export default function ModalitiesEditor() {
   const modalities = useDB((db) => db.profile.modalities)
+  const profile = useDB((db) => db.profile)
   const [open, setOpen] = useState(false)
   const patch = (id: string, p: Partial<Modality>) => actions.setProfile({ modalities: modalities.map((m) => (m.id === id ? { ...m, ...p } : m)) })
   const add = () => {
     const label = 'Nova modalidade'
     actions.setProfile({
-      modalities: [...modalities, { id: uniqueModalityId(label, modalities), label, emoji: '✨', tone: 'accent', favorite: true, active: true, hasDistance: false }],
+      modalities: [...modalities, { id: uniqueModalityId(label, modalities), label, emoji: '✨', tone: 'accent', favorite: true, active: true, hasDistance: false, group: 'fun' }],
     })
   }
 
@@ -96,6 +99,33 @@ export default function ModalitiesEditor() {
                       className={cn('ml-auto h-8 px-3 rounded-full text-[12px]', m.hasDistance ? 'bg-ink text-bg' : 'bg-surface text-muted')}
                     >
                       {m.hasDistance ? 'com km' : 'sem km'}
+                    </button>
+                  </div>
+                  <div className="mt-2 pl-1">
+                    <div className="text-[11.5px] text-muted mb-1">conta como (no “Meu treino da semana”)</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {GROUP_ORDER.map((g) => {
+                        const on = (m.group ?? modalityGroup(profile, m.id)) === g
+                        return (
+                          <button
+                            key={g}
+                            type="button"
+                            aria-pressed={on}
+                            onClick={() => patch(m.id, { group: g })}
+                            className={cn('h-8 px-2.5 rounded-full text-[12px]', on ? 'bg-ink text-bg' : 'bg-surface text-ink-2')}
+                          >
+                            {GROUP_EMOJI[g]} {GROUP_LABEL[g].toLowerCase()}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <button
+                      type="button"
+                      aria-pressed={!!m.heavyLogistics}
+                      onClick={() => patch(m.id, { heavyLogistics: !m.heavyLogistics })}
+                      className={cn('mt-2 h-8 px-3 rounded-full text-[12px]', m.heavyLogistics ? 'bg-sand-soft text-ink' : 'bg-surface text-muted')}
+                    >
+                      {m.heavyLogistics ? '🧳 logística pesada (aviso em dia presencial)' : 'logística leve'}
                     </button>
                   </div>
                 </div>

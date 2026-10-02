@@ -14,8 +14,9 @@ import { contentByStage, deadlineLabel, deadlineSoon, filterContent, nextContent
 
 const COLLAPSED = new Set(['ideia', 'publicado'])
 
-export default function ContentTab() {
-  const items = useDB((db) => db.contentItems)
+export default function ContentTab({ projectId }: { projectId?: string }) {
+  const all = useDB((db) => db.contentItems)
+  const items = useMemo(() => (projectId ? all.filter((c) => c.projectId === projectId) : all), [all, projectId])
   const partnerships = useDB((db) => db.partnerships)
   const today = useToday()
   const [filter, setFilter] = useState<ContentFilter>({})
@@ -25,9 +26,9 @@ export default function ContentTab() {
   const filtered = useMemo(() => filterContent(items, filter), [items, filter])
   const groups = useMemo(() => contentByStage(filtered), [filtered])
   const inProduction = useMemo(() => filtered.some((c) => c.stage !== 'ideia' && c.stage !== 'publicado'), [filtered])
-  const brandById =useMemo(() => new Map(partnerships.map((p) => [p.id, p])), [partnerships])
+  const brandById = useMemo(() => new Map(partnerships.map((p) => [p.id, p])), [partnerships])
 
-  const add = () => openSheet('content', {})
+  const add = () => openSheet('content', { defaults: projectId ? { projectId } : undefined })
 
   if (items.length === 0) {
     return (

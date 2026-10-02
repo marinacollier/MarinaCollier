@@ -19,8 +19,6 @@ import {
   studyingNow,
   upcomingTrips,
   waitingFor,
-  workoutsOn,
-  modalityOf,
   type AgendaEntry,
 } from '@/data/selectors'
 import type { DateKey } from '@/data/types'
@@ -28,7 +26,7 @@ import { addDays, countdownLabel, diffDays, formatShortDate, hmToMinutes, inMinu
 import { occurrenceFor } from '@/lib/recurrence'
 import { cn } from '@/lib/cn'
 import { haptic } from '@/lib/haptics'
-import { prioritiesOf } from '../priorities'
+import { tripPriorityItems } from '../context'
 import { MOODS } from '../closing'
 import { HeaderLink, Widget, type WidgetCtx } from './shared'
 
@@ -115,6 +113,8 @@ export function NextUpWidget({ ctx }: { ctx: WidgetCtx }) {
 export function TripWidget({ ctx }: { ctx: WidgetCtx }) {
   const nav = useNavigate()
   const trip = useMemo(() => nextTrip(ctx.db, ctx.today), [ctx.db, ctx.today])
+  const soon = ctx.home.tripSoon?.trip.id === trip?.id
+  const pending = useMemo(() => (trip && soon ? tripPriorityItems(ctx.db, trip) : []), [ctx.db, trip, soon])
   if (!trip) return null
   const t = toneOf(trip.tone)
   const when = trip.startDate ? countdownLabel(trip.startDate, ctx.today) : trip.dateLabel
@@ -122,8 +122,8 @@ export function TripWidget({ ctx }: { ctx: WidgetCtx }) {
     ? `${formatShortDate(trip.startDate)}${trip.endDate ? ` – ${formatShortDate(trip.endDate)}` : ''}`
     : undefined
   return (
-    <section id="w-proxima_viagem" className="scroll-mt-4">
-      <button type="button" onClick={() => nav(ROUTES.trip(trip.id))} className={cn('w-full text-left rounded-[var(--radius-card)] p-4 flex items-center gap-4 active:scale-[0.99] transition relative overflow-hidden', t.soft)}>
+    <section id="w-proxima_viagem" className={cn('scroll-mt-4 rounded-[var(--radius-card)] overflow-hidden', t.soft)}>
+      <button type="button" onClick={() => nav(ROUTES.trip(trip.id))} className="w-full text-left p-4 flex items-center gap-4 active:opacity-80 transition">
         <span className="text-[42px] leading-none" aria-hidden>
           {trip.flag}
         </span>
@@ -136,6 +136,26 @@ export function TripWidget({ ctx }: { ctx: WidgetCtx }) {
         </span>
         <ChevronRight size={18} className="text-muted shrink-0" />
       </button>
+      {pending.length > 0 && (
+        <div className="mx-3 mb-3 rounded-2xl bg-surface/70 px-3.5 py-2">
+          <div className="text-[11px] uppercase tracking-[0.14em] text-muted font-semibold pt-1">Antes de ir</div>
+          <ul>
+            {pending.map((p) => (
+              <li key={p.key}>
+                <button
+                  type="button"
+                  onClick={() => (p.kind === 'tripItem' ? openSheet('tripItem', { id: p.id }) : openSheet('task', { id: p.id }))}
+                  className="w-full flex items-center gap-2.5 min-h-[40px] text-left active:opacity-70"
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-ink/40 shrink-0" aria-hidden />
+                  <span className="flex-1 min-w-0 text-[14px] truncate">{p.title}</span>
+                  {p.status === 'a_confirmar' && <span className="text-[11.5px] text-muted shrink-0">a confirmar</span>}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </section>
   )
 }
@@ -246,24 +266,30 @@ export function WaitingWidget({ ctx }: { ctx: WidgetCtx }) {
 // ─── Foco do trabalho ───────────────────────────────────────────────────────
 
 export function WorkFocusWidget({ ctx }: { ctx: WidgetCtx }) {
-  const { db, today } = ctx
+  const { db, today, home } = ctx
   const nav = useNavigate()
   const { tasks, delivery } = useMemo(() => {
     const inTop3 = new Set(db.priorities.filter((p) => p.date === today && p.ref?.type === 'task').map((p) => p.ref!.id))
+    const tomorrow = addDays(today, 1)
     const tasks = db.tasks
       .filter((t) => !inTop3.has(t.id))
-      .filter((t) => (t.context === 'trabalho' || !!t.projectId) && isTaskOpen(t) && t.status !== 'waiting' && !t.recurrence)
-      .filter((t) => t.needsMe || t.date === today || t.dueDate === today || (!!t.date && t.date < today))
+      .filter((t) => (t.context === 'trabalho' || !!t.projectId) && isTaskOpen(t) && t.status !== 'waiting' && t.status !== 'review' && !t.recurrence)
+      .filter((t) =>
+        home.weekend
+          ? // Weekend: only what is really urgent stays visible.
+            t.dueDate === today || t.dueDate === tomorrow
+          : t.needsMe || t.date === today || t.dueDate === today || (!!t.date && t.date < today),
+      )
       .sort((a, b) => Number(!!b.needsMe) - Number(!!a.needsMe) || (a.dueDate ?? '9').localeCompare(b.dueDate ?? '9') || a.order - b.order)
-      .slice(0, 3)
+      .slice(0, home.weekend ? 2 : 3)
     const delivery = activeProjects(db)
-      .filter((p) => p.nextDelivery?.date && p.nextDelivery.date >= today)
+      .filter((p) => p.kind !== 'creator' && p.nextDelivery?.date && p.nextDelivery.date >= today && (!home.weekend || diffDays(today, p.nextDelivery.date) <= 2))
       .sort((a, b) => a.nextDelivery!.date!.localeCompare(b.nextDelivery!.date!))[0]
     return { tasks, delivery }
-  }, [db, today])
+  }, [db, today, home.weekend])
   if (!tasks.length && !delivery) return null
   return (
-    <Widget id="work_focus" eyebrow="Foco no trabalho" action={<HeaderLink onClick={() => nav(ROUTES.work)}>trabalho</HeaderLink>}>
+    <Widget id="work_focus" eyebrow={tasks.length ? `Trabalho · ${tasks.length === 1 ? '1 item precisa de você' : `${tasks.length} itens precisam de você`}` : 'Trabalho'} action={<HeaderLink onClick={() => nav(ROUTES.work)}>trabalho</HeaderLink>}>
       {tasks.length > 0 && (
         <ul className="-my-1">
           {tasks.map((t) => {
@@ -389,13 +415,6 @@ export function CountdownWidget({ ctx }: { ctx: WidgetCtx }) {
 export function ClosingWidget({ ctx }: { ctx: WidgetCtx }) {
   const { db, today } = ctx
   const checkin = checkinFor(db, today)
-  const tomorrow = addDays(today, 1)
-  const prep = useMemo(() => {
-    const first = agendaFor(db, tomorrow).find((e) => !e.allDay && e.time)
-    const w = workoutsOn(db, tomorrow).find((x) => x.status === 'planejado')
-    const pri = prioritiesOf(db, tomorrow).length
-    return { first, w: w ? { ...w, m: modalityOf(db, w.modality) } : undefined, pri }
-  }, [db, tomorrow])
 
   if (checkin?.closing) {
     const mood = MOODS.find((m) => m.value === checkin.closing!.mood)
@@ -414,29 +433,11 @@ export function ClosingWidget({ ctx }: { ctx: WidgetCtx }) {
     )
   }
 
-  const prepLines = [
-    prep.first ? `${prep.first.time} · ${prep.first.title}` : undefined,
-    prep.w ? `${prep.w.m.emoji} ${prep.w.title || prep.w.m.label}${prep.w.time ? ` às ${prep.w.time}` : ''}` : undefined,
-    prep.pri ? `${prep.pri} ${prep.pri === 1 ? 'prioridade' : 'prioridades'} já escolhidas` : undefined,
-  ].filter(Boolean) as string[]
-
   return (
     <section id="w-fechamento" className="scroll-mt-4 rounded-[var(--radius-card)] bg-plum-soft p-5">
       <div className="eyebrow">Fechamento</div>
       <div className="font-display text-[23px] leading-tight mt-1">Como foi hoje? 🌙</div>
       <p className="text-[14px] text-ink-2 mt-1">Dois minutos pra fechar o dia com leveza.</p>
-      {prepLines.length > 0 && (
-        <div className="mt-3.5 rounded-2xl bg-surface/70 px-3.5 py-2.5">
-          <div className="text-[11px] uppercase tracking-[0.14em] text-muted font-semibold">Amanhã</div>
-          <ul className="mt-1 space-y-0.5">
-            {prepLines.map((l) => (
-              <li key={l} className="text-[14px] text-ink-2 truncate">
-                {l}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
       <button type="button" onClick={() => openSheet('dailyClosing', { date: today })} className="mt-4 h-11 px-5 rounded-full bg-ink text-bg text-[14.5px] font-semibold active:scale-[0.98] transition">
         Encerrar o dia
       </button>

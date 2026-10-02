@@ -6,6 +6,7 @@ import type { DateKey, DB, HomeWidgetId } from '@/data/types'
 import type { DayPart } from '@/lib/date'
 import { cn } from '@/lib/cn'
 import type { AgoraAction } from '../agora'
+import type { HomeContext } from '../context'
 
 /** Everything a Hoje widget needs, computed once per render of the page. */
 export interface WidgetCtx {
@@ -13,6 +14,8 @@ export interface WidgetCtx {
   today: DateKey
   minutes: number
   part: DayPart
+  /** Contextual rules for the day (energy, weekend, Friday evening, trip soon…). */
+  home: HomeContext
 }
 
 export function runAction(action: AgoraAction, nav: NavigateFunction) {

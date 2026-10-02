@@ -11,8 +11,14 @@ import { cn } from '@/lib/cn'
 import { relativeDay, toDateKey } from '@/lib/date'
 import { haptic } from '@/lib/haptics'
 import { captureText, CONVERTED_LABEL } from './triage'
+import { INBOX_GROUPS } from './seed'
 
 type Tab = 'inbox' | 'notas'
+
+const groupRank = (g: string) => {
+  const i = (INBOX_GROUPS as readonly string[]).indexOf(g)
+  return i === -1 ? INBOX_GROUPS.length : i
+}
 
 function CaptureBar() {
   const [text, setText] = useState('')
@@ -43,7 +49,7 @@ function CaptureBar() {
           }
         }}
         enterKeyHint="send"
-        placeholder="O que está na sua cabeça?"
+        placeholder="O que tá na tua cabeça?"
         aria-label="Capturar na inbox"
         className="flex-1 bg-transparent outline-none resize-none py-2.5 leading-snug placeholder:text-muted/80 max-h-32 field-sizing-content"
       />
@@ -179,7 +185,7 @@ export default function InboxPage() {
     }
     return {
       loose: inbox.filter((b) => !b.group),
-      groups: [...map.entries()],
+      groups: [...map.entries()].sort(([a], [b]) => groupRank(a) - groupRank(b)),
       processed: brainDump.filter((b) => b.status !== 'inbox').sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
     }
   }, [brainDump])
@@ -221,7 +227,7 @@ export default function InboxPage() {
           </div>
 
           {inboxCount === 0 ? (
-            <EmptyState emoji="🫧" title="Cabeça leve" text="Nada esperando por você aqui. Quando algo surgir, joga aqui em cima." />
+            <EmptyState emoji="🫧" title="Nada pedindo tua atenção aqui. Delícia." text="Quando algo surgir, joga aqui em cima." />
           ) : (
             <>
               {loose.length > 0 && <Group title="Soltos" items={loose} today={today} index={0} />}

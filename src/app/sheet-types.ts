@@ -31,7 +31,7 @@ export interface SheetPropsMap {
   /** Create/edit any Task, incl. work tasks, life admin and waiting-for (owner: features/tasks). */
   task: { id?: ID; defaults?: Partial<Task> }
   /** Edit the day's top 3 (owner: features/today). */
-  priorities: { date?: DateKey }
+  priorities: { date?: DateKey; domain?: 'trabalho' | 'corpo' | 'vida' }
   /** Edit routine items + weekdays (owner: features/today). */
   routineEditor: { routineId: ID }
   /** Daily closing "Dia encerrado 🌙" (owner: features/today). */

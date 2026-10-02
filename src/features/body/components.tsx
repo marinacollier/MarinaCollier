@@ -1,7 +1,9 @@
 /** Small building blocks shared by the Corpo page and sheets. */
 import { useState, type ReactNode } from 'react'
 import { motion } from 'framer-motion'
-import type { DailyCheckIn, DateKey, Modality, WorkoutStatus } from '@/data/types'
+import type { DailyCheckIn, DateKey, DayPeriod, Modality, PlanType, WorkoutStatus } from '@/data/types'
+import { PERIOD_LABEL } from '@/data/planning'
+import { PLAN_TYPE_LABEL } from './planner'
 import { tone } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { haptic } from '@/lib/haptics'
@@ -128,6 +130,21 @@ export function CheckinFields({ date, checkin, showNote = true, onNoteSaved }: {
       )}
     </div>
   )
+}
+
+/** Tiny FIXO / BASE / FLEXÍVEL / A CONFIRMAR label. */
+export function PlanTypeTag({ planType, className }: { planType?: PlanType; className?: string }) {
+  if (!planType) return null
+  return (
+    <span className={cn('text-[9.5px] font-semibold tracking-[0.08em] leading-none text-ink-2/70 whitespace-nowrap', planType === 'a_confirmar' && 'text-sand', className)}>
+      {PLAN_TYPE_LABEL[planType]}
+    </span>
+  )
+}
+
+/** "07:00" or "manhã" (approximate window) or ''. */
+export function whenLabel(w: { time?: string; period?: DayPeriod }): string {
+  return w.time ?? (w.period ? PERIOD_LABEL[w.period] : '')
 }
 
 export function Dot({ on, toneName = 'sage', className }: { on: boolean; toneName?: string; className?: string }) {
