@@ -1,0 +1,11 @@
+# Partial Supabase CLI config for MARINA OS integrations.
+# Run `supabase init` in a fresh project and merge these sections if the CLI asks for more keys.
+project_id = "marina-os"
+
+# OAuth providers redirect the browser to /callback without a Supabase JWT, so the gateway JWT check is
+# disabled for these two functions. Their /start routes still verify the user's JWT in code (requireUser).
+[functions.oauth-google]
+verify_jwt = false
+
+[functions.oauth-microsoft]
+verify_jwt = false
