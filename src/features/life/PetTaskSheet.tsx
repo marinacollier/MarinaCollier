@@ -20,16 +20,16 @@ import { haptic } from '@/lib/haptics'
 import { lunaOf, PET_CATEGORIES } from './selectors'
 import { SEED_IDS } from '@/data/seed/ids'
 
-export default function PetTaskSheet({ id }: SheetProps<'petTask'>) {
+export default function PetTaskSheet({ id, defaults }: SheetProps<'petTask'>) {
   const existing = useDB((db) => (id ? db.petTasks.find((t) => t.id === id) : undefined))
   const today = useToday()
 
-  const [title, setTitle] = useState(existing?.title ?? '')
-  const [category, setCategory] = useState<PetTaskCategory>(existing?.category ?? 'lembrete')
-  const [recurrence, setRecurrence] = useState<Recurrence | undefined>(existing?.recurrence)
-  const [dueDate, setDueDate] = useState<string | undefined>(existing?.dueDate)
-  const [notes, setNotes] = useState(existing?.notes ?? '')
-  const [active, setActive] = useState(existing?.active ?? true)
+  const [title, setTitle] = useState(existing?.title ?? defaults?.title ?? '')
+  const [category, setCategory] = useState<PetTaskCategory>(existing?.category ?? defaults?.category ?? 'lembrete')
+  const [recurrence, setRecurrence] = useState<Recurrence | undefined>(existing ? existing.recurrence : defaults?.recurrence)
+  const [dueDate, setDueDate] = useState<string | undefined>(existing ? existing.dueDate : defaults?.dueDate)
+  const [notes, setNotes] = useState(existing?.notes ?? defaults?.notes ?? '')
+  const [active, setActive] = useState(existing?.active ?? defaults?.active ?? true)
 
   const onRecurrence = (r: Recurrence | undefined) => {
     // "a cada X dias" for pets almost always means "from the last time we did it".
@@ -54,7 +54,7 @@ export default function PetTaskSheet({ id }: SheetProps<'petTask'>) {
       toast('Salvo 🐾')
     } else {
       const db = getDB()
-      actions.create('petTasks', { ...data, petId: lunaOf(db)?.id ?? SEED_IDS.petLuna, order: nextOrder(db.petTasks) })
+      actions.create('petTasks', { ...data, petId: defaults?.petId ?? lunaOf(db)?.id ?? SEED_IDS.petLuna, order: nextOrder(db.petTasks) })
       haptic('light')
       toast('Anotado pra Luna 🐾')
     }
@@ -111,7 +111,7 @@ export default function PetTaskSheet({ id }: SheetProps<'petTask'>) {
         </Field>
       )}
       {!recurrence && (
-        <Field label="Quando" hint="opcional — sem data vira lembrete">
+        <Field label="Quando" hint="opcional — sem data fica como anotação, sem cobrança">
           <DateInput value={dueDate} onChange={setDueDate} />
         </Field>
       )}

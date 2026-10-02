@@ -1,10 +1,14 @@
 /**
- * Life-admin + Luna selectors. Pure functions of (db, today) — use inside useMemo.
+ * Life-admin + Luna + Vida hub selectors. Pure functions of (db, today) — use inside useMemo.
+ * Nothing here knows Marina's data by name: categories, kinds and flexibility come from the records.
  */
 import type {
+  CalendarEvent,
   DateKey,
+  DayPriority,
   DB,
   Expense,
+  ID,
   LifeAdminCategory,
   ModuleId,
   Pet,
@@ -15,6 +19,7 @@ import type {
 } from '@/data/types'
 import { SEED_IDS } from '@/data/seed/ids'
 import { expensesBetween } from '@/data/selectors'
+import { eventOccursOn, PERIOD_LABEL } from '@/data/planning'
 import {
   addDays,
   diffDays,
@@ -26,7 +31,7 @@ import {
   toDateKey,
   weekday,
 } from '@/lib/date'
-import { describeRecurrence, isDue, lastDoneDate, nextOccurrence, occurrenceFor } from '@/lib/recurrence'
+import { describeRecurrence, isDue, lastDoneDate, nextOccurrence, occurrenceFor, occursOn } from '@/lib/recurrence'
 
 // ─── Generic ────────────────────────────────────────────────────────────────
 
@@ -80,8 +85,12 @@ export function lunaOf(db: DB): Pet | undefined {
 export interface PetTaskState {
   task: PetTask
   doneToday: boolean
-  /** Shows on "Hoje" (due, or checked today). */
+  /** "Fora da rotina" today (skipped occurrence) — never counts as missed. */
+  skippedToday: boolean
+  /** Shows on "Hoje" (due, or checked today). Skipped days are not due. */
   dueToday: boolean
+  /** Daily/weekly routine (walks, food): gentle check, never nags. */
+  flexible: boolean
   lastDone?: DateKey
   /** Next date it's expected (recurring: after today when done today). */
   next?: DateKey
@@ -89,26 +98,39 @@ export interface PetTaskState {
   detail: string
 }
 
+/** Daily / weekly pet routines are flexible: gentle checks, no "last done" pressure. */
+export function isFlexiblePetTask(t: PetTask): boolean {
+  return !!t.recurrence && (t.recurrence.kind === 'daily' || t.recurrence.kind === 'weekly')
+}
+
+function everyDay(t: PetTask): boolean {
+  const r = t.recurrence
+  return !!r && (r.kind === 'daily' || (r.kind === 'weekly' && r.weekdays.length === 7))
+}
+
 export function petTaskState(db: DB, task: PetTask, today: DateKey): PetTaskState {
   const lastDone = lastDoneDate(db.occurrences, 'petTask', task.id)
+  const flexible = isFlexiblePetTask(task)
   if (task.recurrence) {
-    const doneToday = !!occurrenceFor(db.occurrences, 'petTask', task.id, today)
-    const due = task.active && (doneToday || isDue(task.recurrence, today, lastDone))
-    const from = doneToday ? addDays(today, 1) : today
-    const next = nextOccurrence(task.recurrence, from, lastDone)
-    const parts = [describeRecurrence(task.recurrence)]
-    if (task.recurrence.kind === 'weekly' && task.recurrence.weekdays.length === 7) {
-      // daily-ish: "próximo" is noise
-    } else if (next) parts.push(`próximo: ${nextDateLabel(next, today)}`)
-    return { task, doneToday, dueToday: due, lastDone, next, detail: parts.join(' · ') }
+    const o = occurrenceFor(db.occurrences, 'petTask', task.id, today)
+    const doneToday = o?.status === 'done'
+    const skippedToday = o?.status === 'skipped'
+    const dueToday = task.active && !skippedToday && (doneToday || isDue(task.recurrence, today, lastDone))
+    const next = nextOccurrence(task.recurrence, doneToday || skippedToday ? addDays(today, 1) : today, lastDone)
+    const parts: string[] = []
+    if (skippedToday) parts.push('fora da rotina hoje')
+    parts.push(describeRecurrence(task.recurrence))
+    // Daily things: "próximo" is noise.
+    if (!everyDay(task) && next) parts.push(`próximo: ${nextDateLabel(next, today)}`)
+    return { task, doneToday, skippedToday, dueToday, flexible, lastDone, next, detail: parts.join(' · ') }
   }
-  const doneOneOff = !task.active
+  // One-offs without a date are slots/notes ("quando quiser"): never due.
   const dueToday = task.active && !!task.dueDate && task.dueDate <= today
   let detail: string
-  if (doneOneOff) detail = 'feito ✓'
+  if (!task.active) detail = 'feito ✓'
   else if (task.dueDate) detail = task.dueDate < today ? `ficou de ${formatDayMonth(task.dueDate)}` : nextDateLabel(task.dueDate, today)
-  else detail = 'sem data — quando der'
-  return { task, doneToday: false, dueToday, lastDone, next: task.dueDate, detail }
+  else detail = 'sem data — quando quiser'
+  return { task, doneToday: false, skippedToday: false, dueToday, flexible, lastDone, next: task.dueDate, detail }
 }
 
 /** Pet tasks for "Hoje": due today or already checked today (so the list doesn't jump). */
@@ -116,23 +138,76 @@ export function lunaToday(db: DB, today: DateKey): PetTaskState[] {
   return db.petTasks
     .map((t) => petTaskState(db, t, today))
     .filter((s) => s.dueToday)
-    .sort((a, b) => Number(a.doneToday) - Number(b.doneToday) || a.task.order - b.task.order)
+    .sort((a, b) => Number(a.flexible) - Number(b.flexible) || Number(a.doneToday) - Number(b.doneToday) || a.task.order - b.task.order)
 }
 
-/** Pending count for the hub ("2 coisinhas hoje"). */
+/** Today split: flexible routines (gentle) vs. life-admin things that actually came due. */
+export function lunaTodaySplit(db: DB, today: DateKey): { routines: PetTaskState[]; due: PetTaskState[] } {
+  const all = lunaToday(db, today)
+  return {
+    routines: all.filter((s) => s.flexible).sort((a, b) => a.task.order - b.task.order),
+    due: all.filter((s) => !s.flexible),
+  }
+}
+
+/**
+ * Things that ask for attention ("1 coisinha pra resolver").
+ * Flexible routines never count — a walk not ticked yet is not a pending item.
+ */
 export function lunaPendingToday(db: DB, today: DateKey): number {
-  return lunaToday(db, today).filter((s) => !s.doneToday).length
+  return lunaToday(db, today).filter((s) => !s.flexible && !s.doneToday).length
 }
 
-/** Pet tasks grouped by area in a fixed order; only non-empty areas. */
-export function petTasksByArea(db: DB, today: DateKey) {
-  return PET_CATEGORIES.map((c) => ({
-    ...c,
-    items: db.petTasks
-      .filter((t) => t.category === c.value)
-      .sort((a, b) => Number(b.active) - Number(a.active) || a.order - b.order)
-      .map((t) => petTaskState(db, t, today)),
-  })).filter((g) => g.items.length > 0)
+/** Active flexible routines scheduled for `date` (regardless of done/skipped). */
+export function flexibleRoutinesOn(db: DB, date: DateKey): PetTask[] {
+  return db.petTasks
+    .filter((t) => t.active && t.recurrence && isFlexiblePetTask(t) && occursOn(t.recurrence, date))
+    .sort((a, b) => a.order - b.order)
+}
+
+/** True when the day's flexible routines that aren't done were marked "fora da rotina". */
+export function isLunaOutOfRoutine(db: DB, date: DateKey): boolean {
+  let skipped = 0
+  for (const t of flexibleRoutinesOn(db, date)) {
+    const o = occurrenceFor(db.occurrences, 'petTask', t.id, date)
+    if (!o) return false
+    if (o.status === 'skipped') skipped++
+  }
+  return skipped > 0
+}
+
+/**
+ * What toggling "fora da rotina" changes: skipped occurrences to create (routines without any record
+ * that day) or skipped occurrences to remove. Done checks are never touched.
+ */
+export function outOfRoutinePlan(db: DB, date: DateKey, on: boolean): { create: ID[]; remove: ID[] } {
+  const create: ID[] = []
+  const remove: ID[] = []
+  for (const t of flexibleRoutinesOn(db, date)) {
+    const o = occurrenceFor(db.occurrences, 'petTask', t.id, date)
+    if (on && !o) create.push(t.id)
+    if (!on && o?.status === 'skipped') remove.push(o.id)
+  }
+  return { create, remove }
+}
+
+/** Life-admin side of Luna: everything that isn't a flexible routine (slots, dated, interval rules). */
+export function lunaAreas(db: DB, today: DateKey): PetTaskState[] {
+  return db.petTasks
+    .filter((t) => !isFlexiblePetTask(t))
+    .map((t) => petTaskState(db, t, today))
+    .sort(
+      (a, b) =>
+        Number(!a.task.active) - Number(!b.task.active) || Number(b.dueToday) - Number(a.dueToday) || a.task.order - b.task.order,
+    )
+}
+
+/** Flexible routines (incl. paused) for the "Rotina" list. */
+export function lunaRoutines(db: DB, today: DateKey): PetTaskState[] {
+  return db.petTasks
+    .filter(isFlexiblePetTask)
+    .map((t) => petTaskState(db, t, today))
+    .sort((a, b) => Number(!a.task.active) - Number(!b.task.active) || a.task.order - b.task.order)
 }
 
 export const LUNA_CATEGORY_ID = 'cat-luna'
@@ -162,21 +237,62 @@ export function petAge(birthDate: DateKey | undefined, today: DateKey): string |
 
 // ─── Vida real ──────────────────────────────────────────────────────────────
 
-export const LIFE_CATEGORIES: { value: LifeAdminCategory; label: string; emoji: string }[] = [
-  { value: 'casa', label: 'Casa', emoji: '🏡' },
-  { value: 'carro', label: 'Carro', emoji: '🚗' },
-  { value: 'bike', label: 'Bike', emoji: '🚲' },
-  { value: 'documentos', label: 'Documentos', emoji: '📄' },
-  { value: 'manutencao', label: 'Manutenção', emoji: '🔧' },
-  { value: 'compras', label: 'Compras', emoji: '🛒' },
-  { value: 'assinaturas', label: 'Assinaturas', emoji: '🔁' },
-  { value: 'burocracia', label: 'Burocracias', emoji: '🗂️' },
-  { value: 'consultas', label: 'Consultas', emoji: '🗓️' },
-  { value: 'outros', label: 'Outros', emoji: '✨' },
+/** The categories Marina sees. Anything else (legacy / created elsewhere) lands in "Outros". */
+export const LIFE_CATEGORIES: { value: LifeAdminCategory; label: string; emoji: string; hint: string }[] = [
+  { value: 'casa', label: 'Casa', emoji: '🏠', hint: 'consertos, compras, contas da casa' },
+  { value: 'carro', label: 'Carro', emoji: '🚗', hint: 'revisão, seguro, documentos' },
+  { value: 'bike', label: 'Bike', emoji: '🚲', hint: 'revisão, peças, acessórios' },
+  { value: 'surf', label: 'Surf', emoji: '🏄', hint: 'prancha, parafina, roupa' },
+  { value: 'running', label: 'Running', emoji: '🏃', hint: 'tênis, provas, acessórios' },
+  { value: 'luna', label: 'Luna', emoji: '🐾', hint: 'o que não é rotina dela' },
+  { value: 'viagens', label: 'Viagens', emoji: '✈️', hint: 'coisas práticas entre viagens' },
+  { value: 'documentos', label: 'Documentos', emoji: '📑', hint: 'RG, passaporte, papéis' },
 ]
 
+export const OTHER_CATEGORY = { value: 'outros' as LifeAdminCategory, label: 'Outros', emoji: '✨', hint: 'o resto da vida prática' }
+
+const MAIN = new Set(LIFE_CATEGORIES.map((c) => c.value))
+
+/** Main category for display/filter; legacy values collapse into 'outros'. */
+export function lifeCategoryOf(t: Pick<Task, 'lifeAdminCategory'>): LifeAdminCategory {
+  const c = t.lifeAdminCategory
+  return c && MAIN.has(c) ? c : 'outros'
+}
+
 export function lifeCategoryMeta(c: LifeAdminCategory | undefined) {
-  return LIFE_CATEGORIES.find((x) => x.value === c) ?? LIFE_CATEGORIES[LIFE_CATEGORIES.length - 1]
+  return LIFE_CATEGORIES.find((x) => x.value === c) ?? OTHER_CATEGORY
+}
+
+export type AdminKind = 'manutencao' | 'comprar' | 'resolver' | 'waiting'
+
+export const ADMIN_KINDS: { value: AdminKind; label: string; add: string; emoji: string }[] = [
+  { value: 'manutencao', label: 'Manutenção', add: 'manutenção', emoji: '🔧' },
+  { value: 'comprar', label: 'Comprar', add: 'comprar', emoji: '🛒' },
+  { value: 'resolver', label: 'Resolver', add: 'resolver', emoji: '✅' },
+  { value: 'waiting', label: 'Esperando', add: 'esperando', emoji: '⏳' },
+]
+
+/** manutenção / comprar / resolver / waiting. Waiting = status; untyped items are "resolver". */
+export function adminKindOf(t: Task): AdminKind {
+  if (t.status === 'waiting') return 'waiting'
+  if (t.adminKind) return t.adminKind
+  if (t.lifeAdminCategory === 'manutencao') return 'manutencao'
+  if (t.lifeAdminCategory === 'compras') return 'comprar'
+  return 'resolver'
+}
+
+export function adminKindMeta(k: AdminKind) {
+  return ADMIN_KINDS.find((x) => x.value === k)!
+}
+
+/** Task defaults for a quick add in a category/kind. */
+export function lifeTaskDefaults(category: LifeAdminCategory | undefined, kind: AdminKind | undefined, today: DateKey): Partial<Task> {
+  const d: Partial<Task> = { context: 'vida_real', lifeAdminCategory: category ?? 'outros', bucket: 'semana' }
+  if (kind === 'waiting') {
+    d.status = 'waiting'
+    d.waiting = { who: '', since: today }
+  } else if (kind) d.adminKind = kind
+  return d
 }
 
 export type LifeGroup = 'hoje' | 'semana' | 'review' | 'waiting' | 'algum_dia'
@@ -186,12 +302,13 @@ export const LIFE_GROUPS: { id: LifeGroup; title: string; hint?: string }[] = [
   { id: 'semana', title: 'Esta semana' },
   { id: 'review', title: 'Revisar / confirmar', hint: 'ainda não sei se precisa — dá uma olhada quando der' },
   { id: 'waiting', title: 'Esperando alguém', hint: 'a bola está com outra pessoa' },
-  { id: 'algum_dia', title: 'Algum dia' },
+  { id: 'algum_dia', title: 'Quando der' },
 ]
 
 export interface LifeItem {
   task: Task
   group: LifeGroup
+  kind: AdminKind
   /** Recurring: next expected date. */
   next?: DateKey
   doneToday: boolean
@@ -201,10 +318,11 @@ export interface LifeItem {
 
 function lifeItem(db: DB, t: Task, today: DateKey): LifeItem | undefined {
   if (t.status === 'archived') return undefined
+  const kind = adminKindOf(t)
   const weekEnd = endOfWeek(today)
   if (t.recurrence) {
     const lastDone = lastDoneDate(db.occurrences, 'task', t.id)
-    const doneToday = !!occurrenceFor(db.occurrences, 'task', t.id, today)
+    const doneToday = occurrenceFor(db.occurrences, 'task', t.id, today)?.status === 'done'
     const next = nextOccurrence(t.recurrence, doneToday ? addDays(today, 1) : today, lastDone)
     const due = !doneToday && isDue(t.recurrence, today, lastDone)
     let group: LifeGroup = due || doneToday ? 'hoje' : next && next <= weekEnd ? 'semana' : 'algum_dia'
@@ -213,12 +331,12 @@ function lifeItem(db: DB, t: Task, today: DateKey): LifeItem | undefined {
     const detail = [describeRecurrence(t.recurrence), next ? `próximo: ${nextDateLabel(next, today)}` : undefined]
       .filter(Boolean)
       .join(' · ')
-    return { task: t, group, next, doneToday, detail }
+    return { task: t, group, kind, next, doneToday, detail }
   }
   if (t.status === 'done') {
     // Keep things checked today visible (struck through) so the list doesn't jump.
     if (t.completedAt && toDateKey(new Date(t.completedAt)) === today) {
-      return { task: t, group: 'hoje', doneToday: true, detail: 'feito ✓' }
+      return { task: t, group: 'hoje', kind, doneToday: true, detail: 'feito ✓' }
     }
     return undefined
   }
@@ -232,40 +350,58 @@ function lifeItem(db: DB, t: Task, today: DateKey): LifeItem | undefined {
   const parts: string[] = []
   if (t.status === 'waiting' && t.waiting?.who) parts.push(`com ${t.waiting.who}`)
   if (when) parts.push(when < today ? 'ficou de antes' : nextDateLabel(when, today))
-  return { task: t, group, doneToday: false, detail: parts.join(' · ') }
+  return { task: t, group, kind, doneToday: false, detail: parts.join(' · ') }
 }
 
-export function lifeAdminItems(db: DB, today: DateKey, category?: LifeAdminCategory): LifeItem[] {
+export interface LifeFilter {
+  category?: LifeAdminCategory
+  kind?: AdminKind
+}
+
+export function lifeAdminItems(db: DB, today: DateKey, filter: LifeFilter = {}): LifeItem[] {
   return db.tasks
     .filter((t) => t.context === 'vida_real')
-    .filter((t) => !category || (t.lifeAdminCategory ?? 'outros') === category)
+    .filter((t) => !filter.category || lifeCategoryOf(t) === filter.category)
     .map((t) => lifeItem(db, t, today))
     .filter((x): x is LifeItem => !!x)
-    .sort((a, b) => Number(a.doneToday) - Number(b.doneToday) || (a.next ?? '9999').localeCompare(b.next ?? '9999') || a.task.order - b.task.order)
+    .filter((x) => !filter.kind || x.kind === filter.kind)
+    .sort(
+      (a, b) =>
+        Number(a.doneToday) - Number(b.doneToday) ||
+        (a.next ?? '9999').localeCompare(b.next ?? '9999') ||
+        a.task.order - b.task.order,
+    )
 }
 
-export function groupLifeAdmin(db: DB, today: DateKey, category?: LifeAdminCategory): Record<LifeGroup, LifeItem[]> {
+export function groupLifeAdmin(db: DB, today: DateKey, filter: LifeFilter = {}): Record<LifeGroup, LifeItem[]> {
   const out: Record<LifeGroup, LifeItem[]> = { hoje: [], semana: [], review: [], waiting: [], algum_dia: [] }
-  for (const it of lifeAdminItems(db, today, category)) out[it.group].push(it)
+  for (const it of lifeAdminItems(db, today, filter)) out[it.group].push(it)
   return out
 }
 
-/** Open counts per category (for chips). */
+/** Open counts per main category ('outros' included) for the grid. */
 export function lifeCategoryCounts(db: DB, today: DateKey): Partial<Record<LifeAdminCategory, number>> {
   const out: Partial<Record<LifeAdminCategory, number>> = {}
   for (const it of lifeAdminItems(db, today)) {
     if (it.doneToday) continue
-    const c = it.task.lifeAdminCategory ?? 'outros'
+    const c = lifeCategoryOf(it.task)
     out[c] = (out[c] ?? 0) + 1
   }
   return out
 }
 
+/** Open counts per kind inside a category (for the sub-filter chips). */
+export function lifeKindCounts(db: DB, today: DateKey, category?: LifeAdminCategory): Record<AdminKind, number> {
+  const out: Record<AdminKind, number> = { manutencao: 0, comprar: 0, resolver: 0, waiting: 0 }
+  for (const it of lifeAdminItems(db, today, { category })) if (!it.doneToday) out[it.kind]++
+  return out
+}
+
 /** Hub counts: open today / this week (week includes today). */
-export function lifeAdminCounts(db: DB, today: DateKey): { hoje: number; semana: number; review: number } {
+export function lifeAdminCounts(db: DB, today: DateKey): { hoje: number; semana: number; review: number; waiting: number } {
   const g = groupLifeAdmin(db, today)
   const hoje = g.hoje.filter((i) => !i.doneToday).length
-  return { hoje, semana: hoje + g.semana.length, review: g.review.length }
+  return { hoje, semana: hoje + g.semana.length, review: g.review.length, waiting: g.waiting.length }
 }
 
 // ─── Hub ────────────────────────────────────────────────────────────────────
@@ -290,4 +426,85 @@ export function weekGoalsLabel(done: number, total: number): string {
 export function isReviewTime(today: DateKey): boolean {
   const wd = weekday(today)
   return wd === 5 || wd === 6 || wd === 0
+}
+
+export function isWeekend(today: DateKey): boolean {
+  const wd = weekday(today)
+  return wd === 6 || wd === 0
+}
+
+/** "Montar minha semana" is the main move on Sunday and Monday. */
+export function isPlanningDay(today: DateKey): boolean {
+  const wd = weekday(today)
+  return wd === 0 || wd === 1
+}
+
+/** Week being planned: on Sunday it's the coming week; otherwise the current one. */
+export function planningWeekStart(today: DateKey): DateKey {
+  return weekday(today) === 0 ? addDays(today, 1) : startOfWeek(today)
+}
+
+export function weekPlanConfirmed(db: DB, today: DateKey): boolean {
+  const ws = planningWeekStart(today)
+  return db.weekPlans.some((w) => w.weekStart === ws && !!w.confirmedAt)
+}
+
+export type HubBlock = 'capture' | 'weekend' | 'plan' | 'top3' | 'creative' | 'week' | 'self' | 'home' | 'world' | 'month'
+
+/**
+ * Hub order. Weekdays: capture → plan → Top 3 → week → creativity → care → home → world.
+ * Weekend mode (§44): lead with activity/fun, travel and the weekly review; chores come last.
+ */
+export function hubOrder(today: DateKey): HubBlock[] {
+  if (isWeekend(today)) {
+    return ['capture', 'weekend', 'week', 'plan', 'world', 'top3', 'creative', 'self', 'home', 'month']
+  }
+  if (isPlanningDay(today)) return ['capture', 'plan', 'top3', 'week', 'creative', 'self', 'home', 'world', 'month']
+  return ['capture', 'top3', 'creative', 'week', 'plan', 'self', 'home', 'world', 'month']
+}
+
+/** Top 3 Vida: domain 'vida' priorities of the day (max 3). */
+export function vidaPriorities(db: DB, today: DateKey): DayPriority[] {
+  return db.priorities
+    .filter((p) => p.date === today && p.domain === 'vida')
+    .sort((a, b) => a.order - b.order)
+    .slice(0, 3)
+}
+
+export function isCreativeEvent(e: CalendarEvent): boolean {
+  return e.kind === 'criatividade' || /criatividade/i.test(e.category ?? '')
+}
+
+export interface CreativeSlot {
+  event: CalendarEvent
+  date: DateKey
+  /** "seg, 05/10 · noite" / "hoje · 19:00" */
+  when: string
+  /** Cancelled for this week only (exdate). */
+  cancelled: boolean
+  recurring: boolean
+}
+
+/** Creative events in the next 7 days (today included), with week-only cancellations kept visible. */
+export function creativeThisWeek(db: DB, today: DateKey): CreativeSlot[] {
+  const enabled = new Set(db.calendarSources.filter((s) => s.enabled).map((s) => s.id))
+  const events = db.events.filter((e) => isCreativeEvent(e) && (!db.calendarSources.length || enabled.has(e.sourceId)))
+  const out: CreativeSlot[] = []
+  for (let i = 0; i < 7; i++) {
+    const date = addDays(today, i)
+    for (const e of events) {
+      const cancelled = !!e.exdates?.includes(date)
+      const occurs = cancelled ? eventOccursOn({ ...e, exdates: undefined }, date) : eventOccursOn(e, date)
+      if (!occurs) continue
+      const time = e.startTime ?? (e.period ? PERIOD_LABEL[e.period] : e.allDay ? 'dia todo' : undefined)
+      out.push({
+        event: e,
+        date,
+        when: [nextDateLabel(date, today), time].filter(Boolean).join(' · '),
+        cancelled,
+        recurring: !!e.recurrence,
+      })
+    }
+  }
+  return out
 }

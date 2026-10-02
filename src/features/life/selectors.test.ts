@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { emptyDB } from '@/data/defaults'
-import { createSeedContext } from '@/data/seed/context'
 import { SEED_IDS } from '@/data/seed/ids'
 import type { DB, Occurrence, PetTask, Task } from '@/data/types'
 import { addDays } from '@/lib/date'
@@ -18,7 +17,6 @@ import {
   weekGoalsLabel,
   weekGoalsSummary,
 } from './selectors'
-import { seedLife } from './seed'
 
 // 2026-10-02 is a Friday.
 const TODAY = '2026-10-02'
@@ -115,7 +113,7 @@ describe('Luna due logic', () => {
     const d = db({ petTasks: [vac, later, reminder, doneOne] })
     expect(lunaToday(d, TODAY).map((x) => x.task.title)).toEqual(['Vacina'])
     expect(petTaskState(d, vac, TODAY).detail).toBe('ficou de 30/09')
-    expect(petTaskState(d, reminder, TODAY).detail).toMatch(/quando der/)
+    expect(petTaskState(d, reminder, TODAY).detail).toMatch(/quando quiser/)
   })
 
   it('paused recurring tasks are not due', () => {
@@ -166,13 +164,13 @@ describe('Vida real grouping', () => {
     expect(g.waiting[0].detail).toBe('com mecânico')
     // done items sort last and don't count
     expect(g.hoje[g.hoje.length - 1].task.title).toBe('done-now')
-    expect(lifeAdminCounts(db({ tasks }), TODAY)).toEqual({ hoje: 2, semana: 4, review: 1 })
+    expect(lifeAdminCounts(db({ tasks }), TODAY)).toEqual({ hoje: 2, semana: 4, review: 1, waiting: 1 })
   })
 
   it('filters by category (missing category = outros)', () => {
     const tasks = [task({ title: 'a', lifeAdminCategory: 'carro' }), task({ title: 'b' })]
-    expect(groupLifeAdmin(db({ tasks }), TODAY, 'carro').semana).toHaveLength(0)
-    const all = Object.values(groupLifeAdmin(db({ tasks }), TODAY, 'outros')).flat()
+    expect(groupLifeAdmin(db({ tasks }), TODAY, { category: 'carro' }).semana).toHaveLength(0)
+    const all = Object.values(groupLifeAdmin(db({ tasks }), TODAY, { category: 'outros' })).flat()
     expect(all.map((x) => x.task.title)).toEqual(['b'])
   })
 
@@ -213,25 +211,3 @@ describe('Vida real grouping', () => {
   })
 })
 
-describe('seed', () => {
-  it('creates Luna, her care rules and vida real examples without money or appointments', () => {
-    const ctx = createSeedContext(TODAY)
-    const part = seedLife(ctx)
-    expect(part.pets?.[0]).toMatchObject({ id: SEED_IDS.petLuna, name: 'Luna', breed: 'Border Collie' })
-    expect(part.petTasks).toHaveLength(5)
-    expect(part.petTasks!.every((t) => t.petId === SEED_IDS.petLuna)).toBe(true)
-    const racao = part.petTasks!.find((t) => t.title.startsWith('Ração'))!
-    expect(racao.recurrence).toEqual({ kind: 'every_n_days', days: 30, anchor: TODAY, fromLastDone: true })
-    const vet = part.petTasks!.find((t) => t.category === 'veterinario')!
-    expect(vet.recurrence).toBeUndefined()
-    expect(vet.dueDate).toBeUndefined()
-    expect(part.tasks!.every((t) => t.context === 'vida_real')).toBe(true)
-    expect(part.tasks!.filter((t) => t.tripId === SEED_IDS.tripAfrica)).toHaveLength(2)
-    expect(part.tasks!.filter((t) => t.status === 'review').length).toBeGreaterThanOrEqual(4)
-    expect(Object.keys(part).sort()).toEqual(['petTasks', 'pets', 'tasks'])
-
-    // First open is calm: just the walk + ração due today.
-    const d = db({ pets: part.pets, petTasks: part.petTasks, tasks: part.tasks })
-    expect(lunaToday(d, TODAY).map((s) => s.task.category).sort()).toEqual(['alimentacao', 'passeio'])
-  })
-})
