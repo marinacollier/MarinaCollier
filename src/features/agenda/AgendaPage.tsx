@@ -43,15 +43,17 @@ export default function AgendaPage() {
   const db = useDB()
   const subtitle = useMemo(() => {
     const timed = timedOnly(dayEntries(db, today))
+    const phrase: Record<string, string> = { manhã: 'de manhã', almoço: 'no almoço', tarde: 'à tarde', noite: 'à noite' }
+    const when = (e: (typeof timed)[number]) => (e.approx ? (phrase[e.periodLabel ?? ''] ?? e.periodLabel) : e.time)
     const next = timed.find((e) => hmToMinutes(e.time!) >= minutes && !e.done)
     const current = timed.find((e) => {
       const r = entryRange(e)
-      return r.start <= minutes && minutes < r.end && !e.done
+      return !e.approx && r.start <= minutes && minutes < r.end && !e.done
     })
-    if (current) return `agora: ${current.title}${next ? ` · depois, ${next.time} ${next.title}` : ''}`
+    if (current) return `agora: ${current.title}${next ? ` · depois, ${when(next)} ${next.title}` : ''}`
     if (next) {
       const dist = hmToMinutes(next.time!) - minutes
-      return `próximo: ${next.time} ${next.title}${dist <= 180 ? ` · ${inMinutesLabel(dist)}` : ''}`
+      return `próximo: ${when(next)} ${next.title}${dist <= 180 && !next.approx ? ` · ${inMinutesLabel(dist)}` : ''}`
     }
     if (timed.length) return 'compromissos de hoje feitos ✨'
     return 'dia livre de compromissos'

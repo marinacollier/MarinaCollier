@@ -1,8 +1,9 @@
 /**
  * Agenda-specific reads on top of the shared `agendaFor`. Pure (db, args) functions.
  */
-import type { CalendarEvent, DateKey, DB, ID, Tone } from '@/data/types'
+import type { CalendarEvent, DateKey, DayPeriod, DB, ID, PlanType, Tone, WorkDayMode } from '@/data/types'
 import { agendaFor, isTaskDoneOn, isTaskOpen, prioritiesFor, tasksForDay, type AgendaEntry } from '@/data/selectors'
+import { conflictsOn, PERIOD_LABEL, PERIOD_RANGES, workMode, type Conflict } from '@/data/planning'
 import { addDays, formatShortDate, weekDays } from '@/lib/date'
 import { SEED_IDS } from '@/data/seed/ids'
 
@@ -15,6 +16,8 @@ export const EVENT_KINDS: { value: EventKind; label: string; emoji: string; tone
   { value: 'viagem', label: 'viagem', emoji: '✈️', tone: 'sand' },
   { value: 'saude', label: 'saúde', emoji: '🩺', tone: 'plum' },
   { value: 'luna', label: 'luna', emoji: '🐾', tone: 'sand' },
+  { value: 'criatividade', label: 'criatividade', emoji: '🏺', tone: 'plum' },
+  { value: 'estudo', label: 'estudo', emoji: '📚', tone: 'ocean' },
   { value: 'outro', label: 'outro', emoji: '📅', tone: 'ink' },
 ]
 
@@ -33,6 +36,38 @@ export interface DayEntry extends AgendaEntry {
   rangeLabel?: string
   /** For multi-day events: first day of the range. */
   startsOn?: DateKey
+  /** Recurring event (offers "só nesse dia"). */
+  recurring?: boolean
+  /** Event has a checklist template ("Pauta"). */
+  hasTemplate?: boolean
+  /** "noite" — for entries without an exact time (approx). */
+  periodLabel?: string
+  /** Open planning conflicts that involve this entry. */
+  conflicts?: Conflict[]
+}
+
+export const PLAN_LABEL: Record<PlanType, string> = {
+  fixo: 'FIXO',
+  base: 'BASE',
+  flexivel: 'FLEXÍVEL',
+  a_confirmar: 'A CONFIRMAR',
+}
+
+/** Period of an approximate entry, recovered from its derived range. */
+export function periodOfRange(time?: string, endTime?: string): DayPeriod | undefined {
+  return (Object.keys(PERIOD_RANGES) as DayPeriod[]).find((p) => PERIOD_RANGES[p][0] === time && (!endTime || PERIOD_RANGES[p][1] === endTime))
+}
+
+/** Map "kind:id" (same as DayEntry.key) → conflicts that involve it. */
+export function conflictMarkers(conflicts: Conflict[]): Map<string, Conflict[]> {
+  const out = new Map<string, Conflict[]>()
+  for (const c of conflicts) {
+    for (const r of c.refs) {
+      const k = `${r.type}:${r.id}`
+      out.set(k, [...(out.get(k) ?? []), c])
+    }
+  }
+  return out
 }
 
 export function isMultiDay(e: CalendarEvent): boolean {
@@ -44,12 +79,23 @@ export function rangeLabel(from: DateKey, to: DateKey): string {
   return `${formatShortDate(from)} – ${formatShortDate(to)}`
 }
 
-/** Entries of a day, with nicer emoji/tones per event kind. Multi-day events go to the all-day row. */
-export function dayEntries(db: DB, date: DateKey): DayEntry[] {
+/**
+ * Entries of a day, with nicer emoji/tones per event kind. Multi-day events go to the all-day row.
+ * With `includeBlocks`, BASE work hours / commute come along as 'block' entries (timeline bands).
+ * Each entry carries the open planning conflicts that involve it.
+ */
+export function dayEntries(db: DB, date: DateKey, opts: { includeBlocks?: boolean } = {}): DayEntry[] {
   const events = new Map(db.events.map((e) => [e.id, e]))
   const sources = new Map(db.calendarSources.map((s) => [s.id, s]))
-  return agendaFor(db, date).map((a) => {
-    const base: DayEntry = { ...a, key: `${a.kind}:${a.id}` }
+  const markers = conflictMarkers(conflictsOn(db, date))
+  return agendaFor(db, date, opts).map((a) => {
+    const key = `${a.kind}:${a.id}`
+    const base: DayEntry = {
+      ...a,
+      key,
+      conflicts: markers.get(key),
+      periodLabel: a.approx ? PERIOD_LABEL[periodOfRange(a.time, a.endTime) ?? 'noite'] : undefined,
+    }
     if (a.kind !== 'event') return base
     const ev = events.get(a.id)
     if (!ev) return base
@@ -66,11 +112,14 @@ export function dayEntries(db: DB, date: DateKey): DayEntry[] {
       time: a.allDay || multi ? undefined : a.time,
       rangeLabel: multi ? rangeLabel(ev.date, ev.endDate!) : undefined,
       startsOn: multi ? ev.date : undefined,
+      recurring: !!ev.recurrence,
+      hasTemplate: !!ev.template?.length,
     }
   })
 }
 
-export const timedOnly = (list: DayEntry[]) => list.filter((e) => !e.allDay && !!e.time)
+export const timedOnly = (list: DayEntry[]) => list.filter((e) => e.kind !== 'block' && !e.allDay && !!e.time)
+export const blocksOnly = (list: DayEntry[]) => list.filter((e) => e.kind === 'block')
 export const allDayOnly = (list: DayEntry[]) => list.filter((e) => e.allDay)
 
 // ─── Week / upcoming ────────────────────────────────────────────────────────
@@ -78,11 +127,13 @@ export const allDayOnly = (list: DayEntry[]) => list.filter((e) => e.allDay)
 export interface DayGroup {
   date: DateKey
   entries: DayEntry[]
+  /** BASE work mode of the day (from profile.work). */
+  mode: WorkDayMode
 }
 
 /** Monday..Sunday of the week containing `anyDate`, each with its entries (empty days kept). */
 export function weekAgenda(db: DB, anyDate: DateKey): DayGroup[] {
-  return weekDays(anyDate).map((date) => ({ date, entries: dayEntries(db, date) }))
+  return weekDays(anyDate).map((date) => ({ date, entries: dayEntries(db, date), mode: workMode(db.profile, date) }))
 }
 
 /**
@@ -100,7 +151,7 @@ export function upcomingAgenda(db: DB, today: DateKey, days = 30): DayGroup[] {
       seenMulti.add(e.id)
       return true
     })
-    if (entries.length) out.push({ date, entries })
+    if (entries.length) out.push({ date, entries, mode: workMode(db.profile, date) })
   }
   return out
 }
