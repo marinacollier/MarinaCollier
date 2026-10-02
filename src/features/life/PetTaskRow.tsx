@@ -1,19 +1,23 @@
 import { openSheet, toast } from '@/app/ui-store'
-import { actions } from '@/data/store'
+import { actions, getDB } from '@/data/store'
 import type { DateKey } from '@/data/types'
 import { Checkbox } from '@/components/ui'
 import { haptic } from '@/lib/haptics'
 import { cn } from '@/lib/cn'
+import { occurrenceFor } from '@/lib/recurrence'
 import { lastDoneLabel, petCategoryMeta, type PetTaskState } from './selectors'
 
 /** Check a pet task for today. Recurring → occurrence; one-off → inactive (with undo). */
 export function completePetTask(state: PetTaskState, today: DateKey): void {
   const t = state.task
   if (t.recurrence) {
+    // A "fora da rotina" skip turns into a real check.
+    const skip = occurrenceFor(getDB().occurrences, 'petTask', t.id, today)
+    if (skip?.status === 'skipped') actions.remove('occurrences', skip.id)
     const done = actions.toggleOccurrence('petTask', t.id, today)
     if (done) {
       haptic('success')
-      toast('Feito! A Luna agradece 🐾')
+      toast(state.flexible ? 'Feito 🐾' : 'Feito! A Luna agradece 🐾')
     }
     return
   }
@@ -26,18 +30,18 @@ export function PetTaskRow({
   state,
   today,
   showEmoji = true,
-  showLastDone = true,
 }: {
   state: PetTaskState
   today: DateKey
   showEmoji?: boolean
-  showLastDone?: boolean
 }) {
   const { task } = state
   const meta = petCategoryMeta(task.category)
   const checked = task.recurrence ? state.doneToday : !task.active
-  const last = showLastDone && task.recurrence ? lastDoneLabel(state.lastDone, today) : undefined
+  // Flexible routines never show "feito há X dias" — no pressure.
+  const last = task.recurrence && !state.flexible ? lastDoneLabel(state.lastDone, today) : undefined
   const canCheck = task.recurrence ? task.active : true
+  const muted = (!task.active && !!task.recurrence) || state.skippedToday
   return (
     <div className="flex items-center gap-3 min-h-[60px] px-4 py-2.5">
       {canCheck ? (
@@ -66,7 +70,7 @@ export function PetTaskRow({
           </span>
         )}
         <span className="min-w-0 flex-1">
-          <span className={cn('block text-[15px] leading-snug', checked && 'text-muted line-through decoration-muted/50', !task.active && task.recurrence && 'text-muted')}>
+          <span className={cn('block text-[15px] leading-snug', checked && 'text-muted line-through decoration-muted/50', muted && 'text-muted')}>
             {task.title}
           </span>
           <span className="block text-[12.5px] text-muted mt-0.5 truncate">

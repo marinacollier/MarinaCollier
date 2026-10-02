@@ -4,12 +4,11 @@ import { ExternalLink, Pencil, Plus, Stethoscope, X } from 'lucide-react'
 import { ROUTES } from '@/app/routes'
 import { openSheet, toast } from '@/app/ui-store'
 import { actions, useDB } from '@/data/store'
-import type { Link, Pet, PetTaskCategory } from '@/data/types'
+import type { Link, Pet } from '@/data/types'
 import { SEED_IDS } from '@/data/seed/ids'
 import {
   Button,
   Card,
-  Chip,
   DateInput,
   EmptyState,
   Field,
@@ -25,8 +24,22 @@ import {
 import { useToday } from '@/hooks/useToday'
 import { formatBRL } from '@/lib/money'
 import { formatFullDate, relativeDay } from '@/lib/date'
+import { haptic } from '@/lib/haptics'
+import { cn } from '@/lib/cn'
 import { PetTaskRow } from './PetTaskRow'
-import { LUNA_CATEGORY_ID, lunaExpensesThisMonth, lunaOf, lunaToday, petAge, petTasksByArea } from './selectors'
+import { setLunaOutOfRoutine } from './ops'
+import {
+  isLunaOutOfRoutine,
+  LUNA_CATEGORY_ID,
+  lunaAreas,
+  lunaExpensesThisMonth,
+  lunaOf,
+  lunaRoutines,
+  lunaTodaySplit,
+  petAge,
+  petCategoryMeta,
+  type PetTaskState,
+} from './selectors'
 
 const fade = (i: number) => ({
   initial: { opacity: 0, y: 8 },
@@ -38,12 +51,24 @@ export default function LunaPage() {
   const db = useDB()
   const today = useToday()
   const pet = useMemo(() => lunaOf(db), [db])
-  const todayList = useMemo(() => lunaToday(db, today), [db, today])
-  const areas = useMemo(() => petTasksByArea(db, today), [db, today])
+  const split = useMemo(() => lunaTodaySplit(db, today), [db, today])
+  const routines = useMemo(() => lunaRoutines(db, today), [db, today])
+  const areas = useMemo(() => lunaAreas(db, today), [db, today])
+  const out = useMemo(() => isLunaOutOfRoutine(db, today), [db, today])
   const spend = useMemo(() => lunaExpensesThisMonth(db, today), [db, today])
   const name = pet?.name ?? 'Luna'
-  const pending = todayList.filter((s) => !s.doneToday).length
-  const [area, setArea] = useState<PetTaskCategory | undefined>()
+  const pendingAdmin = split.due.filter((s) => !s.doneToday).length
+  // Routines for today (due) + paused ones (so they stay editable). Weekly ones off-day stay hidden.
+  const routineRows = routines.filter((s) => s.dueToday || !s.task.active)
+  const hasRoutinesToday = split.routines.length > 0
+
+  const toggleOut = (on: boolean) => {
+    setLunaOutOfRoutine(today, on)
+    haptic('light')
+    toast(on ? `Ok! ${name} fora da rotina hoje 🏡` : 'De volta à rotina 🐾', {
+      action: { label: 'Desfazer', run: () => setLunaOutOfRoutine(today, !on) },
+    })
+  }
 
   return (
     <Page>
@@ -53,11 +78,11 @@ export default function LunaPage() {
         eyebrow="Vida"
         title={`${name} 🐾`}
         subtitle={
-          todayList.length === 0
-            ? 'nada pra hoje — só carinho'
-            : pending === 0
-              ? 'tudo feito hoje. boa! 💛'
-              : `${pending} ${pending === 1 ? 'coisinha' : 'coisinhas'} pra hoje`
+          out
+            ? 'fora da rotina hoje — tá tudo bem'
+            : pendingAdmin
+              ? `${pendingAdmin} ${pendingAdmin === 1 ? 'coisinha' : 'coisinhas'} pra resolver`
+              : 'rotina leve, sem cobrança'
         }
         actions={
           <IconButton label="Novo cuidado" onClick={() => openSheet('petTask')}>
@@ -70,64 +95,102 @@ export default function LunaPage() {
         <ProfileCard pet={pet} today={today} />
       </motion.div>
 
-      <SectionTitle>Hoje</SectionTitle>
-      <motion.div {...fade(1)}>
-        {todayList.length ? (
+      <SectionTitle
+        action={
+          <SectionAction
+            label="rotina"
+            onClick={() => openSheet('petTask', { defaults: { category: 'passeio', recurrence: { kind: 'daily' } } })}
+          />
+        }
+      >
+        Hoje
+      </SectionTitle>
+
+      {split.due.length > 0 && (
+        <motion.div {...fade(1)} className="mb-3">
           <ListCard>
-            {todayList.map((s) => (
+            {split.due.map((s) => (
               <PetTaskRow key={s.task.id} state={s} today={today} />
             ))}
           </ListCard>
+        </motion.div>
+      )}
+
+      <motion.div {...fade(2)}>
+        {out ? (
+          <div className="rounded-[22px] bg-sand-soft px-4 py-4 flex items-center gap-3">
+            <span className="text-[28px]" aria-hidden>
+              🏡
+            </span>
+            <span className="flex-1 min-w-0">
+              <span className="block font-display text-[18px] leading-tight">{name} fora da rotina hoje</span>
+              <span className="block text-[13px] text-ink-2 mt-0.5">creche, hotel ou outro plano — nada fica pendente</span>
+            </span>
+            <Button size="sm" variant="outline" onClick={() => toggleOut(false)}>
+              voltar
+            </Button>
+          </div>
+        ) : routineRows.length ? (
+          <div className="card overflow-hidden">
+            <div className="divide-y divide-line/70">
+              {routineRows.map((s) => (
+                <PetTaskRow key={s.task.id} state={s} today={today} />
+              ))}
+            </div>
+            {hasRoutinesToday && (
+              <button
+                type="button"
+                onClick={() => toggleOut(true)}
+                className="w-full flex items-center gap-2.5 px-4 min-h-12 border-t border-line/70 text-[13.5px] text-ink-2 text-left active:bg-surface-2"
+              >
+                <span aria-hidden>🏡</span>
+                <span className="flex-1">
+                  Creche ou hotel hoje? <span className="text-muted">marcar fora da rotina</span>
+                </span>
+              </button>
+            )}
+          </div>
         ) : (
           <Card>
-            <EmptyState compact emoji="🐕" title="Dia livre" text="Nenhum cuidado marcado pra hoje. Um passeio extra nunca é demais." />
+            <EmptyState compact emoji="🐕" title="Dia livre" text="Nenhuma rotina pra hoje. Um passeio extra nunca é demais." />
+          </Card>
+        )}
+      </motion.div>
+      {!out && hasRoutinesToday && (
+        <p className="text-[12.5px] text-muted px-1 mt-2">sem horário fixo — marca quando rolar, se rolar 💛</p>
+      )}
+
+      <SectionTitle action={<SectionAction label="área" onClick={() => openSheet('petTask', { defaults: { category: 'lembrete' } })} />}>
+        Áreas
+      </SectionTitle>
+      <motion.div {...fade(3)}>
+        {areas.length ? (
+          <div className="grid grid-cols-2 gap-3">
+            {areas.map((s) => (
+              <AreaTile key={s.task.id} state={s} />
+            ))}
+          </div>
+        ) : (
+          <Card>
+            <EmptyState
+              compact
+              emoji="🦴"
+              title="Nenhuma área ainda"
+              text="Ração, banho, vet… anota só o que fizer sentido. Data é opcional."
+              action={
+                <Button size="sm" onClick={() => openSheet('petTask', { defaults: { category: 'lembrete' } })}>
+                  Adicionar área
+                </Button>
+              }
+            />
           </Card>
         )}
       </motion.div>
 
-      <SectionTitle action={<SectionAction label="cuidado" onClick={() => openSheet('petTask')} />}>Cuidados</SectionTitle>
-      {areas.length ? (
-        <>
-          {areas.length > 1 && (
-            <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-3">
-              <Chip selected={!area} onClick={() => setArea(undefined)}>
-                Todos
-              </Chip>
-              {areas.map((a) => (
-                <Chip key={a.value} selected={area === a.value} onClick={() => setArea(area === a.value ? undefined : a.value)}>
-                  <span aria-hidden>{a.emoji}</span>
-                  {a.label}
-                </Chip>
-              ))}
-            </div>
-          )}
-          <motion.div {...fade(2)}>
-            <ListCard>
-              {areas
-                .filter((a) => !area || a.value === area)
-                .flatMap((a) => a.items)
-                .map((s) => (
-                  <PetTaskRow key={s.task.id} state={s} today={today} />
-                ))}
-            </ListCard>
-          </motion.div>
-        </>
-      ) : (
-        <Card>
-          <EmptyState
-            compact
-            emoji="🦴"
-            title="Nenhum cuidado ainda"
-            text="Banho, ração, vermífugo… anota uma vez e o app lembra por você."
-            action={<Button size="sm" onClick={() => openSheet('petTask')}>Adicionar cuidado</Button>}
-          />
-        </Card>
-      )}
-
       <SectionTitle action={<SectionAction label="gasto" onClick={() => openSheet('expense', { defaults: { categoryId: LUNA_CATEGORY_ID } })} />}>
         Gastos da {name} · este mês
       </SectionTitle>
-      <motion.div {...fade(3)}>
+      <motion.div {...fade(4)}>
         <div className="card overflow-hidden">
           <div className="px-4 pt-4 pb-3 flex items-baseline justify-between">
             <span className="font-display text-[28px] leading-none tracking-tight">{formatBRL(spend.total)}</span>
@@ -151,6 +214,35 @@ export default function LunaPage() {
         </div>
       </motion.div>
     </Page>
+  )
+}
+
+/** One life-admin area (Ração, Banho…). Tap to edit: add a date or a recurrence only when she wants. */
+function AreaTile({ state }: { state: PetTaskState }) {
+  const { task } = state
+  const meta = petCategoryMeta(task.category)
+  const empty = !task.recurrence && !task.dueDate && task.active
+  return (
+    <button
+      type="button"
+      onClick={() => openSheet('petTask', { id: task.id })}
+      className={cn(
+        'card w-full p-3.5 text-left flex flex-col min-h-[104px] active:scale-[0.98] transition',
+        state.dueToday && 'ring-1 ring-accent/50',
+        !task.active && 'opacity-60',
+      )}
+    >
+      <span className="flex items-center justify-between">
+        <span className="h-9 w-9 rounded-full bg-surface-2 flex items-center justify-center text-[18px]" aria-hidden>
+          {meta.emoji}
+        </span>
+        {empty && <Plus size={15} className="text-muted/70" aria-hidden />}
+      </span>
+      <span className="mt-2.5 text-[15px] font-medium leading-snug line-clamp-1">{task.title}</span>
+      <span className={cn('text-[12.5px] mt-0.5 line-clamp-2', state.dueToday ? 'text-accent' : 'text-muted')}>
+        {empty ? (task.notes?.split('\n')[0] ?? 'sem data · quando quiser') : state.detail}
+      </span>
+    </button>
   )
 }
 
