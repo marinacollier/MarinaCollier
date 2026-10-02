@@ -69,6 +69,9 @@ describe('Milagre da Manhã', () => {
 
   it('suggests the short version for early training or presencial days — gently, once', () => {
     const r = morningRoutine(getDB())!
+    // The real seed plans Friday's 06:00 long run, which already triggers the suggestion.
+    expect(essentialSuggestion(getDB(), r, TODAY)).toBe('Treino às 06h — que tal a versão curta hoje?')
+    for (const w of getDB().workouts.filter((x) => x.date === TODAY)) actions.remove('workouts', w.id)
     expect(essentialSuggestion(getDB(), r, TODAY)).toBeUndefined()
     actions.create('workouts', { date: TODAY, time: '07:00', modality: 'natacao', status: 'planejado', order: 0 })
     expect(essentialSuggestion(getDB(), r, TODAY)).toBe('Treino às 07h — que tal a versão curta hoje?')
