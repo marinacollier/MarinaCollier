@@ -1,0 +1,59 @@
+import { beforeEach, describe, expect, it } from 'vitest'
+import { actions, flushNow, getDB, hydrate } from './store'
+import { createMemoryAdapter } from './storage'
+import { routineItemsFor, routineProgress } from './selectors'
+
+describe('store + persistence', () => {
+  let storage: ReturnType<typeof createMemoryAdapter>
+  beforeEach(async () => {
+    storage = createMemoryAdapter()
+    await hydrate(storage)
+  })
+
+  it('seeds on first run and persists', async () => {
+    expect(getDB().financialCategories.length).toBeGreaterThan(10)
+    expect(storage.data).not.toBeNull()
+  })
+
+  it('CRUD round-trips through storage (reload)', async () => {
+    const t = actions.create('tasks', { title: 'Teste', status: 'todo', order: 0 })
+    actions.update('tasks', t.id, { status: 'done' })
+    await flushNow()
+    await hydrate(storage) // simulate reload
+    expect(getDB().tasks.find((x) => x.id === t.id)?.status).toBe('done')
+  })
+
+  it('remove + restore (undo)', () => {
+    const t = actions.create('tasks', { title: 'Apagar', status: 'todo', order: 0 })
+    const removed = actions.remove('tasks', t.id)!
+    expect(getDB().tasks.some((x) => x.id === t.id)).toBe(false)
+    actions.restore('tasks', removed)
+    expect(getDB().tasks.some((x) => x.id === t.id)).toBe(true)
+  })
+
+  it('checking a routine item today does not affect tomorrow', () => {
+    const r = actions.create('routines', { name: 'Teste', period: 'manha', order: 99, active: true })
+    const item = actions.create('routineItems', {
+      routineId: r.id,
+      title: 'Água',
+      recurrence: { kind: 'daily' },
+      order: 0,
+      active: true,
+    })
+    actions.toggleOccurrence('routineItem', item.id, '2026-10-02')
+    expect(routineProgress(getDB(), r.id, '2026-10-02')).toEqual({ done: 1, total: 1 })
+    expect(routineProgress(getDB(), r.id, '2026-10-03')).toEqual({ done: 0, total: 1 })
+    expect(routineItemsFor(getDB(), r.id, '2026-10-03')).toHaveLength(1)
+    actions.toggleOccurrence('routineItem', item.id, '2026-10-02')
+    expect(routineProgress(getDB(), r.id, '2026-10-02')).toEqual({ done: 0, total: 1 })
+  })
+
+  it('migrates partial/old data without losing it', () => {
+    actions.replaceDB({ tasks: [{ id: 'x', title: 'Old', status: 'todo', order: 0, createdAt: '', updatedAt: '' }], profile: { name: 'Marina' } })
+    const db = getDB()
+    expect(db.tasks).toHaveLength(1)
+    expect(Array.isArray(db.trips)).toBe(true)
+    expect(db.profile.featureFlags.icsEnabled).toBe(true)
+    expect(db.profile.homeWidgets.length).toBeGreaterThan(5)
+  })
+})
