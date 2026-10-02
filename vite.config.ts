@@ -4,7 +4,11 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { fileURLToPath, URL } from 'node:url'
 
+/** `VITE_PREVIEW=1` builds a self-contained preview (relative paths, no service worker) for sharing as a private page. */
+const preview = process.env.VITE_PREVIEW === '1'
+
 export default defineConfig({
+  base: preview ? './' : '/',
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
@@ -12,6 +16,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
+      disable: preview,
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {

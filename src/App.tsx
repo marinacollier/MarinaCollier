@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect } from 'react'
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { BrowserRouter, MemoryRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useStore } from '@/data/store'
 import { routeTable } from '@/app/routes'
 import { openSheet } from '@/app/ui-store'
@@ -9,6 +9,9 @@ import { Fab } from '@/components/layout/Fab'
 import { SheetHost } from '@/components/layout/SheetHost'
 import { Toaster } from '@/components/ui/Toaster'
 import { useLocalReminders } from '@/features/settings/useLocalReminders'
+
+/** Preview builds run inside a sandboxed frame where URL routing isn't available. */
+const Router = import.meta.env.VITE_PREVIEW === '1' ? MemoryRouter : BrowserRouter
 
 const Welcome = lazy(() => import('@/features/settings/Welcome'))
 
@@ -50,7 +53,7 @@ export default function App() {
   if (!hydrated) return <Splash />
 
   return (
-    <BrowserRouter>
+    <Router>
       <ScrollToTop />
       <Suspense fallback={<div className="min-h-dvh" />}>
         <Routes>
@@ -69,6 +72,6 @@ export default function App() {
           <Welcome />
         </Suspense>
       )}
-    </BrowserRouter>
+    </Router>
   )
 }
