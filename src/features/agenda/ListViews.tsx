@@ -52,7 +52,7 @@ export function WeekView({ date, today, onDate, onOpenDay }: { date: DateKey; to
       </div>
 
       <div className="card overflow-hidden divide-y divide-line/70">
-        {week.map(({ date: d, entries }, i) => {
+        {week.map(({ date: d, entries, mode }, i) => {
           const isToday = d === today
           const past = d < today
           return (
@@ -67,7 +67,7 @@ export function WeekView({ date, today, onDate, onOpenDay }: { date: DateKey; to
                 type="button"
                 onClick={() => onOpenDay(d)}
                 aria-label={`Abrir ${relativeDay(d, today)}`}
-                className={cn('w-[68px] shrink-0 flex items-center gap-1.5 h-11 rounded-xl active:bg-surface-2', past && 'opacity-60')}
+                className={cn('relative w-[68px] shrink-0 flex items-center gap-1.5 h-11 rounded-xl active:bg-surface-2', past && 'opacity-60')}
               >
                 <span className={cn('w-7 text-[10.5px] font-semibold tracking-wide', isToday ? 'text-accent' : 'text-muted')}>{WEEKDAY_SHORT[weekday(d)]}</span>
                 <span
@@ -78,6 +78,11 @@ export function WeekView({ date, today, onDate, onOpenDay }: { date: DateKey; to
                 >
                   {Number(d.slice(8))}
                 </span>
+                {mode === 'presencial' && (
+                  <span className="absolute -right-0.5 top-0.5 text-[10px] leading-none" role="img" aria-label="presencial">
+                    📍
+                  </span>
+                )}
               </button>
               <div className="flex-1 min-w-0">
                 {entries.length ? (

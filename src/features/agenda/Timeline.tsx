@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { openSheet } from '@/app/ui-store'
+import { CalendarX2 } from 'lucide-react'
 import { Checkbox, tone as toneOf } from '@/components/ui'
 import type { DateKey } from '@/data/types'
 import { minutesToHM } from '@/lib/date'
@@ -9,8 +10,8 @@ import { haptic } from '@/lib/haptics'
 import { layoutDay, timelineBounds } from './layout'
 import { freeLabel, type FreeSlot } from './free-slots'
 import type { DayEntry, LooseItem } from './selectors'
-import { completeLoose, openEntry, openLoose } from './ui'
-import { setPrefillTime } from './prefill'
+import { completeLoose, EntryMarks, openEntry, openLoose } from './ui'
+import { cancelOccurrence } from './occurrence'
 
 export const HOUR_PX = 64
 const GUTTER = 46
@@ -19,6 +20,8 @@ export interface TimelineProps {
   date: DateKey
   today: DateKey
   entries: DayEntry[]
+  /** BASE work hours / commute, drawn as quiet background bands. */
+  blocks?: DayEntry[]
   /** Minutes of day for the "agora" line (only when date is today). */
   nowMinutes?: number
   /** Free gaps to hint at ("livre 14:00–16:00"). */
@@ -34,10 +37,12 @@ const toMin = (hm: string) => {
   return h * 60 + (m || 0)
 }
 
-export function Timeline({ date, today, entries, nowMinutes, freeSlots, fitted, autoScroll }: TimelineProps) {
+const HATCH = 'repeating-linear-gradient(135deg, var(--line) 0 1.5px, transparent 1.5px 7px)'
+
+export function Timeline({ date, today, entries, blocks = [], nowMinutes, freeSlots, fitted, autoScroll }: TimelineProps) {
   const ref = useRef<HTMLDivElement>(null)
   const placed = useMemo(() => layoutDay(entries), [entries])
-  const { fromHour, toHour } = useMemo(() => timelineBounds(entries), [entries])
+  const { fromHour, toHour } = useMemo(() => timelineBounds([...entries, ...blocks]), [entries, blocks])
   const base = fromHour * 60
   const y = (min: number) => ((min - base) / 60) * HOUR_PX
   const height = (toHour - fromHour) * HOUR_PX
@@ -57,17 +62,37 @@ export function Timeline({ date, today, entries, nowMinutes, freeSlots, fitted, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Tap an empty hour → new event at that hour (time handed over via the local prefill).
+  // Tap an empty hour → new event at that hour.
   const onGridClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
     const min = base + ((e.clientY - rect.top) / HOUR_PX) * 60
     haptic('light')
-    setPrefillTime(minutesToHM(Math.min(23 * 60, Math.max(0, Math.floor(min / 60) * 60))))
-    openSheet('event', { date })
+    openSheet('event', { date, time: minutesToHM(Math.min(23 * 60, Math.max(0, Math.floor(min / 60) * 60))) })
   }
 
   return (
     <div ref={ref} className="relative select-none" style={{ height: height + 12 }}>
+      {/* BASE work hours / commute: quiet bands behind everything */}
+      {blocks.map((b) => {
+        if (!b.time || !b.endTime) return null
+        const top = y(toMin(b.time))
+        const h = y(toMin(b.endTime)) - top
+        const commute = b.blockKind === 'commute'
+        return (
+          <div
+            key={b.key}
+            aria-label={`${b.title} ${b.time}–${b.endTime}`}
+            className={cn('absolute right-0 pointer-events-none rounded-l-xl', commute ? 'bg-transparent' : 'bg-ink/[0.025]')}
+            style={{ top, height: h, left: GUTTER - 2, backgroundImage: commute ? HATCH : undefined }}
+          >
+            <span aria-hidden className={cn('absolute left-0 top-0 bottom-0 w-[2px] rounded-full', commute ? 'bg-line' : 'bg-ink/15')} />
+            <span className="absolute left-2.5 right-2 top-1.5 text-[10.5px] text-muted leading-none whitespace-nowrap truncate">
+              {b.emoji} {b.title}
+              <span className="opacity-70"> · {commute ? `${b.time}–${b.endTime}` : 'base'}</span>
+            </span>
+          </div>
+        )
+      })}
       {/* Hour grid (tap empty space → new event) */}
       <div className="absolute inset-0" onClick={onGridClick} aria-label="Criar compromisso" role="presentation">
         {hours.map((h) => (
@@ -132,15 +157,14 @@ export function Timeline({ date, today, entries, nowMinutes, freeSlots, fitted, 
           const narrow = p.cols > 2 && p.span < p.cols
           const wrap = p.span < p.cols && h >= 58
           return (
-            <motion.button
+            <motion.div
               key={e.key}
-              type="button"
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: Math.min(i * 0.025, 0.2), duration: 0.25 }}
-              onClick={() => openEntry(e, today)}
               className={cn(
-                'absolute pointer-events-auto text-left rounded-xl overflow-hidden flex border border-surface',
+                'absolute pointer-events-auto rounded-xl overflow-hidden flex',
+                e.approx ? 'border-[1.5px] border-dashed border-ink-2/25 dark:border-ink-2/30' : 'border border-surface',
                 t.soft,
                 e.done && 'opacity-60',
               )}
@@ -151,31 +175,59 @@ export function Timeline({ date, today, entries, nowMinutes, freeSlots, fitted, 
                 width: `calc(${(p.span / p.cols) * 100}% - ${p.col ? 4 : 2}px)`,
               }}
             >
-              <span aria-hidden className={cn('w-[3px] shrink-0', !e.sourceColor && t.dot)} style={e.sourceColor ? { background: e.sourceColor } : undefined} />
-              <span className={cn('flex-1 min-w-0 px-2', compact ? 'flex items-center gap-1.5' : 'py-1.5')}>
+              <span
+                aria-hidden
+                className={cn('w-[3px] shrink-0', !e.sourceColor && t.dot, e.approx && 'opacity-50')}
+                style={e.sourceColor ? { background: e.sourceColor } : undefined}
+              />
+              <button type="button" onClick={() => openEntry(e, today)} className={cn('flex-1 min-w-0 px-2 text-left', compact ? 'flex items-center gap-1.5' : 'py-1.5 self-stretch flex flex-col')}>
                 {compact ? (
                   <>
-                    <span className="text-[12px] tabular-nums text-ink-2 shrink-0">{e.time}</span>
+                    <span className="text-[12px] tabular-nums text-ink-2 shrink-0">{e.approx ? e.periodLabel : e.time}</span>
                     <span className={cn('truncate text-[13.5px] font-medium', e.done && 'line-through')}>
                       {!narrow && e.emoji && e.emoji !== '✓' && <span className="mr-1">{e.emoji}</span>}
                       {e.title}
                     </span>
+                    {!narrow && <EntryMarks entry={e} />}
                   </>
                 ) : (
                   <>
-                    <span className={cn('block text-[14px] font-medium leading-tight', wrap ? 'line-clamp-2 break-words' : 'truncate', e.done && 'line-through')}>
-                      {!narrow && e.emoji && e.emoji !== '✓' && <span className="mr-1">{e.emoji}</span>}
-                      {e.title}
+                    <span className="flex items-start gap-1.5 min-w-0">
+                      <span className={cn('flex-1 min-w-0 text-[14px] font-medium leading-tight', wrap ? 'line-clamp-2 break-words' : 'truncate', e.done && 'line-through')}>
+                        {!narrow && e.emoji && e.emoji !== '✓' && <span className="mr-1">{e.emoji}</span>}
+                        {e.title}
+                      </span>
+                      {!narrow && <EntryMarks entry={e} className="mt-[1px]" />}
                     </span>
                     <span className="block truncate text-[12px] text-ink-2/80 tabular-nums mt-0.5">
-                      {e.time}
-                      {e.endTime && p.end > p.start ? `–${e.endTime}` : ''}
-                      {e.subtitle && !narrow ? ` · ${e.subtitle}` : ''}
+                      {e.approx ? (
+                        e.subtitle
+                      ) : (
+                        <>
+                          {e.time}
+                          {e.endTime && p.end > p.start ? `–${e.endTime}` : ''}
+                          {e.subtitle && !narrow ? ` · ${e.subtitle}` : ''}
+                        </>
+                      )}
                     </span>
                   </>
                 )}
-              </span>
-            </motion.button>
+              </button>
+              {e.kind === 'event' && e.recurring && !e.external && !narrow && (
+                <button
+                  type="button"
+                  aria-label={`Cancelar ${e.title} só nesse dia`}
+                  title="Cancelar só nesse dia"
+                  onClick={(ev) => {
+                    ev.stopPropagation()
+                    cancelOccurrence(e.id, e.date, `${e.title} fica de fora só nesse dia`)
+                  }}
+                  className={cn('shrink-0 w-10 flex justify-center text-muted/80 active:text-ink', compact ? 'items-center' : 'items-end pb-2')}
+                >
+                  <CalendarX2 size={15} />
+                </button>
+              )}
+            </motion.div>
           )
         })}
       </div>
