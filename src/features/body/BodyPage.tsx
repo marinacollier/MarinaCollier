@@ -1,5 +1,7 @@
 import { useSearchParams } from 'react-router-dom'
-import { Plus } from 'lucide-react'
+import { Plus, UtensilsCrossed, Sprout } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { ROUTES } from '@/app/routes'
 import { IconButton, Page, PageHeader, Segmented } from '@/components/ui'
 import { openSheet } from '@/app/ui-store'
 import { useToday } from '@/hooks/useToday'
@@ -20,6 +22,7 @@ const TABS: { value: Tab; label: string }[] = [
 export default function BodyPage() {
   const today = useToday()
   const [params, setParams] = useSearchParams()
+  const nav = useNavigate()
   const raw = params.get('aba') as Tab | null
   const tab: Tab = TABS.some((t) => t.value === raw) ? raw! : 'hoje'
 
@@ -30,9 +33,17 @@ export default function BodyPage() {
         title="Corpo"
         subtitle="treino, comida e como você está — sem pressão."
         actions={
+          <>
+          <IconButton label="Estratégia nutricional" onClick={() => nav(ROUTES.nutrition)}>
+            <UtensilsCrossed size={20} />
+          </IconButton>
+          <IconButton label="Evolução" onClick={() => nav(ROUTES.bodyEvolution)}>
+            <Sprout size={20} />
+          </IconButton>
           <IconButton label={tab === 'objetivos' ? 'Novo objetivo' : 'Planejar treino'} onClick={() => (tab === 'objetivos' ? openSheet('workoutGoal', {}) : openSheet('workout', { date: today }))}>
             <Plus size={22} />
           </IconButton>
+          </>
         }
       />
       <Segmented
