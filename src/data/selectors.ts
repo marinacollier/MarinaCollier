@@ -69,8 +69,9 @@ export function waitingFor(db: DB): Task[] {
     .sort((a, b) => (a.waiting?.since ?? '').localeCompare(b.waiting?.since ?? ''))
 }
 
-export function prioritiesFor(db: DB, date: DateKey): DayPriority[] {
-  return db.priorities.filter((p) => p.date === date).sort(byOrder).slice(0, 3)
+/** The day's main Top 3 (domain priorities — trabalho/corpo/vida — are separate lists). */
+export function prioritiesFor(db: DB, date: DateKey, domain?: DayPriority['domain']): DayPriority[] {
+  return db.priorities.filter((p) => p.date === date && p.domain === domain).sort(byOrder).slice(0, 3)
 }
 
 // ─── Routines ───────────────────────────────────────────────────────────────
@@ -82,9 +83,12 @@ export function routineItemsFor(db: DB, routineId: ID, date: DateKey): RoutineIt
 }
 
 export function routineProgress(db: DB, routineId: ID, date: DateKey): { done: number; total: number } {
-  const items = routineItemsFor(db, routineId, date)
-  const done = items.filter((i) => occurrenceFor(db.occurrences, 'routineItem', i.id, date)).length
-  return { done, total: items.length }
+  const mode = checkinFor(db, date)?.routineModes?.[routineId]
+  const items = routineItemsFor(db, routineId, date).filter((i) => mode !== 'essential' || i.essential)
+  const isDone = (id: string) => occurrenceFor(db.occurrences, 'routineItem', id, date)?.status === 'done'
+  // Optional items (e.g. Luna's walk) only count once they're done — never as "missing".
+  const counted = items.filter((i) => !i.optional || isDone(i.id))
+  return { done: counted.filter((i) => isDone(i.id)).length, total: counted.length }
 }
 
 // ─── Calendar / agenda ──────────────────────────────────────────────────────
@@ -317,7 +321,8 @@ export function petTasksDue(db: DB, date: DateKey) {
     .filter((p) => {
       if (p.recurrence) {
         const last = lastDoneDate(db.occurrences, 'petTask', p.id)
-        if (occurrenceFor(db.occurrences, 'petTask', p.id, date)) return true
+        const occ = occurrenceFor(db.occurrences, 'petTask', p.id, date)
+        if (occ) return occ.status === 'done' // done today stays visible (checked); skipped ("fora da rotina") hides it
         return isDue(p.recurrence, date, last)
       }
       return !!p.dueDate && p.dueDate <= date
