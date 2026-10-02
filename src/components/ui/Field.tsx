@@ -1,16 +1,25 @@
-import { forwardRef, useState, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from 'react'
+import { forwardRef, useId, useState, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { cn } from '@/lib/cn'
 import { centsToInput, parseBRL } from '@/lib/money'
 
+/**
+ * Labelled form group. Rendered as a div + aria-labelledby (not <label>) so wrapping a chip
+ * group doesn't forward taps on the label text to the first chip.
+ */
 export function Field({ label, hint, children, className }: { label?: ReactNode; hint?: ReactNode; children: ReactNode; className?: string }) {
+  const id = useId()
   return (
-    <label className={cn('block', className)}>
-      {label && <span className="block text-[13px] font-medium text-ink-2 mb-1.5 px-0.5">{label}</span>}
+    <div role="group" aria-labelledby={label ? id : undefined} className={cn('block', className)}>
+      {label && (
+        <span id={id} className="block text-[13px] font-medium text-ink-2 mb-1.5 px-0.5">
+          {label}
+        </span>
+      )}
       {children}
       {hint && <span className="block text-[12px] text-muted mt-1 px-0.5">{hint}</span>}
-    </label>
+    </div>
   )
 }
 

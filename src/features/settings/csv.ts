@@ -1,3 +1,4 @@
+import { toDateKey } from '@/lib/date'
 /**
  * CSV export. Pure. Comma separated, CRLF lines, UTF-8 BOM so Excel opens accents correctly.
  */
@@ -68,7 +69,7 @@ export function buildDataset(db: DB, id: CsvDatasetId): { headers: string[]; row
           t.priority,
           t.context,
           t.projectId ? proj.get(t.projectId) : '',
-          t.completedAt ? t.completedAt.slice(0, 10) : '',
+          t.completedAt ? toDateKey(new Date(t.completedAt)) : '',
           t.notes,
         ]),
       }

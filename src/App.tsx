@@ -8,6 +8,7 @@ import { BottomNav } from '@/components/layout/BottomNav'
 import { Fab } from '@/components/layout/Fab'
 import { SheetHost } from '@/components/layout/SheetHost'
 import { Toaster } from '@/components/ui/Toaster'
+import { useLocalReminders } from '@/features/settings/useLocalReminders'
 
 const Welcome = lazy(() => import('@/features/settings/Welcome'))
 
@@ -44,6 +45,7 @@ export default function App() {
   const onboarded = useStore((s) => !!s.db.profile.onboardedAt)
   useTheme()
   useCommandShortcut()
+  useLocalReminders()
 
   if (!hydrated) return <Splash />
 

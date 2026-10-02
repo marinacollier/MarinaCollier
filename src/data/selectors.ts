@@ -21,7 +21,7 @@ import type {
   Trip,
   Workout,
 } from './types'
-import { diffDays, endOfMonth, endOfWeek, hmToMinutes, startOfMonth, startOfWeek } from '@/lib/date'
+import { diffDays, endOfMonth, endOfWeek, hmToMinutes, startOfMonth, startOfWeek, toDateKey } from '@/lib/date'
 import { isDue, lastDoneDate, occurrenceFor, occursOn } from '@/lib/recurrence'
 import { DEFAULT_MODALITIES } from './defaults'
 
@@ -48,7 +48,7 @@ export function tasksForDay(db: DB, date: DateKey): Task[] {
     .filter((t) => {
       if (t.status === 'archived') return false
       if (t.recurrence) return occursOn(t.recurrence, date, lastDoneDate(db.occurrences, 'task', t.id))
-      if (t.status === 'done') return t.completedAt?.slice(0, 10) === date || t.date === date
+      if (t.status === 'done') return (!!t.completedAt && toDateKey(new Date(t.completedAt)) === date) || t.date === date
       return t.date === date || t.dueDate === date || (t.bucket === 'hoje' && !t.date)
     })
     .sort((a, b) => (a.time ?? '99').localeCompare(b.time ?? '99') || a.order - b.order)

@@ -57,3 +57,12 @@ describe('store + persistence', () => {
     expect(db.profile.homeWidgets.length).toBeGreaterThan(5)
   })
 })
+
+describe('selectors timezone', () => {
+  it('counts a task finished at 22h in São Paulo on that São Paulo day (not the UTC next day)', async () => {
+    const { tasksForDay } = await import('./selectors')
+    const t = actions.create('tasks', { title: 'Noite', status: 'done', order: 0, completedAt: '2026-10-03T01:30:00.000Z' })
+    expect(tasksForDay(getDB(), '2026-10-02').some((x) => x.id === t.id)).toBe(true)
+    expect(tasksForDay(getDB(), '2026-10-03').some((x) => x.id === t.id)).toBe(false)
+  })
+})
