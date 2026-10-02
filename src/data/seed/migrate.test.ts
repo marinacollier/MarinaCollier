@@ -30,3 +30,22 @@ describe('life seed migration', () => {
     expect(applyLifeSeed(old, '2026-10-02').profile.rhythm.wakeTime).toBe('05:30')
   })
 })
+
+describe('life seed migration — old example cleanup', () => {
+  it('upgrades/retires untouched old examples and keeps edited ones', () => {
+    const stamp = '2026-09-01T10:00:00.000Z'
+    const old = migrate({ ...emptyDB(), profile: { ...emptyDB().profile, seedVersion: 1 } })
+    old.financialCategories = [{ id: 'cat-casa', name: 'Casa', emoji: '🏡', tone: 'sand', order: 0, archived: false, createdAt: stamp, updatedAt: stamp }]
+    old.books = [
+      { id: 'b-untouched', title: 'Exemplo', status: 'quero', progress: 0, quotes: [], order: 0, createdAt: stamp, updatedAt: stamp },
+      { id: 'b-edited', title: 'Exemplo editado', status: 'lendo', progress: 30, quotes: [], order: 1, createdAt: stamp, updatedAt: '2026-09-10T10:00:00.000Z' },
+    ]
+    old.routines = [{ id: 'routine-manha', name: 'Minha manhã', period: 'manha', order: 0, active: true, createdAt: stamp, updatedAt: stamp }]
+    const next = applyLifeSeed(old, '2026-10-02')
+    expect(next.books.map((b) => b.id)).toEqual(['b-edited'])
+    // untouched routine with a stable id is upgraded to the new seed's version
+    const r = next.routines.find((x) => x.id === 'routine-manha')!
+    const fresh = buildSeed('2026-10-02').routines.find((x) => x.id === 'routine-manha')!
+    expect(r.name).toBe(fresh.name)
+  })
+})
