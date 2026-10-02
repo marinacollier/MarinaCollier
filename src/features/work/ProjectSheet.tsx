@@ -10,7 +10,13 @@ import { haptic } from '@/lib/haptics'
 import { PRIORITY_OPTIONS, PROJECT_STATUS_OPTIONS, TONE_OPTIONS } from './constants'
 import { updateProject } from './mutations'
 
-const EMOJIS = ['💼', '🏦', '👗', '🌅', '🧘‍♀️', '🎬', '🚀', '🤖', '📱', '🧠', '🌱', '✍️']
+const EMOJIS = ['💼', '🟥', '👗', '🤖', '🧘', '📸', '🎬', '🚀', '📱', '🧠', '🌱', '✍️']
+
+/** "Planner, Match ,," → ['Planner', 'Match'] (undefined when empty). */
+function splitList(v: string): string[] | undefined {
+  const list = [...new Set(v.split(',').map((x) => x.trim()).filter(Boolean))]
+  return list.length ? list : undefined
+}
 
 export default function ProjectSheet({ id }: SheetProps<'project'>) {
   const existing = id ? getDB().projects.find((p) => p.id === id) : undefined
@@ -24,6 +30,8 @@ export default function ProjectSheet({ id }: SheetProps<'project'>) {
   const [objective, setObjective] = useState(existing?.objective ?? '')
   const [deadline, setDeadline] = useState(existing?.deadline)
   const [creator, setCreator] = useState(existing?.kind === 'creator')
+  const [sections, setSections] = useState((existing?.sections ?? []).join(', '))
+  const [categories, setCategories] = useState((existing?.categories ?? []).join(', '))
 
   const save = () => {
     const data: Partial<Project> = {
@@ -37,6 +45,8 @@ export default function ProjectSheet({ id }: SheetProps<'project'>) {
       objective: objective.trim() || undefined,
       deadline,
       kind: creator ? 'creator' : 'default',
+      sections: splitList(sections),
+      categories: creator ? splitList(categories) : existing?.categories,
     }
     if (existing) {
       updateProject(existing.id, data)
@@ -111,6 +121,9 @@ export default function ProjectSheet({ id }: SheetProps<'project'>) {
         <Field label="Objetivo">
           <TextArea rows={2} value={objective} onChange={(e) => setObjective(e.target.value)} placeholder="O que seria sucesso aqui?" />
         </Field>
+        <Field label="Seções" hint="Áreas do projeto, separadas por vírgula — viram filtros das tarefas.">
+          <TextInput placeholder="ex.: Planner, Match" value={sections} onChange={(e) => setSections(e.target.value)} />
+        </Field>
         <Field label="Deadline" hint="Só se existir de verdade.">
           <DateInput value={deadline} onChange={setDeadline} />
         </Field>
@@ -134,6 +147,11 @@ export default function ProjectSheet({ id }: SheetProps<'project'>) {
           <span className="text-[14px] text-ink-2">Frente de conteúdo (Creator / UGC)</span>
           <input type="checkbox" checked={creator} onChange={(e) => setCreator(e.target.checked)} className="h-5 w-5 accent-[var(--accent)]" />
         </label>
+        {creator && (
+          <Field label="Categorias de conteúdo" hint="Separadas por vírgula.">
+            <TextInput placeholder="ex.: corrida, surf, rotina" value={categories} onChange={(e) => setCategories(e.target.value)} />
+          </Field>
+        )}
       </MoreOptions>
     </SheetLayout>
   )
