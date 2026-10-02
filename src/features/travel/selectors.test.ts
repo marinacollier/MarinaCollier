@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Expense, Trip, TripItem } from '@/data/types'
+import type { DB, Expense, Trip, TripItem } from '@/data/types'
 import { createSeedContext } from '@/data/seed/context'
 import { SEED_IDS } from '@/data/seed/ids'
 import { seedTravel } from './seed'
@@ -15,7 +15,19 @@ import {
   tripCountdown,
   tripDatesLabel,
   tripPhase,
+  PAYMENT_META,
+  PAYMENT_ORDER,
+  followingTrip,
+  followingTripLabel,
+  groupCounts,
+  groupsOfTrip,
+  inSection,
+  itemDateLabel,
+  reviewGroups,
+  reviewItems,
+  statusLabel,
 } from './selectors'
+import { upcomingTrips } from '@/data/selectors'
 
 const TODAY = '2026-10-02'
 const now = '2026-10-02T12:00:00.000Z'
@@ -78,7 +90,8 @@ describe('countdown', () => {
     expect(tripCountdown(trip({ startDate: TODAY }), TODAY)).toBe('é hoje! ✨')
   })
   it('never invents dates for fuzzy trips', () => {
-    expect(tripCountdown(trip({ dateLabel: 'out/nov 2026' }), TODAY)).toBe('data a definir')
+    expect(tripCountdown(trip({ dateLabel: 'out/nov 2026' }), TODAY)).toBe('data a confirmar')
+    expect(tripCountdown(trip({}), TODAY)).toBe('data a confirmar')
     expect(tripDatesLabel(trip({ dateLabel: 'out/nov 2026' }))).toBe('out/nov 2026')
     expect(tripPhase(trip({ dateLabel: 'x' }), TODAY)).toBe('sem_data')
   })
@@ -157,7 +170,7 @@ describe('sections', () => {
 describe('default checklist', () => {
   it('creates the full list for international trips with unproven items "a confirmar"', () => {
     const list = defaultChecklistItems({ id: 'za', flag: '🇿🇦' }, [])
-    expect(list).toHaveLength(11)
+    expect(list).toHaveLength(10)
     expect(list.find((i) => i.title.startsWith('Visto'))?.status).toBe('a_confirmar')
     expect(list.find((i) => i.title.startsWith('Vacinas'))?.status).toBe('a_confirmar')
     expect(list.every((i) => i.section === 'antes_de_ir' && i.tripId === 'za')).toBe(true)
@@ -168,13 +181,73 @@ describe('default checklist', () => {
     const existing = first.map((d, i) => item({ ...d, id: `x${i}`, title: i === 0 ? d.title.toUpperCase() : d.title }))
     expect(defaultChecklistItems({ id: 'za', flag: '🇿🇦' }, existing)).toEqual([])
     // other trip's items don't count
-    expect(defaultChecklistItems({ id: 'other', flag: '🇿🇦' }, existing)).toHaveLength(11)
+    expect(defaultChecklistItems({ id: 'other', flag: '🇿🇦' }, existing)).toHaveLength(10)
   })
 
   it('skips international-only items for domestic trips', () => {
     const titles = defaultChecklistItems({ id: 'br', flag: '🇧🇷' }, []).map((i) => i.title)
     expect(titles).not.toContain('Passaporte e validade')
-    expect(titles).toContain('Luna: creche/hotel')
+    expect(titles).toContain('Seguro viagem')
+  })
+
+  it('adds one care item per pet from the data (nothing hardcoded)', () => {
+    expect(defaultChecklistItems({ id: 'br', flag: '🇧🇷' }, []).some((i) => /creche/.test(i.title))).toBe(false)
+    const titles = defaultChecklistItems({ id: 'br', flag: '🇧🇷' }, [], 0, ['Nina']).map((i) => i.title)
+    expect(titles).toContain('Nina: creche/hotel')
+  })
+})
+
+describe('payment + review', () => {
+  it('has its own labels, never derived from the reservation status', () => {
+    expect(PAYMENT_ORDER.map((p) => PAYMENT_META[p].label)).toEqual(['A confirmar', 'Pendente', 'Pago', 'N/A'])
+    expect(statusLabel('a_confirmar', true)).toBe('Revisar')
+    expect(statusLabel('a_confirmar')).toBe('A confirmar')
+    expect(statusLabel('confirmado', true)).toBe('Confirmado')
+  })
+
+  it('lists a_confirmar items grouped by sub-area (trip order), ungrouped last, filterable', () => {
+    const list = [
+      item({ title: 'a', group: 'Cape Town', status: 'a_confirmar', order: 1 }),
+      item({ title: 'b', group: 'Safari', status: 'a_confirmar', order: 2 }),
+      item({ title: 'c', status: 'a_confirmar', order: 3 }),
+      item({ title: 'd', group: 'Cape Town', status: 'confirmado', order: 4 }),
+      item({ title: 'e', group: 'Cape Town', status: 'a_confirmar', order: 5 }),
+    ]
+    expect(reviewItems(list).map((i) => i.title)).toEqual(['a', 'b', 'c', 'e'])
+    const g = reviewGroups(list)
+    expect(g.map((x) => x.label)).toEqual(['Cape Town', 'Safari', 'Outros'])
+    expect(g[0].items.map((i) => i.title)).toEqual(['a', 'e'])
+    expect(reviewGroups(list, 'Safari').map((x) => x.label)).toEqual(['Safari'])
+    expect(groupCounts(list)).toEqual([
+      { group: 'Cape Town', count: 3 },
+      { group: 'Safari', count: 1 },
+    ])
+  })
+
+  it('roteiro is a timeline: dated items of other sections show up, multi-day labels', () => {
+    const flight = item({ section: 'voo', title: 'voo', date: '2026-11-16', time: '10:00' })
+    const undatedFlight = item({ section: 'voo', title: 'revisar voo' })
+    const safari = item({ section: 'roteiro', title: 'Safari', date: '2026-11-14', endDate: '2026-11-15' })
+    expect(inSection(flight, 'roteiro')).toBe(true)
+    expect(inSection(undatedFlight, 'roteiro')).toBe(false)
+    expect(groupItems([flight, undatedFlight, safari], 'roteiro').map((g) => g.label)).toEqual(['2026-11-14', '2026-11-16'])
+    expect(itemDateLabel(safari)).toBe('14 → 15 de nov.')
+    expect(itemDateLabel({ date: '2026-10-30', endDate: '2026-11-02' })).toBe('30 de out. → 2 de nov.')
+    expect(itemDateLabel({ date: '2026-11-16' })).toBe('16 de nov.')
+  })
+})
+
+describe('back-to-back trips', () => {
+  it('finds a trip starting within 3 days after this one', () => {
+    const a = trip({ id: 'r', name: 'Recife', flag: '🇧🇷', startDate: '2026-10-22' })
+    const b = trip({ id: 'z', name: 'South Africa 2026', flag: '🇿🇦', startDate: '2026-10-24', endDate: '2026-11-16' })
+    const c = trip({ id: 'i', name: 'Itacaré', dateLabel: 'Réveillon' })
+    const f = followingTrip(a, [a, b, c])
+    expect(f?.trip.id).toBe('z')
+    expect(followingTripLabel(f!)).toBe('2 dias depois: South Africa 2026 🇿🇦')
+    expect(followingTrip(b, [a, b, c])).toBeUndefined()
+    expect(followingTrip(a, [a, trip({ startDate: '2026-10-26' })])).toBeUndefined()
+    expect(followingTrip(c, [a, b, c])).toBeUndefined()
   })
 })
 
@@ -182,30 +255,79 @@ describe('seed', () => {
   const data = seedTravel(createSeedContext(TODAY))
   const trips = data.trips!
   const items = data.tripItems!
+  const byId = (id: string) => trips.find((t) => t.id === id)!
 
-  it('seeds the three trips with the stable ids', () => {
+  it('seeds the three trips with stable ids and her dates', () => {
     expect(trips.map((t) => t.id).sort()).toEqual([SEED_IDS.tripAfrica, SEED_IDS.tripItacare, SEED_IDS.tripRecife].sort())
-    const recife = trips.find((t) => t.id === SEED_IDS.tripRecife)!
-    expect(recife.startDate).toBe('2026-10-22')
+    const recife = byId(SEED_IDS.tripRecife)
+    expect(recife).toMatchObject({ startDate: '2026-10-22', datesConfirmed: true, status: 'planejando' })
     expect(recife.endDate).toBeUndefined()
+    const africa = byId(SEED_IDS.tripAfrica)
+    expect(africa).toMatchObject({ name: 'South Africa 2026', flag: '🇿🇦', startDate: '2026-10-24', endDate: '2026-11-16', datesConfirmed: true })
+    expect(africa.notes).toMatch(/período-base/)
+    const itacare = byId(SEED_IDS.tripItacare)
+    expect(itacare).toMatchObject({ place: 'Itacaré, Bahia', dateLabel: 'fim de 2026 / Réveillon', datesConfirmed: false })
+    expect(itacare.startDate).toBeUndefined()
+    expect(tripCountdown(itacare, TODAY)).toBe('data a confirmar')
+  })
+
+  it('every item has a stable, unique id', () => {
+    expect(items.every((i) => i.id.startsWith('seed:travel:'))).toBe(true)
+    expect(new Set(items.map((i) => i.id)).size).toBe(items.length)
+    expect(seedTravel(createSeedContext('2027-01-01')).tripItems!.map((i) => i.id)).toEqual(items.map((i) => i.id))
+  })
+
+  it('orders countdowns Recife → South Africa → Itacaré (local + shared selector)', () => {
+    const order = [SEED_IDS.tripRecife, SEED_IDS.tripAfrica, SEED_IDS.tripItacare]
+    expect(sortUpcoming(trips, TODAY).map((t) => t.id)).toEqual(order)
+    const db = { trips } as unknown as DB
+    expect(upcomingTrips(db, TODAY).map((t) => t.id)).toEqual(order)
     expect(tripBuckets(trips, TODAY).next?.id).toBe(SEED_IDS.tripRecife)
   })
 
-  it('never invents dates, prices or confirmations', () => {
-    const africa = trips.find((t) => t.id === SEED_IDS.tripAfrica)!
-    expect(africa.startDate).toBeUndefined()
-    expect(africa.datesConfirmed).toBe(false)
+  it('never invents money, confirmations or payments', () => {
     expect(trips.every((t) => t.budgetCents == null)).toBe(true)
-    expect(items.every((i) => i.amountCents == null && !i.date && !i.confirmationCode)).toBe(true)
-    expect(items.some((i) => i.status === 'confirmado' || i.status === 'feito')).toBe(false)
-    expect(items.some((i) => i.section === 'voo')).toBe(false)
+    expect(items.every((i) => i.amountCents == null && !i.confirmationCode)).toBe(true)
+    expect(items.every((i) => i.status === 'a_confirmar')).toBe(true)
+    expect(items.some((i) => i.paymentStatus === 'pago')).toBe(false)
+    expect(JSON.stringify(data)).not.toMatch(/"confirmado"|"pago"|"feito"/)
   })
 
-  it('África do Sul has its groups and a checklist', () => {
+  it('África: §26 itinerary with own payment status, all sub-areas present', () => {
     const mine = items.filter((i) => i.tripId === SEED_IDS.tripAfrica)
-    expect(new Set(mine.map((i) => i.group).filter(Boolean))).toEqual(new Set(['Cape Town', 'Johannesburg / Safari', 'Equipment']))
-    expect(mine.filter((i) => i.group === 'Equipment').every((i) => i.section === 'mala' && i.status === 'a_fazer')).toBe(true)
-    expect(checklistProgress(mine).total).toBe(11)
-    expect(defaultChecklistItems({ id: SEED_IDS.tripAfrica, flag: '🇿🇦' }, mine)).toEqual([])
+    const ida = mine.find((i) => i.date === '2026-11-13')!
+    expect(ida).toMatchObject({ section: 'roteiro', status: 'a_confirmar', paymentStatus: 'a_confirmar' })
+    const safari = mine.find((i) => i.date === '2026-11-14')!
+    expect(safari).toMatchObject({ title: 'Safari', endDate: '2026-11-15', paymentStatus: 'a_confirmar' })
+    const flight = mine.find((i) => i.date === '2026-11-16')!
+    expect(flight).toMatchObject({ section: 'voo', time: '10:00', group: 'Flights', paymentStatus: 'a_confirmar' })
+    expect(flight.title).toMatch(/OR Tambo/)
+    expect(groupItems(mine, 'roteiro').filter((g) => g.key.startsWith('d:')).map((g) => g.label)).toEqual(['2026-11-13', '2026-11-14', '2026-11-16'])
+
+    const subAreas = ['Cape Town', 'School', 'Surf', 'Running', 'Trail', 'Gravel / Cycling', 'Beaches', 'Wine', 'Social', 'Content', 'Johannesburg', 'Safari', 'Flights', 'Accommodation', 'Transport', 'Shopping', 'Packing', 'Documents', 'Budget']
+    expect(groupsOfTrip(mine)).toEqual(subAreas)
+
+    const find = (t: string) => mine.find((i) => i.title === t)!
+    expect(find('Revisar voo')).toMatchObject({ section: 'voo', group: 'Flights' })
+    expect(find('Hospedagem Cape Town')).toMatchObject({ section: 'hospedagem', group: 'Accommodation' })
+    expect(find('Logística aeroporto').section).toBe('transporte')
+    expect(find('Seguro').section).toBe('documento')
+    expect(find('Bike rental').group).toBe('Gravel / Cycling')
+    expect(find('Vinícolas').group).toBe('Wine')
+    expect(reviewItems(mine)).toHaveLength(mine.length)
+  })
+
+  it('Recife: §29 items a confirmar, return phrased as a question; back-to-back note', () => {
+    const mine = items.filter((i) => i.tripId === SEED_IDS.tripRecife)
+    expect(mine.map((i) => i.title)).toEqual(['Voo', 'Mala', 'Compromissos', 'Pessoas', 'Compras', 'Logística', 'Retorno / próximo deslocamento'])
+    expect(mine.at(-1)!.notes).toMatch(/\?$/)
+    const f = followingTrip(byId(SEED_IDS.tripRecife), trips)
+    expect(f && followingTripLabel(f)).toBe('2 dias depois: South Africa 2026 🇿🇦')
+  })
+
+  it('Itacaré: §30 items, no budget', () => {
+    const mine = items.filter((i) => i.tripId === SEED_IDS.tripItacare)
+    expect(mine).toHaveLength(9)
+    expect(byId(SEED_IDS.tripItacare).budgetCents).toBeUndefined()
   })
 })
