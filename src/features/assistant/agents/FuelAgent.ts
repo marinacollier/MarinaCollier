@@ -64,6 +64,10 @@ function strategyAnswer(ctx: AgentContext): AnswerBlock[] {
   const { db, today } = ctx
   const w = targetWorkout(ctx)
   const createAction = sheetAction('nutritionStrategy', {})
+  if (!w && !ctx.q.modalities.length) {
+    const when = ctx.q.time === 'hoje' ? 'Hoje' : 'Amanhã'
+    return [{ kind: 'headline', text: `${when} não tem treino no plano — nada de estratégia especial pra preparar 🙂` }]
+  }
   if (!w) {
     const what = ctx.q.modalities.length ? modalityOf(db, ctx.q.modalities[0]).label.toLowerCase() : ctx.q.time === 'hoje' ? 'hoje' : 'amanhã'
     return [

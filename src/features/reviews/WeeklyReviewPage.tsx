@@ -21,6 +21,7 @@ import {
   nextMonday,
   prioritySuggestions,
   QUESTIONS,
+  reviewEventOfWeek,
   reviewWeekFor,
   weekData,
   weeklyHints,
@@ -29,6 +30,7 @@ import {
   type WeekData,
 } from './weekly'
 import { plural } from './shared'
+import { AgendaHint } from './AgendaHint'
 
 type Answers = WeeklyReview['answers']
 
@@ -171,6 +173,8 @@ function Intro({
     [reviews],
   )
   const canGoForward = weekStart < startOfWeek(today)
+  const db = useDB()
+  const ceo = useMemo(() => reviewEventOfWeek(db, weekStart), [db, weekStart])
   return (
     <Page>
       <PageHeader
@@ -219,6 +223,8 @@ function Intro({
               : 'Começar'}
         </Button>
       </Card>
+
+      {ceo && <AgendaHint emoji="📋" when={`${formatShortDate(ceo.date)}${ceo.event.startTime ? ` · ${ceo.event.startTime}` : ''}`} title={ceo.event.title} eventId={ceo.event.id} />}
 
       <SectionTitle>Revisões anteriores</SectionTitle>
       {past.length === 0 ? (
@@ -624,6 +630,9 @@ function DoneStep({
             Ver minhas metas
           </Button>
         )}
+        <Button variant={picked.length ? 'soft' : 'primary'} size="lg" onClick={() => nav(ROUTES.weekPlanner)}>
+          🧭 Montar minha semana
+        </Button>
         <Button variant="ghost" onClick={onIntro}>
           Voltar pra revisão
         </Button>

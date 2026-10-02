@@ -63,7 +63,7 @@ function groupRow(g: TripGroup, trip: Trip): AnswerItem {
   const titles = g.items.map((i) => i.title)
   return {
     id: `group:${trip.id}:${g.name}`,
-    emoji: '❓',
+    emoji: '🧳',
     title: g.name,
     subtitle: titles.slice(0, 3).join(' · ') + (titles.length > 3 ? ` +${titles.length - 3}` : ''),
     trailing: review ? `${review} revisar` : `${g.items.length} a fazer`,
@@ -102,7 +102,16 @@ function pending(ctx: AgentContext, trip: Trip): AnswerBlock[] {
     if (openBefore) blocks.push({ kind: 'suggestions', questions: [`O que falta pra ${before.name}?`] })
   }
 
-  if (o.groups.length) blocks.push({ kind: 'list', title: 'Por sub-área', emoji: trip.flag, items: o.groups.map((g) => groupRow(g, trip)) })
+  if (o.groups.length) {
+    const MAX = 8
+    blocks.push({
+      kind: 'list',
+      title: 'Por sub-área',
+      emoji: trip.flag,
+      items: o.groups.slice(0, MAX).map((g) => groupRow(g, trip)),
+      more: o.groups.length > MAX ? { label: `Ver as outras ${o.groups.length - MAX} sub-áreas`, action: routeAction(ROUTES.trip(trip.id)) } : undefined,
+    })
+  }
   if (o.tasks.length) blocks.push({ kind: 'list', title: 'Tarefas da viagem', emoji: '✓', items: o.tasks.map((t) => taskItem(db, t, today)) })
   if (o.dump.length)
     blocks.push({
@@ -112,7 +121,7 @@ function pending(ctx: AgentContext, trip: Trip): AnswerBlock[] {
       items: o.dump.map((b) => ({ id: `dump:${b.id}`, emoji: '🧠', title: b.text, subtitle: b.group, action: sheetAction('brainDumpTriage', { id: b.id }) })),
     })
   const lastList = [...blocks].reverse().find((b) => b.kind === 'list')
-  if (lastList && lastList.kind === 'list') lastList.more = { label: `Abrir ${trip.name}`, action: routeAction(ROUTES.trip(trip.id)) }
+  if (lastList && lastList.kind === 'list') lastList.more ??= { label: `Abrir ${trip.name}`, action: routeAction(ROUTES.trip(trip.id)) }
   else blocks.push({ kind: 'list', title: trip.name, emoji: trip.flag, items: [{ id: 'trip', emoji: trip.flag, title: 'Abrir viagem', action: routeAction(ROUTES.trip(trip.id)) }] })
   return blocks
 }

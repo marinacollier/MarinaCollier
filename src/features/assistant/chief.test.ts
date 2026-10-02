@@ -110,7 +110,7 @@ describe('Mari answers', () => {
     expect(a.agents[0].id).toBe('training')
     const slots = list(a, 'Toque pra planejar')!.items
     // Saturday already has musculação → skipped; today only after "now" (08:00) and outside BASE work hours
-    expect(slots.map((s) => s.title)).toEqual(['Hoje · 18:00–19:00', 'Domingo · 06:00–07:00', 'Segunda · 06:00–07:00', 'Terça · 06:00–07:00'])
+    expect(slots.map((s) => s.title)).toEqual(['Hoje · 18:00', 'Domingo · 06:00', 'Segunda · 06:00', 'Terça · 06:00'])
     expect(slots[0].action).toEqual({
       kind: 'createWorkout',
       data: { date: today, time: '18:00', modality: 'musculacao', status: 'planejado', planType: 'flexivel', plannedDurationMin: 60, workoutGoalId: undefined, order: 0 },

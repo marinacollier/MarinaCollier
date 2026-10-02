@@ -49,6 +49,12 @@ describe('command palette', () => {
     expect(labels('calendario')).toContain('Ir para Agenda')
   })
 
+  it('has "Ir para Montar minha semana"', () => {
+    expect(labels('montar')[0]).toBe('Ir para Montar minha semana')
+    expect(labels('planejar')).toContain('Ir para Montar minha semana')
+    expect(cmds.find((c) => c.label === 'Ir para Montar minha semana')!.action).toEqual({ kind: 'route', to: '/semana' })
+  })
+
   it('returns nothing for nonsense', () => {
     expect(labels('zzqx')).toEqual([])
   })

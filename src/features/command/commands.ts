@@ -45,6 +45,7 @@ const MAIN_ROUTES: { label: string; emoji: string; to: string; keywords?: string
   { label: 'Creator / UGC', emoji: '🎬', to: ROUTES.creator, keywords: ['conteudo', 'ugc', 'parcerias'] },
   { label: 'Work inbox', emoji: '📥', to: ROUTES.workInbox, keywords: ['emails', 'teams', 'outlook'] },
   { label: 'Wins', emoji: '✨', to: ROUTES.wins, keywords: ['conquistas'] },
+  { label: 'Montar minha semana', emoji: '🧭', to: ROUTES.weekPlanner, keywords: ['semana', 'planejar', 'planner', 'treinos da semana', 'conflitos'] },
   { label: 'Revisão semanal', emoji: '🗓️', to: ROUTES.weeklyReview, keywords: ['review'] },
   { label: 'Meu mês', emoji: '🌙', to: ROUTES.monthlyReview, keywords: ['review', 'mes'] },
   { label: 'Mari', emoji: '✨', to: ROUTES.assistant, keywords: ['assistente', 'chief of staff', 'perguntar'] },

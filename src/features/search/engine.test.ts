@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { emptyDB } from '@/data/defaults'
-import { search, searchAll, topResults } from './engine'
+import { search, searchAll, tokenAliases, topResults } from './engine'
+import { buildLifeFixture, LIFE_TODAY } from './life-fixture'
 import { buildFixture, FIXTURE_TODAY } from './test-fixture'
 
 const db = buildFixture()
@@ -123,5 +124,52 @@ describe('search engine', () => {
 
   it('topResults flattens best results', () => {
     expect(topResults(run('cape town'), 2)).toHaveLength(2)
+  })
+})
+
+describe('search · real-life entities', () => {
+  const life = buildLifeFixture()
+  const lrun = (q: string) => search(life, q, LIFE_TODAY)
+  const ltitles = (q: string) => lrun(q).groups.flatMap((g) => g.results.map((r) => r.title))
+
+  it('airport codes find city names (and back), without matching every item of the trip', () => {
+    expect(tokenAliases('jnb')).toContain('johannesburg')
+    expect(tokenAliases('johannesburg')).toContain('jnb')
+    expect(ltitles('JNB')).toEqual(expect.arrayContaining(['Hospedagem Johannesburg', 'Logística aeroporto', 'Voo internacional de volta']))
+    expect(ltitles('JNB')).not.toContain('Hospedagem Cape Town')
+    expect(ltitles('CPT')).toContain('Hospedagem Cape Town')
+  })
+
+  it('safari → trip item (sub-area) and the trip itself', () => {
+    expect(lrun('safari').groups.map((g) => g.domain)).toEqual(expect.arrayContaining(['tripItem', 'trip']))
+  })
+
+  it('cerâmica / Criatividade → the recurring event with its category', () => {
+    expect(lrun('cerâmica').groups[0].results[0]).toMatchObject({ title: 'Cerâmica', subtitle: 'segunda e quinta · noite · Vida / Criatividade' })
+    expect(ltitles('criatividade')).toContain('Cerâmica')
+  })
+
+  it('TotalPass → the planning rule; week template lines are findable', () => {
+    expect(lrun('TotalPass').groups[0].domain).toBe('planning')
+    expect(lrun('TotalPass').groups[0].results[0].title).toBe('TotalPass — 1 check-in/dia')
+    expect(ltitles('quarta natação')).toContain('Quarta · 🏊‍♀️ Natação')
+    expect(ltitles('fun day')).toContain('Sábado · Fun day')
+  })
+
+  it('Cambly → the study track through its formats; roadmap groups → milestones', () => {
+    expect(ltitles('Cambly')).toContain('Inglês')
+    expect(ltitles('busca')).toContain('Embeddings')
+    expect(ltitles('infra catalogo')).toContain('Postgres + sync')
+  })
+
+  it('nutrition: strategies and day-plan foods ("whey", "pré-treino", "pedal")', () => {
+    expect(ltitles('whey')).toContain('Domingo — pedal longo')
+    expect(ltitles('pré-treino')).toEqual(expect.arrayContaining(['Domingo — pedal longo', 'Long ride']))
+    expect(ltitles('pedal')).toEqual(expect.arrayContaining(['Pedal longo', 'Long ride']))
+    expect(ltitles('tapioca')).toContain('Domingo — pedal longo')
+  })
+
+  it('flexible workout goals are indexed', () => {
+    expect(ltitles('yoga')).toContain('Yoga — 1x/semana')
   })
 })

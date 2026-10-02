@@ -560,7 +560,7 @@ function buildDocs(db: DB, today: DateKey): Doc[] {
       emoji: trip?.flag ?? '🧳',
       subtitle: join(trip?.name, i.group, i.status === 'a_confirmar' ? 'revisar' : TRIP_ITEM_STATUS[i.status]),
       primary: field(i.title),
-      secondary: field(i.group, i.notes, trip?.name, trip?.place, TRIP_SECTION_LABEL[i.section], TRIP_ITEM_STATUS[i.status]),
+      secondary: field(i.group, i.notes, trip?.name, TRIP_SECTION_LABEL[i.section], TRIP_ITEM_STATUS[i.status]),
       date: i.date,
       inactive: i.status === 'cancelado',
       action: sheetAction('tripItem', { id: i.id, tripId: i.tripId }),

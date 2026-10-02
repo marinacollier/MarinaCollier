@@ -197,6 +197,8 @@ export const WorkAgent: Agent = {
     if (has(q, ...LAGGING_WORDS) && has(q, 'projeto*', 'trabalho')) return 0.95
     if (has(q, ...WAITING_WORDS)) return q.projects.length || q.people.length ? 0.95 : 0.8
     // "Quando consigo encaixar yoga?" names a modality that is also a word of a project name.
+    // "pendente antes da África?" also names the trip's content project: the trip wins.
+    if (q.projects.length && q.trips.length && q.projects.every((p) => !!p.tripId && q.trips.some((t) => t.id === p.tripId))) return 0.6
     if (q.projects.length) return q.modalities.length && !has(q, 'projeto*', 'trabalho', 'tarefa*', 'cliente*', 'app') ? 0.6 : 0.85
     if (has(q, 'projeto*', 'trabalho', 'work', 'precisa de mim', 'inbox', 'cliente*', 'entrega*')) return 0.75
     if (has(q, ...LAGGING_WORDS)) return 0.6

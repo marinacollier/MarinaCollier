@@ -30,8 +30,8 @@ function fit({ db, today, minutes, q }: AgentContext): AnswerBlock[] {
     return {
       id: `fit:${w.date}:${w.start}`,
       emoji: m.emoji,
-      title: `${capitalize(day)} · ${w.start}–${w.end}`,
-      subtitle: [w.reason, presencial && !w.reason.includes('presencial') ? 'dia presencial' : undefined].filter(Boolean).join(' · '),
+      title: `${capitalize(day)} · ${w.start}`,
+      subtitle: [`até ${w.end}`, w.reason, presencial && !w.reason.includes('presencial') ? 'dia presencial' : undefined].filter(Boolean).join(' · '),
       trailing: '+ planejar',
       action: createWorkoutAction(
         {
