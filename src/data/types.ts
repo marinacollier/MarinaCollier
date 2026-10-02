@@ -465,6 +465,41 @@ export interface Workout extends Entity {
   period?: DayPeriod
   /** Created from a WeekTemplateItem. */
   templateId?: ID
+  // ── Training load & fuel (time = startTime, plannedDurationMin = expected, durationMin = actual) ──
+  sessionType?: SessionType
+  /** Upper bound of the expected duration ("60–75 min"). */
+  plannedDurationMaxMin?: number
+  loadCategory?: LoadCategory
+  isKeySession?: boolean
+  isLongSession?: boolean
+  requiresPreviousDayPrep?: boolean
+  requiresPreWorkout?: boolean
+  requiresIntraWorkout?: boolean
+  requiresPostWorkout?: boolean
+  /** Explicit strategy; otherwise resolved by tags (see data/fuel.ts). */
+  nutritionStrategyId?: ID
+  recoveryPriority?: 'normal' | 'alta'
+  /** Free tags: 'long-run', 'key-session', 'fuel-required', 'pernas'... */
+  tags?: string[]
+  /** Fuel steps Marina marked as done (tracking, never a score). */
+  fuelDone?: FuelPhase[]
+  /** Planned duration when the strategy was last reviewed — used to suggest a review after big changes. */
+  strategyReviewedAtMin?: number
+  /** Quick check-in after a key session. */
+  postCheckin?: PostWorkoutCheckin
+}
+
+export type SessionType = 'endurance' | 'forca' | 'qualidade' | 'tecnica' | 'longo' | 'recuperacao' | 'mobilidade' | 'fun' | 'outro'
+export type LoadCategory = 'key' | 'moderada' | 'leve' | 'descanso'
+export type FuelPhase = 'ontem' | 'pre' | 'intra' | 'pos'
+
+export interface PostWorkoutCheckin {
+  energia?: 'baixa' | 'ok' | 'otima'
+  treino?: 'mais_facil' | 'esperado' | 'mais_dificil'
+  nutricao?: 'funcionou' | 'ajustar' | 'nao_usei'
+  recuperacao?: 'boa' | 'atencao'
+  nota?: string
+  at: ISODateTime
 }
 
 export interface Milestone {
@@ -509,7 +544,23 @@ export interface Meal extends Entity {
   tags: FoodTag[]
   templateId?: ID
   time?: TimeHM
+  /** Why this meal: around a training or general. */
+  purpose?: MealPurpose
+  /** Training this meal relates to (before/after/intra). */
+  workoutId?: ID
 }
+
+export type MealPurpose =
+  | 'geral'
+  | 'pre_treino'
+  | 'intra_treino'
+  | 'pos_treino'
+  | 'recovery'
+  | 'pre_long_run'
+  | 'post_long_run'
+  | 'pre_long_ride'
+  | 'post_long_ride'
+  | 'prep_dia_anterior'
 
 /** Favorite meals for one-tap logging. */
 export interface MealTemplate extends Entity {
@@ -542,6 +593,71 @@ export interface DailyCheckIn extends Entity {
     closedAt: ISODateTime
     winText?: string
   }
+}
+
+// ─── Nutrition (organizes Marina's + nutritionist's guidance; never prescribes) ──
+
+export type NutritionSource = 'nutricionista' | 'usuaria' | 'outro_profissional'
+
+/** Guidance attached to a kind of training ("Long run", "Long ride", "Leg day"). */
+export interface NutritionStrategy extends Entity {
+  name: string
+  /** Matched against Workout.tags / sessionType / modality ('long-run', 'long-ride', 'leg-day'...). */
+  linkedWorkoutTypes: string[]
+  previousDayInstructions?: string
+  preWorkoutInstructions?: string
+  duringWorkoutInstructions?: string
+  postWorkoutInstructions?: string
+  timing?: string
+  notes?: string
+  source: NutritionSource
+  sourceName?: string
+}
+
+/** Day type used to pick a day plan — derived from the trainings, not the weekday name. */
+export type NutritionDayType = 'descanso' | 'leve' | 'moderado' | 'forca_pesada' | 'corrida_longa' | 'pedal_longo' | 'prep_longo'
+
+export interface PlannedFood {
+  food: string
+  qty?: string
+  /** "Opções de substituição" exactly as prescribed. */
+  substitutions?: string[]
+}
+
+export interface PlannedMeal {
+  time?: TimeHM
+  name: string
+  phase?: FuelPhase | 'refeicao'
+  items: PlannedFood[]
+  notes?: string
+}
+
+/** A prescribed day plan (e.g. the nutritionist's "SEXTA" PDF). */
+export interface NutritionDayPlan extends Entity {
+  name: string
+  dayType: NutritionDayType
+  /** Weekday(s) it was prescribed for — used as a tie-breaker; the day type wins when trainings move. */
+  weekdays: Weekday[]
+  meals: PlannedMeal[]
+  source: NutritionSource
+  sourceName?: string
+  prescribedAt?: DateKey
+  notes?: string
+  active: boolean
+}
+
+/** Body composition reference — lives in Corpo → Evolução, never on Home. */
+export interface BodyComposition extends Entity {
+  /** Missing for undated historical references ("Referência 2022"). */
+  date?: DateKey
+  label?: string
+  weightKg?: number
+  bodyFatPct?: number
+  fatMassKg?: number
+  skeletalMuscleKg?: number
+  notes?: string
+  /** History only — never used as a target. */
+  historical?: boolean
 }
 
 // ─── Money ──────────────────────────────────────────────────────────────────
@@ -1009,6 +1125,18 @@ export interface WeekTemplateItem extends Entity {
   notes?: string
   order: number
   active: boolean
+  /** Training-load fields copied into the workout when materialized. */
+  durationMaxMin?: number
+  sessionType?: SessionType
+  loadCategory?: LoadCategory
+  isKeySession?: boolean
+  isLongSession?: boolean
+  requiresPreviousDayPrep?: boolean
+  requiresPreWorkout?: boolean
+  requiresIntraWorkout?: boolean
+  requiresPostWorkout?: boolean
+  recoveryPriority?: 'normal' | 'alta'
+  tags?: string[]
 }
 
 /** Marina's decision about a detected conflict (never auto-resolved). */
@@ -1084,6 +1212,10 @@ export interface DB {
   weekTemplate: WeekTemplateItem[]
   conflictAcks: ConflictAck[]
   weekPlans: WeekPlan[]
+
+  nutritionStrategies: NutritionStrategy[]
+  nutritionDayPlans: NutritionDayPlan[]
+  bodyComposition: BodyComposition[]
 }
 
 /** Keys of DB that hold arrays of entities. */
