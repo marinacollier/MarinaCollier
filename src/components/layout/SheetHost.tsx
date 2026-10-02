@@ -12,7 +12,7 @@ export function SheetHost() {
       {sheets.map((s, i) => {
         const Comp = SHEETS[s.name]
         return (
-          <SheetFrame key={s.key} onClose={closeSheet} depth={i}>
+          <SheetFrame key={s.key} onClose={closeSheet} depth={i} isTop={i === sheets.length - 1}>
             <Suspense fallback={<div className="h-48" />}>
               <Comp {...(s.props as object)} />
             </Suspense>

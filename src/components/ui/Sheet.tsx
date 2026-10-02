@@ -9,16 +9,18 @@ import { Button, IconButton } from './Button'
  * Bottom sheet frame (used by the SheetHost; feature code uses <SheetLayout/>).
  * Drag the handle down to dismiss. Max height 92dvh, scrolls internally, lifts above the keyboard.
  */
-export function SheetFrame({ onClose, children, depth = 0 }: { onClose: () => void; children: ReactNode; depth?: number }) {
+export function SheetFrame({ onClose, children, depth = 0, isTop = true }: { onClose: () => void; children: ReactNode; depth?: number; isTop?: boolean }) {
   const controls = useDragControls()
   const kb = useKeyboardInset()
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    // Only the top sheet reacts to Esc, so stacked sheets close one at a time.
+    if (!isTop) return
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [onClose, isTop])
 
   return (
     <div className="fixed inset-0 z-50" style={{ zIndex: 50 + depth }} role="dialog" aria-modal="true">
