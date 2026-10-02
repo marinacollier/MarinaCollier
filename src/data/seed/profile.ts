@@ -61,9 +61,9 @@ export const seedProfile: FeatureSeed = (ctx) => ({
       name: 'TotalPass — 1 check-in/dia',
       kind: 'max_checkins_per_day',
       limit: 1,
-      modalities: ['natacao', 'yoga', 'musculacao'],
+      modalities: ['natacao', 'yoga'],
       active: true,
-      notes: 'Não dá pra usar alguns lugares/atividades via TotalPass duas vezes no mesmo dia (ex.: natação + yoga). Ajuste as modalidades conforme seus locais.',
+      notes: 'Não dá pra usar alguns lugares/atividades via TotalPass duas vezes no mesmo dia (ex.: natação + yoga). Ajuste as modalidades conforme seus locais (ex.: inclua musculação se for no mesmo serviço).',
     }),
     ctx.make('constraints', {
       id: seedId('planning', 'yoga-app-1h'),

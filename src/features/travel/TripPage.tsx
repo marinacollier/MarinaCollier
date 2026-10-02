@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ChevronLeft, ExternalLink, Pencil, Plus, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ExternalLink, Pencil, Plus, X } from 'lucide-react'
 import { actions, useDB } from '@/data/store'
 import type { Expense, Trip, TripItem, TripSection } from '@/data/types'
 import { useToday } from '@/hooks/useToday'
@@ -12,13 +12,18 @@ import { cn } from '@/lib/cn'
 import { formatBRL } from '@/lib/money'
 import { formatShortDate } from '@/lib/date'
 import { Postcard, toneVars } from './Postcard'
-import { SectionItems } from './TripItems'
+import { ReviewItems, SectionItems } from './TripItems'
 import {
   TRIP_STATUS_LABEL,
   TRIP_TABS,
   budgetSummary,
   checklistProgress,
+  followingTrip,
+  followingTripLabel,
+  groupCounts,
   itemsOfTrip,
+  reviewItems,
+  tripBuckets,
   sectionCounts,
   tabMeta,
   tripCountdown,
@@ -40,7 +45,12 @@ export default function TripPage() {
   const progress = useMemo(() => checklistProgress(items), [items])
   const [params, setParams] = useSearchParams()
   const tab = (TRIP_TABS.some((t) => t.id === params.get('s')) ? params.get('s') : 'visao') as TripTab
-  const setTab = (t: TripTab) => setParams(t === 'visao' ? {} : { s: t }, { replace: true })
+  const group = params.get('g') ?? undefined
+  const setTab = (t: TripTab, g?: string) => setParams(t === 'visao' ? {} : g ? { s: t, g } : { s: t }, { replace: true })
+  const setGroup = (g?: string) => setTab(tab, g)
+  const toReview = useMemo(() => reviewItems(items).length, [items])
+  const isNext = useMemo(() => tripBuckets(trips, today).next?.id === id, [trips, today, id])
+  const following = useMemo(() => (trip ? followingTrip(trip, trips) : undefined), [trip, trips])
 
   const navRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -78,35 +88,29 @@ export default function TripPage() {
         variant="hero"
         dense
         trip={trip}
-        eyebrow={TRIP_STATUS_LABEL[trip.status]}
+        eyebrow={isNext && trip.status === 'planejando' ? 'próxima' : TRIP_STATUS_LABEL[trip.status]}
         datesLabel={tripDatesLabel(trip)}
         countdown={tripCountdown(trip, today)}
-        footer={
-          <button type="button" className="w-full text-left" onClick={() => setTab('antes_de_ir')}>
-            <div className="flex items-baseline justify-between text-[13px]">
-              <span className="eyebrow" style={{ color: 'var(--pc-ink)' }}>
-                antes de ir
-              </span>
-              <span className="text-ink-2">
-                {progress.total ? (
-                  <>
-                    <b className="font-semibold text-ink">{progress.done}</b> de {progress.total} prontos
-                  </>
-                ) : (
-                  'começar checklist →'
-                )}
-              </span>
-            </div>
-            {progress.total > 0 && <ProgressBar className="mt-2 bg-surface/70" value={progress.done} max={progress.total} tone={trip.tone} />}
-          </button>
-        }
+        footer={<HeroFooter progress={progress} toReview={toReview} onReview={() => setTab('revisar')} onChecklist={() => setTab('antes_de_ir')} tone={trip.tone} />}
       />
+
+      {following && (
+        <button
+          type="button"
+          onClick={() => nav(ROUTES.trip(following.trip.id))}
+          className="mt-3 w-full flex items-center gap-2.5 rounded-2xl bg-surface-2 px-4 min-h-11 py-2.5 text-left text-[13.5px] text-ink-2 active:scale-[0.99] transition"
+        >
+          <span aria-hidden>↪</span>
+          <span className="flex-1 min-w-0">{followingTripLabel(following)}</span>
+          <ChevronRight size={16} className="text-muted shrink-0" />
+        </button>
+      )}
 
       {/* Section navigation */}
       <div className="sticky top-0 z-20 -mx-4 mt-4 bg-bg/92 backdrop-blur-md">
         <div ref={navRef} className="flex gap-2 overflow-x-auto no-scrollbar px-4 py-2.5" role="tablist" aria-label="Seções da viagem">
           {TRIP_TABS.map((t) => {
-            const c = t.items ? counts[t.id as TripSection] : undefined
+            const c = t.items ? counts[t.id as TripSection] : t.id === 'revisar' ? { total: toReview } : undefined
             const active = t.id === tab
             return (
               <button
@@ -132,7 +136,9 @@ export default function TripPage() {
 
       <motion.div key={tab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22 }} className="mt-3">
         {meta.items ? (
-          <SectionItems trip={trip} section={tab as TripSection} items={items} />
+          <SectionItems trip={trip} section={tab as TripSection} items={items} group={group} onGroup={setGroup} />
+        ) : tab === 'revisar' ? (
+          <ReviewItems items={items} group={group} onGroup={setGroup} />
         ) : tab === 'visao' ? (
           <Overview trip={trip} items={items} counts={counts} onGo={setTab} />
         ) : tab === 'orcamento' ? (
@@ -159,8 +165,55 @@ export default function TripPage() {
 
 // ─── Visão geral ────────────────────────────────────────────────────────────
 
-function Overview({ trip, items, counts, onGo }: { trip: Trip; items: TripItem[]; counts: ReturnType<typeof sectionCounts>; onGo: (t: TripTab) => void }) {
+function HeroFooter({
+  progress,
+  toReview,
+  onReview,
+  onChecklist,
+  tone,
+}: {
+  progress: { done: number; total: number }
+  toReview: number
+  onReview: () => void
+  onChecklist: () => void
+  tone: Trip['tone']
+}) {
+  if (toReview > 0) {
+    return (
+      <button type="button" className="w-full text-left flex items-center justify-between gap-3 min-h-11" onClick={onReview}>
+        <span className="eyebrow" style={{ color: 'var(--pc-ink)' }}>
+          pra revisar
+        </span>
+        <span className="text-[13px] text-ink-2">
+          <b className="font-semibold text-ink">{toReview}</b> {toReview === 1 ? 'item' : 'itens'} · ver →
+        </span>
+      </button>
+    )
+  }
+  return (
+    <button type="button" className="w-full text-left" onClick={onChecklist}>
+      <div className="flex items-baseline justify-between text-[13px]">
+        <span className="eyebrow" style={{ color: 'var(--pc-ink)' }}>
+          antes de ir
+        </span>
+        <span className="text-ink-2">
+          {progress.total ? (
+            <>
+              <b className="font-semibold text-ink">{progress.done}</b> de {progress.total} prontos
+            </>
+          ) : (
+            'começar checklist →'
+          )}
+        </span>
+      </div>
+      {progress.total > 0 && <ProgressBar className="mt-2 bg-surface/70" value={progress.done} max={progress.total} tone={tone} />}
+    </button>
+  )
+}
+
+function Overview({ trip, items, counts, onGo }: { trip: Trip; items: TripItem[]; counts: ReturnType<typeof sectionCounts>; onGo: (t: TripTab, g?: string) => void }) {
   const toConfirm = items.filter((i) => i.status === 'a_confirmar').length
+  const subAreas = groupCounts(items)
   const tiles = TRIP_TABS.filter((t) => t.items && counts[t.id as TripSection]?.total)
   return (
     <div className="space-y-4">
@@ -209,11 +262,35 @@ function Overview({ trip, items, counts, onGo }: { trip: Trip; items: TripItem[]
       </Card>
 
       {toConfirm > 0 && (
-        <div className="flex items-center gap-3 rounded-2xl bg-sand-soft px-4 py-3 text-[13.5px]">
+        <button type="button" onClick={() => onGo('revisar')} className="w-full flex items-center gap-3 rounded-2xl bg-sand-soft px-4 py-3 text-[13.5px] text-left active:scale-[0.99] transition">
           <span aria-hidden>🔎</span>
-          <span className="text-ink-2">
-            <b className="font-semibold text-ink">{toConfirm}</b> {toConfirm === 1 ? 'coisa ainda está' : 'coisas ainda estão'} “a confirmar” — sem pressa, só pra não esquecer.
+          <span className="flex-1 text-ink-2">
+            <b className="font-semibold text-ink">{toConfirm}</b> {toConfirm === 1 ? 'coisa pra revisar' : 'coisas pra revisar'} — sem pressa, só pra não esquecer.
           </span>
+          <ChevronRight size={16} className="text-muted shrink-0" />
+        </button>
+      )}
+
+      {subAreas.length > 1 && (
+        <div>
+          <div className="eyebrow px-1 mb-2">sub-áreas</div>
+          <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-4 px-4 py-0.5">
+            {subAreas.map(({ group, count }) => (
+              <button
+                key={group}
+                type="button"
+                onClick={() => {
+                  const mine = items.filter((i) => i.group === group)
+                  if (mine.some((i) => i.status === 'a_confirmar')) return onGo('revisar', group)
+                  onGo(mine[0]?.section ?? 'visao', group)
+                }}
+                className="inline-flex items-center gap-1 h-9 px-3 rounded-full text-[13px] shrink-0 border bg-surface border-line text-ink-2 active:scale-[0.97] transition"
+              >
+                {group}
+                <span className="text-[11px] text-muted tabular-nums">{count}</span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
