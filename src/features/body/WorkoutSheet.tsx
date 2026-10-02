@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { Check } from 'lucide-react'
+import { AlertTriangle, Check } from 'lucide-react'
 import { actions, getDB, nextOrder, useDB } from '@/data/store'
-import type { Workout, WorkoutStatus } from '@/data/types'
+import type { DayPeriod, Workout, WorkoutStatus } from '@/data/types'
+import { isPresencial, PERIOD_LABEL } from '@/data/planning'
 import { closeSheet, replaceSheet, toast } from '@/app/ui-store'
 import { removeWithUndo } from '@/app/undo'
 import type { SheetProps } from '@/app/sheet-types'
@@ -10,19 +11,22 @@ import { todayKey, relativeDay } from '@/lib/date'
 import { cn } from '@/lib/cn'
 import { INTENSITY, REST_MODALITY, STATUS_META } from './constants'
 import { orderedModalities } from './selectors'
+import { draftConflicts, PLAN_TYPE_LABEL, PLAN_TYPES } from './planner'
 
 const DURATIONS = [30, 45, 60, 90]
+const PERIODS: DayPeriod[] = ['manha', 'almoco', 'tarde', 'noite']
 const STATUSES: WorkoutStatus[] = ['planejado', 'feito', 'adaptado', 'descanso', 'pulado']
 
-export default function WorkoutSheet({ id, date }: SheetProps<'workout'>) {
+export default function WorkoutSheet({ id, date, defaults }: SheetProps<'workout'>) {
   const db = useDB()
   const existing = id ? db.workouts.find((w) => w.id === id) : undefined
   const [draft, setDraft] = useState<Partial<Workout>>(
     () =>
       existing ?? {
-        date: date ?? todayKey(),
         status: 'planejado',
         modality: orderedModalities(getDB().profile.modalities)[0]?.id ?? 'corrida',
+        ...defaults,
+        date: defaults?.date ?? date ?? todayKey(),
       },
   )
   const set = (p: Partial<Workout>) => setDraft((d) => ({ ...d, ...p }))
@@ -33,6 +37,12 @@ export default function WorkoutSheet({ id, date }: SheetProps<'workout'>) {
   const shown = showAll ? modalities : modalities.filter((m) => m.favorite || m.id === draft.modality)
   const isRest = draft.status === 'descanso'
   const goals = db.workoutGoals.filter((g) => g.status === 'ativa' || g.id === draft.workoutGoalId)
+  // Live, informational: what would this plan bump into? (never blocks saving)
+  const conflicts = useMemo(
+    () => (draft.date && draft.modality && !isRest ? draftConflicts(db, { ...draft, date: draft.date, modality: draft.modality }, existing?.id) : []),
+    [db, draft, isRest, existing?.id],
+  )
+  const presencial = draft.date ? isPresencial(db.profile, draft.date) : false
 
   if (id && !existing) {
     return (
@@ -133,10 +143,30 @@ export default function WorkoutSheet({ id, date }: SheetProps<'workout'>) {
         </Field>
         {!isRest && (
           <Field label="Horário">
-            <TimeInput value={draft.time} onChange={(time) => set({ time })} />
+            <TimeInput value={draft.time} onChange={(time) => set({ time, ...(time ? { period: undefined } : {}) })} />
           </Field>
         )}
       </div>
+
+      {!isRest && !draft.time && (
+        <Field label="Sem horário? Escolhe um período">
+          <ChipSelect value={draft.period} clearable onChange={(period) => set({ period })} options={PERIODS.map((p) => ({ value: p, label: PERIOD_LABEL[p] }))} />
+        </Field>
+      )}
+
+      {(presencial || conflicts.length > 0) && (
+        <div className="space-y-2">
+          {presencial && <div className="text-[12.5px] text-ink-2 px-0.5">📍 dia presencial{db.profile.work?.location ? ` · ${db.profile.work.location}` : ''}</div>}
+          {conflicts.map((c) => (
+            <div key={c.key} className={cn('rounded-2xl px-3.5 py-2.5 flex gap-2.5', c.severity === 'warn' ? 'bg-sand-soft' : 'bg-surface-2')} role="status">
+              <AlertTriangle size={15} className={cn('shrink-0 mt-0.5', c.severity === 'warn' ? 'text-sand' : 'text-muted')} />
+              <div className="text-[13px] leading-snug text-ink-2">
+                {c.message.replace(/^⚠️\s*/, '')} <span className="text-muted">Dá pra salvar mesmo assim.</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {!isRest && (
         <Field label="Duração prevista">
@@ -154,6 +184,12 @@ export default function WorkoutSheet({ id, date }: SheetProps<'workout'>) {
               className="w-[72px] h-9 py-0 text-center"
             />
           </div>
+        </Field>
+      )}
+
+      {!isRest && (
+        <Field label="Firmeza">
+          <ChipSelect value={draft.planType} clearable onChange={(planType) => set({ planType })} options={PLAN_TYPES.map((p) => ({ value: p, label: PLAN_TYPE_LABEL[p].toLowerCase() }))} />
         </Field>
       )}
 

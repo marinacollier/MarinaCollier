@@ -1,57 +1,102 @@
 /**
- * Corpo seed: a light, editable example plan for the current week, 3 generic favorite meals
- * and two sport goals. No check-ins, no invented race dates.
+ * Corpo seed — Marina's real week as DATA (reference 02/10/2026, a Friday).
+ *
+ * - `weekTemplate`: her editable weekly training base (not law). Fixed/rest lines become workouts;
+ *   one_of / optional lines stay as choices in the planner.
+ * - Workouts: only the current week, only from today on (never "não feito" noise on past days).
+ * - Goals: Yoga 1x/semana (flexível) and Circo/Aéreos (diversão, never an obligation).
+ * - No meal templates: no invented diet.
  */
-import type { FeatureSeed } from '@/data/seed/context'
-import { SEED_IDS } from '@/data/seed/ids'
-import { addDays, startOfWeek } from '@/lib/date'
+import type { FeatureSeed, SeedContext } from '@/data/seed/context'
+import { seedId } from '@/data/seed/context'
+import { emptyDB } from '@/data/defaults'
+import { proposeWeekFromTemplate } from '@/data/planning'
+import type { DateKey, WeekTemplateItem, Weekday } from '@/data/types'
+import { startOfWeek } from '@/lib/date'
+
+type Line = Omit<WeekTemplateItem, 'id' | 'createdAt' | 'updatedAt' | 'order' | 'active'> & { slug: string }
+
+const DAY_SLUG = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'] as const
+
+/** Her weekly base (§10). Times only where she gave them. */
+export const TEMPLATE_LINES: Line[] = [
+  // SEG
+  { slug: 'corrida', weekday: 1, modalities: ['corrida'], choice: 'fixed', planType: 'base', notes: 'Janela compatível com o dia.' },
+  { slug: 'musculacao', weekday: 1, modalities: ['musculacao'], choice: 'optional', planType: 'flexivel', notes: 'Pode rolar no mesmo dia, dependendo da semana.' },
+  // TER — presencial
+  { slug: 'corrida-ou-forca', weekday: 2, modalities: ['corrida', 'musculacao'], choice: 'one_of', title: 'Corrida leve ou força', planType: 'flexivel', notes: 'presencial — evitar pedal longo' },
+  // QUA — presencial
+  { slug: 'natacao', weekday: 3, modalities: ['natacao'], choice: 'fixed', time: '07:00', durationMin: 60, planType: 'base' },
+  { slug: 'musculacao', weekday: 3, modalities: ['musculacao'], choice: 'optional', planType: 'flexivel', notes: 'outra janela; cuidado com o check-in' },
+  // QUI
+  { slug: 'bike-ou-corrida', weekday: 4, modalities: ['bike', 'corrida'], choice: 'one_of', title: 'Bike cedo ou corrida', period: 'manha', planType: 'flexivel' },
+  // SEX
+  { slug: 'natacao', weekday: 5, modalities: ['natacao'], choice: 'fixed', time: '07:00', durationMin: 60, planType: 'base', notes: 'espaço pra recuperação e vida pessoal' },
+  { slug: 'musculacao', weekday: 5, modalities: ['musculacao'], choice: 'optional', planType: 'flexivel' },
+  // SÁB — fun day
+  { slug: 'fun-day', weekday: 6, modalities: ['circo', 'surf', 'bike', 'corrida', 'trail', 'caminhada'], choice: 'one_of', title: 'Fun day', planType: 'flexivel', notes: 'Escolha o que combina com seu sábado.' },
+  // DOM — recovery
+  { slug: 'off', weekday: 0, modalities: [], choice: 'rest', title: 'Recovery / OFF', planType: 'base', notes: 'pedal longo pode migrar pra cá' },
+]
+
+export function templateId(weekday: Weekday, slug: string): string {
+  return seedId('body', `tpl-${DAY_SLUG[weekday]}-${slug}`)
+}
+
+export function seedWeekTemplate(ctx: SeedContext): WeekTemplateItem[] {
+  const orderInDay = new Map<number, number>()
+  return TEMPLATE_LINES.map(({ slug, ...line }) => {
+    const order = orderInDay.get(line.weekday) ?? 0
+    orderInDay.set(line.weekday, order + 1)
+    return ctx.make('weekTemplate', { ...line, id: templateId(line.weekday, slug), order, active: true })
+  })
+}
+
+/** Fixed + rest lines of the current week, from `today` on. */
+export function seedCurrentWeekWorkouts(ctx: SeedContext, template: WeekTemplateItem[], today: DateKey = ctx.today) {
+  const db = { ...emptyDB(), weekTemplate: template }
+  return proposeWeekFromTemplate(db, startOfWeek(today))
+    .filter((p) => p.workout && p.date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((p) => ctx.make('workouts', { ...p.workout!, id: seedId('body', `w-${p.date}-${p.templateId.split(':').pop()}`) }))
+}
 
 export const seedBody: FeatureSeed = (ctx) => {
+  const weekTemplate = seedWeekTemplate(ctx)
+  const workouts = seedCurrentWeekWorkouts(ctx, weekTemplate)
   const ws = startOfWeek(ctx.today)
-  const plan: [number, string, string | undefined, 'planejado' | 'descanso'][] = [
-    [0, 'natacao', 'técnica', 'planejado'],
-    [1, 'corrida', 'leve', 'planejado'],
-    [2, 'musculacao', 'força geral', 'planejado'],
-    [3, 'yoga', 'soltar o corpo', 'planejado'],
-    [5, 'gravel', 'passeio longo, sem pressa', 'planejado'],
-    [6, 'recuperacao', undefined, 'descanso'],
-  ]
-  const workouts = plan.map(([offset, modality, goal, status]) =>
-    ctx.make('workouts', { date: addDays(ws, offset), modality, goal, status, order: 0 }),
-  )
-
-  const mealTemplates = [
-    ctx.make('mealTemplates', { name: 'Ovos + fruta', description: 'Ovos mexidos, pão e uma fruta', slot: 'cafe', tags: ['proteina', 'fruta'], order: 0 }),
-    ctx.make('mealTemplates', { name: 'Prato colorido', description: 'Arroz, feijão, proteína e salada', slot: 'almoco', tags: ['proteina', 'vegetais'], order: 1 }),
-    ctx.make('mealTemplates', { name: 'Iogurte com granola', description: 'Iogurte, granola e banana', slot: 'lanche_tarde', tags: ['proteina', 'fruta'], order: 2 }),
-  ]
 
   const workoutGoals = [
     ctx.make('workoutGoals', {
-      title: 'Manter rotina de força',
+      id: seedId('body', 'goal-yoga'),
+      title: 'Yoga — 1x/semana',
       kind: 'habit',
-      modality: 'musculacao',
-      target: 2,
+      modality: 'yoga',
+      perWeek: 1,
+      target: 1,
       unit: 'sessoes',
       startDate: ws,
-      preparation: 'Duas sessões de musculação por semana, do jeito que der.',
       milestones: [],
       status: 'ativa',
+      planType: 'flexivel',
+      preferredWeekdays: [4],
+      preparation: 'Sem dia fixo. Quinta é uma janela possível — o planner confere a agenda antes.',
     }),
     ctx.make('workoutGoals', {
-      title: 'Preparar trilhas e surf da África do Sul',
-      kind: 'event',
-      startDate: ctx.today,
-      preparation: 'Chegar com fôlego pras trilhas e braço pro surf.',
-      milestones: [
-        { id: 'ms-africa-trilhas', title: 'Trilhas longas no fim de semana', done: false },
-        { id: 'ms-africa-surf', title: 'Aulas de surf / condicionamento', done: false },
-        { id: 'ms-africa-natacao', title: 'Natação pra ganhar confiança no mar', done: false },
-      ],
+      id: seedId('body', 'goal-circo'),
+      title: 'Circo / Aéreos',
+      kind: 'habit',
+      modality: 'circo',
+      perWeek: 1,
+      obligation: false,
+      startDate: ws,
+      milestones: [],
       status: 'ativa',
-      tripId: SEED_IDS.tripAfrica,
+      planType: 'flexivel',
+      preferredWeekdays: [6],
+      preparation: 'De preferência no sábado, quando combinar.',
     }),
   ]
 
-  return { workouts, mealTemplates, workoutGoals }
+  return { weekTemplate, workouts, workoutGoals, mealTemplates: [] }
 }

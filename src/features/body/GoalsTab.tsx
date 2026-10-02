@@ -8,12 +8,14 @@ import { modalityOf } from '@/data/selectors'
 import { openSheet } from '@/app/ui-store'
 import { ROUTES } from '@/app/routes'
 import { Button, Card, Checkbox, EmptyState, Pill, ProgressBar, SectionTitle } from '@/components/ui'
-import { countdownLabel, formatShortDate } from '@/lib/date'
+import { addDays, countdownLabel, formatShortDate, relativeDay, startOfWeek } from '@/lib/date'
 import { cn } from '@/lib/cn'
 import { haptic } from '@/lib/haptics'
 import { GOAL_KINDS, MODALITY_GROUPS } from './constants'
 import { goalProgress } from './selectors'
 import ModalitiesEditor from './ModalitiesEditor'
+import { dayLabel, goalSuggestions } from './planner'
+import { fitGoalAt } from './mutations'
 
 export default function GoalsTab({ today }: { today: DateKey }) {
   const goals = useDB((db) => db.workoutGoals)
@@ -95,6 +97,7 @@ function GoalCard({ goal: g, today }: { goal: WorkoutGoal; today: DateKey }) {
   const kind = GOAL_KINDS.find((k) => k.value === g.kind)!
   const trip = g.tripId ? db.trips.find((t) => t.id === g.tripId) : undefined
   const mod = modalityLabel(db, g.modality)
+  const fun = g.obligation === false
   const unitLabel = p.unit === 'km' ? 'km' : p.current === 1 && !p.target ? 'sessão' : 'sessões'
   const toggleMilestone = (id: string) => {
     const milestones = g.milestones.map((m) => (m.id === id ? { ...m, done: !m.done } : m))
@@ -117,6 +120,7 @@ function GoalCard({ goal: g, today }: { goal: WorkoutGoal; today: DateKey }) {
           ) : null}
         </div>
         <div className="font-display text-[22px] leading-[1.15] mt-1.5">{g.title}</div>
+        {fun && <div className="text-[12.5px] text-ink-2 mt-1">🎈 diversão — conta como alegria, não como obrigação</div>}
         {g.preparation && <div className="text-[13.5px] text-muted mt-1 leading-snug">{g.preparation}</div>}
       </button>
 
@@ -140,7 +144,7 @@ function GoalCard({ goal: g, today }: { goal: WorkoutGoal; today: DateKey }) {
             <div>
               <div className="flex items-baseline gap-1.5">
                 <span className="font-display text-[30px] leading-none">{p.current}</span>
-                <span className="text-[14px] text-muted">{p.target ? `de ${p.target} esta semana` : 'esta semana'}</span>
+                <span className="text-[14px] text-muted">{fun ? 'esta semana · sem obrigação' : p.target ? `de ${p.target} esta semana` : 'esta semana'}</span>
               </div>
             </div>
             <div className="flex items-end gap-1.5" aria-label="últimas semanas">
@@ -149,7 +153,7 @@ function GoalCard({ goal: g, today }: { goal: WorkoutGoal; today: DateKey }) {
                   <span
                     className={cn(
                       'h-7 w-7 rounded-full inline-flex items-center justify-center text-[12px] font-semibold',
-                      p.target && w.count >= p.target ? 'bg-sage text-white' : w.count ? 'bg-sage-soft text-ink-2' : 'bg-surface-2 text-muted',
+                      !fun && p.target && w.count >= p.target ? 'bg-sage text-white' : w.count ? 'bg-sage-soft text-ink-2' : 'bg-surface-2 text-muted',
                     )}
                   >
                     {w.count}
@@ -160,6 +164,8 @@ function GoalCard({ goal: g, today }: { goal: WorkoutGoal; today: DateKey }) {
             </div>
           </div>
         )}
+
+        {g.kind === 'habit' && !fun && g.modality && <WindowSuggestions goal={g} today={today} />}
 
         {g.kind === 'event' && (
           <div className="mt-1">
@@ -194,6 +200,53 @@ function GoalCard({ goal: g, today }: { goal: WorkoutGoal; today: DateKey }) {
           </button>
         )}
       </div>
+    </div>
+  )
+}
+
+/** "Sugestões de janela" for a weekly flexible goal: free windows that respect check-in limits and the calendar. */
+function WindowSuggestions({ goal: g, today }: { goal: WorkoutGoal; today: DateKey }) {
+  const db = useDB()
+  const ws = startOfWeek(today)
+  const want = g.perWeek ?? g.target ?? 1
+  const planned = useMemo(
+    () =>
+      db.workouts
+        .filter((w) => w.date >= ws && w.date <= addDays(ws, 6) && w.status !== 'pulado' && w.status !== 'descanso' && (w.workoutGoalId === g.id || w.modality === g.modality))
+        .sort((a, b) => a.date.localeCompare(b.date)),
+    [db.workouts, ws, g.id, g.modality],
+  )
+  const suggestions = useMemo(() => (planned.length < want ? goalSuggestions(db, g, today) : []), [db, g, today, planned.length, want])
+
+  if (planned.length >= want) {
+    return (
+      <div className="mt-3 rounded-2xl bg-sage-soft px-3.5 py-2.5 text-[13.5px] text-ink-2">
+        ✓ Já tem lugar nesta semana: {planned.map((w) => `${relativeDay(w.date, today)}${w.time ? ` ${w.time}` : ''}`).join(', ')}
+      </div>
+    )
+  }
+  return (
+    <div className="mt-3">
+      <div className="eyebrow mb-1.5">sugestões de janela</div>
+      {suggestions.length ? (
+        <div className="flex flex-wrap gap-2">
+          {suggestions.map((s) => (
+            <button
+              key={s.date + s.start}
+              type="button"
+              onClick={() => fitGoalAt(g, s)}
+              className="inline-flex flex-col items-start rounded-2xl bg-surface-2 px-3.5 py-2 min-h-11 text-left active:bg-line"
+            >
+              <span className="text-[14px] font-medium">
+                {dayLabel(s.date)} · {s.start}
+              </span>
+              <span className="text-[11.5px] text-muted">{s.reason}</span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="text-[13px] text-muted">Semana cheia — sem janela que respeite as regras. Tudo bem, fica pra próxima. 🌿</div>
+      )}
     </div>
   )
 }

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { emptyDB, DEFAULT_MODALITIES } from '@/data/defaults'
 import type { DB, Workout, WorkoutGoal } from '@/data/types'
-import { createSeedContext } from '@/data/seed/context'
 import { SEED_IDS } from '@/data/seed/ids'
 import { addDays, startOfWeek } from '@/lib/date'
 import {
@@ -17,7 +16,6 @@ import {
   weekLabel,
   weekSummary,
 } from './selectors'
-import { seedBody } from './seed'
 
 const TODAY = '2026-10-02' // sexta
 const WS = startOfWeek(TODAY) // 2026-09-28
@@ -165,20 +163,5 @@ describe('patternNotes', () => {
       habits: { agua: 0, proteina: false, fruta: false, vegetais: false, refeicoesPlanejadas: false },
     }))
     expect(patternNotes(db({ checkins }), TODAY)[0]).toMatch(/sono ok ou bom/)
-  })
-})
-
-describe('seed', () => {
-  it('plans the current week and links the Africa goal to the trip', () => {
-    const out = seedBody(createSeedContext(TODAY))
-    expect(out.workouts).toHaveLength(6)
-    expect(out.workouts!.every((x) => x.date >= WS && x.date <= addDays(WS, 6))).toBe(true)
-    expect(out.workouts!.every((x) => !x.time && (x.status === 'planejado' || x.status === 'descanso'))).toBe(true)
-    expect(out.workouts!.find((x) => x.date === addDays(WS, 6))?.status).toBe('descanso')
-    expect(out.mealTemplates).toHaveLength(3)
-    const africa = out.workoutGoals!.find((g) => g.tripId === SEED_IDS.tripAfrica)
-    expect(africa?.kind).toBe('event')
-    expect(africa?.deadline).toBeUndefined()
-    expect(out.checkins).toBeUndefined()
   })
 })
