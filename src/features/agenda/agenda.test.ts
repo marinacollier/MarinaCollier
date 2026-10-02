@@ -6,7 +6,7 @@ import { createSeedContext } from '@/data/seed/context'
 import { entryRange, layoutDay, timelineBounds } from './layout'
 import { ceilQuarter, findFreeSlots, fitIntoSlots } from './free-slots'
 import { blocksOnly, conflictMarkers, dayEntries, looseItemsFor, timedOnly, upcomingAgenda, weekAgenda } from './selectors'
-import { SEED_CERAMICA_ID, seedAgenda } from './seed'
+import { SEED_CERAMICA_ID, SEED_FISIO_ID, seedAgenda } from './seed'
 import { nextOccurrenceOf, occurrenceCopy, withExdate, withoutExdate } from './occurrence'
 import type { Conflict } from '@/data/planning'
 import type { Workout, WorkSchedule } from '@/data/types'
@@ -122,8 +122,17 @@ describe('agenda selectors', () => {
   it('seed: local source + Cerâmica (seg e qui à noite, sem horário inventado)', () => {
     const part = seedAgenda(createSeedContext('2026-10-02'))
     expect(part.calendarSources?.[0].id).toBe(SEED_IDS.sourceLocal)
-    expect(part.events).toHaveLength(1)
-    const [c] = part.events!
+    expect(part.events).toHaveLength(2)
+    const [c, fisio] = part.events!
+    expect(fisio).toMatchObject({
+      id: SEED_FISIO_ID,
+      title: 'Fisioterapia',
+      startTime: '12:00',
+      endTime: '13:00',
+      kind: 'saude',
+      planType: 'base',
+      recurrence: { kind: 'weekly', weekdays: [5] },
+    })
     expect(c.id).toBe(SEED_CERAMICA_ID)
     expect(c.id).toBe(seedAgenda(createSeedContext('2026-10-02')).events![0].id) // stable
     expect(c).toMatchObject({
@@ -147,7 +156,7 @@ describe('agenda selectors', () => {
     Object.assign(db, seedAgenda(createSeedContext('2026-10-02')))
     expect(dayEntries(db, '2026-10-01').map((e) => e.title)).toEqual(['Cerâmica']) // quinta
     expect(dayEntries(db, '2026-10-05').map((e) => e.title)).toEqual(['Cerâmica']) // segunda
-    expect(dayEntries(db, '2026-10-02')).toHaveLength(0) // sexta
+    expect(dayEntries(db, '2026-10-02').map((e) => [e.title, e.time, e.approx])).toEqual([['Fisioterapia', '12:00', false]]) // sexta
     const [e] = dayEntries(db, '2026-10-05')
     expect(e.approx).toBe(true)
     expect(e.periodLabel).toBe('noite')
@@ -345,6 +354,17 @@ describe('conflict markers', () => {
     // acknowledged → marker goes away
     db.conflictAcks = [ctx.make('conflictAcks', { key: byKey['workout:w1'].conflicts![0].key, decision: 'manter', date: '2026-10-01' })]
     expect(dayEntries(db, '2026-10-01').every((e) => !e.conflicts)).toBe(true)
+  })
+
+  it('key-session workouts get the 🔥 flag', () => {
+    const db = seededDB()
+    const ctx = createSeedContext('2026-10-02')
+    db.workouts = [
+      ctx.make('workouts', { id: 'k', date: '2026-10-03', time: '07:00', modality: 'corrida', status: 'planejado', order: 0, isKeySession: true } as Workout),
+      ctx.make('workouts', { id: 'n', date: '2026-10-03', time: '17:00', modality: 'yoga', status: 'planejado', order: 1 } as Workout),
+    ]
+    const by = Object.fromEntries(dayEntries(db, '2026-10-03').map((e) => [e.id, e.keySession]))
+    expect(by).toEqual({ k: true, n: undefined })
   })
 
   it('template marker', () => {

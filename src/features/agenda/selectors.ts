@@ -44,6 +44,8 @@ export interface DayEntry extends AgendaEntry {
   periodLabel?: string
   /** Open planning conflicts that involve this entry. */
   conflicts?: Conflict[]
+  /** Workout marked as a key session of the week (🔥). */
+  keySession?: boolean
 }
 
 export const PLAN_LABEL: Record<PlanType, string> = {
@@ -86,6 +88,7 @@ export function rangeLabel(from: DateKey, to: DateKey): string {
  */
 export function dayEntries(db: DB, date: DateKey, opts: { includeBlocks?: boolean } = {}): DayEntry[] {
   const events = new Map(db.events.map((e) => [e.id, e]))
+  const keyWorkouts = new Set(db.workouts.filter((w) => w.isKeySession).map((w) => w.id))
   const sources = new Map(db.calendarSources.map((s) => [s.id, s]))
   const markers = conflictMarkers(conflictsOn(db, date))
   return agendaFor(db, date, opts).map((a) => {
@@ -96,6 +99,7 @@ export function dayEntries(db: DB, date: DateKey, opts: { includeBlocks?: boolea
       conflicts: markers.get(key),
       periodLabel: a.approx ? PERIOD_LABEL[periodOfRange(a.time, a.endTime) ?? 'noite'] : undefined,
     }
+    if (a.kind === 'workout' && keyWorkouts.has(a.id)) base.keySession = true
     if (a.kind !== 'event') return base
     const ev = events.get(a.id)
     if (!ev) return base

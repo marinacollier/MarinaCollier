@@ -118,10 +118,15 @@ export function EntryRow({ entry, today, dense }: { entry: DayEntry; today: Date
 /** Tiny markers after a title: plan type (FIXO/BASE/…), ⚠️ planning conflict, 📋 pauta. */
 export function EntryMarks({ entry, plan = true, className }: { entry: DayEntry; plan?: boolean; className?: string }) {
   const warn = entry.conflicts?.length
-  if (!warn && !entry.hasTemplate && !(plan && entry.planType)) return null
+  if (!warn && !entry.hasTemplate && !entry.keySession && !(plan && entry.planType)) return null
   return (
     <span className={cn('inline-flex items-center gap-1 shrink-0', className)}>
       {plan && entry.planType && <PlanTag type={entry.planType} />}
+      {entry.keySession && (
+        <span className="text-[11px] leading-none" role="img" aria-label="Treino-chave da semana">
+          🔥
+        </span>
+      )}
       {entry.hasTemplate && (
         <span className="text-[11px] leading-none" role="img" aria-label="Tem pauta">
           📋
