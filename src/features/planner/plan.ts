@@ -270,10 +270,10 @@ export function flexibleGoals(db: DB): WorkoutGoal[] {
   return db.workoutGoals.filter((g) => g.status === 'ativa' && (g.perWeek ?? 0) > 0 && !!g.modality)
 }
 
-/** How many sessions of a flexible goal already exist in the week. */
-export function flexPlannedCount(db: DB, goal: WorkoutGoal, weekStart: DateKey): number {
+/** How many sessions of a flexible goal already exist in the week (plus template choices of the draft, when given). */
+export function flexPlannedCount(db: DB, goal: WorkoutGoal, weekStart: DateKey, planned: Workout[] = []): number {
   const days = new Set(weekDays(weekStart))
-  return db.workouts.filter((w) => days.has(w.date) && w.status !== 'pulado' && w.status !== 'descanso' && (w.workoutGoalId === goal.id || w.modality === goal.modality)).length
+  return mergeWorkouts(db.workouts, planned).filter((w) => days.has(w.date) && w.status !== 'pulado' && w.status !== 'descanso' && (w.workoutGoalId === goal.id || w.modality === goal.modality)).length
 }
 
 export interface FlexPick {

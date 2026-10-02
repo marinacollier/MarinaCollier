@@ -105,8 +105,8 @@ export function WorkSection() {
       <ListCard>
         {DAY_ORDER.map((d) => (
           <div key={d} className="flex items-center gap-2 min-h-[56px] px-3.5 py-2">
-            <span className="w-[62px] shrink-0 text-[14px] capitalize">{WEEKDAY_LONG[d]}</span>
-            <div className="flex-1 flex gap-1.5 justify-end flex-wrap" role="radiogroup" aria-label={`Modo de ${WEEKDAY_LONG[d]}`}>
+            <span className="w-10 shrink-0 text-[14px] capitalize">{WEEKDAY_LONG[d].slice(0, 3)}</span>
+            <div className="flex-1 flex gap-1 justify-end" role="radiogroup" aria-label={`Modo de ${WEEKDAY_LONG[d]}`}>
               {WORK_MODE_OPTIONS.map((o) => {
                 const on = work.days[d] === o.value
                 return (
@@ -120,7 +120,7 @@ export function WorkSection() {
                       set({ days: setWorkDay(work.days, d, o.value as WorkDayMode) })
                     }}
                     className={cn(
-                      'h-9 px-2.5 rounded-full text-[12.5px] border transition active:scale-[0.97]',
+                      'h-9 px-2 rounded-full text-[12px] border whitespace-nowrap transition active:scale-[0.97]',
                       on ? (o.value === 'presencial' ? 'bg-accent text-white border-accent' : 'bg-ink text-bg border-ink') : 'bg-surface border-line text-ink-2',
                     )}
                   >

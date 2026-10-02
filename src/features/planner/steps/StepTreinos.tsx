@@ -28,7 +28,7 @@ export function StepTreinos(props: StepProps) {
       const has = d.flex.some((f) => f.goalId === goal.id && f.date === date)
       if (has) return { ...d, flex: d.flex.filter((f) => !(f.goalId === goal.id && f.date === date)) }
       const mine = d.flex.filter((f) => f.goalId === goal.id).length
-      const room = (goal.perWeek ?? 1) - flexPlannedCount(db, goal, weekStart)
+      const room = (goal.perWeek ?? 1) - flexPlannedCount(db, goal, weekStart, templateOnly)
       if (mine >= room) {
         toast(`${goal.title}: ${goal.perWeek}x já tá bom 😉`)
         return d
@@ -95,7 +95,7 @@ export function StepTreinos(props: StepProps) {
           <Eyebrow className="mt-8">Do jeito que der</Eyebrow>
           <div className="space-y-2.5">
             {goals.map((g) => {
-              const already = flexPlannedCount(db, g, weekStart)
+              const already = flexPlannedCount(db, g, weekStart, templateOnly)
               const per = g.perWeek ?? 1
               const fun = g.obligation === false
               const m = modalityLabel(db, g.modality!)
@@ -108,7 +108,7 @@ export function StepTreinos(props: StepProps) {
                     </span>
                     <div className="flex-1 min-w-0">
                       <div className="text-[15px] leading-snug">
-                        {g.title} <span className="text-muted">· {per}x/semana</span>
+                        {g.title} {!/x\/semana/.test(g.title) && <span className="text-muted">· {per}x/semana</span>}
                       </div>
                       <div className="text-[12.5px] text-muted">{fun ? 'diversão, se der vontade — nunca obrigação' : already >= per ? 'já tem na semana ✓' : 'escolhe uma janela, se quiser'}</div>
                     </div>

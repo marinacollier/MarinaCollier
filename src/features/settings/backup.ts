@@ -68,6 +68,9 @@ export const COLLECTION_LABELS: Partial<Record<CollectionKey, string>> = {
   weekTemplate: 'Modelo da semana',
   conflictAcks: 'Conflitos decididos',
   weekPlans: 'Semanas montadas',
+  nutritionStrategies: 'Estratégias nutricionais',
+  nutritionDayPlans: 'Planos alimentares',
+  bodyComposition: 'Composição corporal',
 }
 
 export interface BackupPreview {

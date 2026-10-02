@@ -131,7 +131,7 @@ export default function WeekPlannerPage() {
           </AnimatePresence>
           <div className="h-24" aria-hidden />
 
-          <div className="fixed left-0 right-0 z-[45] bg-bg/90 backdrop-blur-xl border-t border-line/70" style={{ bottom: 'calc(env(safe-area-inset-bottom) + 60px)' }}>
+          <div className="fixed left-0 right-0 z-[45] bg-bg border-t border-line/70" style={{ bottom: 'calc(env(safe-area-inset-bottom) + 60px)' }}>
             <div className="mx-auto max-w-[640px] px-4 py-2.5 flex gap-2.5">
               <Button variant="soft" onClick={() => go(step - 1)} disabled={step === 0} className="w-[96px]">
                 Voltar
