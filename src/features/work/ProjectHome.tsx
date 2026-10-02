@@ -38,6 +38,7 @@ function HomeSection({
   onAdd,
   addLabel,
   onMore,
+  alwaysMore,
   children,
 }: {
   title: string
@@ -46,6 +47,8 @@ function HomeSection({
   onAdd?: () => void
   addLabel?: string
   onMore?: () => void
+  /** Show "ver tudo" even when the section itself is empty. */
+  alwaysMore?: boolean
   children?: ReactNode
 }) {
   return (
@@ -53,7 +56,7 @@ function HomeSection({
       <div className="flex items-center justify-between px-1 mb-2 min-h-9">
         <h2 className="eyebrow">{title}</h2>
         <div className="flex items-center -mr-2">
-          {onMore && !empty && (
+          {onMore && (!empty || alwaysMore) && (
             <button type="button" onClick={onMore} className="h-9 px-2 text-[13px] text-muted active:text-ink">
               ver tudo
             </button>
@@ -116,6 +119,10 @@ export function ProjectHome({ project, today, onTab }: { project: Project; today
   }, [db.milestones, project.id])
   const delivery = project.nextDelivery
   const weekEmpty = week.dated.length === 0 && week.tasks.length === 0
+  const openCount = useMemo(
+    () => db.tasks.filter((t) => t.projectId === project.id && t.status !== 'waiting' && t.status !== 'done' && t.status !== 'archived' && !t.recurrence).length,
+    [db.tasks, project.id],
+  )
   const taskDefaults = { projectId: project.id, context: 'trabalho' as const, area: 'profissional' as const }
 
   return (
@@ -187,11 +194,12 @@ export function ProjectHome({ project, today, onTab }: { project: Project; today
 
       <HomeSection
         title="Esta semana"
-        quiet="Semana leve por aqui."
+        quiet={openCount ? `Nada com data esta semana · ${pluralize(openCount, 'tarefa aberta', 'tarefas abertas')} quando der.` : 'Semana leve por aqui.'}
         empty={weekEmpty}
         addLabel="Nova tarefa da semana"
         onAdd={() => openSheet('task', { defaults: { ...taskDefaults, bucket: 'semana' } })}
         onMore={() => onTab('tarefas')}
+        alwaysMore={openCount > 0}
       >
         <ListCard>
           <div className="divide-y divide-line/70">

@@ -50,7 +50,7 @@ function RitualRow({ ritual, today }: { ritual: RitualOccurrence; today: DateKey
           {event.recurrence?.kind === 'monthly' ? '🗓️' : '☕'}
         </span>
         <div className="flex-1 min-w-0">
-          <div className="text-[15px] font-medium leading-snug truncate">{event.title}</div>
+          <div className="text-[15px] font-medium leading-snug line-clamp-2">{event.title}</div>
           <div className={cn('text-[12.5px] mt-0.5', isToday ? 'text-accent font-medium' : 'text-muted')}>
             {when}
             {checks.length > 0 && <span className="text-muted font-normal"> · {checks.length}/{template.length} na pauta</span>}
