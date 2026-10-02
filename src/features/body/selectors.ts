@@ -156,6 +156,9 @@ export function copyWeekPlan(db: DB, toWeekStart: DateKey): NewItem<'workouts'>[
       goal: w.goal,
       intensity: w.intensity,
       workoutGoalId: w.workoutGoalId,
+      planType: w.planType,
+      period: w.period,
+      templateId: w.templateId,
       order: w.order,
     })
   }
@@ -204,7 +207,7 @@ export function goalProgress(db: DB, g: WorkoutGoal, today: DateKey): GoalProgre
         const from = ws < g.startDate ? g.startDate : ws
         return { weekStart: ws, count: from > addDays(ws, 6) ? 0 : matching(db, g, from, addDays(ws, 6)).length }
       })
-    return { current: weeks[weeks.length - 1].count, target: g.target, unit: 'sessoes', deadline, daysLeft, weeks }
+    return { current: weeks[weeks.length - 1].count, target: g.perWeek ?? g.target, unit: 'sessoes', deadline, daysLeft, weeks }
   }
   const list = matching(db, g, g.startDate, end)
   if (g.kind === 'distance') {

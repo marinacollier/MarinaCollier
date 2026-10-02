@@ -27,6 +27,8 @@ import {
 import { WorkTaskRow } from './WorkTaskRow'
 import { WaitingRow } from './WaitingRow'
 import { DatedRow, ProjectCard } from './WorkParts'
+import { RitualsCard } from './RitualsCard'
+import { upcomingRituals } from './rituals'
 
 export default function WorkPage() {
   const db = useDB()
@@ -41,6 +43,8 @@ export default function WorkPage() {
   const later = useMemo(() => laterDeadlines(db, today), [db, today])
   const { live, resting } = useMemo(() => splitProjects(db), [db])
   const newInbox = useMemo(() => inboxNew(db).length, [db])
+  const rituals = useMemo(() => upcomingRituals(db, today), [db, today])
+  const ritualToday = rituals.some((r) => r.date === today)
   const lastWins = useMemo(() => winsSorted(db.wins).slice(0, 3), [db.wins])
   const openCounts = useMemo(() => {
     const m = new Map<string, number>()
@@ -111,6 +115,14 @@ export default function WorkPage() {
         )}
       </Reveal>
 
+      {/* RITUAIS (em destaque no dia) */}
+      {ritualToday && (
+        <Reveal delay={next()}>
+          <SectionTitle>Rituais</SectionTitle>
+          <RitualsCard rituals={rituals} today={today} />
+        </Reveal>
+      )}
+
       {/* HOJE */}
       {todayTasks.length > 0 && (
         <Reveal delay={next()}>
@@ -148,6 +160,14 @@ export default function WorkPage() {
           <ListCard>
             <CappedList items={later} render={(i) => <DatedRow key={i.key} item={i} today={today} />} className="divide-y divide-line/70" />
           </ListCard>
+        </Reveal>
+      )}
+
+      {/* RITUAIS */}
+      {!ritualToday && rituals.length > 0 && (
+        <Reveal delay={next()}>
+          <SectionTitle>Rituais</SectionTitle>
+          <RitualsCard rituals={rituals} today={today} />
         </Reveal>
       )}
 

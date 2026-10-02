@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { actions, useDB } from '@/data/store'
 import type { Workout } from '@/data/types'
 import { modalityOf } from '@/data/selectors'
-import { closeSheet, toast } from '@/app/ui-store'
+import { closeSheet, replaceSheet, toast } from '@/app/ui-store'
 import type { SheetProps } from '@/app/sheet-types'
 import { Field, NumberInput, SheetLayout, TextArea } from '@/components/ui'
 import { relativeDay } from '@/lib/date'
@@ -39,7 +39,9 @@ export default function WorkoutLogSheet({ id }: SheetProps<'workoutLog'>) {
     })
     haptic('success')
     toast('Treino registrado 💪', { tone: 'win' })
-    closeSheet()
+    // Key sessions get a quick "como foi?" (energia, treino, nutrição, recuperação) — never mandatory.
+    if (w.isKeySession && (status === 'feito' || status === 'adaptado') && !w.postCheckin) replaceSheet('postWorkoutCheckin', { workoutId: w.id })
+    else closeSheet()
   }
 
   return (

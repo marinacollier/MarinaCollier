@@ -64,19 +64,11 @@ describe('routine occurrences', () => {
   it('toggling today does not touch other days', () => {
     actions.replaceDB(buildSeed(TODAY))
     const items = routineItemsFor(getDB(), SEED_IDS.routineMorning, TODAY)
-    expect(items.length).toBe(8)
+    expect(items.length).toBe(11)
     actions.toggleOccurrence('routineItem', items[0].id, TODAY)
     expect(routineProgress(getDB(), SEED_IDS.routineMorning, TODAY).done).toBe(1)
     expect(routineProgress(getDB(), SEED_IDS.routineMorning, '2026-10-01').done).toBe(0)
     expect(routineProgress(getDB(), SEED_IDS.routineMorning, TOMORROW).done).toBe(0)
-  })
-
-  it('"Preparar coisas do dia" only shows on weekdays', () => {
-    actions.replaceDB(buildSeed(TODAY))
-    const titles = (d: string) => routineItemsFor(getDB(), SEED_IDS.routineMorning, d).map((i) => i.title)
-    expect(titles(TODAY)).toContain('Preparar coisas do dia') // sexta
-    expect(titles(TOMORROW)).not.toContain('Preparar coisas do dia') // sábado
-    expect(titles(TOMORROW)).toHaveLength(7)
   })
 })
 
@@ -104,13 +96,20 @@ describe('daily closing', () => {
 })
 
 describe('seed', () => {
-  it('has the morning routine, today’s 3 priorities and no invented appointments', () => {
+  it('has Milagre da Manhã + Encerrar o dia, no invented Top 3 or tasks', () => {
     const seed = buildSeed(TODAY)
-    expect(seed.routines.find((r) => r.id === SEED_IDS.routineMorning)?.name).toBe('Minha manhã')
-    expect(prioritiesOf(seed, TODAY).map((p) => p.title)).toEqual(['Entregar revisão do projeto X', 'Fazer treino de natação', 'Estudar inglês'])
-    const ref = prioritiesOf(seed, TODAY)[0].ref
-    expect(ref && seed.tasks.some((t) => t.id === ref.id)).toBe(true)
-    // Recurring routines Marina asked for (Weekly CEO Review, Monthly Board) may have times; one-off tasks may not.
-    expect(seed.tasks.filter((t) => !t.recurrence).every((t) => !t.time)).toBe(true)
+    const morning = seed.routines.find((r) => r.id === SEED_IDS.routineMorning)!
+    expect(morning).toMatchObject({ name: 'Milagre da Manhã', planType: 'base', startTime: '04:40', hasEssential: true, essentialName: 'Essential' })
+    const items = routineItemsFor(seed, morning.id, TODAY)
+    expect(items[0]).toMatchObject({ title: 'Despertar', time: '04:40', essentialLabel: 'Respirar' })
+    expect(items.find((i) => i.title.startsWith('Journaling'))?.acceptsText).toBe(true)
+    expect(items.find((i) => i.title.startsWith('Passeio'))?.optional).toBe(true)
+    expect(items.find((i) => i.title === 'Movimento')?.hint).toBe('depende do treino do dia')
+    expect(items.filter((i) => i.essential).map((i) => i.essentialLabel)).toEqual(['Respirar', 'Higiene', 'Morning shot', '5 min de leitura', 'Agenda + Top 3'])
+    const evening = seed.routines.find((r) => r.period === 'noite')!
+    expect(evening.name).toBe('Encerrar o dia')
+    expect(routineItemsFor(seed, evening.id, TODAY)).toHaveLength(8)
+    expect(prioritiesOf(seed, TODAY)).toHaveLength(0)
+    expect([...seed.routines, ...seed.routineItems].every((r) => r.id.startsWith('seed:') || r.id === SEED_IDS.routineMorning)).toBe(true)
   })
 })

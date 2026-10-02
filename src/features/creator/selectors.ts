@@ -1,9 +1,9 @@
 /**
  * Creator OS read helpers. Pure functions — use inside useMemo.
  */
-import type { BrandPartnership, ContentItem, ContentStage, DateKey, ID, PartnershipStage } from '@/data/types'
+import type { BrandPartnership, ContentItem, ContentStage, DateKey, ID, PartnershipStage, Project, Task } from '@/data/types'
 import { diffDays, relativeDay } from '@/lib/date'
-import { CONTENT_STAGES, PARTNERSHIP_STAGES } from './constants'
+import { CATEGORIES, CONTENT_STAGES, PARTNERSHIP_STAGES } from './constants'
 
 const PARTNERSHIP_ORDER = PARTNERSHIP_STAGES.map((s) => s.value)
 const CONTENT_ORDER = CONTENT_STAGES.map((s) => s.value)
@@ -75,10 +75,55 @@ export function ideas(items: ContentItem[]): ContentItem[] {
 export interface ContentFilter {
   category?: string
   platform?: string
+  /** Creator project / series. */
+  projectId?: ID
 }
 
 export function filterContent(items: ContentItem[], f: ContentFilter): ContentItem[] {
-  return items.filter((c) => (!f.category || c.category === f.category) && (!f.platform || c.platform === f.platform))
+  return items.filter(
+    (c) =>
+      (!f.category || c.category === f.category) &&
+      (!f.platform || c.platform === f.platform) &&
+      (!f.projectId || c.projectId === f.projectId),
+  )
+}
+
+// ─── Creator projects / series ──────────────────────────────────────────────
+
+/** Creator-kind projects (UGC front, series) that are not finished, in project order. */
+export function creatorProjects(projects: Project[]): Project[] {
+  return projects.filter((p) => p.kind === 'creator' && p.status !== 'concluido').sort((a, b) => a.order - b.order)
+}
+
+/**
+ * Category options for a content item: the chosen project's own categories, else the union of all
+ * creator projects' categories, else the default list. `current` is always kept.
+ */
+export function categoryOptions(projects: Project[], projectId?: ID, current?: string): string[] {
+  const own = projectId ? projects.find((p) => p.id === projectId)?.categories : undefined
+  let list: string[]
+  if (own?.length) list = [...own]
+  else {
+    const union = new Set<string>()
+    for (const p of creatorProjects(projects)) for (const c of p.categories ?? []) union.add(c)
+    list = union.size ? [...union] : [...CATEGORIES]
+  }
+  if (current && !list.includes(current)) list.push(current)
+  return list
+}
+
+/** Open "revisar / confirmar" tasks tied to partnerships (Breevo: "revisar hoje"). Never 'late'. */
+export function partnershipReviews(tasks: Task[], partnershipId?: ID): Task[] {
+  return tasks
+    .filter((t) => !!t.partnershipId && t.status === 'review' && (!partnershipId || t.partnershipId === partnershipId))
+    .sort((a, b) => (a.date ?? '9999').localeCompare(b.date ?? '9999') || a.order - b.order)
+}
+
+/** "revisar hoje" / "revisar sexta" / "revisar quando der" — a past date reads as "revisar hoje". */
+export function reviewLabel(task: Pick<Task, 'date'>, today: DateKey): string {
+  if (!task.date) return 'revisar quando der'
+  if (task.date <= today) return 'revisar hoje'
+  return `revisar ${relativeDay(task.date, today)}`
 }
 
 /** Distinct non-empty values of a field, in the order of a reference list (unknown values last). */

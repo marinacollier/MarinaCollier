@@ -10,7 +10,7 @@ import { addDays, relativeDay } from '@/lib/date'
 import { cn } from '@/lib/cn'
 import { haptic } from '@/lib/haptics'
 import { FEELINGS, FOOD_TAGS, HABIT_ROWS, MEAL_SLOTS } from './constants'
-import { CheckinFields, ModalityIcon, StatusPill } from './components'
+import { CheckinFields, ModalityIcon, PlanTypeTag, StatusPill, whenLabel } from './components'
 import { setHabits } from './mutations'
 import { formatKm, formatMinutes, isDone, mealsBySlot } from './selectors'
 
@@ -107,7 +107,7 @@ function WorkoutCard({ workout: w }: { workout: Workout }) {
   const m = modalityOf(db, w.modality)
   const t = tone(m.tone)
   const done = isDone(w)
-  const meta = [w.time, w.plannedDurationMin && formatMinutes(w.plannedDurationMin), w.intensity].filter(Boolean).join(' · ')
+  const meta = [whenLabel(w), w.plannedDurationMin && formatMinutes(w.plannedDurationMin), w.intensity].filter(Boolean).join(' · ')
   const feeling = FEELINGS.find((f) => f.value === w.feeling)
   return (
     <div className="card overflow-hidden">
@@ -115,7 +115,10 @@ function WorkoutCard({ workout: w }: { workout: Workout }) {
         <ModalityIcon modality={m} size="lg" />
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
-            <div className="eyebrow truncate">{meta || 'quando der'}</div>
+            <div className="eyebrow truncate">
+              {meta || 'quando der'}
+              {w.planType && <PlanTypeTag planType={w.planType} className="ml-2 align-middle" />}
+            </div>
             <StatusPill status={w.status} className="-mt-0.5" />
           </div>
           <div className="font-display text-[24px] leading-[1.1] mt-1">{w.title || m.label}</div>
@@ -123,6 +126,12 @@ function WorkoutCard({ workout: w }: { workout: Workout }) {
         </div>
       </button>
       {w.notes && <p className="px-4 -mt-1 pb-3 text-[13.5px] text-muted leading-relaxed">{w.notes}</p>}
+      <div className="px-4 pb-2.5 -mt-1 flex items-center gap-2">
+        {w.isKeySession && <span className="text-[12px] font-semibold tracking-[0.06em] text-accent">🔥 KEY SESSION</span>}
+        <button type="button" className="ml-auto h-9 px-3 rounded-full bg-surface-2 text-[13px] text-ink-2 active:bg-line" onClick={() => openSheet('fuel', { workoutId: w.id })}>
+          🍽️ Ver estratégia
+        </button>
+      </div>
       <div className="px-4 pb-4">
         {done ? (
           <button
@@ -154,7 +163,7 @@ function RestCard({ workout: w }: { workout: Workout }) {
       </span>
       <div className="min-w-0">
         <div className="eyebrow">dia de descanso</div>
-        <div className="font-display text-[22px] leading-tight mt-0.5">Recuperar também é treino</div>
+        <div className="font-display text-[22px] leading-tight mt-0.5">{w.title ?? 'Recuperar também é treino'}</div>
         {w.notes && <div className="text-[13px] text-ink-2 mt-1">{w.notes}</div>}
       </div>
     </Card>

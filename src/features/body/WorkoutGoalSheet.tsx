@@ -5,7 +5,7 @@ import type { Milestone, WorkoutGoal } from '@/data/types'
 import { closeSheet, toast } from '@/app/ui-store'
 import { removeWithUndo } from '@/app/undo'
 import type { SheetProps } from '@/app/sheet-types'
-import { ChipSelect, DateInput, Field, IconButton, MoreOptions, NumberInput, Select, SheetLayout, TextArea, TitleInput } from '@/components/ui'
+import { ChipSelect, DateInput, WeekdayPicker, Field, IconButton, MoreOptions, NumberInput, Select, SheetLayout, TextArea, TitleInput } from '@/components/ui'
 import { todayKey } from '@/lib/date'
 import { uid } from '@/lib/id'
 import { cn } from '@/lib/cn'
@@ -68,6 +68,10 @@ export default function WorkoutGoalSheet({ id }: SheetProps<'workoutGoal'>) {
       notes: draft.notes?.trim() || undefined,
       status: draft.status ?? 'ativa',
       tripId: draft.tripId,
+      perWeek: kind === 'habit' ? (draft.perWeek ?? draft.target) : undefined,
+      obligation: kind === 'habit' ? draft.obligation : undefined,
+      preferredWeekdays: draft.preferredWeekdays?.length ? draft.preferredWeekdays : undefined,
+      planType: draft.planType,
     }
     if (existing) {
       actions.update('workoutGoals', existing.id, data)
@@ -119,7 +123,9 @@ export default function WorkoutGoalSheet({ id }: SheetProps<'workoutGoal'>) {
             <Select value={draft.modality} onChange={(modality) => set({ modality })} placeholder="qualquer uma" options={modalityOptions} />
           </Field>
           <Field label={kind === 'distance' ? 'Meta (km)' : kind === 'habit' ? 'Vezes/semana' : 'Sessões'}>
-            <NumberInput value={draft.target} onChange={(target) => set({ target })} placeholder={kind === 'distance' ? '100' : kind === 'habit' ? '2' : '12'} />
+            <NumberInput
+              value={kind === 'habit' ? (draft.perWeek ?? draft.target) : draft.target}
+              onChange={(target) => set(kind === 'habit' ? { target, perWeek: target } : { target })} placeholder={kind === 'distance' ? '100' : kind === 'habit' ? '2' : '12'} />
           </Field>
         </div>
       )}
@@ -167,7 +173,24 @@ export default function WorkoutGoalSheet({ id }: SheetProps<'workoutGoal'>) {
         </Field>
       </div>
 
-      <MoreOptions defaultOpen={!!existing?.tripId}>
+      <MoreOptions defaultOpen={!!existing?.tripId || !!existing?.preferredWeekdays?.length}>
+        {kind === 'habit' && (
+          <>
+            <Field label="Dias que costumo preferir" hint="as sugestões de janela começam por eles">
+              <WeekdayPicker value={draft.preferredWeekdays ?? []} onChange={(preferredWeekdays) => set({ preferredWeekdays })} />
+            </Field>
+            <Field label="É compromisso da semana?" hint="diversão não vira cobrança: sem lembrete de “ainda sem lugar”">
+              <ChipSelect
+                value={draft.obligation === false ? 'nao' : 'sim'}
+                onChange={(v) => set({ obligation: v === 'nao' ? false : undefined })}
+                options={[
+                  { value: 'sim', label: 'sim, quero encaixar' },
+                  { value: 'nao', label: 'não, é diversão' },
+                ]}
+              />
+            </Field>
+          </>
+        )}
         {db.trips.length > 0 && (
           <Field label="Ligado a uma viagem" hint="sem data própria, a contagem usa o início da viagem">
             <Select value={draft.tripId} onChange={(tripId) => set({ tripId })} placeholder="nenhuma" options={db.trips.map((t) => ({ value: t.id, label: `${t.flag} ${t.name}` }))} />

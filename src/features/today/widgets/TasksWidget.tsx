@@ -6,25 +6,32 @@ import { openSheet } from '@/app/ui-store'
 import { IconButton } from '@/components/ui'
 import { todayTasks } from '@/features/tasks/groups'
 import { TaskRow } from '@/features/tasks/TaskRow'
+import { showCarried, sortForFocus } from '../context'
 import { HeaderLink, Widget, type WidgetCtx } from './shared'
 
 const LIMIT = 5
+const WEEKEND_LIMIT = 3
 
 export function TasksWidget({ ctx }: { ctx: WidgetCtx }) {
-  const { db, today } = ctx
+  const { db, today, home } = ctx
   const nav = useNavigate()
   const { open, carried, done } = useMemo(() => {
-    // Tasks already in the Top 3 don't need to show twice.
+    // Tasks already in a Top 3 don't need to show twice.
     const inTop3 = new Set(db.priorities.filter((p) => p.date === today && p.ref?.type === 'task').map((p) => p.ref!.id))
     const t = todayTasks(db, today)
     const keep = (list: typeof t.open) => list.filter((x) => !inTop3.has(x.id))
-    return { open: keep(t.open), carried: keep(t.carried), done: keep(t.done) }
-  }, [db, today])
+    return {
+      open: sortForFocus(keep(t.open), home),
+      // Sunday OFF (and low-energy days) are never auto-filled with things from before.
+      carried: showCarried(home) ? sortForFocus(keep(t.carried), home) : [],
+      done: keep(t.done),
+    }
+  }, [db, today, home])
 
   if (open.length + carried.length + done.length === 0) return null
 
   const rows = [...open.map((t) => ({ t, note: undefined as string | undefined })), ...carried.map((t) => ({ t, note: 'ficou de antes' }))]
-  const shown = rows.slice(0, LIMIT)
+  const shown = rows.slice(0, home.weekend ? WEEKEND_LIMIT : LIMIT)
   const hidden = rows.length - shown.length
 
   return (

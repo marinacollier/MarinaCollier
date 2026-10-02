@@ -61,8 +61,8 @@ export default function TasksPage() {
       {openCount === 0 && done.tasks.length === 0 ? (
         <EmptyState
           emoji="🌿"
-          title={context ? `Nada em ${CONTEXT_LABEL[context].toLowerCase()} por aqui` : 'Nenhuma tarefa por aqui'}
-          text="Cabeça leve. Quando surgir algo, é só anotar."
+          title={context ? `Nada em ${CONTEXT_LABEL[context].toLowerCase()} por aqui` : 'Nada pedindo tua atenção aqui. Delícia.'}
+          text="Quando surgir algo, é só anotar."
           action={
             <Button variant="primary" icon={<Plus size={16} />} onClick={() => openSheet('task', { defaults: context ? { context } : undefined })}>
               Nova tarefa

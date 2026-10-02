@@ -24,11 +24,10 @@ import {
   isTaskOpen,
   mealsOn,
   nextTrip,
-  prioritiesFor,
-  routineProgress,
   type AgendaEntry,
 } from '@/data/selectors'
-import { SEED_IDS } from '@/data/seed/ids'
+import { prioritiesOf } from './priorities'
+import { morningRoutine, routineView } from './routine'
 import { countdownLabel, dayPart, diffDays, hmToMinutes, inMinutesLabel } from '@/lib/date'
 
 export type AgoraAction =
@@ -131,15 +130,14 @@ export function pickAgora(db: DB, today: DateKey, minutes: number): AgoraPick {
 
   // 3. Morning routine.
   if (part === 'manha') {
-    const routine = db.routines.find((r) => r.id === SEED_IDS.routineMorning && r.active) ??
-      db.routines.find((r) => r.period === 'manha' && r.active)
-    if (routine) {
-      const { done, total } = routineProgress(db, routine.id, today)
+    const routine = morningRoutine(db)
+    if (routine?.active) {
+      const { done, total, mode } = routineView(db, routine, today)
       if (total > 0 && done < total) {
         return {
           label: 'Agora',
           emoji: routine.emoji ?? '☀️',
-          title: routine.name,
+          title: mode === 'essential' ? `${routine.name} · ${routine.essentialName ?? 'Essential'}` : routine.name,
           subtitle: done === 0 ? `${total} coisinhas pra começar bem` : `${done} de ${total} ✓ — faltam ${total - done}`,
           action: { kind: 'scroll', target: 'manha' },
           tone: 'sand',
@@ -211,7 +209,7 @@ export function pickAgora(db: DB, today: DateKey, minutes: number): AgoraPick {
   if (trip && tripDays !== undefined && tripDays >= 0 && tripDays <= 1) return tripPick()
 
   // 8. Top 3.
-  const priority = prioritiesFor(db, today).find((p) => !p.done)
+  const priority = prioritiesOf(db, today).find((p) => !p.done)
   if (priority) {
     const task = priority.ref?.type === 'task' ? db.tasks.find((t) => t.id === priority.ref!.id) : undefined
     return {

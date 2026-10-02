@@ -3,8 +3,11 @@ import { motion } from 'framer-motion'
 import { Plus } from 'lucide-react'
 import { openSheet } from '@/app/ui-store'
 import { useDB } from '@/data/store'
-import type { BrandPartnership } from '@/data/types'
-import { Button, Card, EmptyState, SectionTitle } from '@/components/ui'
+import type { BrandPartnership, Task } from '@/data/types'
+import { actions } from '@/data/store'
+import { haptic } from '@/lib/haptics'
+import { nowISO } from '@/lib/id'
+import { Button, Card, Checkbox, EmptyState, SectionTitle } from '@/components/ui'
 import { useToday } from '@/hooks/useToday'
 import { relativeDay } from '@/lib/date'
 import { formatBRL } from '@/lib/money'
@@ -13,14 +16,30 @@ import { cn } from '@/lib/cn'
 import { advancePartnership } from './actions'
 import { partnershipStageMeta } from './constants'
 import { AdvanceButton, StageList, Tag } from './components'
-import { awaitingPayment, deadlineLabel, deadlineSoon, nextPartnershipStage, partnershipsByStage, upcomingDeliveries } from './selectors'
+import {
+  awaitingPayment,
+  deadlineLabel,
+  deadlineSoon,
+  nextPartnershipStage,
+  partnershipReviews,
+  partnershipsByStage,
+  reviewLabel,
+  upcomingDeliveries,
+} from './selectors'
 
 const COLLAPSED = new Set(['finalizado'])
 
 export default function PartnershipsTab() {
   const partnerships = useDB((db) => db.partnerships)
   const contentItems = useDB((db) => db.contentItems)
+  const tasks = useDB((db) => db.tasks)
   const today = useToday()
+  const reviews = useMemo(() => partnershipReviews(tasks), [tasks])
+  const reviewFor = useMemo(() => {
+    const m = new Map<string, Task>()
+    for (const t of reviews) if (t.partnershipId && !m.has(t.partnershipId)) m.set(t.partnershipId, t)
+    return m
+  }, [reviews])
   const groups = useMemo(() => partnershipsByStage(partnerships), [partnerships])
   const upcoming = useMemo(() => upcomingDeliveries(partnerships), [partnerships])
   const payment = useMemo(() => awaitingPayment(partnerships), [partnerships])
@@ -51,6 +70,32 @@ export default function PartnershipsTab() {
 
   return (
     <div>
+      {reviews.length > 0 && (
+        <Card padded={false} className="overflow-hidden mb-3">
+          <div className="eyebrow px-4 pt-3.5 pb-1">Para revisar</div>
+          <div className="divide-y divide-line/70">
+            {reviews.map((t) => (
+              <div key={t.id} className="flex items-start gap-3 px-4 py-2.5 min-h-[52px]">
+                <div className="pt-0.5">
+                  <Checkbox
+                    checked={false}
+                    label={`Concluir ${t.title}`}
+                    onChange={() => {
+                      actions.update('tasks', t.id, { status: 'done', completedAt: nowISO() })
+                      haptic('success')
+                    }}
+                  />
+                </div>
+                <button type="button" onClick={() => openSheet('task', { id: t.id })} className="flex-1 min-w-0 text-left">
+                  <span className="block text-[15px] leading-snug">{t.title}</span>
+                  <span className="block text-[12.5px] text-muted mt-0.5">{reviewLabel(t, today)} · a confirmar</span>
+                </button>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       {(upcoming.length > 0 || payment.count > 0) && (
         <div className="grid gap-3 mb-2">
           {upcoming.length > 0 && (
@@ -114,13 +159,27 @@ export default function PartnershipsTab() {
       <StageList
         groups={groups}
         collapsed={COLLAPSED}
-        render={(p, i) => <PartnershipCard key={p.id} p={p} index={i} today={today} contents={contentCount.get(p.id) ?? 0} />}
+        render={(p, i) => (
+          <PartnershipCard key={p.id} p={p} index={i} today={today} contents={contentCount.get(p.id) ?? 0} review={reviewFor.get(p.id)} />
+        )}
       />
     </div>
   )
 }
 
-function PartnershipCard({ p, index, today, contents }: { p: BrandPartnership; index: number; today: string; contents: number }) {
+function PartnershipCard({
+  p,
+  index,
+  today,
+  contents,
+  review,
+}: {
+  p: BrandPartnership
+  index: number
+  today: string
+  contents: number
+  review?: Task
+}) {
   const next = nextPartnershipStage(p.stage)
   const value = p.valueCents ? formatBRL(p.valueCents) : p.barter ? 'permuta' : undefined
   const meta: string[] = []
@@ -133,11 +192,13 @@ function PartnershipCard({ p, index, today, contents }: { p: BrandPartnership; i
           <div className="flex-1 min-w-0">
             <div className="font-display text-[19px] leading-tight truncate">{p.brand}</div>
             {meta.length > 0 && <div className="text-[13px] text-muted mt-0.5 truncate">{meta.join(' · ')}</div>}
+            {p.notes && <div className="text-[13px] text-ink-2 mt-1 leading-snug line-clamp-2">{p.notes}</div>}
           </div>
           {next && <AdvanceButton label={partnershipStageMeta(next).short} onClick={() => advancePartnership(p)} />}
         </div>
-        {(p.deadline || value) && (
+        {(p.deadline || value || review) && (
           <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
+            {review && <Tag tone="link">{reviewLabel(review, today)}</Tag>}
             {p.deadline && <Tag tone={deadlineSoon(p.deadline, today) ? 'soon' : 'neutral'}>{deadlineLabel(p.deadline, today)}</Tag>}
             {value && <Tag tone={p.valueCents ? 'money' : 'barter'}>{p.valueCents ? value : `🎁 ${value}`}</Tag>}
             {p.valueCents && p.barter ? <Tag tone="barter">🎁 + permuta</Tag> : null}

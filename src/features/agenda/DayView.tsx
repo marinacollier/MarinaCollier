@@ -1,13 +1,14 @@
 import { useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { Plus } from 'lucide-react'
+import { ChevronRight, Plus } from 'lucide-react'
 import { openSheet } from '@/app/ui-store'
 import { Button, Checkbox, EmptyState } from '@/components/ui'
 import { useDB } from '@/data/store'
 import type { DateKey } from '@/data/types'
+import { conflictsOn, workMode } from '@/data/planning'
 import { cn } from '@/lib/cn'
 import { ceilQuarter, findFreeSlots, fitIntoSlots } from './free-slots'
-import { allDayOnly, dayEntries, looseItemsFor, timedOnly, type LooseItem } from './selectors'
+import { allDayOnly, blocksOnly, dayEntries, looseItemsFor, timedOnly, type LooseItem } from './selectors'
 import { Timeline } from './Timeline'
 import { completeLoose, EntryDot, openEntry, openLoose } from './ui'
 
@@ -22,18 +23,45 @@ export interface DayViewProps {
 export function DayView({ date, today, nowMinutes, autoScroll }: DayViewProps) {
   const db = useDB()
   const isToday = date === today
-  const entries = useMemo(() => dayEntries(db, date), [db, date])
+  const entries = useMemo(() => dayEntries(db, date, { includeBlocks: true }), [db, date])
   const timed = useMemo(() => timedOnly(entries), [entries])
+  const blocks = useMemo(() => blocksOnly(entries), [entries])
+  const conflicts = useMemo(() => conflictsOn(db, date), [db, date])
+  const mode = workMode(db.profile, date)
+  const hasTimeline = timed.length > 0 || blocks.length > 0
   const allDay = useMemo(() => allDayOnly(entries), [entries])
   const loose = useMemo(() => looseItemsFor(db, date), [db, date])
 
-  // Free time from now (today) or from 06:00, until 21:00.
+  // Free time from now (today) or from 06:00, until 21:00. Work hours / commute count as busy.
   const from = isToday ? (nowMinutes > 6 * 60 ? ceilQuarter(nowMinutes) : '06:00') : '06:00'
-  const slots = useMemo(() => (from >= '21:00' ? [] : findFreeSlots(timed, { from, to: '21:00', minMinutes: 60, minBlockMin: 30 })), [timed, from])
-  const fit = useMemo(() => (timed.length ? fitIntoSlots(loose, slots, 50, 60) : { placed: [], rest: loose }), [loose, slots, timed.length])
+  const slots = useMemo(
+    () => (from >= '21:00' ? [] : findFreeSlots([...timed, ...blocks], { from, to: '21:00', minMinutes: 60, minBlockMin: 30 })),
+    [timed, blocks, from],
+  )
+  const fit = useMemo(() => (hasTimeline ? fitIntoSlots(loose, slots, 50, 60) : { placed: [], rest: loose }), [loose, slots, hasTimeline])
 
   return (
     <div className="space-y-4">
+      {(mode === 'presencial' || conflicts.length > 0) && (
+        <div className="flex flex-wrap items-center gap-2">
+          {mode === 'presencial' && (
+            <span className="inline-flex items-center gap-1 h-8 px-3 rounded-full bg-accent-soft text-[13px] font-medium text-ink">📍 presencial</span>
+          )}
+          {conflicts.length > 0 && (
+            <button
+              type="button"
+              onClick={() => openSheet('conflicts', { from: date, to: date })}
+              className="inline-flex items-center gap-1.5 min-h-11 pl-3 pr-2 rounded-full bg-sand-soft text-[13.5px] text-ink active:scale-[0.98] transition"
+            >
+              <span aria-hidden>⚠️</span>
+              Pontos de atenção
+              <span className="text-muted tabular-nums">· {conflicts.length}</span>
+              <ChevronRight size={16} className="text-muted" />
+            </button>
+          )}
+        </div>
+      )}
+
       {allDay.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {allDay.map((e) => (
@@ -55,14 +83,15 @@ export function DayView({ date, today, nowMinutes, autoScroll }: DayViewProps) {
         </div>
       )}
 
-      {fit.rest.length > 0 && <LooseRail items={fit.rest} date={date} label={timed.length ? 'para encaixar · sem pressa' : 'importante hoje'} />}
+      {fit.rest.length > 0 && <LooseRail items={fit.rest} date={date} label={hasTimeline ? 'para encaixar · sem pressa' : 'importante hoje'} />}
 
-      {timed.length > 0 ? (
+      {hasTimeline ? (
         <Timeline
           key={date}
           date={date}
           today={today}
           entries={timed}
+          blocks={blocks}
           nowMinutes={isToday ? nowMinutes : undefined}
           freeSlots={slots}
           fitted={fit.placed}

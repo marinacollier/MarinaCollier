@@ -2,14 +2,16 @@ import { useMemo, useState } from 'react'
 import { ArrowUp, X } from 'lucide-react'
 import { closeSheet, toast } from '@/app/ui-store'
 import type { SheetProps } from '@/app/sheet-types'
-import { Checkbox, SheetLayout, SortableList } from '@/components/ui'
+import { Checkbox, Segmented, SheetLayout, SortableList } from '@/components/ui'
 import { actions, useDB } from '@/data/store'
 import { activeProjects, isTaskOpen, modalityOf, nextStudy, nextTrip, studyingNow, workoutsOn } from '@/data/selectors'
 import type { DateKey, DB, EntityType, ID } from '@/data/types'
 import { formatLongDate, relativeDay, todayKey } from '@/lib/date'
 import { haptic } from '@/lib/haptics'
 import { cn } from '@/lib/cn'
-import { addPriority, FULL_COPY, MAX_PRIORITIES, prioritiesOf, setPriorityDone } from './priorities'
+import { isWorkTask } from './context'
+import { addPriority, DOMAINS, FULL_COPY, MAX_PRIORITIES, prioritiesOf, setPriorityDone, type PriorityList } from './priorities'
+import { takeInitialList } from './open-priorities'
 
 interface Suggestion {
   key: string
@@ -18,9 +20,10 @@ interface Suggestion {
   ref?: { type: EntityType; id: ID }
 }
 
-function suggestionsFor(db: DB, date: DateKey): { label: string; items: Suggestion[] }[] {
+function suggestionsFor(db: DB, date: DateKey, list: PriorityList): { label: string; items: Suggestion[] }[] {
   const tasks = db.tasks
     .filter((t) => isTaskOpen(t) && t.status !== 'waiting' && !t.recurrence)
+    .filter((t) => (list === 'trabalho' ? isWorkTask(t) : list === 'vida' ? !isWorkTask(t) : list !== 'corpo'))
     .sort((a, b) => {
       const score = (t: typeof a) => (t.date === date || t.dueDate === date ? 0 : t.date && t.date < date ? 1 : t.needsMe ? 2 : 3)
       return score(a) - score(b) || a.order - b.order
@@ -53,37 +56,48 @@ function suggestionsFor(db: DB, date: DateKey): { label: string; items: Suggesti
         .map((i) => ({ key: `ti-${i.id}`, title: i.title, emoji: trip.flag, ref: { type: 'tripItem' as const, id: i.id } }))
     : []
 
+  const show = (only: PriorityList[]) => list === 'main' || only.includes(list)
   return [
-    { label: 'Treino de hoje', items: workouts },
+    { label: 'Treino de hoje', items: show(['corpo']) ? workouts : [] },
     { label: 'Tarefas', items: tasks },
-    { label: 'Próximas ações de projetos', items: projects },
-    { label: 'Estudos', items: studies },
-    { label: trip ? `Viagem · ${trip.name}` : 'Viagem', items: tripItems },
+    { label: 'Próximas ações de projetos', items: show(['trabalho']) ? projects : [] },
+    { label: 'Estudos', items: show(['vida']) ? studies : [] },
+    { label: trip ? `Viagem · ${trip.name}` : 'Viagem', items: show(['vida']) ? tripItems : [] },
   ].filter((g) => g.items.length > 0)
 }
 
 export default function PrioritiesSheet({ date: dateProp }: SheetProps<'priorities'>) {
   const date = dateProp ?? todayKey()
   const db = useDB()
-  const list = useMemo(() => prioritiesOf(db, date), [db, date])
-  const groups = useMemo(() => suggestionsFor(db, date), [db, date])
+  const [tab, setTab] = useState<PriorityList>(takeInitialList)
+  const list = useMemo(() => prioritiesOf(db, date, tab), [db, date, tab])
+  const groups = useMemo(() => suggestionsFor(db, date, tab), [db, date, tab])
+  const counts = useMemo(() => Object.fromEntries(DOMAINS.map((d) => [d.value, prioritiesOf(db, date, d.value).length])) as Record<PriorityList, number>, [db, date])
   const [draft, setDraft] = useState('')
   const full = list.length >= MAX_PRIORITIES
   const chosen = new Set(list.map((p) => (p.ref ? `${p.ref.type}:${p.ref.id}` : p.title.toLowerCase())))
 
   const add = (title: string, ref?: Suggestion['ref']) => {
-    const res = addPriority(date, title, ref)
+    const res = addPriority(date, title, ref, tab)
     if (res.ok) {
       haptic('light')
       setDraft('')
     } else if (res.reason === 'full') toast(FULL_COPY)
-    else if (res.reason === 'duplicate') toast('Essa já está nas suas 3 ✓')
+    else if (res.reason === 'duplicate') toast('Essa já está aqui ✓')
   }
 
   const isToday = date === todayKey()
 
   return (
-    <SheetLayout eyebrow={isToday ? formatLongDate(date) : relativeDay(date)} title="Minhas 3 prioridades" onClose={closeSheet} primary={{ label: 'Pronto', onClick: closeSheet }}>
+    <SheetLayout eyebrow={isToday ? formatLongDate(date) : relativeDay(date)} title="Top 3" onClose={closeSheet} primary={{ label: 'Pronto', onClick: closeSheet }}>
+      <Segmented
+        value={tab}
+        onChange={(v) => {
+          setTab(v)
+          setDraft('')
+        }}
+        options={DOMAINS.map((d) => ({ value: d.value, label: counts[d.value] ? `${d.label} · ${counts[d.value]}` : d.label }))}
+      />
       {list.length > 0 ? (
         <SortableList
           items={list}
@@ -115,13 +129,15 @@ export default function PrioritiesSheet({ date: dateProp }: SheetProps<'prioriti
           )}
         />
       ) : (
-        <p className="font-display text-[19px] leading-snug text-ink-2">Se o dia só tivesse espaço pra três coisas, quais seriam?</p>
+        <div>
+          <p className="font-display text-[20px] leading-snug">{tab === 'main' ? 'O que realmente importa hoje?' : `O que importa hoje em ${DOMAINS.find((d) => d.value === tab)!.label.toLowerCase()}?`}</p>
+          <p className="text-[13.5px] text-muted mt-1">{tab === 'main' ? 'Escolhe três. O resto pode esperar.' : 'Até três. Fica guardado aqui, sem ocupar o Hoje.'}</p>
+        </div>
       )}
 
       {full ? (
-        <div className="rounded-2xl bg-sand-soft px-4 py-3 text-[14px] text-ink-2">{FULL_COPY}</div>
+        <div className="rounded-2xl bg-sand-soft px-4 py-3 text-[14px] text-ink-2">Três escolhidas ✓ Pra trocar, tira uma antes.</div>
       ) : (
-        <>
           <form
             onSubmit={(e) => {
               e.preventDefault()
@@ -141,6 +157,7 @@ export default function PrioritiesSheet({ date: dateProp }: SheetProps<'prioriti
               <ArrowUp size={18} />
             </button>
           </form>
+      )}
 
           {groups.length > 0 && (
             <div className="space-y-4 pt-1">
@@ -172,8 +189,6 @@ export default function PrioritiesSheet({ date: dateProp }: SheetProps<'prioriti
               ))}
             </div>
           )}
-        </>
-      )}
     </SheetLayout>
   )
 }
