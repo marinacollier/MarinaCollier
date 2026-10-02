@@ -1,18 +1,18 @@
 import { useMemo, type ComponentType } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Brain, Inbox, Search } from 'lucide-react'
+import { Inbox, Search } from 'lucide-react'
 import { ROUTES } from '@/app/routes'
-import { openSheet } from '@/app/ui-store'
 import { IconButton, Page } from '@/components/ui'
 import { useDB } from '@/data/store'
 import type { HomeWidgetId } from '@/data/types'
 import { useNow } from '@/hooks/useToday'
-import { dayPart, formatLongDate, greeting } from '@/lib/date'
-import { haptic } from '@/lib/haptics'
+import { formatLongDate, greeting } from '@/lib/date'
+import { homeContext } from './context'
 import { orderWidgets } from './layout'
 import { greetingEmoji, phraseFor } from './phrases'
 import { AgoraCard } from './widgets/AgoraCard'
+import { AmanhaWidget, BrainDumpWidget, DaySummaryLine, EnergyPicker, LowEnergyNote, WeekWrapCard } from './widgets/ContextWidgets'
 import { GastosWidget, RefeicoesWidget, TreinoWidget } from './widgets/DayWidgets'
 import {
   ClosingWidget,
@@ -47,19 +47,22 @@ const WIDGETS: Record<HomeWidgetId, ComponentType<{ ctx: WidgetCtx }>> = {
   luna: LunaWidget,
   countdown: CountdownWidget,
   fechamento: ClosingWidget,
-  // Placeholders until the Today agent implements them (Real Life Seed phase).
+  // Rendered in the header (see DaySummaryLine), never as a card.
   resumo_dia: () => null,
-  brain_dump: () => null,
-  amanha: () => null,
+  brain_dump: BrainDumpWidget,
+  amanha: AmanhaWidget,
 }
 
 export default function TodayPage() {
   const db = useDB()
   const { today, minutes } = useNow()
   const nav = useNavigate()
-  const part = dayPart(minutes, db.profile.dayParts)
-  const order = useMemo(() => orderWidgets(db.profile.homeWidgets, part), [db.profile.homeWidgets, part])
-  const ctx: WidgetCtx = useMemo(() => ({ db, today, minutes, part }), [db, today, minutes, part])
+  const home = useMemo(() => homeContext(db, today, minutes), [db, today, minutes])
+  const { part } = home
+  const order = useMemo(() => orderWidgets(db.profile.homeWidgets, home), [db.profile.homeWidgets, home])
+  const ctx: WidgetCtx = useMemo(() => ({ db, today, minutes, part, home }), [db, today, minutes, part, home])
+  const showSummary = db.profile.homeWidgets.some((w) => w.id === 'resumo_dia' && w.visible)
+  const showWeekWrap = home.mode === 'sexta'
   const inboxCount = useMemo(() => db.brainDump.filter((b) => b.status === 'inbox').length, [db.brainDump])
   const name = db.profile.name?.trim() || 'Marina'
 
@@ -89,29 +92,18 @@ export default function TodayPage() {
           </h1>
           <p className="font-display italic text-[17px] text-ink-2/80 mt-2">{phraseFor(today)}</p>
         </motion.div>
-        <motion.button
-          type="button"
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.06 }}
-          whileTap={{ scale: 0.985 }}
-          onClick={() => {
-            haptic('light')
-            openSheet('brainDump')
-          }}
-          className="mt-5 w-full flex items-center gap-3 h-[52px] pl-4 pr-3 rounded-full border border-dashed border-line bg-surface/60 text-left"
-        >
-          <Brain size={18} className="text-accent shrink-0" />
-          <span className="flex-1 min-w-0 truncate text-[15px] text-ink-2">+ tirar isso da minha cabeça</span>
-          <span className="hidden min-[430px]:inline text-[12px] text-muted">escreve agora, organiza depois</span>
-        </motion.button>
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.06 }}>
+          {showSummary && <DaySummaryLine db={db} today={today} />}
+          <EnergyPicker db={db} today={today} />
+          {home.mode === 'baixa' && <LowEnergyNote />}
+        </motion.div>
       </header>
 
       <div className="space-y-3.5">
         {order.map((id, i) => {
           const W = WIDGETS[id]
           if (!W) return null
-          return (
+          const card = (
             <motion.div
               key={id}
               initial={{ opacity: 0, y: 14 }}
@@ -122,6 +114,15 @@ export default function TodayPage() {
               <W ctx={ctx} />
             </motion.div>
           )
+          // Friday evening: "Fechando a semana ✨" right after Agora.
+          if (showWeekWrap && i === 0)
+            return [
+              card,
+              <motion.div key="semana" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.12 }}>
+                <WeekWrapCard db={db} today={today} />
+              </motion.div>,
+            ]
+          return card
         })}
       </div>
 
