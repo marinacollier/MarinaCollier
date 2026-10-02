@@ -4,6 +4,7 @@
  */
 import type {
   Area,
+  CalendarEvent,
   Book,
   DateKey,
   DayPriority,
@@ -16,6 +17,7 @@ import type {
   WeeklyReview,
 } from '@/data/types'
 import { eventsFor, expensesBetween, isTaskOpen } from '@/data/selectors'
+import { eventOccursOn } from '@/data/planning'
 import { addDays, startOfWeek, weekday } from '@/lib/date'
 import { normalize } from '@/lib/text'
 import {
@@ -46,6 +48,16 @@ export const QUESTIONS: { key: QuestionKey; question: string; placeholder: strin
 export function reviewWeekFor(today: DateKey): DateKey {
   const ws = startOfWeek(today)
   return weekday(today) === 1 ? addDays(ws, -7) : ws
+}
+
+/**
+ * A review-style calendar event with a checklist template on the Saturday of this week
+ * (e.g. "Weekly CEO Review"). Found from data only: any event with `template` occurring that day.
+ */
+export function reviewEventOfWeek(db: DB, weekStartIn: DateKey): { event: CalendarEvent; date: DateKey } | undefined {
+  const saturday = addDays(startOfWeek(weekStartIn), 5)
+  const event = db.events.find((e) => !!e.template?.length && eventOccursOn(e, saturday))
+  return event ? { event, date: saturday } : undefined
 }
 
 export function nextMonday(weekStart: DateKey): DateKey {

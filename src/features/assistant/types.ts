@@ -1,4 +1,5 @@
-import type { DateKey, DB, Project, Trip } from '@/data/types'
+import type { DateKey, DB, ID, Project, Trip } from '@/data/types'
+import type { Conflict } from '@/data/planning'
 import type { ResultAction } from '@/features/search/actions'
 
 export interface AnswerItem {
@@ -17,6 +18,8 @@ export type AnswerBlock =
   | { kind: 'stat'; label: string; value: string; hint?: string; action?: ResultAction }
   | { kind: 'list'; title: string; emoji?: string; items: AnswerItem[]; more?: { label: string; action: ResultAction } }
   | { kind: 'suggestions'; title?: string; questions: string[] }
+  /** Planning conflicts rendered with ConflictCard (Mover / Manter assim / Ignorar). */
+  | { kind: 'conflicts'; items: { conflict: Conflict; dayLabel: string }[]; more?: { label: string; action: ResultAction } }
 
 export type TimeWord = 'hoje' | 'amanha' | 'semana' | 'mes'
 
@@ -33,6 +36,8 @@ export interface ParsedQuestion {
   trips: Trip[]
   /** Modality ids ("musculacao", "bike"...). */
   modalities: string[]
+  /** People mentioned by name (Project.people and waiting-for "who"), with the projects they appear in. */
+  people: { name: string; projectIds: ID[] }[]
 }
 
 export interface AgentContext {

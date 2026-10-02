@@ -21,7 +21,8 @@ import { formatShortDate, monthKey } from '@/lib/date'
 import { haptic } from '@/lib/haptics'
 import { formatBRLShort } from '@/lib/money'
 import { nowISO } from '@/lib/id'
-import { findMonthlyReview, monthData, monthLabel, shiftMonth } from './monthly'
+import { boardEventOfMonth, findMonthlyReview, monthData, monthLabel, shiftMonth } from './monthly'
+import { AgendaHint } from './AgendaHint'
 import { plural } from './shared'
 
 function upsertMonthly(month: string, patch: Partial<MonthlyReview>) {
@@ -37,6 +38,7 @@ export default function MonthlyReviewPage() {
   const [month, setMonth] = useState(current)
   const data = useMemo(() => monthData(db, month), [db, month])
   const review = findMonthlyReview(db.monthlyReviews, month)
+  const board = useMemo(() => boardEventOfMonth(db, month), [db, month])
 
   return (
     <Page>
@@ -65,6 +67,15 @@ export default function MonthlyReviewPage() {
           <ChevronRight size={18} />
         </IconButton>
       </Card>
+
+      {board && (
+        <AgendaHint
+          emoji="🏛️"
+          title={board.event.title}
+          when={`${formatShortDate(board.date)}${board.event.startTime ? ` · ${board.event.startTime}` : ''}`}
+          eventId={board.event.id}
+        />
+      )}
 
       <motion.div
         key={month}

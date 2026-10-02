@@ -1,64 +1,65 @@
 import { describe, expect, it } from 'vitest'
 import { emptyDB } from '@/data/defaults'
 import { buildFixture, FIXTURE_TODAY } from '@/features/search/test-fixture'
-import { findWorkoutSlots, freeSlotsForDay, slotLabel } from './freeSlots'
-import { buildInsights } from './insights'
+import { buildLifeFixture, LIFE_TODAY } from '@/features/search/life-fixture'
+import { buildInsights, planningInsights } from './insights'
 
 const db = buildFixture()
 const today = FIXTURE_TODAY
-
-describe('free slots', () => {
-  it('finds gaps ≥ 60 min between 06:00 and 21:00', () => {
-    expect(freeSlotsForDay(db, today).map(slotLabel)).toEqual(['06:00–09:00', '10:00–14:00', '15:30–21:00'])
-  })
-
-  it('respects notBefore and the minimum length', () => {
-    expect(freeSlotsForDay(db, today, { notBefore: 8 * 60 + 30 }).map(slotLabel)).toEqual(['10:00–14:00', '15:30–21:00'])
-    expect(freeSlotsForDay(db, today, { notBefore: 8 * 60, minMinutes: 240 }).map(slotLabel)).toEqual(['10:00–14:00', '15:30–21:00'])
-    expect(freeSlotsForDay(db, today, { notBefore: 8 * 60, minMinutes: 241 }).map(slotLabel)).toEqual(['15:30–21:00'])
-  })
-
-  it('an empty day is one big window', () => {
-    expect(freeSlotsForDay(emptyDB(), today).map(slotLabel)).toEqual(['06:00–21:00'])
-  })
-
-  it('skips days that already have the modality and extends the window when the week is ending', () => {
-    const fit = findWorkoutSlots(db, today, 8 * 60, 'musculacao')
-    expect(fit.skipped).toEqual(['2026-10-03'])
-    expect(fit.extended).toBe(true) // Friday: only Fri + Sun left this week
-    expect(fit.days[0].date).toBe(today)
-    // 08:00 now → starts at 08:30, so 08:30–09:00 (30 min) is too short
-    expect(fit.days[0].slots.map(slotLabel)).toEqual(['10:00–14:00', '15:30–21:00'])
-    expect(fit.days.map((d) => d.date)).toContain('2026-10-06') // Tuesday, next week (dentist on Tue 08:00)
-  })
-
-  it('on a Monday the window stays inside the week', () => {
-    const fit = findWorkoutSlots(emptyDB(), '2026-09-28', 6 * 60, 'musculacao')
-    expect(fit.extended).toBe(false)
-    expect(fit.days).toHaveLength(7)
-  })
-})
+const texts = (list: { text: string }[]) => list.map((i) => i.text)
 
 describe('insights', () => {
   it('returns 2–4 gentle, deterministic insights', () => {
     const list = buildInsights(db, today, 8 * 60)
     expect(list.length).toBeGreaterThanOrEqual(2)
     expect(list.length).toBeLessThanOrEqual(4)
-    const texts = list.map((i) => i.text)
-    expect(texts).toContain('2 coisas esperando alguém há mais de 7 dias')
-    expect(texts).toContain('Recife é em 20 dias — 4 itens a confirmar')
+    expect(texts(list)).toContain('2 coisas esperando alguém há mais de 7 dias')
+    expect(texts(list)).toContain('Recife é em 20 dias — 4 itens pra revisar')
     expect(buildInsights(db, today, 8 * 60)).toEqual(list)
-    for (const t of texts) expect(t).not.toMatch(/%|atrasad|streak|falhou/i)
+    for (const t of texts(list)) expect(t).not.toMatch(/%|atrasad|streak|falhou/i)
   })
 
   it('mentions tomorrow without a workout only when it is true', () => {
     const noTomorrow = { ...db, workouts: db.workouts.filter((w) => w.date !== '2026-10-03') }
-    expect(buildInsights(noTomorrow, today, 8 * 60, 10).map((i) => i.text)).toContain('Nenhum treino planejado para amanhã ainda')
-    expect(buildInsights(db, today, 8 * 60, 10).map((i) => i.text)).not.toContain('Nenhum treino planejado para amanhã ainda')
+    expect(texts(buildInsights(noTomorrow, today, 8 * 60, 10))).toContain('Nenhum treino planejado para amanhã ainda')
+    expect(texts(buildInsights(db, today, 8 * 60, 10))).not.toContain('Nenhum treino planejado para amanhã ainda')
   })
 
   it('an empty db still gets at least two calm insights', () => {
-    const list = buildInsights(emptyDB(), today, 8 * 60)
-    expect(list.length).toBeGreaterThanOrEqual(2)
+    expect(buildInsights(emptyDB(), today, 8 * 60).length).toBeGreaterThanOrEqual(2)
+  })
+})
+
+describe('planning insights (from data, never hardcoded)', () => {
+  const life = buildLifeFixture()
+
+  it('Friday morning: a check-in conflict today and a flexible goal without a place', () => {
+    const list = planningInsights(life, LIFE_TODAY, 8 * 60)
+    expect(texts(list)).toEqual(['Hoje: dois treinos podem competir pelo mesmo check-in', 'Yoga ainda não tem lugar essa semana — quer que eu ache uma janela?'])
+    expect(list[0].ask).toBe('Tem conflito essa semana?')
+    expect(list[1].ask).toBe('Quando consigo encaixar yoga?')
+    // they come first in the page's list
+    expect(buildInsights(life, LIFE_TODAY, 8 * 60)[0].id).toBe(list[0].id)
+  })
+
+  it('evening before a presencial day suggests preparing things', () => {
+    const monday = '2026-10-05'
+    expect(texts(planningInsights(life, monday, 19 * 60))[0]).toBe('Amanhã é presencial. Quer preparar as coisas hoje?')
+    // not in the morning, and not before a remote day
+    expect(texts(planningInsights(life, monday, 9 * 60))).not.toContain('Amanhã é presencial. Quer preparar as coisas hoje?')
+    expect(texts(planningInsights(life, LIFE_TODAY, 19 * 60))).not.toContain('Amanhã é presencial. Quer preparar as coisas hoje?')
+  })
+
+  it('a flexible goal already placed this week is not mentioned; fun goals never count', () => {
+    const placed = { ...life, workouts: [...life.workouts, { ...life.workouts[0], id: 'yoga-sat', date: '2026-10-03', modality: 'yoga', status: 'planejado' as const }] }
+    expect(texts(planningInsights(placed, LIFE_TODAY, 8 * 60)).some((t) => t.includes('Yoga'))).toBe(false)
+    expect(texts(planningInsights(placed, LIFE_TODAY, 8 * 60)).some((t) => t.includes('Circo'))).toBe(false)
+  })
+
+  it('trip in ≤ 7 days shows how many items are left to review', () => {
+    const list = planningInsights(life, '2026-10-17', 8 * 60)
+    expect(texts(list)).toContain('Recife é em 5 dias — 2 itens pra revisar')
+    expect(list.find((i) => i.id === 'trip:trip-recife')!.ask).toBe('O que falta pra Recife?')
+    expect(texts(planningInsights(life, '2026-10-10', 8 * 60)).some((t) => t.startsWith('Recife'))).toBe(false)
   })
 })

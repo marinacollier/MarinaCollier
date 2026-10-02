@@ -1,9 +1,10 @@
 /**
  * "Meu mês": pure aggregation of one calendar month ('YYYY-MM').
  */
-import type { Book, DateKey, DB, Goal, MonthlyReview, Project, ProfessionalWin, StudyItem, Trip } from '@/data/types'
+import type { Book, CalendarEvent, DateKey, DB, Goal, MonthlyReview, Project, ProfessionalWin, StudyItem, Trip } from '@/data/types'
 import { expensesBetween } from '@/data/selectors'
-import { addMonths, endOfMonth, MONTHS } from '@/lib/date'
+import { addDays, addMonths, endOfMonth, MONTHS } from '@/lib/date'
+import { eventOccursOn } from '@/data/planning'
 import { inRange, isoToKey, isWorkoutDone, spendBreakdown, workoutsByModality, type CategorySpend } from './shared'
 
 export const monthStart = (month: string): DateKey => `${month}-01`
@@ -16,6 +17,20 @@ export function shiftMonth(month: string, n: number): string {
 export function monthLabel(month: string): string {
   const [y, m] = month.split('-').map(Number)
   return `${MONTHS[m - 1]} ${y}`
+}
+
+/**
+ * A monthly calendar event with a checklist template in this month (e.g. "Monthly Board Meeting"),
+ * found from data only. Returns its (first) date in the month.
+ */
+export function boardEventOfMonth(db: DB, month: string): { event: CalendarEvent; date: DateKey } | undefined {
+  const last = endOfMonth(monthStart(month))
+  const candidates = db.events.filter((e) => !!e.template?.length && e.recurrence?.kind === 'monthly')
+  for (let d = monthStart(month); d <= last; d = addDays(d, 1)) {
+    const event = candidates.find((e) => eventOccursOn(e, d))
+    if (event) return { event, date: d }
+  }
+  return undefined
 }
 
 export function findMonthlyReview(reviews: MonthlyReview[], month: string): MonthlyReview | undefined {

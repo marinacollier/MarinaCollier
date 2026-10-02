@@ -13,7 +13,6 @@ const ask = (q: string, minutes = EIGHT_AM) => nbsp(askMari(db, q, today, minute
 
 const lists = (a: MariAnswer) => a.blocks.filter((b): b is Extract<AnswerBlock, { kind: 'list' }> => b.kind === 'list')
 const list = (a: MariAnswer, title: string) => lists(a).find((l) => l.title === title)
-const allTitles = (a: MariAnswer) => lists(a).flatMap((l) => l.items.map((i) => i.title))
 
 describe('parseQuestion', () => {
   it('resolves entities accent-insensitively', () => {
@@ -89,31 +88,35 @@ describe('Mari answers', () => {
     expect(items.map((i) => i.title)).not.toContain('FashionFinder')
   })
 
-  it('"O que tenho pendente antes da África?" → open trip items, trip tasks, brain dump group', () => {
+  it('"O que tenho pendente antes da África?" → items to review grouped by sub-area, trip tasks, brain dump, Recife first', () => {
     const a = ask('O que tenho pendente antes da África?')
     expect(a.agents[0].id).toBe('travel')
-    expect(a.headline).toMatch(/África do Sul — faltam 39 dias: 9 coisas em aberto/)
-    expect(list(a, 'Documentos e antes de ir')!.items.map((i) => i.title)).toEqual(['Passaporte válido', 'Vacina de febre amarela'])
-    expect(list(a, 'A confirmar')!.items.map((i) => i.title)).toEqual(['Safari no Kruger', 'Hospedagem em Cape Town', 'Subir a Table Mountain'])
+    expect(a.headline).toMatch(/África do Sul — faltam 39 dias: 3 itens pra revisar em 4 sub-áreas \+ 2 a fazer \+ 2 tarefas \+ 2 ideias no brain dump/)
+    const groups = list(a, 'Por sub-área')!.items
+    expect(groups.map((g) => g.title)).toEqual(['Johannesburg / Safari', 'Cape Town', 'Documentos', 'Antes de ir'])
+    expect(groups[1]).toMatchObject({ subtitle: 'Hospedagem em Cape Town · Subir a Table Mountain', trailing: '2 revisar' })
+    expect(groups[2].trailing).toBe('1 a fazer')
     expect(list(a, 'Tarefas da viagem')!.items.map((i) => i.title)).toEqual(['Reservar tour Cape Point', 'Comprar adaptador de tomada'])
     expect(list(a, 'No brain dump')!.items).toHaveLength(2)
-    expect(allTitles(a)).not.toContain('Voo para Johannesburg') // confirmed
+    expect(JSON.stringify(a)).not.toContain('Voo para Johannesburg') // confirmed
+    // Recife starts earlier and is mentioned first, with a follow-up question
+    expect(a.blocks.some((b) => b.kind === 'text' && /Antes vem 🇧🇷 Recife \(faltam 20 dias\), com 4 coisas pra revisar/.test(b.text))).toBe(true)
+    expect(a.blocks.some((b) => b.kind === 'suggestions' && b.questions[0] === 'O que falta pra Recife?')).toBe(true)
+    expect(ask('O que falta pra Recife?').headline).toMatch(/^🇧🇷 Recife/)
   })
 
-  it('"Quando consigo encaixar musculação?" → free ≥60min slots, skipping strength days', () => {
+  it('"Quando consigo encaixar musculação?" → planning-engine windows, one tap creates a flexible workout', () => {
     const a = ask('Quando consigo encaixar musculação?')
     expect(a.agents[0].id).toBe('training')
-    const slots = list(a, 'Janelas livres (60 min ou mais)')!.items
-    // Saturday already has musculação → skipped
-    expect(slots.map((s) => s.title).some((t) => t.startsWith('Amanhã'))).toBe(false)
-    expect(a.blocks.some((b) => b.kind === 'text' && /amanhã/.test(b.text))).toBe(true)
-    // Today: 10:00–14:00 is the biggest gap between the daily and the workshop... 15:30–21:00 is bigger
-    expect(slots[0].title).toBe('Hoje · 15:30–21:00')
-    expect(slots[0].action).toEqual({ kind: 'sheet', name: 'workout', props: { date: today } })
-    // Sunday has a run 07:00–08:00 → the long window starts 08:00
-    expect(slots.find((s) => s.title.startsWith('Domingo'))!.title).toBe('Domingo · 08:00–21:00')
-    expect(a.headline).toMatch(/Dá pra encaixar musculação/)
-    expect(a.headline).toMatch(/hoje, 15:30/)
+    const slots = list(a, 'Toque pra planejar')!.items
+    // Saturday already has musculação → skipped; today only after "now" (08:00) and outside BASE work hours
+    expect(slots.map((s) => s.title)).toEqual(['Hoje · 18:00', 'Domingo · 06:00', 'Segunda · 06:00', 'Terça · 06:00'])
+    expect(slots[0].action).toEqual({
+      kind: 'createWorkout',
+      data: { date: today, time: '18:00', modality: 'musculacao', status: 'planejado', planType: 'flexivel', plannedDurationMin: 60, workoutGoalId: undefined, order: 0 },
+      message: '🏋️‍♀️ Musculação no plano: hoje, 18:00 ✓',
+    })
+    expect(a.headline).toBe('Dá pra encaixar musculação hoje, 18:00 — sem competir com nada.')
   })
 
   it('"O que estou esperando do FashionFinder?" → waiting tasks of the project + inbox waiting', () => {
@@ -136,8 +139,10 @@ describe('Mari answers', () => {
   it('"Que coisas preciso resolver antes de viajar?" → next trip (Recife) open items', () => {
     const a = ask('Que coisas preciso resolver antes de viajar?')
     expect(a.agents[0].id).toBe('travel')
-    expect(a.headline).toMatch(/Recife — faltam 20 dias: 4 coisas em aberto/)
-    expect(list(a, 'A confirmar')!.items).toHaveLength(4)
+    expect(a.headline).toBe('🇧🇷 Recife — faltam 20 dias: 4 itens pra revisar em 4 sub-áreas.')
+    expect(list(a, 'Por sub-área')!.items.map((i) => i.title)).toEqual(['Hospedagem', 'Roteiro', 'Transporte', 'Comida'])
+    // A single-item group opens that item directly
+    expect(list(a, 'Por sub-área')!.items[0].action).toMatchObject({ kind: 'sheet', name: 'tripItem' })
   })
 
   it('study and Luna questions', () => {

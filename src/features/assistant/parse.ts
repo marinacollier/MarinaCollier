@@ -3,6 +3,7 @@
  * (projects, trips incl. "África" → "África do Sul", modalities, time words, months).
  */
 import type { DB } from '@/data/types'
+// People are matched only by data (Project.people / waiting "who"), never by hardcoded names.
 import { MONTHS } from '@/lib/date'
 import { normalize } from '@/lib/text'
 import { MODALITY_SYNONYMS, tokenize } from '@/features/search/engine'
@@ -48,7 +49,34 @@ export function parseQuestion(db: DB, raw: string): ParsedQuestion {
     })
     .map((m) => m.id)
 
-  return { raw, norm, tokens, time, month: monthIdx >= 0 ? monthIdx : undefined, projects, trips, modalities }
+  const people = findPeople(db, compact, tokenSet)
+
+  return { raw, norm, tokens, time, month: monthIdx >= 0 ? monthIdx : undefined, projects, trips, modalities, people }
+}
+
+const PEOPLE_GENERIC = new Set([...GENERIC_WORDS, 'time', 'equipe', 'pessoal', 'cliente', 'turma', 'galera', 'alguem', 'todos'])
+
+/**
+ * People Marina mentions by name: anyone listed in a project's `people` or as the "who" of a
+ * waiting-for task. Matches the full name, or its first word when it is specific enough.
+ */
+function findPeople(db: DB, compact: string, tokenSet: Set<string>): ParsedQuestion['people'] {
+  const byName = new Map<string, { name: string; projectIds: Set<string> }>()
+  const consider = (name: string | undefined, projectId?: string) => {
+    if (!name?.trim()) return
+    const words = tokenize(name)
+    const first = words[0]
+    const full = words.join('')
+    const hit = (full.length >= 3 && compact.includes(full)) || (!!first && first.length >= 3 && !PEOPLE_GENERIC.has(first) && tokenSet.has(first))
+    if (!hit) return
+    const key = first ?? full
+    const entry = byName.get(key) ?? { name: name.trim(), projectIds: new Set<string>() }
+    if (projectId) entry.projectIds.add(projectId)
+    byName.set(key, entry)
+  }
+  for (const p of db.projects) for (const person of p.people) consider(person.name, p.id)
+  for (const t of db.tasks) if (t.status === 'waiting') consider(t.waiting?.who, t.projectId)
+  return [...byName.values()].map((e) => ({ name: e.name, projectIds: [...e.projectIds] }))
 }
 
 /**

@@ -88,17 +88,18 @@ describe('goals logic', () => {
 })
 
 describe('goals seed', () => {
-  it('creates the week and the bigger goals with valid references', () => {
-    const ctx = createSeedContext('2026-10-02')
-    const goals = seedGoals(ctx).goals!
-    expect(goals).toHaveLength(7)
-    const week = goalsIn(goals, 'semana', '2026-09-28')
-    expect(week).toHaveLength(5)
-    expect(week.filter((x) => x.big)).toHaveLength(3)
-    expect(goalsIn(goals, 'maior').map((x) => x.id)).toEqual([GOAL_SEED_IDS.africa, GOAL_SEED_IDS.ingles])
-    const ids = new Set(goals.map((x) => x.id))
-    for (const x of goals) if (x.parentId) expect(ids.has(x.parentId)).toBe(true)
-    // no invented progress
+  it('only long-term goals grounded in the brief, stable ids, no weekly goals, no invented progress', () => {
+    const goals = seedGoals(createSeedContext('2026-10-02')).goals!
+    expect(goals.map((x) => [x.title, x.category, x.deadline])).toEqual([
+      ['South Africa 2026 pronta pra embarcar', 'viagem', '2026-10-24'],
+      ['FashionFinder — roadmap até 20/11', 'profissional', '2026-11-20'],
+      ['Manter yoga na rotina', 'corpo', undefined],
+    ])
+    expect(goals.every((x) => x.level === 'maior' && x.status === 'ativa')).toBe(true)
+    expect(goalsIn(goals, 'semana', '2026-09-28')).toHaveLength(0)
+    expect(goals.map((x) => x.id)).toEqual([GOAL_SEED_IDS.africa, GOAL_SEED_IDS.fashionFinder, GOAL_SEED_IDS.yoga])
+    expect(seedGoals(createSeedContext('2026-11-01')).goals!.map((x) => x.id)).toEqual(goals.map((x) => x.id))
     expect(goals.every((x) => x.progress === undefined)).toBe(true)
+    expect(goals.map((x) => x.title).join(' ')).not.toMatch(/Treinar 4x|Avançar o FashionFinder|Inglês confortável/)
   })
 })

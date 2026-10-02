@@ -1,6 +1,8 @@
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { Chip } from '@/components/ui'
+import { ConflictCard } from '@/components/planning/ConflictCard'
+import { openSheet } from '@/app/ui-store'
 import { runAction } from '@/features/search/actions'
 import { ResultRow } from '@/features/search/ResultViews'
 import type { AnswerBlock, MariAnswer } from './types'
@@ -41,11 +43,36 @@ function Block({ block, onAsk }: { block: AnswerBlock; onAsk: (q: string) => voi
                 emoji={item.emoji}
                 title={item.title}
                 subtitle={item.subtitle}
-                trailing={item.trailing}
+                trailing={
+                  item.action?.kind === 'createWorkout' ? (
+                    <span className="inline-flex items-center rounded-full bg-accent-soft text-accent px-2.5 h-7 text-[12.5px] font-medium">{item.trailing}</span>
+                  ) : (
+                    item.trailing
+                  )
+                }
                 onPress={item.action ? () => runAction(item.action!, navigate) : undefined}
               />
             ))}
           </div>
+          {block.more && (
+            <button type="button" onClick={() => runAction(block.more!.action, navigate)} className="text-[13px] font-medium text-accent h-9 px-0.5">
+              {block.more.label} →
+            </button>
+          )}
+        </section>
+      )
+    case 'conflicts':
+      return (
+        <section className="space-y-2.5">
+          {block.items.map(({ conflict, dayLabel }) => {
+            const workout = conflict.refs.find((r) => r.type === 'workout')
+            return (
+              <div key={conflict.key}>
+                <div className="eyebrow px-0.5 mb-1">{dayLabel}</div>
+                <ConflictCard conflict={conflict} onMove={workout ? () => openSheet('workout', { id: workout.id }) : undefined} />
+              </div>
+            )
+          })}
           {block.more && (
             <button type="button" onClick={() => runAction(block.more!.action, navigate)} className="text-[13px] font-medium text-accent h-9 px-0.5">
               {block.more.label} →

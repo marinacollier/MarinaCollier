@@ -1,64 +1,49 @@
 import type { FeatureSeed } from '@/data/seed/context'
-import type { Area, Goal } from '@/data/types'
-import { startOfWeek } from '@/lib/date'
+import { seedId } from '@/data/seed/context'
 
 export const GOAL_SEED_IDS = {
+  /** Kept from the first seed so existing installs don't get a duplicate. */
   africa: 'goal-africa-pronta',
-  ingles: 'goal-ingles-reunioes',
+  fashionFinder: seedId('goals', 'fashionfinder-roadmap'),
+  yoga: seedId('goals', 'yoga-na-rotina'),
 } as const
 
-/** Editable examples: three big ones for the week, two small, two "maiores". No invented progress. */
-export const seedGoals: FeatureSeed = (ctx) => {
-  const week = startOfWeek(ctx.today)
-  let order = 0
-  const goal = (title: string, category: Area, extra: Partial<Goal> & Pick<Goal, 'level' | 'big'>) =>
+/**
+ * Marina's long-term goals, grounded in her brief. No weekly goals: she builds the week in
+ * "Montar minha semana". No invented progress.
+ * (Goal has no planType field yet — see contract request in the report.)
+ */
+export const seedGoals: FeatureSeed = (ctx) => ({
+  goals: [
     ctx.make('goals', {
-      title,
-      category,
+      id: GOAL_SEED_IDS.africa,
+      level: 'maior',
+      title: 'South Africa 2026 pronta pra embarcar',
+      category: 'viagem',
+      deadline: '2026-10-24',
+      big: true,
       status: 'ativa',
-      order: order++,
-      ...extra,
-    })
-
-  return {
-    goals: [
-      goal('África do Sul pronta para embarcar', 'viagem', {
-        id: GOAL_SEED_IDS.africa,
-        level: 'maior',
-        big: true,
-      }),
-      goal('Inglês confortável em reuniões', 'estudo', {
-        id: GOAL_SEED_IDS.ingles,
-        level: 'maior',
-        big: true,
-      }),
-      goal('Treinar 4x nesta semana', 'corpo', {
-        level: 'semana',
-        period: week,
-        big: true,
-      }),
-      goal('Avançar o FashionFinder', 'profissional', {
-        level: 'semana',
-        period: week,
-        big: true,
-      }),
-      goal('Organizar pendências da África do Sul', 'viagem', {
-        level: 'semana',
-        period: week,
-        big: true,
-        parentId: GOAL_SEED_IDS.africa,
-      }),
-      goal('Estudar inglês 3x', 'estudo', {
-        level: 'semana',
-        period: week,
-        big: false,
-        parentId: GOAL_SEED_IDS.ingles,
-      }),
-      goal('Revisar gastos da semana', 'financeiro', {
-        level: 'semana',
-        period: week,
-        big: false,
-      }),
-    ],
-  }
-}
+      order: 0,
+    }),
+    ctx.make('goals', {
+      id: GOAL_SEED_IDS.fashionFinder,
+      level: 'maior',
+      title: 'FashionFinder — roadmap até 20/11',
+      category: 'profissional',
+      deadline: '2026-11-20',
+      big: true,
+      status: 'ativa',
+      order: 1,
+    }),
+    ctx.make('goals', {
+      id: GOAL_SEED_IDS.yoga,
+      level: 'maior',
+      title: 'Manter yoga na rotina',
+      category: 'corpo',
+      big: true,
+      status: 'ativa',
+      notes: 'Sem dia fixo — o planejamento sugere uma janela livre na semana.',
+      order: 2,
+    }),
+  ],
+})

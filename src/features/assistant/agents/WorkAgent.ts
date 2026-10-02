@@ -3,6 +3,7 @@ import { ROUTES } from '@/app/routes'
 import { activeProjects, isTaskOpen, projectTasks, waitingFor } from '@/data/selectors'
 import { diffDays, toDateKey } from '@/lib/date'
 import { routeAction, sheetAction } from '@/features/search/actions'
+import { tokenize } from '@/features/search/engine'
 import { has } from '../parse'
 import type { Agent, AgentContext, AnswerBlock, AnswerItem } from '../types'
 import { dayLabel, listJoin, plural, sinceLabel, taskItem } from './common'
@@ -86,7 +87,40 @@ function lagging({ db, today }: AgentContext): AnswerBlock[] {
   ]
 }
 
-function waiting({ db, today, q }: AgentContext): AnswerBlock[] {
+/** "O que estou esperando da <pessoa>?" — waiting-for whose "who" names that person; else her projects' waiting list. */
+function waitingFromPerson({ db, today, q }: AgentContext): AnswerBlock[] {
+  const person = q.people[0]
+  const first = tokenize(person.name)[0] ?? ''
+  const fromPerson = waitingFor(db).filter((t) => tokenize(t.waiting?.who ?? '').includes(first))
+  const projects = db.projects.filter((p) => person.projectIds.includes(p.id))
+  if (fromPerson.length) {
+    const oldest = fromPerson[0]
+    return [
+      {
+        kind: 'headline',
+        text: `Esperando ${person.name}: ${plural(fromPerson.length, 'coisa', 'coisas')} — ${oldest.title} (${sinceLabel(oldest.waiting?.since, today)}).`,
+      },
+      { kind: 'list', title: `Esperando ${person.name}`, emoji: '⏳', items: fromPerson.map((t) => taskItem(db, t, today)) },
+      ...(oldest.waiting && diffDays(oldest.waiting.since, today) >= 7
+        ? [{ kind: 'text', text: 'Já faz uns dias — uma mensagem curta de follow-up resolve.' } as AnswerBlock]
+        : []),
+    ]
+  }
+  const projWaiting = waitingFor(db).filter((t) => !!t.projectId && person.projectIds.includes(t.projectId))
+  if (projWaiting.length)
+    return [
+      {
+        kind: 'headline',
+        text: `Nada no nome de ${person.name}, mas no ${listJoin(projects.map((p) => p.name))} você espera ${plural(projWaiting.length, 'coisa', 'coisas')}.`,
+      },
+      { kind: 'list', title: 'Esperando alguém', emoji: '⏳', items: projWaiting.map((t) => taskItem(db, t, today)) },
+    ]
+  return [{ kind: 'headline', text: `Você não está esperando nada de ${person.name} agora 🙌` }]
+}
+
+function waiting(ctx: AgentContext): AnswerBlock[] {
+  const { db, today, q } = ctx
+  if (q.people.length && !q.projects.length) return waitingFromPerson(ctx)
   const scope = q.projects.map((p) => p.id)
   const inScope = (pid?: string) => !scope.length || (!!pid && scope.includes(pid))
   const tasks = waitingFor(db).filter((t) => inScope(t.projectId))
@@ -161,8 +195,11 @@ export const WorkAgent: Agent = {
   emoji: '💼',
   match(q) {
     if (has(q, ...LAGGING_WORDS) && has(q, 'projeto*', 'trabalho')) return 0.95
-    if (has(q, ...WAITING_WORDS)) return q.projects.length ? 0.95 : 0.8
-    if (q.projects.length) return 0.85
+    if (has(q, ...WAITING_WORDS)) return q.projects.length || q.people.length ? 0.95 : 0.8
+    // "Quando consigo encaixar yoga?" names a modality that is also a word of a project name.
+    // "pendente antes da África?" also names the trip's content project: the trip wins.
+    if (q.projects.length && q.trips.length && q.projects.every((p) => !!p.tripId && q.trips.some((t) => t.id === p.tripId))) return 0.6
+    if (q.projects.length) return q.modalities.length && !has(q, 'projeto*', 'trabalho', 'tarefa*', 'cliente*', 'app') ? 0.6 : 0.85
     if (has(q, 'projeto*', 'trabalho', 'work', 'precisa de mim', 'inbox', 'cliente*', 'entrega*')) return 0.75
     if (has(q, ...LAGGING_WORDS)) return 0.6
     return 0
