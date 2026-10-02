@@ -5,8 +5,8 @@ import { openSheet } from '@/app/ui-store'
 import type { Conflict } from '@/data/planning'
 import { WEEKDAY_SHORT, weekday } from '@/lib/date'
 import { haptic } from '@/lib/haptics'
-import { moveOptions, planConflicts } from '../plan'
-import { DayHeader, Quiet } from '../ui'
+import { moveOptions, planConflicts, weekLoad } from '../plan'
+import { DayHeader, LoadStrip, Quiet } from '../ui'
 import type { StepProps } from './types'
 
 export function StepConflitos({ db, today, weekStart, days, setDraft, planned }: StepProps) {
@@ -14,6 +14,7 @@ export function StepConflitos({ db, today, weekStart, days, setDraft, planned }:
   const [moving, setMoving] = useState<{ key: string; workoutId: string } | null>(null)
   const plannedIds = useMemo(() => new Set(planned.map((w) => w.id)), [planned])
   const dates = [...new Set(conflicts.map((c) => c.date))]
+  const load = useMemo(() => weekLoad(db, weekStart, planned), [db, weekStart, planned])
 
   /** Which workout "Mover" should move: a planned flexible one first, then any planned, then an existing one. */
   const movable = (c: Conflict) => {
@@ -26,10 +27,17 @@ export function StepConflitos({ db, today, weekStart, days, setDraft, planned }:
     return flexible ?? plannedRefs[plannedRefs.length - 1] ?? ws[0]
   }
 
-  if (!conflicts.length) return <EmptyState emoji="🌿" title="Tudo encaixado" text="Nenhum conflito com o que você escolheu. Delícia." />
+  if (!conflicts.length)
+    return (
+      <div>
+        <LoadStrip load={load} today={today} title="Carga da semana" />
+        <EmptyState emoji="🌿" title="Tudo encaixado" text="Nenhum conflito com o que você escolheu. Delícia." />
+      </div>
+    )
 
   return (
     <div>
+      <LoadStrip load={load} today={today} title="Carga da semana" />
       {dates.map((date) => (
         <section key={date}>
           <DayHeader date={date} today={today} right={<span />} />
@@ -55,6 +63,9 @@ export function StepConflitos({ db, today, weekStart, days, setDraft, planned }:
                         <div className="text-[13px] text-ink-2 mb-2">
                           Mover <b className="font-medium">{target!.title}</b> pra:
                         </div>
+                        {planned.find((w) => w.id === target!.id)?.requiresPreviousDayPrep && (
+                          <div className="text-[12px] text-muted -mt-1 mb-2">O PREP vai junto: vira a véspera do novo dia.</div>
+                        )}
                         <div className="flex flex-wrap gap-2">
                           {moveOptions(db, planned, target!.id, days).map((o) => (
                             <Chip

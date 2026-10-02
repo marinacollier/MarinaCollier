@@ -1,8 +1,8 @@
 import { useMemo } from 'react'
 import { PERIOD_LABEL } from '@/data/planning'
 import { WEEKDAY_SHORT, weekday } from '@/lib/date'
-import { confirmedPlan, modalityLabel, planConflicts, plannedSummaryLine, type PlanOps } from '../plan'
-import { Eyebrow, Group, Quiet, Row } from '../ui'
+import { confirmedPlan, modalityLabel, planConflicts, plannedSummaryLine, weekLoad, type PlanOps } from '../plan'
+import { Eyebrow, Group, LoadStrip, Quiet, Row } from '../ui'
 import type { StepProps } from './types'
 
 const short = (d: string) => WEEKDAY_SHORT[weekday(d)].toLowerCase()
@@ -11,6 +11,7 @@ export function StepConfirmo({ db, today, weekStart, planned, ops }: StepProps &
   const summary = useMemo(() => plannedSummaryLine(db, weekStart, planned), [db, weekStart, planned])
   const open = useMemo(() => planConflicts(db, weekStart, today, planned).filter((c) => c.severity === 'warn').length, [db, weekStart, today, planned])
   const already = confirmedPlan(db, weekStart)
+  const load = useMemo(() => weekLoad(db, weekStart, planned), [db, weekStart, planned])
   const workouts = [...ops.workouts].sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '99').localeCompare(b.time ?? '99'))
   const nothing = !workouts.length && !ops.goals.length && !ops.priorities.length
 
@@ -23,6 +24,10 @@ export function StepConfirmo({ db, today, weekStart, planned, ops }: StepProps &
         </div>
       )}
 
+      <div className="mt-4">
+        <LoadStrip load={load} today={today} />
+      </div>
+
       {workouts.length > 0 && (
         <>
           <Eyebrow>Treinos que entram</Eyebrow>
@@ -34,7 +39,7 @@ export function StepConfirmo({ db, today, weekStart, planned, ops }: StepProps &
                 <Row
                   key={w.id}
                   emoji={rest ? '🌿' : m.emoji}
-                  title={w.title || (rest ? 'Descanso' : m.label)}
+                  title={`${w.title || (rest ? 'Descanso' : m.label)}${w.isKeySession ? ' 🔥' : ''}`}
                   time={short(w.date)}
                   detail={w.time ?? (w.period ? PERIOD_LABEL[w.period] : undefined)}
                 />

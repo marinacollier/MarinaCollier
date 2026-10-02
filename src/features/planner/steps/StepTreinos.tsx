@@ -5,8 +5,8 @@ import { modalityGroup, PERIOD_LABEL } from '@/data/planning'
 import { WEEKDAY_SHORT, weekday } from '@/lib/date'
 import { haptic } from '@/lib/haptics'
 import { toast } from '@/app/ui-store'
-import { existingWorkouts, flexPlannedCount, flexibleGoals, flexSuggestions, modalityLabel, pickFor, plannedSummaryLine, plannedWorkouts, type TrainingLine } from '../plan'
-import { dayName, DayHeader, Eyebrow, Group, PlanTag, Quiet, Row } from '../ui'
+import { existingWorkouts, flexPlannedCount, flexibleGoals, flexSuggestions, lineDate, modalityLabel, pickFor, plannedSummaryLine, plannedWorkouts, weekLoad, type TrainingLine } from '../plan'
+import { dayName, DayHeader, Eyebrow, Group, LoadStrip, PlanTag, PrepTag, Quiet, Row } from '../ui'
 import type { StepProps } from './types'
 
 export function StepTreinos(props: StepProps) {
@@ -16,6 +16,7 @@ export function StepTreinos(props: StepProps) {
   // Suggestions consider the template choices, not the flexible picks themselves (keeps options stable).
   const templateOnly = useMemo(() => plannedWorkouts(db, { ...draft, flex: [] }, lines), [db, draft, lines])
   const summary = useMemo(() => plannedSummaryLine(db, weekStart, planned), [db, weekStart, planned])
+  const load = useMemo(() => weekLoad(db, weekStart, planned), [db, weekStart, planned])
 
   const setPick = (line: TrainingLine, v: string | null) => {
     if (v) haptic('light')
@@ -45,13 +46,28 @@ export function StepTreinos(props: StepProps) {
         <EmptyState emoji="🏃‍♀️" title="Sem modelo de semana ainda" text="Quando você montar seu modelo de treinos em Corpo, ele aparece aqui pra escolher." />
       )}
 
+      <LoadStrip load={load} today={today} title="Carga da semana" />
+
       {days.map((date) => {
-        const dayLines = lines.filter((l) => l.date === date)
+        const dayLines = lines.filter((l) => lineDate(draft, l) === date)
         const dayExisting = existing.filter((w) => w.date === date)
         if (!dayLines.length && !dayExisting.length) return null
+        const prep = load.find((l) => l.date === date)?.prepFor
         return (
           <section key={date}>
-            <DayHeader date={date} today={today} />
+            <DayHeader
+              date={date}
+              today={today}
+              right={
+                prep ? (
+                  <span className="inline-flex items-center gap-1.5 text-[12px] text-muted">
+                    <PrepTag /> pra {(prep.title || modalityLabel(db, prep.modality).label).toLowerCase()}
+                  </span>
+                ) : (
+                  <span />
+                )
+              }
+            />
             <Group>
               {dayExisting.map((w) => {
                 const m = modalityLabel(db, w.modality)
@@ -59,7 +75,7 @@ export function StepTreinos(props: StepProps) {
                   <Row
                     key={w.id}
                     emoji={w.status === 'descanso' ? '🌿' : m.emoji}
-                    title={w.title || (w.status === 'descanso' ? 'Descanso' : m.label)}
+                    title={`${w.title || (w.status === 'descanso' ? 'Descanso' : m.label)}${w.isKeySession ? ' 🔥' : ''}`}
                     time={w.time ?? (w.period ? PERIOD_LABEL[w.period] : undefined)}
                     detail="já no plano"
                     muted
@@ -129,6 +145,14 @@ export function StepTreinos(props: StepProps) {
   )
 }
 
+function durationLabel(line: TrainingLine): string | undefined {
+  const min = line.durationMin
+  const max = line.load.plannedDurationMaxMin
+  if (!min) return undefined
+  const fmt = (m: number) => (m >= 120 && m % 60 === 0 ? `${m / 60}h` : `${m}`)
+  return max && max !== min ? `${fmt(min)}–${fmt(max)}${max >= 120 && max % 60 === 0 ? '' : ' min'}` : `${fmt(min)}${min >= 120 && min % 60 === 0 ? '' : ' min'}`
+}
+
 function LineRow({ line, pick, onPick, db }: StepProps & { line: TrainingLine; pick: string | null; onPick: (v: string | null) => void }) {
   if (line.choice === 'fixed' || line.choice === 'rest') {
     const rest = line.choice === 'rest'
@@ -138,11 +162,12 @@ function LineRow({ line, pick, onPick, db }: StepProps & { line: TrainingLine; p
         emoji={rest ? '🌿' : m.emoji}
         title={
           <span className="inline-flex items-center gap-2 flex-wrap">
-            {line.title || (rest ? 'Descanso' : m.label)} <PlanTag type={line.planType} />
+            {line.title || (rest ? 'Descanso' : m.label)}
+            {line.load.isKeySession && <span aria-label="sessão-chave">🔥</span>} <PlanTag type={line.planType} />
           </span>
         }
         time={line.time ?? (line.period ? PERIOD_LABEL[line.period] : undefined)}
-        detail={line.notes}
+        detail={[durationLabel(line), line.notes].filter(Boolean).join(' · ') || undefined}
         muted={!pick}
         right={<Checkbox checked={!!pick} onChange={(v) => onPick(v ? line.options[0] : null)} label={`Incluir ${line.title || m.label}`} />}
       />
@@ -158,7 +183,10 @@ function LineRow({ line, pick, onPick, db }: StepProps & { line: TrainingLine; p
   return (
     <div className="px-3.5 py-3">
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-[15px] leading-snug">{line.title || prompt}</span>
+        <span className="text-[15px] leading-snug">
+          {line.title || prompt}
+          {line.load.isKeySession ? ' 🔥' : ''}
+        </span>
         <PlanTag type={line.planType} />
       </div>
       {(line.title || line.time || line.period || line.notes) && (

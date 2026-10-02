@@ -23,6 +23,8 @@ import {
   trainingLines,
   workDeadlines,
   weekTrips,
+  weekLoad,
+  lineDate,
   type WeekDraft,
 } from './plan'
 
@@ -218,6 +220,54 @@ describe('step 6 · conflitos', () => {
     expect(opts.find((o) => o.date === '2026-10-09')?.conflicts).toBe(0)
     const moved = plannedWorkouts(db, { ...draft, moved: { [forcaId]: '2026-10-09' } }, lines)
     expect(planConflicts(db, WS, TODAY, moved).some((c) => c.kind === 'checkin_limit')).toBe(false)
+  })
+})
+
+describe('load hierarchy (🔥 / PREP)', () => {
+  const withKey = () => {
+    const db = fixture()
+    db.weekTemplate.push({
+      ...meta,
+      id: 't-sex',
+      weekday: 5,
+      modalities: ['corrida'],
+      choice: 'fixed',
+      time: '06:00',
+      durationMin: 60,
+      durationMaxMin: 75,
+      planType: 'base',
+      order: 0,
+      active: true,
+      isKeySession: true,
+      isLongSession: true,
+      loadCategory: 'key',
+      requiresPreviousDayPrep: true,
+      tags: ['long-run'],
+    })
+    return db
+  }
+
+  it('marks key sessions and the PREP day before them, from template data', () => {
+    const db = withKey()
+    const lines = trainingLines(db, WS, TODAY)
+    expect(lines.find((l) => l.templateId === 't-sex')?.load.isKeySession).toBe(true)
+    const load = weekLoad(db, WS, plannedWorkouts(db, draftWith(), lines))
+    expect(load.find((d) => d.key)?.date).toBe('2026-10-09')
+    expect(load.filter((d) => d.prepFor).map((d) => d.date)).toEqual(['2026-10-08'])
+  })
+
+  it('PREP follows the key session when it is moved', () => {
+    const db = withKey()
+    const lines = trainingLines(db, WS, TODAY)
+    const id = plannedTemplateId(WS, 't-sex')
+    const draft = draftWith({ moved: { [id]: '2026-10-10' } })
+    const load = weekLoad(db, WS, plannedWorkouts(db, draft, lines))
+    expect(load.find((d) => d.key)?.date).toBe('2026-10-10')
+    expect(load.filter((d) => d.prepFor).map((d) => d.date)).toEqual(['2026-10-09'])
+    expect(lineDate(draft, lines.find((l) => l.templateId === 't-sex')!)).toBe('2026-10-10')
+    // and the created workout carries the load fields
+    const ops = buildOps(db, draft, lines)
+    expect(ops.workouts.find((w) => w.templateId === 't-sex')).toMatchObject({ date: '2026-10-10', isKeySession: true, requiresPreviousDayPrep: true, plannedDurationMaxMin: 75 })
   })
 })
 

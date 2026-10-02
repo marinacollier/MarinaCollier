@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
 import type { DateKey, PlanType, WorkDayMode } from '@/data/types'
-import { formatDayMonth, relativeDay, WEEKDAY_LONG, weekday } from '@/lib/date'
+import { formatDayMonth, relativeDay, WEEKDAY_LONG, WEEKDAY_SHORT, weekday } from '@/lib/date'
 import { cn } from '@/lib/cn'
+import type { DayLoad } from './plan'
 
 const PLAN_TYPE: Record<PlanType, { label: string; cls: string }> = {
   fixo: { label: 'fixo', cls: 'bg-surface-2 text-ink-2' },
@@ -32,7 +33,7 @@ export function dayName(date: DateKey): string {
 export function DayHeader({ date, today, mode, right }: { date: DateKey; today: DateKey; mode?: WorkDayMode; right?: ReactNode }) {
   const rel = relativeDay(date, today)
   return (
-    <div className="flex items-baseline justify-between gap-2 px-1 mb-1.5 mt-5 first:mt-1">
+    <div className="flex items-baseline justify-between gap-2 px-1 mb-1.5 mt-5">
       <div className="text-[13px] font-semibold text-ink-2">
         {dayName(date)} <span className="text-muted font-normal">· {formatDayMonth(date)}{rel === 'hoje' || rel === 'amanhã' ? ` · ${rel}` : ''}</span>
       </div>
@@ -61,6 +62,30 @@ export function Row({ emoji, title, detail, time, right, muted, className }: { e
         )}
       </div>
       {right && <div className="shrink-0 flex items-center gap-1.5">{right}</div>}
+    </div>
+  )
+}
+
+export function PrepTag({ className }: { className?: string }) {
+  return <span className={cn('inline-flex items-center h-5 px-1.5 rounded-md text-[10px] font-bold tracking-wider bg-sand-soft text-sand shrink-0', className)}>PREP</span>
+}
+
+/** One-line week: 🔥 on key-session days, PREP the day before a session that needs it. Information only. */
+export function LoadStrip({ load, today, title }: { load: DayLoad[]; today: DateKey; title?: string }) {
+  if (!load.some((d) => d.key || d.prepFor)) return null
+  return (
+    <div className="card px-3 py-3 mb-4">
+      {title && <div className="eyebrow mb-2 px-0.5">{title}</div>}
+      <div className="grid grid-cols-7 gap-1 text-center">
+        {load.map((d) => (
+          <div key={d.date} className={cn('flex flex-col items-center gap-1 min-w-0', d.date < today && 'opacity-45')}>
+            <span className="text-[10.5px] font-semibold text-muted tracking-wide">{WEEKDAY_SHORT[weekday(d.date)]}</span>
+            <span className="h-6 flex items-center justify-center">
+              {d.key ? <span aria-label="sessão-chave">🔥</span> : d.prepFor ? <PrepTag /> : <span className="text-line">•</span>}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

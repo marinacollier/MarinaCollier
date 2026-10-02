@@ -39,6 +39,7 @@ import {
   type WindowSuggestion,
 } from '@/data/planning'
 import { eventsFor, nextTrip, petTasksDue } from '@/data/selectors'
+import { dayTrainingContext } from '@/data/fuel'
 import { addDays, endOfWeek, startOfWeek, weekday, weekDays } from '@/lib/date'
 
 // ─── Week & steps ───────────────────────────────────────────────────────────
@@ -194,6 +195,39 @@ export interface TrainingLine {
   period?: DayPeriod
   durationMin?: number
   notes?: string
+  /** Training-load fields copied from the template into the workout (🔥 key session, PREP…). */
+  load: LoadFields
+}
+
+export type LoadFields = Pick<
+  Workout,
+  | 'plannedDurationMaxMin'
+  | 'sessionType'
+  | 'loadCategory'
+  | 'isKeySession'
+  | 'isLongSession'
+  | 'requiresPreviousDayPrep'
+  | 'requiresPreWorkout'
+  | 'requiresIntraWorkout'
+  | 'requiresPostWorkout'
+  | 'recoveryPriority'
+  | 'tags'
+>
+
+function loadOf(t: WeekTemplateItem): LoadFields {
+  return {
+    plannedDurationMaxMin: t.durationMaxMin,
+    sessionType: t.sessionType,
+    loadCategory: t.loadCategory,
+    isKeySession: t.isKeySession,
+    isLongSession: t.isLongSession,
+    requiresPreviousDayPrep: t.requiresPreviousDayPrep,
+    requiresPreWorkout: t.requiresPreWorkout,
+    requiresIntraWorkout: t.requiresIntraWorkout,
+    requiresPostWorkout: t.requiresPostWorkout,
+    recoveryPriority: t.recoveryPriority,
+    tags: t.tags,
+  }
 }
 
 /** Template lines not yet materialized anywhere in the week (a moved line counts as materialized). */
@@ -219,6 +253,7 @@ export function trainingLines(db: DB, weekStart: DateKey, today: DateKey): Train
       period: t.time ? undefined : t.period,
       durationMin: t.durationMin,
       notes: t.notes,
+      load: rest ? {} : loadOf(t),
     })
   }
   return out
@@ -315,6 +350,7 @@ export function plannedWorkouts(db: DB, draft: WeekDraft, lines: TrainingLine[],
       planType: line.planType,
       templateId: line.templateId,
       notes: line.notes,
+      ...(rest ? {} : line.load),
       order: 0,
     })
   }
@@ -341,6 +377,31 @@ export function plannedWorkouts(db: DB, draft: WeekDraft, lines: TrainingLine[],
 function mergeWorkouts(existing: Workout[], planned: Workout[]): Workout[] {
   const ids = new Set(planned.map((w) => w.id))
   return [...existing.filter((w) => !ids.has(w.id)), ...planned]
+}
+
+/** Day a template line lands on in the draft (moved in step 6, or its template day). */
+export function lineDate(draft: WeekDraft, line: TrainingLine): DateKey {
+  return draft.moved[plannedTemplateId(draft.weekStart, line.templateId)] ?? line.date
+}
+
+export interface DayLoad {
+  date: DateKey
+  /** 🔥 key session of the day. */
+  key?: Workout
+  /** Tomorrow's training that needs preparation today (PREP). */
+  prepFor?: Workout
+}
+
+/**
+ * Load hierarchy of the simulated week. Context belongs to the training, not the weekday:
+ * move the key session and its PREP day moves with it (via data/fuel.ts dayTrainingContext).
+ */
+export function weekLoad(db: DB, weekStart: DateKey, planned: Workout[]): DayLoad[] {
+  const sim = weekWithPlan(db, planned)
+  return weekDays(weekStart).map((date) => {
+    const ctx = dayTrainingContext(sim, date)
+    return { date, key: ctx.key, prepFor: ctx.prepFor }
+  })
 }
 
 // ─── Step 3 · Estudos ───────────────────────────────────────────────────────
