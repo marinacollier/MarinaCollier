@@ -72,4 +72,4 @@ export const INBOX_SOURCE_OPTIONS = (Object.keys(INBOX_SOURCES) as WorkInboxItem
 }))
 
 export const PRIVACY_NOTE = 'Guardamos só assunto, remetente e data — nunca o e-mail inteiro.'
-export const CALM_EMPTY = 'Nada pedindo sua atenção aqui. Gostoso, né?'
+export const CALM_EMPTY = 'Nada pedindo tua atenção aqui. Delícia.'

@@ -7,23 +7,27 @@ import type { ContentItem, NewItem } from '@/data/types'
 import { ChipSelect, DateInput, Field, MoreOptions, Select, SheetLayout, TextArea, TextInput, TitleInput } from '@/components/ui'
 import { haptic } from '@/lib/haptics'
 import { todayKey } from '@/lib/date'
-import { CATEGORIES, CONTENT_STAGES, FORMATS, PLATFORMS, toOptions } from './constants'
+import { CONTENT_STAGES, FORMATS, PLATFORMS, toOptions } from './constants'
+import { categoryOptions, creatorProjects } from './selectors'
 import { Group, LinksEditor } from './components'
 
 type Draft = NewItem<'contentItems'>
 
-function blank(): Draft {
-  return { title: '', stage: 'ideia', links: [], order: nextOrder(getDB().contentItems) }
+function blank(defaults?: Partial<ContentItem>): Draft {
+  const rest: Partial<ContentItem> = { ...defaults }
+  delete rest.id
+  delete rest.createdAt
+  delete rest.updatedAt
+  return { title: '', stage: 'ideia', links: [], order: nextOrder(getDB().contentItems), ...rest }
 }
 
 const STAGE_OPTIONS = CONTENT_STAGES.map((s) => ({ value: s.value, label: `${s.emoji} ${s.label}` }))
 const FORMAT_OPTIONS = toOptions(FORMATS)
 const PLATFORM_OPTIONS = toOptions(PLATFORMS)
-const CATEGORY_OPTIONS = toOptions(CATEGORIES)
 
-export default function ContentSheet({ id }: SheetProps<'content'>) {
+export default function ContentSheet({ id, defaults }: SheetProps<'content'>) {
   const existing = useDB((db) => (id ? db.contentItems.find((c) => c.id === id) : undefined))
-  const [draft, setDraft] = useState<Draft>(() => (existing ? { ...existing } : blank()))
+  const [draft, setDraft] = useState<Draft>(() => (existing ? { ...existing } : blank(defaults)))
   const set = (patch: Partial<ContentItem>) => setDraft((d) => ({ ...d, ...patch }))
 
   const partnerships = useDB((db) => db.partnerships)
@@ -36,6 +40,16 @@ export default function ContentSheet({ id }: SheetProps<'content'>) {
     [partnerships, draft.partnershipId],
   )
 
+  const projects = useDB((db) => db.projects)
+  const projectOptions = useMemo(
+    () =>
+      creatorProjects(projects)
+        .concat(projects.filter((p) => p.id === draft.projectId && (p.kind !== 'creator' || p.status === 'concluido')))
+        .map((p) => ({ value: p.id, label: `${p.emoji} ${p.name}` })),
+    [projects, draft.projectId],
+  )
+  const categoryOpts = useMemo(() => toOptions(categoryOptions(projects, draft.projectId, draft.category)), [projects, draft.projectId, draft.category])
+
   const hasDetails = !!(
     existing &&
     (existing.format ||
@@ -46,6 +60,8 @@ export default function ContentSheet({ id }: SheetProps<'content'>) {
       existing.cta ||
       existing.deadline ||
       existing.partnershipId ||
+      existing.projectId ||
+      existing.category ||
       existing.links.length)
   )
 
@@ -101,6 +117,11 @@ export default function ContentSheet({ id }: SheetProps<'content'>) {
       </Group>
 
       <MoreOptions defaultOpen={hasDetails}>
+        {projectOptions.length > 0 && (
+          <Group label="Projeto / série">
+            <ChipSelect clearable value={draft.projectId} onChange={(v) => set({ projectId: v })} options={projectOptions} />
+          </Group>
+        )}
         <Group label="Formato">
           <ChipSelect clearable value={draft.format} onChange={(v) => set({ format: v })} options={FORMAT_OPTIONS} />
         </Group>
@@ -108,7 +129,7 @@ export default function ContentSheet({ id }: SheetProps<'content'>) {
           <ChipSelect clearable value={draft.platform} onChange={(v) => set({ platform: v })} options={PLATFORM_OPTIONS} />
         </Group>
         <Group label="Categoria">
-          <ChipSelect clearable value={draft.category} onChange={(v) => set({ category: v })} options={CATEGORY_OPTIONS} />
+          <ChipSelect clearable value={draft.category} onChange={(v) => set({ category: v })} options={categoryOpts} />
         </Group>
         <Field label="Hook" hint="a primeira frase que segura o dedo">
           <TextInput placeholder="ex.: 5h da manhã e eu já…" value={draft.hook ?? ''} onChange={(e) => set({ hook: e.target.value })} />

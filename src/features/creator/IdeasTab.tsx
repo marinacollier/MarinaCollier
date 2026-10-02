@@ -10,16 +10,18 @@ import { cn } from '@/lib/cn'
 import { advanceContent } from './actions'
 import { ideas as ideasOf } from './selectors'
 
-export default function IdeasTab() {
+export default function IdeasTab({ projectId }: { projectId?: string }) {
   const items = useDB((db) => db.contentItems)
-  const list = useMemo(() => ideasOf(items), [items])
+  const list = useMemo(() => ideasOf(projectId ? items.filter((c) => c.projectId === projectId) : items), [items, projectId])
+  const projects = useDB((db) => db.projects)
+  const emojiOf = useMemo(() => new Map(projects.map((p) => [p.id, p.emoji])), [projects])
   const [text, setText] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
   const add = () => {
     const title = text.trim()
     if (!title) return
-    actions.create('contentItems', { title, stage: 'ideia', links: [], order: nextOrder(items) })
+    actions.create('contentItems', { title, stage: 'ideia', projectId, links: [], order: nextOrder(items) })
     haptic('light')
     toast('Ideia guardada 💡')
     setText('')
@@ -90,9 +92,9 @@ export default function IdeasTab() {
                       className="w-full text-left px-4 py-3.5 min-h-[52px]"
                     >
                       <div className="text-[15.5px] leading-snug">{c.title}</div>
-                      {(c.category || c.format || c.hook) && (
+                      {(c.category || c.format || c.hook || (!projectId && c.projectId)) && (
                         <div className="text-[13px] text-muted mt-0.5 truncate">
-                          {[c.category, c.format, c.hook && `“${c.hook}”`].filter(Boolean).join(' · ')}
+                          {[!projectId && c.projectId ? emojiOf.get(c.projectId) : undefined, c.category, c.format, c.hook && `“${c.hook}”`].filter(Boolean).join(' · ')}
                         </div>
                       )}
                     </button>
