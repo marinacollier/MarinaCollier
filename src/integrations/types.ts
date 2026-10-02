@@ -8,7 +8,7 @@
  *   VITE_MARINA_API_URL. When it is missing, the provider reports status 'needs_config'.
  * - Corporate data (Outlook/Teams) is minimized: metadata + authorized summary + external refs.
  */
-import type { DateKey, FeatureFlags, IntegrationStatus, ISODateTime, ProviderId, TimeHM } from '@/data/types'
+import type { DateKey, FeatureFlags, IntegrationStatus, ISODateTime, ProviderId, Recurrence, TimeHM } from '@/data/types'
 
 export type ProviderKind = 'calendar' | 'mail' | 'messaging' | 'finance' | 'health' | 'tasks'
 
@@ -24,6 +24,16 @@ export interface ProviderInfo {
   docsUrl?: string
   /** Short honest description shown in the integrations screen. */
   description: string
+  /** Group on the integrations screen. */
+  group: 'calendarios' | 'trabalho' | 'financas' | 'apple'
+  /** 'built' = adapter + backend function written; 'planned' = nothing to connect yet. */
+  maturity: 'built' | 'planned'
+  /** What MARINA OS keeps locally (privacy). */
+  stores: string[]
+  /** Exactly what is requested from the provider (OAuth scopes / credentials). */
+  permissions: string[]
+  /** Hard guarantees shown to Marina (e.g. read-only). */
+  guarantees?: string[]
 }
 
 export interface ProviderStatus {
@@ -56,6 +66,8 @@ export interface RemoteEvent {
   updatedAt?: ISODateTime
   /** Provider says the event was cancelled/deleted. */
   deleted?: boolean
+  /** Only when the source rule maps exactly onto our Recurrence (ICS import). Providers expand instances instead. */
+  recurrence?: Recurrence
 }
 
 export interface CalendarProvider {
