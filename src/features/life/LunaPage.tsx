@@ -240,7 +240,7 @@ function AreaTile({ state }: { state: PetTaskState }) {
       </span>
       <span className="mt-2.5 text-[15px] font-medium leading-snug line-clamp-1">{task.title}</span>
       <span className={cn('text-[12.5px] mt-0.5 line-clamp-2', state.dueToday ? 'text-accent' : 'text-muted')}>
-        {empty ? (task.notes?.split('\n')[0] ?? 'sem data · quando quiser') : state.detail}
+        {empty ? (task.notes?.split('\n')[0] ?? 'sem data, sem pressa') : state.detail}
       </span>
     </button>
   )
