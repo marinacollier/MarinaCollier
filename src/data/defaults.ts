@@ -187,6 +187,9 @@ export function emptyDB(): DB {
     weekTemplate: [],
     conflictAcks: [],
     weekPlans: [],
+    nutritionStrategies: [],
+    nutritionDayPlans: [],
+    bodyComposition: [],
   }
 }
 

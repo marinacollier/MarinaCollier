@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowUp, Wand2 } from 'lucide-react'
-import { actions, nextOrder } from '@/data/store'
+import { ArrowUp, CreditCard, Wand2 } from 'lucide-react'
+import { actions, nextOrder, useDB } from '@/data/store'
 import type { Trip, TripItem, TripSection } from '@/data/types'
 import { openSheet, toast } from '@/app/ui-store'
 import { removeWithUndo } from '@/app/undo'
@@ -9,36 +9,66 @@ import { Button, Checkbox, EmptyState, SwipeRow } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { haptic } from '@/lib/haptics'
 import { formatBRL } from '@/lib/money'
-import { formatLongDate, formatShortDate } from '@/lib/date'
+import { formatLongDate } from '@/lib/date'
 import {
+  PAYMENT_META,
+  PAYMENT_ORDER,
   STATUS_META,
   STATUS_ORDER,
   defaultChecklistItems,
   defaultStatusFor,
+  groupCounts,
   groupItems,
+  inSection,
   isCheckable,
+  itemDateLabel,
+  reviewGroups,
+  reviewItems,
+  statusLabel,
   tabMeta,
   type ItemStatus,
+  type PaymentStatus,
 } from './selectors'
 
-export function StatusPill({ status, onClick, className }: { status: ItemStatus; onClick?: () => void; className?: string }) {
+function stop(onClick?: () => void) {
+  return onClick
+    ? (e: React.MouseEvent) => {
+        e.stopPropagation()
+        onClick()
+      }
+    : undefined
+}
+
+export function StatusPill({ status, onClick, className, review }: { status: ItemStatus; onClick?: () => void; className?: string; review?: boolean }) {
   const m = STATUS_META[status]
+  const label = statusLabel(status, review)
   const Comp = onClick ? 'button' : 'span'
   return (
     <Comp
       type={onClick ? 'button' : undefined}
-      onClick={
-        onClick
-          ? (e: React.MouseEvent) => {
-              e.stopPropagation()
-              onClick()
-            }
-          : undefined
-      }
-      aria-label={onClick ? `Status: ${m.label}. Tocar para mudar` : undefined}
+      onClick={stop(onClick)}
+      aria-label={onClick ? `Status: ${label}. Tocar para mudar` : undefined}
       className={cn('inline-flex items-center h-7 px-2.5 rounded-full text-[12px] font-semibold whitespace-nowrap shrink-0', m.cls, onClick && 'active:scale-95 transition', className)}
     >
-      {m.label}
+      {label}
+    </Comp>
+  )
+}
+
+/** Payment has its own pill: never derived from the reservation or the itinerary. */
+export function PaymentPill({ status, onClick, className }: { status: PaymentStatus; onClick?: () => void; className?: string }) {
+  const m = PAYMENT_META[status]
+  const Comp = onClick ? 'button' : 'span'
+  return (
+    <Comp
+      type={onClick ? 'button' : undefined}
+      onClick={stop(onClick)}
+      aria-label={`Pagamento: ${m.label}${onClick ? '. Tocar para mudar' : ''}`}
+      className={cn('inline-flex items-center gap-1 h-7 px-2.5 rounded-full text-[12px] font-semibold whitespace-nowrap shrink-0', m.cls, onClick && 'active:scale-95 transition', className)}
+    >
+      <CreditCard size={12.5} strokeWidth={2.2} aria-hidden />
+      <span className="font-medium opacity-80">pgto</span>
+      {m.label.toLowerCase()}
     </Comp>
   )
 }
@@ -48,18 +78,44 @@ function setStatus(item: TripItem, status: ItemStatus) {
   if (status === 'feito' || status === 'confirmado') haptic('success')
 }
 
-function ItemRow({ item, showDate }: { item: TripItem; showDate?: boolean }) {
-  const [choosing, setChoosing] = useState(false)
+function ChoiceRow<T extends string>({ options, value, meta, onPick }: { options: T[]; value?: T; meta: Record<T, { label: string; cls: string }>; onPick: (v: T) => void }) {
+  return (
+    <div className="flex gap-1.5 overflow-x-auto no-scrollbar pt-1.5 pb-1 -mx-4 px-4">
+      {options.map((s) => (
+        <button
+          key={s}
+          type="button"
+          aria-pressed={s === value}
+          onClick={() => onPick(s)}
+          className={cn('h-9 px-3 rounded-full text-[12.5px] font-semibold shrink-0 border transition', s === value ? 'border-ink' : 'border-transparent', meta[s].cls)}
+        >
+          {meta[s].label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+export function ItemRow({ item, showDate, review }: { item: TripItem; showDate?: boolean; review?: boolean }) {
+  const [choosing, setChoosing] = useState<'status' | 'payment' | null>(null)
   const checkable = isCheckable(item.section)
   const done = item.status === 'feito'
   const cancelled = item.status === 'cancelado'
+  const toggle = (k: 'status' | 'payment') => setChoosing((c) => (c === k ? null : k))
+  const section = tabMeta(item.section)
   const meta = [
-    showDate && item.date ? formatShortDate(item.date) : undefined,
+    review ? `${section.emoji} ${section.label}` : undefined,
+    showDate || item.endDate ? itemDateLabel(item) : undefined,
     item.time,
     item.amountCents != null ? formatBRL(item.amountCents) : undefined,
     item.confirmationCode ? `cód. ${item.confirmationCode}` : undefined,
     item.notes,
   ].filter(Boolean)
+  const showStatusPill = review || !checkable || item.status === 'a_confirmar' || cancelled
+  const statusMeta = useMemo(
+    () => (review ? { ...STATUS_META, a_confirmar: { ...STATUS_META.a_confirmar, label: statusLabel('a_confirmar', true) } } : STATUS_META),
+    [review],
+  )
 
   return (
     <SwipeRow
@@ -73,7 +129,7 @@ function ItemRow({ item, showDate }: { item: TripItem; showDate?: boolean }) {
     >
       <div className="px-4 py-2.5">
         <div className="flex items-center gap-3 min-h-11">
-          {checkable && (
+          {checkable && !review && (
             <Checkbox
               checked={done}
               label={item.title}
@@ -86,11 +142,16 @@ function ItemRow({ item, showDate }: { item: TripItem; showDate?: boolean }) {
           )}
           <button type="button" className="flex-1 min-w-0 text-left py-1" onClick={() => openSheet('tripItem', { id: item.id })}>
             <div className={cn('text-[15px] leading-snug', (done || cancelled) && 'text-muted line-through decoration-muted/50')}>{item.title}</div>
-            {meta.length > 0 && <div className="text-[12.5px] text-muted mt-0.5 truncate">{meta.join(' · ')}</div>}
+            {meta.length > 0 && <div className="text-[12.5px] text-muted mt-0.5 line-clamp-2">{meta.join(' · ')}</div>}
           </button>
-          {(!checkable || item.status === 'a_confirmar' || cancelled) && <StatusPill status={item.status} onClick={() => setChoosing((c) => !c)} />}
-          {checkable && item.status !== 'a_confirmar' && !cancelled && (
-            <button type="button" aria-label="Mudar status" onClick={() => setChoosing((c) => !c)} className="h-11 w-6 -mr-1 text-muted/70 text-lg leading-none">
+          {(showStatusPill || item.paymentStatus) && (
+            <div className="flex flex-col items-end gap-1 shrink-0">
+              {showStatusPill && <StatusPill status={item.status} review={review} onClick={() => toggle('status')} />}
+              {item.paymentStatus && <PaymentPill status={item.paymentStatus} onClick={() => toggle('payment')} />}
+            </div>
+          )}
+          {!showStatusPill && (
+            <button type="button" aria-label="Mudar status" onClick={() => toggle('status')} className="h-11 w-6 -mr-1 text-muted/70 text-lg leading-none">
               ⋯
             </button>
           )}
@@ -98,25 +159,31 @@ function ItemRow({ item, showDate }: { item: TripItem; showDate?: boolean }) {
         <AnimatePresence initial={false}>
           {choosing && (
             <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.18 }} className="overflow-hidden">
-              <div className="flex gap-1.5 overflow-x-auto no-scrollbar pt-1.5 pb-1 -mx-4 px-4">
-                {STATUS_ORDER.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => {
-                      setStatus(item, s)
-                      setChoosing(false)
+              {choosing === 'status' ? (
+                <ChoiceRow
+                  options={STATUS_ORDER}
+                  value={item.status}
+                  meta={statusMeta}
+                  onPick={(s) => {
+                    setStatus(item, s)
+                    setChoosing(null)
+                  }}
+                />
+              ) : (
+                <>
+                  <div className="text-[11.5px] text-muted pt-1.5 px-0.5">Pagamento</div>
+                  <ChoiceRow
+                    options={PAYMENT_ORDER}
+                    value={item.paymentStatus}
+                    meta={PAYMENT_META}
+                    onPick={(p) => {
+                      actions.update('tripItems', item.id, { paymentStatus: p })
+                      if (p === 'pago') haptic('success')
+                      setChoosing(null)
                     }}
-                    className={cn(
-                      'h-9 px-3 rounded-full text-[12.5px] font-semibold shrink-0 border transition',
-                      s === item.status ? 'border-ink' : 'border-transparent',
-                      STATUS_META[s].cls,
-                    )}
-                  >
-                    {STATUS_META[s].label}
-                  </button>
-                ))}
-              </div>
+                  />
+                </>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -125,9 +192,37 @@ function ItemRow({ item, showDate }: { item: TripItem; showDate?: boolean }) {
   )
 }
 
-function QuickAdd({ trip, section, groups, items }: { trip: Trip; section: TripSection; groups: string[]; items: TripItem[] }) {
+/** Horizontal sub-area filter ("Cape Town", "Safari", …). Hidden when there's nothing to filter. */
+export function GroupChips({ groups, value, onChange }: { groups: { group: string; count: number }[]; value?: string; onChange: (g?: string) => void }) {
+  if (groups.length < 2 && !value) return null
+  const options: { group?: string; count: number }[] = [{ count: 0 }, ...groups]
+  return (
+    <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-4 px-4 py-0.5" role="group" aria-label="Filtrar por sub-área">
+      {options.map(({ group, count }) => {
+        const active = value === group
+        return (
+          <button
+            key={group ?? '_all'}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onChange(active ? undefined : group)}
+            className={cn(
+              'inline-flex items-center gap-1 h-9 px-3 rounded-full text-[13px] shrink-0 border transition active:scale-[0.97]',
+              active ? 'bg-ink text-bg border-ink font-semibold' : 'bg-surface border-line text-ink-2',
+            )}
+          >
+            {group ?? 'Tudo'}
+            {group && <span className={cn('text-[11px] tabular-nums', active ? 'opacity-70' : 'text-muted')}>{count}</span>}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function QuickAdd({ trip, section, groups, items, initialGroup }: { trip: Trip; section: TripSection; groups: string[]; items: TripItem[]; initialGroup?: string }) {
   const [text, setText] = useState('')
-  const [group, setGroup] = useState<string | undefined>(undefined)
+  const [group, setGroup] = useState<string | undefined>(initialGroup)
   const meta = tabMeta(section)
   const add = () => {
     const title = text.trim()
@@ -170,10 +265,7 @@ function QuickAdd({ trip, section, groups, items }: { trip: Trip; section: TripS
               key={g ?? '_'}
               type="button"
               onClick={() => setGroup(g)}
-              className={cn(
-                'h-8 px-3 rounded-full text-[12.5px] shrink-0 border transition',
-                group === g ? 'bg-ink text-bg border-ink' : 'border-line text-ink-2',
-              )}
+              className={cn('h-8 px-3 rounded-full text-[12.5px] shrink-0 border transition', group === g ? 'bg-ink text-bg border-ink' : 'border-line text-ink-2')}
             >
               {g ?? 'geral'}
             </button>
@@ -184,9 +276,27 @@ function QuickAdd({ trip, section, groups, items }: { trip: Trip; section: TripS
   )
 }
 
-/** One TripItem-backed section: quick add, grouped list, swipe + status chooser. */
-export function SectionItems({ trip, section, items }: { trip: Trip; section: TripSection; items: TripItem[] }) {
-  const groups = useMemo(() => groupItems(items, section), [items, section])
+/** One TripItem-backed section: quick add, sub-area filter, grouped list, swipe + status chooser. */
+export function SectionItems({
+  trip,
+  section,
+  items,
+  group,
+  onGroup,
+}: {
+  trip: Trip
+  section: TripSection
+  items: TripItem[]
+  group?: string
+  onGroup: (g?: string) => void
+}) {
+  const pets = useDB((db) => db.pets)
+  const petNames = useMemo(() => pets.map((p) => p.name), [pets])
+  const inThis = useMemo(() => items.filter((i) => inSection(i, section)), [items, section])
+  const chips = useMemo(() => groupCounts(inThis), [inThis])
+  const activeGroup = group && chips.some((c) => c.group === group) ? group : undefined
+  const visible = useMemo(() => (activeGroup ? inThis.filter((i) => i.group === activeGroup) : inThis), [inThis, activeGroup])
+  const groups = useMemo(() => groupItems(visible, section), [visible, section])
   const groupNames = useMemo(() => {
     const names = new Set<string>()
     for (const i of items) if (i.group) names.add(i.group)
@@ -196,7 +306,7 @@ export function SectionItems({ trip, section, items }: { trip: Trip; section: Tr
   const empty = groups.length === 0
 
   const useDefaults = () => {
-    const list = defaultChecklistItems(trip, items, nextOrder(items))
+    const list = defaultChecklistItems(trip, items, nextOrder(items), petNames)
     if (!list.length) return toast('O checklist padrão já está aqui ✓')
     actions.createMany('tripItems', list)
     haptic('success')
@@ -205,7 +315,9 @@ export function SectionItems({ trip, section, items }: { trip: Trip; section: Tr
 
   return (
     <div className="space-y-4">
-      <QuickAdd trip={trip} section={section} groups={groupNames} items={items} />
+      <QuickAdd key={activeGroup ?? '_'} trip={trip} section={section} groups={groupNames} items={items} initialGroup={activeGroup} />
+
+      <GroupChips groups={chips} value={activeGroup} onChange={onGroup} />
 
       {empty && (
         <div className="card">
@@ -247,7 +359,7 @@ export function SectionItems({ trip, section, items }: { trip: Trip; section: Tr
         </motion.section>
       ))}
 
-      {!empty && section === 'antes_de_ir' && defaultChecklistItems(trip, items).length > 0 && (
+      {!empty && section === 'antes_de_ir' && defaultChecklistItems(trip, items, 0, petNames).length > 0 && (
         <div className="text-center">
           <Button variant="ghost" size="sm" icon={<Wand2 size={15} />} onClick={useDefaults}>
             completar com o checklist padrão
@@ -255,6 +367,45 @@ export function SectionItems({ trip, section, items }: { trip: Trip; section: Tr
         </div>
       )}
       {!empty && <p className="text-center text-[12px] text-muted">deslize → para {meta.checkable ? 'marcar feito' : 'confirmar'} · ← para apagar</p>}
+    </div>
+  )
+}
+
+/** Revisar: every a_confirmar item of the trip, grouped by sub-area, filterable by sub-area. */
+export function ReviewItems({ items, group, onGroup }: { items: TripItem[]; group?: string; onGroup: (g?: string) => void }) {
+  const all = useMemo(() => reviewItems(items), [items])
+  const chips = useMemo(() => groupCounts(all), [all])
+  const activeGroup = group && chips.some((c) => c.group === group) ? group : undefined
+  const groups = useMemo(() => reviewGroups(items, activeGroup), [items, activeGroup])
+
+  if (!all.length) {
+    return (
+      <div className="card">
+        <EmptyState compact emoji="🌿" title="Nada pra revisar" text="Tudo que estava “a confirmar” já foi resolvido. Leveza ✨" />
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="px-1 text-[13.5px] text-ink-2">
+        <b className="font-semibold text-ink">{all.length}</b> {all.length === 1 ? 'coisa' : 'coisas'} pra revisar quando der — nada aqui é dado como certo.
+      </p>
+      <GroupChips groups={chips} value={activeGroup} onChange={onGroup} />
+      {groups.map((g, gi) => (
+        <motion.section key={g.key} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: gi * 0.03 }}>
+          <div className="flex items-center justify-between px-1 mb-2">
+            <h3 className="eyebrow">{g.label}</h3>
+            <span className="text-[12px] text-muted tabular-nums">{g.items.length}</span>
+          </div>
+          <div className="card overflow-hidden divide-y divide-line/70">
+            {g.items.map((i) => (
+              <ItemRow key={i.id} item={i} review showDate />
+            ))}
+          </div>
+        </motion.section>
+      ))}
+      <p className="text-center text-[12px] text-muted">toque em “Revisar” para mudar o status · deslize → para confirmar</p>
     </div>
   )
 }
