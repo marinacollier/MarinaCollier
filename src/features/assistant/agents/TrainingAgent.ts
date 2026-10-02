@@ -138,7 +138,8 @@ export const TrainingAgent: Agent = {
   emoji: '🏃‍♀️',
   match(q) {
     const sporty = q.modalities.length > 0 || has(q, 'treino*', 'treinar', 'exercicio*', 'malhar', 'academia')
-    if (sporty && has(q, ...CONFLICT_WORDS)) return 0.5
+    // Conflicts, fuel and key-session questions belong to Planning / Fuel.
+    if (sporty && has(q, ...CONFLICT_WORDS, 'comer', 'estrategia*', 'nutri*', 'chave', 'whey', 'gel')) return 0.5
     if (sporty && has(q, ...FIT_WORDS)) return 0.95
     if (sporty) return 0.85
     return 0

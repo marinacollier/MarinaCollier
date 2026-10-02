@@ -51,6 +51,7 @@ export type SearchDomain =
   | 'goal'
   | 'routine'
   | 'planning'
+  | 'nutrition'
 
 export interface SearchResult {
   /** Unique across domains: `${domain}:${entityId}`. */
@@ -112,6 +113,7 @@ export const DOMAIN_META: Record<SearchDomain, { label: string; emoji: string }>
   goal: { label: 'Metas', emoji: '🎯' },
   routine: { label: 'Rotinas', emoji: '☀️' },
   planning: { label: 'Planejamento', emoji: '🧭' },
+  nutrition: { label: 'Nutrição', emoji: '🥗' },
 }
 
 /** Words that make a workout findable by the way Marina talks about it. */
@@ -305,6 +307,26 @@ const CONTENT_STAGE: Record<string, string> = {
 }
 
 const PLAN_LABEL: Record<PlanType, string> = { fixo: 'fixo', base: 'base', flexivel: 'flexível', a_confirmar: 'a confirmar' }
+
+const NUTRITION_SOURCE: Record<string, string> = { nutricionista: 'nutricionista', usuaria: 'minha', outro_profissional: 'outro profissional' }
+
+/** Plain words for training-type tags ("long-ride" → "pedal bike longo"), so "pedal" finds its strategy. */
+const LINK_WORDS: Record<string, string> = {
+  ride: 'pedal bike ciclismo',
+  pedal: 'pedal bike ciclismo',
+  run: 'corrida correr',
+  corrida: 'corrida correr',
+  long: 'longo longa',
+  longo: 'longo longa',
+  leg: 'perna pernas',
+  swim: 'natacao',
+  forca: 'forca musculacao',
+}
+function linkedTypeWords(tag: string): string {
+  return tokenize(tag)
+    .map((w) => LINK_WORDS[w] ?? '')
+    .join(' ')
+}
 
 function recurrenceWords(r: Recurrence): string {
   if (r.kind === 'daily') return 'todo dia'
@@ -696,6 +718,51 @@ function buildDocs(db: DB, today: DateKey): Doc[] {
       date: g.deadline,
       inactive: g.status !== 'ativa',
       action: sheetAction('workoutGoal', { id: g.id }),
+    })
+  }
+
+  for (const s of db.nutritionStrategies) {
+    const linked = s.linkedWorkoutTypes.map((t) => `${t} ${linkedTypeWords(t)}`).join(' ')
+    docs.push({
+      domain: 'nutrition',
+      id: s.id,
+      title: s.name,
+      emoji: '⛽',
+      subtitle: join('Estratégia de treino', s.sourceName ?? NUTRITION_SOURCE[s.source]),
+      primary: field(s.name),
+      secondary: field(
+        linked,
+        s.previousDayInstructions,
+        s.preWorkoutInstructions && `pre treino ${s.preWorkoutInstructions}`,
+        s.duringWorkoutInstructions && `intra durante ${s.duringWorkoutInstructions}`,
+        s.postWorkoutInstructions && `pos treino ${s.postWorkoutInstructions}`,
+        s.timing,
+        s.notes,
+        'nutricao estrategia',
+      ),
+      action: sheetAction('nutritionStrategy', { id: s.id }),
+    })
+  }
+
+  for (const p of db.nutritionDayPlans) {
+    const foods = p.meals.flatMap((m) => m.items.flatMap((f) => [f.food, ...(f.substitutions ?? [])]))
+    docs.push({
+      domain: 'nutrition',
+      id: p.id,
+      title: p.name,
+      emoji: '🥗',
+      subtitle: join('Plano do dia', p.meals.map((m) => m.name).slice(0, 3).join(', ')),
+      primary: field(p.name),
+      secondary: field(
+        p.meals.map((m) => `${m.name} ${m.notes ?? ''}`).join(' '),
+        foods.join(' '),
+        linkedTypeWords(p.dayType.replace('_', '-')),
+        p.dayType.replace('_', ' '),
+        p.notes,
+        'nutricao plano refeicao',
+      ),
+      inactive: !p.active,
+      action: routeAction(ROUTES.nutrition),
     })
   }
 

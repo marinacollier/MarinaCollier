@@ -55,6 +55,32 @@ export function buildLifeFixture(): DB {
   add('workouts', { id: 'w-gym-fri', date: '2026-10-02', modality: 'musculacao', status: 'planejado', time: '18:30', plannedDurationMin: 60, order: 1 })
   add('workouts', { id: 'w-circo', date: '2026-10-03', modality: 'circo', status: 'planejado', period: 'manha', planType: 'flexivel', order: 0 })
   add('workouts', { date: '2026-10-04', modality: 'recuperacao', status: 'descanso', order: 0 })
+  // Key sessions: Thursday's bike was key (with a post check-in); next Sunday a long ride with registered guidance.
+  const thuBike = db.workouts.find((w) => w.date === '2026-10-01')!
+  Object.assign(thuBike, { isKeySession: true, postCheckin: { energia: 'otima', treino: 'esperado', nutricao: 'funcionou', recuperacao: 'boa', at: iso } })
+  add('workouts', { id: 'w-long-ride', date: '2026-10-11', modality: 'bike', status: 'planejado', time: '06:00', plannedDurationMin: 240, title: 'Pedal longo', isKeySession: true, isLongSession: true, requiresPreviousDayPrep: true, requiresPreWorkout: true, requiresIntraWorkout: true, requiresPostWorkout: true, tags: ['long-ride'], order: 0 })
+  add('nutritionStrategies', {
+    id: 's-long-ride',
+    name: 'Long ride',
+    linkedWorkoutTypes: ['long-ride'],
+    previousDayInstructions: 'Jantar como a nutri combinou.',
+    preWorkoutInstructions: 'Café da manhã do plano, 1h30 antes.',
+    duringWorkoutInstructions: 'Gel a cada 45 min.',
+    postWorkoutInstructions: 'Refeição pós do plano.',
+    source: 'nutricionista',
+  })
+  add('nutritionDayPlans', {
+    id: 'dp-dom',
+    name: 'Domingo — pedal longo',
+    dayType: 'pedal_longo',
+    weekdays: [0],
+    meals: [
+      { time: '04:30', name: 'Pré-treino', phase: 'pre', items: [{ food: 'Pão com banana', substitutions: ['tapioca'] }] },
+      { name: 'Pós-treino', phase: 'pos', items: [{ food: 'Whey', qty: '1 dose' }] },
+    ],
+    source: 'nutricionista',
+    active: true,
+  })
   // Next Tuesday (presencial): an early swim
   add('workouts', { date: '2026-10-06', modality: 'corrida', status: 'planejado', time: '06:00', plannedDurationMin: 45, order: 0 })
 
