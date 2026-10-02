@@ -11,22 +11,22 @@ import { cn } from '@/lib/cn'
 import { haptic } from '@/lib/haptics'
 import { EmojiBubble, Hint, Toggle } from './components'
 import { HIDEABLE_MODULES, WIDGET_META } from './labels'
+import { mergeWidgets } from './profileEdit'
 
 export default function CustomizePage() {
   const nav = useNavigate()
   const profile = useDB((db) => db.profile)
   const hasMorningRoutine = useDB((db) => db.routines.some((r) => r.id === SEED_IDS.routineMorning))
 
-  const widgets = useMemo(() => profile.homeWidgets.filter((w) => w.id in WIDGET_META), [profile.homeWidgets])
+  const widgets = useMemo(() => mergeWidgets(profile.homeWidgets, Object.keys(WIDGET_META) as HomeWidgetId[]), [profile.homeWidgets])
   const moduleVisible = useMemo(() => new Map(profile.modules.map((m) => [m.id, m.visible])), [profile.modules])
 
-  const setWidget = (id: HomeWidgetId, visible: boolean) =>
-    actions.setProfile({ homeWidgets: profile.homeWidgets.map((w) => (w.id === id ? { ...w, visible } : w)) })
+  const setWidget = (id: HomeWidgetId, visible: boolean) => actions.setProfile({ homeWidgets: widgets.map((w) => (w.id === id ? { ...w, visible } : w)) })
 
   const reorderWidgets = (ids: string[]) => {
-    const byId = new Map(profile.homeWidgets.map((w) => [w.id, w]))
+    const byId = new Map(widgets.map((w) => [w.id, w]))
     const ordered = ids.map((id) => byId.get(id as HomeWidgetId)!).filter(Boolean)
-    const rest = profile.homeWidgets.filter((w) => !ids.includes(w.id))
+    const rest = widgets.filter((w) => !ids.includes(w.id))
     actions.setProfile({ homeWidgets: [...ordered, ...rest] })
   }
 

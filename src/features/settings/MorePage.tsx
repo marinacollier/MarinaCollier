@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Bell, ChevronDown, Database, Plug, Share, SlidersHorizontal, SquarePlus, X } from 'lucide-react'
+import { Bell, ChevronDown, ChevronRight, Database, Plug, Share, SlidersHorizontal, SquarePlus, X } from 'lucide-react'
 import { IconButton, ListCard, ListRow, Page, PageHeader, SectionTitle, Segmented, TONE } from '@/components/ui'
 import { actions, useDB } from '@/data/store'
 import { ROUTES } from '@/app/routes'
@@ -85,6 +85,24 @@ export default function MorePage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <motion.button
+        type="button"
+        onClick={() => nav(ROUTES.weekPlanner)}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="card w-full flex items-center gap-3 p-3.5 mb-3 text-left active:scale-[0.99] transition-transform"
+      >
+        <span aria-hidden className="h-11 w-11 rounded-[14px] bg-ocean-soft inline-flex items-center justify-center text-[22px] leading-none shrink-0">
+          🗓️
+        </span>
+        <span className="flex-1 min-w-0">
+          <span className="block font-display text-[17px] leading-tight">Montar minha semana</span>
+          <span className="block text-[13px] text-muted mt-0.5">fixos, treinos, estudos, entregas e vida — em 7 passos</span>
+        </span>
+        <ChevronRight size={18} className="text-muted/60 shrink-0" />
+      </motion.button>
 
       <div className="grid grid-cols-3 gap-2.5">
         {visible.map((m, i) => (

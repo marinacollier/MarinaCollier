@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Download, FileSpreadsheet, HardDrive, RotateCcw, ShieldCheck, Upload } from 'lucide-react'
+import { Download, FileSpreadsheet, HardDrive, RotateCcw, ShieldCheck, Sprout, Upload } from 'lucide-react'
 import { Button, Card, Page, PageHeader, SectionTitle } from '@/components/ui'
 import { actions, flushNow, getDB, useDB } from '@/data/store'
 import { ROUTES } from '@/app/routes'
@@ -98,7 +98,7 @@ export default function DataPage() {
     actions.setProfile({ onboardedAt: nowISO() })
     await flushNow().catch(() => undefined)
     setResetArmed(false)
-    toast('Dados de exemplo de volta 🌱')
+    toast('Recomeçou com o seu seed 🌱')
   }
 
   const usagePct = info?.usage !== undefined && info.quota ? Math.max(1, Math.round((info.usage / info.quota) * 100)) : undefined
@@ -129,6 +129,12 @@ export default function DataPage() {
             <dd className="font-display text-[20px] tabular-nums">{info?.usage !== undefined ? formatBytes(info.usage) : '—'}</dd>
           </div>
         </dl>
+        {db.profile.seedVersion !== undefined && (
+          <p className="text-[12.5px] text-muted mt-3 flex items-start gap-1.5">
+            <Sprout size={14} className="mt-0.5 shrink-0" />
+            <span>Seed da vida real aplicado (v{db.profile.seedVersion})</span>
+          </p>
+        )}
         {(usagePct !== undefined || info?.persisted !== undefined) && (
           <p className="text-[12.5px] text-muted mt-3 flex items-start gap-1.5">
             <ShieldCheck size={14} className="mt-0.5 shrink-0" />
@@ -224,23 +230,25 @@ export default function DataPage() {
         <AnimatePresence mode="wait" initial={false}>
           {!resetArmed ? (
             <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <p className="text-[14px] text-ink-2 leading-snug">Volta para a primeira versão que eu organizei pra você.</p>
+              <p className="text-[14px] text-ink-2 leading-snug">
+                Volta pro começo: sua vida real como eu organizei no primeiro dia — rotina, trabalho, treinos, projetos, viagens e a Luna do jeito que vieram.
+              </p>
               <Button variant="outline" className="mt-3" icon={<RotateCcw size={16} />} onClick={() => setResetArmed(true)}>
-                Restaurar dados de exemplo
+                Recomeçar com meu seed
               </Button>
             </motion.div>
           ) : (
             <motion.div key="armed" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <div className="font-display text-[17px]">Tem certeza?</div>
               <p className="text-[14px] text-ink-2 mt-1 leading-snug">
-                Tudo o que você registrou aqui vai ser trocado pelos dados de exemplo. Se quiser guardar, exporte um backup antes.
+                Isso substitui todos os dados do app pelo seed inicial. O que você registrou ou editou depois some daqui — exporte um backup antes se quiser guardar.
               </p>
               <div className="flex gap-2 mt-3">
                 <Button variant="ghost" onClick={() => setResetArmed(false)}>
                   Cancelar
                 </Button>
                 <Button variant="accent" className="flex-1" onClick={() => void confirmReset()}>
-                  Sim, restaurar
+                  Sim, substituir tudo
                 </Button>
               </div>
             </motion.div>
