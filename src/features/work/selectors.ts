@@ -64,9 +64,14 @@ export function attentionItems(db: DB): AttentionItem[] {
 
 // ─── Hoje ───────────────────────────────────────────────────────────────────
 
-/** Work tasks for today (date/dueDate today, bucket hoje, recurring today). Waiting items live elsewhere. */
+/**
+ * Work tasks for today (date/dueDate today, bucket hoje, recurring today). Waiting items live elsewhere,
+ * and open tasks already listed under "Precisa de mim" are not repeated here.
+ */
 export function todayWorkTasks(db: DB, today: DateKey): Task[] {
-  return tasksForDay(db, today).filter((t) => isWorkTask(t) && t.status !== 'waiting')
+  return tasksForDay(db, today).filter(
+    (t) => isWorkTask(t) && t.status !== 'waiting' && !(t.needsMe && !t.recurrence && isTaskOpen(t)),
+  )
 }
 
 // ─── Waiting for ────────────────────────────────────────────────────────────

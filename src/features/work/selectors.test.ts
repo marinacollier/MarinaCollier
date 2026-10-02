@@ -217,3 +217,18 @@ describe('wins', () => {
     expect(text).toBe('• Lançou MVP — 2k usuários (FashionFinder, set/2026)\n• Contrato fechado (out/2026)')
   })
 })
+
+describe('todayWorkTasks dedupe', () => {
+  it('does not repeat a task already in "Precisa de mim"', async () => {
+    const { emptyDB } = await import('@/data/defaults')
+    const { attentionItems, todayWorkTasks } = await import('./selectors')
+    const db = emptyDB()
+    const base = { createdAt: '', updatedAt: '', status: 'todo' as const, context: 'trabalho' as const, date: '2026-10-02', order: 0 }
+    db.tasks = [
+      { ...base, id: 'a', title: 'Precisa', needsMe: true },
+      { ...base, id: 'b', title: 'Normal' },
+    ]
+    expect(attentionItems(db).length).toBe(1)
+    expect(todayWorkTasks(db, '2026-10-02').map((t) => t.id)).toEqual(['b'])
+  })
+})
