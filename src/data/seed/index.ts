@@ -53,4 +53,4 @@ export function buildSeed(today: DateKey): DB {
 }
 
 /** Bump when the life seed gains records that existing installs should receive (see migrate.ts). */
-export const LIFE_SEED_VERSION = 2
+export const LIFE_SEED_VERSION = 3
