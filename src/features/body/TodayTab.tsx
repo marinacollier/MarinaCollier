@@ -126,6 +126,12 @@ function WorkoutCard({ workout: w }: { workout: Workout }) {
         </div>
       </button>
       {w.notes && <p className="px-4 -mt-1 pb-3 text-[13.5px] text-muted leading-relaxed">{w.notes}</p>}
+      <div className="px-4 pb-2.5 -mt-1 flex items-center gap-2">
+        {w.isKeySession && <span className="text-[12px] font-semibold tracking-[0.06em] text-accent">🔥 KEY SESSION</span>}
+        <button type="button" className="ml-auto h-9 px-3 rounded-full bg-surface-2 text-[13px] text-ink-2 active:bg-line" onClick={() => openSheet('fuel', { workoutId: w.id })}>
+          🍽️ Ver estratégia
+        </button>
+      </div>
       <div className="px-4 pb-4">
         {done ? (
           <button

@@ -91,16 +91,33 @@ export function workoutFromChoice(db: DB, t: WeekTemplateItem, date: DateKey, mo
   if (!modality) {
     return { date, modality: 'recuperacao', status: 'descanso', title: t.choice === 'rest' ? t.title : undefined, planType: t.planType, templateId: t.id, order }
   }
+  const line = t.choice === 'fixed' || t.choice === 'optional'
   return {
     date,
     modality,
     status: 'planejado',
+    title: line ? t.title : undefined,
     time: t.time,
     period: t.time ? undefined : t.period,
     plannedDurationMin: t.durationMin,
-    planType: t.choice === 'fixed' || t.choice === 'rest' ? t.planType : 'flexivel',
+    plannedDurationMaxMin: t.durationMaxMin,
+    planType: t.choice === 'fixed' ? t.planType : 'flexivel',
     templateId: t.id,
-    notes: t.choice === 'fixed' ? t.notes : undefined,
+    notes: line ? t.notes : undefined,
+    loadCategory: t.loadCategory,
+    ...(line
+      ? {
+          sessionType: t.sessionType,
+          isKeySession: t.isKeySession,
+          isLongSession: t.isLongSession,
+          requiresPreviousDayPrep: t.requiresPreviousDayPrep,
+          requiresPreWorkout: t.requiresPreWorkout,
+          requiresIntraWorkout: t.requiresIntraWorkout,
+          requiresPostWorkout: t.requiresPostWorkout,
+          recoveryPriority: t.recoveryPriority,
+          tags: t.tags,
+        }
+      : {}),
     order,
   }
 }
@@ -157,6 +174,15 @@ export function goalWeekCount(db: DB, g: WorkoutGoal, weekStart: DateKey): numbe
   return db.workouts.filter((w) => w.date >= weekStart && w.date <= end && w.status !== 'pulado' && w.status !== 'descanso' && goalMatches(g, w)).length
 }
 
+/**
+ * Sessions that "cover" the goal this week: planned/done workouts + template lines of that modality on
+ * past days that were never materialized (we don't know — so no noise about them).
+ */
+export function goalCoverage(db: DB, g: WorkoutGoal, weekStart: DateKey, today: DateKey): number {
+  const pastTemplate = proposeWeekFromTemplate(db, weekStart).filter((p) => p.date < today && p.workout?.modality === g.modality).length
+  return goalWeekCount(db, g, weekStart) + pastTemplate
+}
+
 export interface GoalNudge {
   goal: WorkoutGoal
   missing: number
@@ -182,7 +208,7 @@ export function goalNudges(db: DB, weekStart: DateKey, today: DateKey, before?: 
   const out: GoalNudge[] = []
   for (const g of flexibleGoals(db)) {
     const want = g.perWeek ?? 1
-    const count = goalWeekCount(db, g, weekStart)
+    const count = goalCoverage(db, g, weekStart, today)
     if (count >= want) continue
     const hadBefore = before instanceof Set ? before.has(g.id) : before ? goalWeekCount(before, g, weekStart) >= want : false
     const skipped = db.workouts.some((w) => w.date >= weekStart && w.date <= end && w.status === 'pulado' && goalMatches(g, w))

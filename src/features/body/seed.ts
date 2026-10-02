@@ -4,7 +4,7 @@
  * - `weekTemplate`: her editable weekly training base (not law). Fixed/rest lines become workouts;
  *   one_of / optional lines stay as choices in the planner.
  * - Workouts: only the current week, only from today on (never "não feito" noise on past days).
- * - Goals: Yoga 1x/semana (flexível) and Circo/Aéreos (diversão, never an obligation).
+ * - Goals: Yoga 1x/semana (lives on Tuesday 19:00; suggestions only if it leaves) and Circo/Aéreos (never an obligation).
  * - No meal templates: no invented diet.
  */
 import type { FeatureSeed, SeedContext } from '@/data/seed/context'
@@ -18,25 +18,41 @@ type Line = Omit<WeekTemplateItem, 'id' | 'createdAt' | 'updatedAt' | 'order' | 
 
 const DAY_SLUG = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'] as const
 
-/** Her weekly base (§10). Times only where she gave them. */
+const KEY_FUEL = { requiresPreviousDayPrep: true, requiresPreWorkout: true, requiresIntraWorkout: true, requiresPostWorkout: true } as const
+
+/**
+ * Her weekly base (training & nutrition update, 02/10/2026 — supersedes the first template).
+ * Heavy sessions early (06:00); lighter second sessions at the end of the day are a preference.
+ * Hierarchy: KEY = qua pernas, sex corrida longa, dom pedal longo · MODERADA = seg/qui natação, ter upper · LEVE = yoga, core, acessórios.
+ */
 export const TEMPLATE_LINES: Line[] = [
   // SEG
-  { slug: 'corrida', weekday: 1, modalities: ['corrida'], choice: 'fixed', planType: 'base', notes: 'Janela compatível com o dia.' },
-  { slug: 'musculacao', weekday: 1, modalities: ['musculacao'], choice: 'optional', planType: 'flexivel', notes: 'Pode rolar no mesmo dia, dependendo da semana.' },
-  // TER — presencial
-  { slug: 'corrida-ou-forca', weekday: 2, modalities: ['corrida', 'musculacao'], choice: 'one_of', title: 'Corrida leve ou força', planType: 'flexivel', notes: 'presencial — evitar pedal longo' },
-  // QUA — presencial
-  { slug: 'natacao', weekday: 3, modalities: ['natacao'], choice: 'fixed', time: '07:00', durationMin: 60, planType: 'base' },
-  { slug: 'musculacao', weekday: 3, modalities: ['musculacao'], choice: 'optional', planType: 'flexivel', notes: 'outra janela; cuidado com o check-in' },
+  { slug: 'natacao-endurance', weekday: 1, modalities: ['natacao'], choice: 'fixed', title: 'Natação endurance', time: '06:00', durationMin: 60, durationMaxMin: 75, planType: 'base', sessionType: 'endurance', loadCategory: 'moderada', notes: 'Treino principal do dia.' },
+  { slug: 'upper-core', weekday: 1, modalities: ['musculacao'], choice: 'optional', title: 'Upper / Core leve', period: 'noite', planType: 'flexivel', sessionType: 'forca', loadCategory: 'leve', notes: 'Opcional, complementar.' },
+  // TER
+  { slug: 'upper-pliometria', weekday: 2, modalities: ['musculacao'], choice: 'fixed', title: 'Upper + pliometria', time: '06:00', planType: 'base', sessionType: 'forca', loadCategory: 'moderada', tags: ['forca', 'upper', 'pliometria'] },
+  { slug: 'yoga', weekday: 2, modalities: ['yoga'], choice: 'fixed', title: 'Yoga', time: '19:00', planType: 'base', sessionType: 'mobilidade', loadCategory: 'leve', notes: 'Leve — recuperação e mobilidade.' },
+  // QUA
+  {
+    slug: 'pernas', weekday: 3, modalities: ['musculacao'], choice: 'fixed', title: 'Pernas — key session', time: '06:00', planType: 'base', sessionType: 'forca', loadCategory: 'key',
+    isKeySession: true, recoveryPriority: 'alta', requiresPreWorkout: true, requiresPostWorkout: true, tags: ['forca', 'pernas', 'key-session', 'recovery-important'],
+    notes: 'Quadríceps, agachamento, búlgaro, afundo, extensora, posterior, panturrilha.',
+  },
   // QUI
-  { slug: 'bike-ou-corrida', weekday: 4, modalities: ['bike', 'corrida'], choice: 'one_of', title: 'Bike cedo ou corrida', period: 'manha', planType: 'flexivel' },
+  { slug: 'natacao', weekday: 4, modalities: ['natacao'], choice: 'fixed', title: 'Natação', time: '06:00', durationMin: 45, durationMaxMin: 60, planType: 'base', sessionType: 'qualidade', loadCategory: 'moderada', notes: 'Pode ter tiros, técnica ou qualidade.' },
+  { slug: 'upper-acessorios', weekday: 4, modalities: ['musculacao'], choice: 'optional', title: 'Upper / acessórios', period: 'noite', planType: 'flexivel', sessionType: 'forca', loadCategory: 'leve' },
   // SEX
-  { slug: 'natacao', weekday: 5, modalities: ['natacao'], choice: 'fixed', time: '07:00', durationMin: 60, planType: 'base', notes: 'espaço pra recuperação e vida pessoal' },
-  { slug: 'musculacao', weekday: 5, modalities: ['musculacao'], choice: 'optional', planType: 'flexivel' },
-  // SÁB — fun day
-  { slug: 'fun-day', weekday: 6, modalities: ['circo', 'surf', 'bike', 'corrida', 'trail', 'caminhada'], choice: 'one_of', title: 'Fun day', planType: 'flexivel', notes: 'Escolha o que combina com seu sábado.' },
-  // DOM — recovery
-  { slug: 'off', weekday: 0, modalities: [], choice: 'rest', title: 'Recovery / OFF', planType: 'base', notes: 'pedal longo pode migrar pra cá' },
+  {
+    slug: 'corrida-longa', weekday: 5, modalities: ['corrida'], choice: 'fixed', title: 'Corrida longa Z2', time: '06:00', durationMin: 60, durationMaxMin: 75, planType: 'base', sessionType: 'longo', loadCategory: 'key',
+    isKeySession: true, isLongSession: true, ...KEY_FUEL, tags: ['running', 'long-run', 'Z2', 'endurance', 'key-session', 'fuel-required'],
+  },
+  // SÁB — flexível, never auto-filled
+  { slug: 'flex', weekday: 6, modalities: ['circo', 'surf', 'mobilidade', 'caminhada'], choice: 'one_of', title: 'Sábado flexível', planType: 'flexivel', loadCategory: 'leve', notes: 'Escolha o que combina com seu sábado.' },
+  // DOM
+  {
+    slug: 'pedal-longo', weekday: 0, modalities: ['bike'], choice: 'fixed', title: 'Pedal longo', time: '06:00', durationMin: 120, durationMaxMin: 180, planType: 'base', sessionType: 'longo', loadCategory: 'key',
+    isKeySession: true, isLongSession: true, ...KEY_FUEL, recoveryPriority: 'alta', tags: ['cycling', 'endurance', 'long-ride', 'long-session', 'key-session', 'fuel-required', 'intra-workout-fuel'],
+  },
 ]
 
 export function templateId(weekday: Weekday, slug: string): string {
@@ -79,8 +95,8 @@ export const seedBody: FeatureSeed = (ctx) => {
       milestones: [],
       status: 'ativa',
       planType: 'flexivel',
-      preferredWeekdays: [4],
-      preparation: 'Sem dia fixo. Quinta é uma janela possível — o planner confere a agenda antes.',
+      preferredWeekdays: [2],
+      preparation: 'Hoje mora na terça 19:00. Se ela sair do lugar, eu sugiro outra janela que respeite o check-in e a agenda.',
     }),
     ctx.make('workoutGoals', {
       id: seedId('body', 'goal-circo'),

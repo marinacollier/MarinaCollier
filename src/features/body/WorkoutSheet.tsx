@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
-import { AlertTriangle, Check } from 'lucide-react'
+import { AlertTriangle, Check, Utensils } from 'lucide-react'
 import { actions, getDB, nextOrder, useDB } from '@/data/store'
-import type { DayPeriod, Workout, WorkoutStatus } from '@/data/types'
+import type { DayPeriod, LoadCategory, SessionType, Workout, WorkoutStatus } from '@/data/types'
 import { isPresencial, PERIOD_LABEL } from '@/data/planning'
 import { closeSheet, replaceSheet, toast } from '@/app/ui-store'
 import { removeWithUndo } from '@/app/undo'
@@ -15,6 +15,30 @@ import { draftConflicts, PLAN_TYPE_LABEL, PLAN_TYPES } from './planner'
 
 const DURATIONS = [30, 45, 60, 90]
 const PERIODS: DayPeriod[] = ['manha', 'almoco', 'tarde', 'noite']
+const SESSION_TYPES: { value: SessionType; label: string }[] = [
+  { value: 'endurance', label: 'endurance' },
+  { value: 'longo', label: 'longo' },
+  { value: 'forca', label: 'força' },
+  { value: 'qualidade', label: 'qualidade' },
+  { value: 'tecnica', label: 'técnica' },
+  { value: 'mobilidade', label: 'mobilidade' },
+  { value: 'recuperacao', label: 'recuperação' },
+  { value: 'fun', label: 'fun' },
+  { value: 'outro', label: 'outro' },
+]
+const LOADS: { value: LoadCategory; label: string }[] = [
+  { value: 'key', label: '🔥 key' },
+  { value: 'moderada', label: 'moderada' },
+  { value: 'leve', label: 'leve' },
+]
+const FLAGS: { key: 'isKeySession' | 'isLongSession' | 'requiresPreviousDayPrep' | 'requiresPreWorkout' | 'requiresIntraWorkout' | 'requiresPostWorkout'; label: string }[] = [
+  { key: 'isKeySession', label: '🔥 key session' },
+  { key: 'isLongSession', label: 'sessão longa' },
+  { key: 'requiresPreviousDayPrep', label: 'prep na véspera' },
+  { key: 'requiresPreWorkout', label: 'pré' },
+  { key: 'requiresIntraWorkout', label: 'intra' },
+  { key: 'requiresPostWorkout', label: 'pós' },
+]
 const STATUSES: WorkoutStatus[] = ['planejado', 'feito', 'adaptado', 'descanso', 'pulado']
 
 export default function WorkoutSheet({ id, date, defaults }: SheetProps<'workout'>) {
@@ -187,6 +211,12 @@ export default function WorkoutSheet({ id, date, defaults }: SheetProps<'workout
         </Field>
       )}
 
+      {existing && !isRest && (
+        <Button variant="soft" block icon={<Utensils size={16} />} onClick={() => replaceSheet('fuel', { workoutId: existing.id })}>
+          Ver estratégia{existing.isKeySession ? ' · 🔥 key session' : ''}
+        </Button>
+      )}
+
       {!isRest && (
         <Field label="Firmeza">
           <ChipSelect value={draft.planType} clearable onChange={(planType) => set({ planType })} options={PLAN_TYPES.map((p) => ({ value: p, label: PLAN_TYPE_LABEL[p].toLowerCase() }))} />
@@ -208,6 +238,42 @@ export default function WorkoutSheet({ id, date, defaults }: SheetProps<'workout
           <Field label="Intensidade">
             <ChipSelect value={draft.intensity} onChange={(intensity) => set({ intensity })} options={INTENSITY} clearable />
           </Field>
+        )}
+        {!isRest && (
+          <div className="space-y-3">
+            <div className="eyebrow">carga e combustível</div>
+            <Field label="Tipo de sessão">
+              <ChipSelect value={draft.sessionType} clearable onChange={(sessionType) => set({ sessionType })} options={SESSION_TYPES} />
+            </Field>
+            <Field label="Carga">
+              <ChipSelect
+                value={draft.loadCategory}
+                clearable
+                onChange={(loadCategory) => set({ loadCategory, ...(loadCategory === 'key' ? { isKeySession: true } : {}) })}
+                options={LOADS}
+              />
+            </Field>
+            <Field label="Duração máxima (min)" hint="pra faixas tipo 60–75 min">
+              <NumberInput value={draft.plannedDurationMaxMin} placeholder="ex: 75" onChange={(v) => set({ plannedDurationMaxMin: v ? Math.round(v) : undefined })} />
+            </Field>
+            <div className="flex flex-wrap gap-2">
+              {FLAGS.map((f) => (
+                <Chip key={f.key} selected={!!draft[f.key]} onClick={() => set({ [f.key]: !draft[f.key] })}>
+                  {f.label}
+                </Chip>
+              ))}
+              <Chip selected={draft.recoveryPriority === 'alta'} onClick={() => set({ recoveryPriority: draft.recoveryPriority === 'alta' ? undefined : 'alta' })}>
+                recuperação importante
+              </Chip>
+            </div>
+            <Field label="Tags">
+              <TextInput
+                defaultValue={(draft.tags ?? []).join(', ')}
+                placeholder="long-run, key-session, fuel-required…"
+                onBlur={(e) => set({ tags: e.target.value.split(',').map((t) => t.trim()).filter(Boolean) })}
+              />
+            </Field>
+          </div>
         )}
         <Field label="Status">
           <ChipSelect

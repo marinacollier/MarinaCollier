@@ -1,12 +1,14 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Star } from 'lucide-react'
 import { actions, getDB, nextOrder, useDB } from '@/data/store'
-import type { FoodTag, MealSlot } from '@/data/types'
+import type { FoodTag, MealPurpose, MealSlot } from '@/data/types'
+import { modalityOf } from '@/data/selectors'
 import { closeSheet, toast } from '@/app/ui-store'
 import { removeWithUndo } from '@/app/undo'
 import type { SheetProps } from '@/app/sheet-types'
 import { ChipSelect, DateInput, Field, MoreOptions, MultiChipSelect, SheetLayout, TitleInput } from '@/components/ui'
-import { minutesOfDay, relativeDay, todayKey } from '@/lib/date'
+import { hmToMinutes, minutesOfDay, relativeDay, todayKey } from '@/lib/date'
+import { MEAL_PURPOSE_LABEL, SLOT_MINUTES, suggestMealLink } from './mealLink'
 import { cn } from '@/lib/cn'
 import { haptic } from '@/lib/haptics'
 import { FOOD_TAGS, SLOT_LABEL } from './constants'
@@ -18,6 +20,8 @@ const SLOT_OPTIONS: { value: MealSlot; label: string }[] = (['cafe', 'lanche_man
   label: SLOT_LABEL[s],
 }))
 
+const PURPOSES: MealPurpose[] = ['pre_treino', 'intra_treino', 'pos_treino', 'recovery', 'prep_dia_anterior', 'pre_long_run', 'post_long_run', 'pre_long_ride', 'post_long_ride', 'geral']
+
 export default function MealSheet({ id, date, slot }: SheetProps<'meal'>) {
   const db = useDB()
   const existing = id ? db.meals.find((m) => m.id === id) : undefined
@@ -28,6 +32,14 @@ export default function MealSheet({ id, date, slot }: SheetProps<'meal'>) {
   const [planned, setPlanned] = useState(existing?.planned ?? false)
   const [templateId, setTemplateId] = useState(existing?.templateId)
   const [saveAsFavorite, setSaveAsFavorite] = useState(false)
+  const [purpose, setPurpose] = useState<MealPurpose | undefined>(existing?.purpose)
+  const [workoutId, setWorkoutId] = useState<string | undefined>(existing?.workoutId)
+  const [linkTouched, setLinkTouched] = useState(!!existing)
+  const suggestion = useMemo(() => suggestMealLink(db, mealDate, existing?.time ? hmToMinutes(existing.time) : SLOT_MINUTES[mealSlot]), [db, mealDate, mealSlot, existing?.time])
+  // Until Marina touches it, follow the suggestion (moment of the day changes → suggestion changes).
+  const linkedId = linkTouched ? workoutId : suggestion?.workout.id
+  const linkedPurpose = linkTouched ? purpose : suggestion?.purpose
+  const linked = linkedId ? db.workouts.find((w) => w.id === linkedId) : undefined
   const templates = [...db.mealTemplates].sort((a, b) => a.order - b.order)
 
   if (id && !existing) {
@@ -41,7 +53,7 @@ export default function MealSheet({ id, date, slot }: SheetProps<'meal'>) {
   const save = () => {
     const text = description.trim()
     if (!text) return
-    const data = { date: mealDate, slot: mealSlot, description: text, tags, planned, templateId, done: true }
+    const data = { date: mealDate, slot: mealSlot, description: text, tags, planned, templateId, done: true, purpose: linkedPurpose, workoutId: linked?.id }
     if (existing) actions.update('meals', existing.id, data)
     else actions.create('meals', data)
     applyMealTags(mealDate, tags, planned)
@@ -143,6 +155,54 @@ export default function MealSheet({ id, date, slot }: SheetProps<'meal'>) {
           </button>
         )}
       </div>
+
+      {(linked || suggestion || linkedPurpose) && (
+        <div className="rounded-2xl bg-surface-2 p-3 space-y-2.5">
+          {linked ? (
+            <div className="flex items-center gap-2 text-[13.5px]">
+              <span className="text-[16px]">{modalityOf(db, linked.modality).emoji}</span>
+              <span className="flex-1 min-w-0 truncate">
+                ligada a {(linked.title ?? modalityOf(db, linked.modality).label).toLowerCase()}
+                {linked.date !== mealDate ? ` (${relativeDay(linked.date)})` : ''}
+                {linked.time ? ` · ${linked.time}` : ''}
+              </span>
+              <button
+                type="button"
+                className="h-8 px-2.5 text-[12.5px] text-muted"
+                onClick={() => {
+                  setLinkTouched(true)
+                  setWorkoutId(undefined)
+                  setPurpose(linkedPurpose)
+                }}
+              >
+                desligar
+              </button>
+            </div>
+          ) : suggestion ? (
+            <button
+              type="button"
+              className="text-[13.5px] text-ink-2 h-8"
+              onClick={() => {
+                setLinkTouched(true)
+                setWorkoutId(suggestion.workout.id)
+                setPurpose(suggestion.purpose)
+              }}
+            >
+              + ligar a {(suggestion.workout.title ?? modalityOf(db, suggestion.workout.modality).label).toLowerCase()}
+            </button>
+          ) : null}
+          <ChipSelect
+            value={linkedPurpose}
+            clearable
+            onChange={(v) => {
+              setLinkTouched(true)
+              setWorkoutId(linkedId)
+              setPurpose(v)
+            }}
+            options={PURPOSES.map((p) => ({ value: p, label: MEAL_PURPOSE_LABEL[p] }))}
+          />
+        </div>
+      )}
 
       <MoreOptions>
         <Field label="Dia">

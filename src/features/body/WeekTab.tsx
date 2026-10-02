@@ -6,6 +6,7 @@ import { getDB, useDB } from '@/data/store'
 import type { DateKey, DB, ID, Workout } from '@/data/types'
 import { modalityOf } from '@/data/selectors'
 import { conflictsBetween, isPresencial, type Conflict, type TemplateProposal } from '@/data/planning'
+import { dayTrainingContext } from '@/data/fuel'
 import { openSheet, toast } from '@/app/ui-store'
 import { ConflictCard } from '@/components/planning/ConflictCard'
 import { Button, IconButton, tone, useDndSensors } from '@/components/ui'
@@ -62,7 +63,11 @@ export default function WeekTab({ today }: { today: DateKey }) {
   const proposals = useMemo(() => openProposals(db, weekStart, today), [db, weekStart, today])
   const baseCount = useMemo(() => materializeWeek(db, weekStart, today).length, [db, weekStart, today])
   const training = useMemo(() => weekTrainingChips(db, weekStart), [db, weekStart])
-  const conflicts = useMemo(() => conflictsBetween(db, weekStart < today ? today : weekStart, weekEnd), [db, weekStart, weekEnd, today])
+  // Two sessions in a day is her normal (heavy early + light at night): info only, not a "ponto de atenção".
+  const conflicts = useMemo(
+    () => conflictsBetween(db, weekStart < today ? today : weekStart, weekEnd).filter((c) => c.kind !== 'same_day_workout'),
+    [db, weekStart, weekEnd, today],
+  )
   const conflictDays = useMemo(() => conflictsByDay(conflicts), [conflicts])
   const nudges = useMemo(() => goalNudges(db, weekStart, today, left), [db, weekStart, today, left])
   const prevCount = useMemo(() => workoutsBetween(db, addDays(weekStart, -7), addDays(weekStart, -1)).length, [db, weekStart])
@@ -127,7 +132,7 @@ export default function WeekTab({ today }: { today: DateKey }) {
         </motion.div>
       )}
 
-      {nudges.map((n) => (
+      {baseCount === 0 && nudges.map((n) => (
         <NudgeCard key={n.goal.id} db={db} nudge={n} />
       ))}
 
@@ -336,6 +341,8 @@ function DayRow({
   const choices = proposals.filter((p) => p.choice === 'one_of')
   const rest = workouts.find((w) => w.status === 'descanso')
   const notes = [...new Set(workouts.filter((w) => w.templateId && w.notes).map((w) => w.notes!))]
+  // Context belongs to the training: the day before a session that needs prep becomes a PREP day.
+  const prepFor = past ? undefined : dayTrainingContext(db, date).prepFor
 
   return (
     <div
@@ -353,8 +360,16 @@ function DayRow({
       </div>
 
       <div className="flex-1 min-w-0 py-1">
-        {(presencial || conflicts.length > 0) && (
+        {(presencial || conflicts.length > 0 || prepFor) && (
           <div className="flex items-center gap-2 mb-1.5 min-w-0">
+            {prepFor && (
+              <span className="shrink-0 inline-flex items-center gap-1 h-6 px-2 rounded-full bg-accent-soft text-[10.5px] font-semibold tracking-[0.06em] text-accent" title={`preparação pra ${prepFor.title ?? modalityOf(db, prepFor.modality).label} amanhã`}>
+                PREP
+                <span className="font-normal normal-case tracking-normal text-ink-2 truncate max-w-[120px]">
+                  · {(prepFor.title ?? modalityOf(db, prepFor.modality).label).toLowerCase()}
+                </span>
+              </span>
+            )}
             {presencial && (
               <span className="text-[11.5px] text-ink-2 truncate">
                 📍 presencial{location ? ` · ${location}` : ''}
@@ -500,15 +515,20 @@ function ChipBody({ db, workout: w, lifted }: { db: DB; workout: Workout; lifted
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 h-10 pl-2.5 pr-3 rounded-full text-[13.5px] font-medium whitespace-nowrap max-w-full',
+        'inline-flex items-center gap-1.5 min-h-10 py-1.5 pl-2.5 pr-3 rounded-[20px] text-[13.5px] font-medium max-w-full text-left',
         rest ? 'bg-ocean-soft text-ink-2' : t.soft,
         w.status === 'pulado' && 'opacity-55',
         lifted && 'shadow-xl scale-105',
       )}
     >
+      {w.isKeySession && !rest && (
+        <span className="text-[13px] leading-none -mr-0.5" aria-label="key session">
+          🔥
+        </span>
+      )}
       <span className="text-[16px] leading-none">{rest ? '😴' : m.emoji}</span>
-      <span className="truncate">{rest ? (w.title ?? 'descanso') : w.title || m.label}</span>
-      {when && !rest && <span className="text-[12px] font-normal text-ink-2/80">{when}</span>}
+      <span className="min-w-0 leading-tight">{rest ? (w.title ?? 'descanso') : w.title || m.label}</span>
+      {when && !rest && <span className="text-[12px] font-normal text-ink-2/80 whitespace-nowrap">{when}</span>}
       <PlanTypeTag planType={w.planType} />
       {done && (
         <span className={cn('h-[18px] w-[18px] rounded-full inline-flex items-center justify-center text-white shrink-0', w.status === 'adaptado' ? 'bg-sand' : 'bg-sage')}>

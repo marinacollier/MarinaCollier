@@ -14,7 +14,7 @@ import { haptic } from '@/lib/haptics'
 import { GOAL_KINDS, MODALITY_GROUPS } from './constants'
 import { goalProgress } from './selectors'
 import ModalitiesEditor from './ModalitiesEditor'
-import { dayLabel, goalSuggestions } from './planner'
+import { dayLabel, goalCoverage, goalSuggestions } from './planner'
 import { fitGoalAt } from './mutations'
 
 export default function GoalsTab({ today }: { today: DateKey }) {
@@ -216,12 +216,15 @@ function WindowSuggestions({ goal: g, today }: { goal: WorkoutGoal; today: DateK
         .sort((a, b) => a.date.localeCompare(b.date)),
     [db.workouts, ws, g.id, g.modality],
   )
-  const suggestions = useMemo(() => (planned.length < want ? goalSuggestions(db, g, today) : []), [db, g, today, planned.length, want])
+  const covered = useMemo(() => goalCoverage(db, g, ws, today), [db, g, ws, today])
+  const suggestions = useMemo(() => (covered < want ? goalSuggestions(db, g, today) : []), [db, g, today, covered, want])
 
-  if (planned.length >= want) {
+  if (covered >= want) {
     return (
       <div className="mt-3 rounded-2xl bg-sage-soft px-3.5 py-2.5 text-[13.5px] text-ink-2">
-        ✓ Já tem lugar nesta semana: {planned.map((w) => `${relativeDay(w.date, today)}${w.time ? ` ${w.time}` : ''}`).join(', ')}
+        {planned.length
+          ? `✓ Já tem lugar nesta semana: ${planned.map((w) => `${relativeDay(w.date, today)}${w.time ? ` ${w.time}` : ''}`).join(', ')}`
+          : '✓ Faz parte da sua semana base. Se sair do lugar, eu sugiro outra janela.'}
       </div>
     )
   }
