@@ -72,3 +72,17 @@ describe('fuel context', () => {
     expect(dayPlanFor(db, '2026-10-07')).toBeUndefined()
   })
 })
+
+describe('fuel context from the weekly template', () => {
+  it('days without workout records use the template fixed lines; real records win', () => {
+    const db = emptyDB()
+    db.weekTemplate = [
+      { createdAt: '', updatedAt: '', id: 't-qua', weekday: 3, modalities: ['musculacao'], choice: 'fixed', time: '06:00', planType: 'base', order: 0, active: true, isKeySession: true, tags: ['pernas'] },
+      { createdAt: '', updatedAt: '', id: 't-sex', weekday: 5, modalities: ['corrida'], choice: 'fixed', time: '06:00', planType: 'base', order: 0, active: true, isKeySession: true, isLongSession: true, requiresPreviousDayPrep: true, tags: ['long-run'] },
+    ]
+    expect(dayTrainingContext(db, '2026-09-30').dayType).toBe('forca_pesada') // Wed from template
+    expect(dayTrainingContext(db, '2026-10-01').dayType).toBe('prep_longo') // Thu: template run tomorrow
+    db.workouts = [{ createdAt: '', updatedAt: '', id: 'rest', date: '2026-09-30', modality: 'recuperacao', status: 'descanso', order: 0 }]
+    expect(dayTrainingContext(db, '2026-09-30').dayType).toBe('descanso') // a real rest day wins
+  })
+})

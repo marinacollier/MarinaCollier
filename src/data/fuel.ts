@@ -16,7 +16,7 @@ import type {
   PlannedMeal,
   Workout,
 } from './types'
-import { addDays, weekday } from '@/lib/date'
+import { addDays, weekday, weekDays } from '@/lib/date'
 import { modalityGroup } from './planning'
 
 const ACTIVE = (w: Workout) => w.status !== 'pulado' && w.status !== 'descanso'
@@ -25,6 +25,47 @@ export function workoutsOnDay(db: DB, date: DateKey): Workout[] {
   return db.workouts
     .filter((w) => w.date === date && ACTIVE(w))
     .sort((a, b) => (a.time ?? '99').localeCompare(b.time ?? '99') || a.order - b.order)
+}
+
+/**
+ * Trainings that shape a day's context. When the day has no workout records at all (not planned yet,
+ * or a past day of the week that was never materialized), the weekly template's FIXED lines stand in,
+ * so "QUA 🔥 Pernas" still reads right. Real records always win, including rest days.
+ */
+export function contextWorkouts(db: DB, date: DateKey): Workout[] {
+  if (db.workouts.some((w) => w.date === date)) return workoutsOnDay(db, date)
+  // A template line already materialized somewhere this week (e.g. the long run moved to Saturday)
+  // belongs to that workout now — it must not reappear on its original weekday.
+  const week = new Set(weekDays(date))
+  const used = new Set(db.workouts.filter((w) => w.templateId && week.has(w.date)).map((w) => w.templateId))
+  return db.weekTemplate
+    .filter((t) => t.active && t.choice === 'fixed' && t.weekday === weekday(date) && t.modalities[0] && !used.has(t.id))
+    .sort((a, b) => (a.time ?? '99').localeCompare(b.time ?? '99') || a.order - b.order)
+    .map((t) => ({
+      id: `template:${t.id}:${date}`,
+      createdAt: '',
+      updatedAt: '',
+      date,
+      modality: t.modalities[0],
+      status: 'planejado' as const,
+      title: t.title,
+      time: t.time,
+      period: t.period,
+      plannedDurationMin: t.durationMin,
+      plannedDurationMaxMin: t.durationMaxMin,
+      sessionType: t.sessionType,
+      loadCategory: t.loadCategory,
+      isKeySession: t.isKeySession,
+      isLongSession: t.isLongSession,
+      requiresPreviousDayPrep: t.requiresPreviousDayPrep,
+      requiresPreWorkout: t.requiresPreWorkout,
+      requiresIntraWorkout: t.requiresIntraWorkout,
+      requiresPostWorkout: t.requiresPostWorkout,
+      recoveryPriority: t.recoveryPriority,
+      tags: t.tags,
+      templateId: t.id,
+      order: t.order,
+    }))
 }
 
 function isLong(w: Workout): boolean {
@@ -42,9 +83,9 @@ export interface DayTrainingContext {
 }
 
 export function dayTrainingContext(db: DB, date: DateKey): DayTrainingContext {
-  const workouts = workoutsOnDay(db, date)
+  const workouts = contextWorkouts(db, date)
   const key = workouts.find((w) => w.isKeySession)
-  const prepFor = workoutsOnDay(db, addDays(date, 1)).find((w) => w.requiresPreviousDayPrep)
+  const prepFor = contextWorkouts(db, addDays(date, 1)).find((w) => w.requiresPreviousDayPrep)
   const group = (w: Workout) => modalityGroup(db.profile, w.modality)
 
   let dayType: NutritionDayType = 'descanso'
