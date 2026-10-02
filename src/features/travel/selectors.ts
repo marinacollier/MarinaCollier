@@ -9,6 +9,7 @@ import { normalize } from '@/lib/text'
 
 export type TripTab =
   | 'visao'
+  | 'revisar'
   | TripSection
   | 'orcamento'
   | 'gastos'
@@ -31,6 +32,7 @@ export interface TabMeta {
 
 export const TRIP_TABS: TabMeta[] = [
   { id: 'visao', label: 'Visão geral', emoji: '🗺️', items: false },
+  { id: 'revisar', label: 'Revisar', emoji: '🔎', items: false },
   { id: 'antes_de_ir', label: 'Antes de ir', emoji: '✅', items: true, checkable: true, empty: 'Nada pendente antes de ir.', placeholder: 'Ex.: renovar passaporte' },
   { id: 'voo', label: 'Voos', emoji: '✈️', items: true, empty: 'Nenhum voo por aqui ainda.', placeholder: 'Ex.: voo de ida' },
   { id: 'hospedagem', label: 'Hospedagem', emoji: '🛏️', items: true, empty: 'Onde você vai dormir? Sem pressa.', placeholder: 'Ex.: hostel perto da praia' },
@@ -90,6 +92,29 @@ export const STATUS_META: Record<ItemStatus, { label: string; cls: string }> = {
 
 export const STATUS_ORDER: ItemStatus[] = ['a_confirmar', 'a_fazer', 'confirmado', 'feito', 'cancelado']
 
+/** In the to-review context an unproven item reads "revisar" (never "não feito"). */
+export const REVIEW_LABEL = 'Revisar'
+
+export function statusLabel(status: ItemStatus, review = false): string {
+  return review && status === 'a_confirmar' ? REVIEW_LABEL : STATUS_META[status].label
+}
+
+// ─── Payment (separate from the reservation status, never inferred) ────────
+
+export type PaymentStatus = NonNullable<TripItem['paymentStatus']>
+
+export const PAYMENT_META: Record<PaymentStatus, { label: string; cls: string }> = {
+  a_confirmar: { label: 'A confirmar', cls: 'bg-surface border border-[color-mix(in_oklab,var(--sand)_55%,transparent)] text-[color-mix(in_oklab,var(--sand)_62%,var(--ink))]' },
+  pendente: { label: 'Pendente', cls: 'bg-surface border border-[color-mix(in_oklab,var(--accent)_50%,transparent)] text-[color-mix(in_oklab,var(--accent)_72%,var(--ink))]' },
+  pago: { label: 'Pago', cls: 'bg-sage-soft border border-transparent text-[color-mix(in_oklab,var(--sage)_70%,var(--ink))]' },
+  nao_se_aplica: { label: 'N/A', cls: 'bg-surface border border-line text-muted' },
+}
+
+export const PAYMENT_ORDER: PaymentStatus[] = ['a_confirmar', 'pendente', 'pago', 'nao_se_aplica']
+
+/** Sections where paying for something is usually a thing (the sheet shows the field up front). */
+export const PAYABLE_SECTIONS: TripSection[] = ['voo', 'hospedagem', 'transporte', 'reserva', 'roteiro']
+
 export function isItemDone(i: TripItem): boolean {
   return i.status === 'feito'
 }
@@ -120,7 +145,7 @@ export function tripPhase(t: Trip, today: DateKey): TripPhase {
 /** Warm countdown copy. Never invents a date for fuzzy trips. */
 export function tripCountdown(t: Trip, today: DateKey): string {
   const phase = tripPhase(t, today)
-  if (phase === 'sem_data') return t.dateLabel ? 'data a definir' : 'sem data ainda'
+  if (phase === 'sem_data') return 'data a confirmar'
   if (phase === 'futura') return countdownLabel(t.startDate!, today)
   if (phase === 'em_viagem') return t.startDate === today ? 'é hoje! ✨' : 'em viagem 🌴'
   return 'já foi 💛'
@@ -197,6 +222,21 @@ export function nextChecklistItem(items: TripItem[]): TripItem | undefined {
     .sort((a, b) => a.order - b.order)[0]
 }
 
+/** Roteiro is the trip timeline: its own items plus anything dated in other sections (a flight). */
+export function inSection(i: TripItem, section: TripSection): boolean {
+  return i.section === section || (section === 'roteiro' && !!i.date && i.status !== 'cancelado')
+}
+
+/** "14 de nov." / "14 → 15 de nov." for multi-day items. */
+export function itemDateLabel(i: Pick<TripItem, 'date' | 'endDate'>): string | undefined {
+  if (!i.date) return undefined
+  if (!i.endDate || i.endDate <= i.date) return formatShortDate(i.date)
+  const [y1, m1] = i.date.split('-')
+  const [y2, m2] = i.endDate.split('-')
+  if (y1 === y2 && m1 === m2) return `${Number(i.date.slice(8))} → ${formatShortDate(i.endDate)}`
+  return `${formatShortDate(i.date)} → ${formatShortDate(i.endDate)}`
+}
+
 export interface ItemGroup {
   key: string
   label?: string
@@ -208,7 +248,7 @@ export interface ItemGroup {
  * everything else groups by `group` in order of first appearance, ungrouped first.
  */
 export function groupItems(items: TripItem[], section: TripSection): ItemGroup[] {
-  const list = items.filter((i) => i.section === section).sort((a, b) => a.order - b.order)
+  const list = items.filter((i) => inSection(i, section)).sort((a, b) => a.order - b.order)
   const map = new Map<string, ItemGroup>()
   const keyOf = (i: TripItem) => (section === 'roteiro' && i.date ? `d:${i.date}` : `g:${i.group ?? ''}`)
   for (const i of list) {
@@ -229,10 +269,60 @@ export function groupItems(items: TripItem[], section: TripSection): ItemGroup[]
   return groups.sort((a, b) => (a.key === 'g:' ? -1 : b.key === 'g:' ? 1 : 0))
 }
 
+/** Everything still unproven ("revisar"), optionally inside one sub-area. */
+export function reviewItems(items: TripItem[], group?: string): TripItem[] {
+  return items.filter((i) => i.status === 'a_confirmar' && (!group || i.group === group)).sort((a, b) => a.order - b.order)
+}
+
+/**
+ * The Revisar view: a_confirmar items grouped by sub-area (in the trip's own group order),
+ * items without a group last under "Outros".
+ */
+export function reviewGroups(items: TripItem[], group?: string): ItemGroup[] {
+  const list = reviewItems(items, group)
+  const order = groupsOfTrip(items)
+  const map = new Map<string, ItemGroup>()
+  for (const i of list) {
+    const k = `g:${i.group ?? ''}`
+    if (!map.has(k)) map.set(k, { key: k, label: i.group || 'Outros', items: [] })
+    map.get(k)!.items.push(i)
+  }
+  const rank = (g: ItemGroup) => (g.key === 'g:' ? Infinity : order.indexOf(g.key.slice(2)))
+  return [...map.values()].sort((a, b) => rank(a) - rank(b))
+}
+
+/** Sub-areas of a list with how many items each has (for filter chips), in first-appearance order. */
+export function groupCounts(items: TripItem[]): { group: string; count: number }[] {
+  const order = groupsOfTrip(items)
+  return order.map((group) => ({ group, count: items.filter((i) => i.group === group).length }))
+}
+
 export function groupsOfTrip(items: TripItem[]): string[] {
   const seen: string[] = []
   for (const i of [...items].sort((a, b) => a.order - b.order)) if (i.group && !seen.includes(i.group)) seen.push(i.group)
   return seen
+}
+
+// ─── Back-to-back trips ──────────────────────────────────────────────────────
+
+/**
+ * The next trip that starts within `maxGap` days after this one starts/ends (Recife → Cape Town).
+ * Uses endDate when present, else startDate. Only dated trips count.
+ */
+export function followingTrip(trip: Trip, trips: Trip[], maxGap = 3): { trip: Trip; days: number } | undefined {
+  const ref = trip.endDate ?? trip.startDate
+  if (!ref) return undefined
+  const cands = trips
+    .filter((t) => t.id !== trip.id && t.startDate && t.status !== 'concluida' && t.startDate >= ref)
+    .map((t) => ({ trip: t, days: diffDays(ref, t.startDate!) }))
+    .filter((c) => c.days <= maxGap)
+    .sort((a, b) => a.days - b.days)
+  return cands[0]
+}
+
+export function followingTripLabel(f: { trip: Trip; days: number }): string {
+  const when = f.days === 0 ? 'No mesmo dia' : f.days === 1 ? '1 dia depois' : `${f.days} dias depois`
+  return `${when}: ${f.trip.name} ${f.trip.flag}`.trim()
 }
 
 // ─── Default "Antes de ir" checklist ────────────────────────────────────────
@@ -254,7 +344,6 @@ export const DEFAULT_CHECKLIST: ChecklistTemplate[] = [
   { title: 'Câmbio/cartão internacional', status: 'a_fazer', international: true },
   { title: 'Cópias dos documentos', status: 'a_fazer' },
   { title: 'Reservas offline', status: 'a_fazer' },
-  { title: 'Luna: creche/hotel', status: 'a_fazer' },
   { title: 'Mala esportiva', status: 'a_fazer' },
 ]
 
@@ -267,10 +356,18 @@ export function isDomestic(t: Pick<Trip, 'flag'>): boolean {
  * Items to create for the default checklist. Idempotent: titles already present in the trip's
  * "Antes de ir" section (accent/case-insensitive) are skipped, so tapping twice never duplicates.
  */
-export function defaultChecklistItems(trip: Pick<Trip, 'id' | 'flag'>, existing: TripItem[], startOrder = 0): NewItem<'tripItems'>[] {
+export function defaultChecklistItems(
+  trip: Pick<Trip, 'id' | 'flag'>,
+  existing: TripItem[],
+  startOrder = 0,
+  /** One "quem cuida" item per pet, from the data (never hardcoded). */
+  petNames: string[] = [],
+): NewItem<'tripItems'>[] {
   const have = new Set(existing.filter((i) => i.tripId === trip.id && i.section === 'antes_de_ir').map((i) => normalize(i.title)))
   const domestic = isDomestic(trip)
-  return DEFAULT_CHECKLIST.filter((c) => !(domestic && c.international))
+  const pets: ChecklistTemplate[] = petNames.map((n) => ({ title: `${n}: creche/hotel`, status: 'a_fazer' }))
+  return [...DEFAULT_CHECKLIST, ...pets]
+    .filter((c) => !(domestic && c.international))
     .filter((c) => !have.has(normalize(c.title)))
     .map((c, i) => ({ tripId: trip.id, section: 'antes_de_ir' as const, title: c.title, status: c.status, order: startOrder + i }))
 }
