@@ -110,6 +110,7 @@ describe('seed', () => {
     expect(prioritiesOf(seed, TODAY).map((p) => p.title)).toEqual(['Entregar revisão do projeto X', 'Fazer treino de natação', 'Estudar inglês'])
     const ref = prioritiesOf(seed, TODAY)[0].ref
     expect(ref && seed.tasks.some((t) => t.id === ref.id)).toBe(true)
-    expect(seed.tasks.every((t) => !t.time)).toBe(true)
+    // Recurring routines Marina asked for (Weekly CEO Review, Monthly Board) may have times; one-off tasks may not.
+    expect(seed.tasks.filter((t) => !t.recurrence).every((t) => !t.time)).toBe(true)
   })
 })
