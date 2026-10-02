@@ -13,6 +13,88 @@ export function activeTracks(tracks: StudyTrack[]): StudyTrack[] {
   return tracks.filter((t) => !t.archived).sort(byOrder)
 }
 
+export type TrackStatus = NonNullable<StudyTrack['status']>
+
+export const TRACK_STATUS_LABEL: Record<TrackStatus, string> = {
+  ativo: 'ativo',
+  continuo: 'contínuo',
+  pausado: 'pausado',
+}
+
+export const TRACK_STATUSES: TrackStatus[] = ['ativo', 'continuo', 'pausado']
+
+/** Tracks without a status (older data) count as ativo. */
+export function trackStatus(t: Pick<StudyTrack, 'status'>): TrackStatus {
+  return t.status ?? 'ativo'
+}
+
+/** Tap on the status pill: ativo → contínuo → pausado → ativo. */
+export function nextTrackStatus(t: Pick<StudyTrack, 'status'>): TrackStatus {
+  const i = TRACK_STATUSES.indexOf(trackStatus(t))
+  return TRACK_STATUSES[(i + 1) % TRACK_STATUSES.length]
+}
+
+/** Visible trilhas: paused ones sink to the end, otherwise keep her order. */
+export function tracksForDisplay(tracks: StudyTrack[]): StudyTrack[] {
+  const rank = (t: StudyTrack) => (trackStatus(t) === 'pausado' ? 1 : 0)
+  return activeTracks(tracks).sort((a, b) => rank(a) - rank(b) || a.order - b.order)
+}
+
+/** Guess a study kind from a format name ("Cambly" → aula, "Listening" → podcast…). Generic keywords only. */
+export function kindForFormat(format: string): StudyItem['kind'] {
+  const f = normalize(format)
+  if (/podcast|listening|audio/.test(f)) return 'podcast'
+  if (/video|youtube/.test(f)) return 'video'
+  if (/artigo|article|newsletter/.test(f)) return 'artigo'
+  if (/livro|book/.test(f)) return 'livro'
+  if (/certifica/.test(f)) return 'certificacao'
+  if (/curso|course|trilha|modulo/.test(f)) return 'curso'
+  if (/aula|class|conversa|cambly|tutor|mentoria/.test(f)) return 'aula'
+  if (/vocabul|tema|topic/.test(f)) return 'tema'
+  return 'outro'
+}
+
+export type FormatQuick =
+  | { type: 'existing'; item: StudyItem }
+  | { type: 'create'; data: Pick<StudyItem, 'title' | 'kind' | 'status' | 'progress' | 'order'> & { trackId: ID } }
+
+/**
+ * Tapping a format chip on a trilha ("Cambly"): if something with that name is already open in the
+ * trilha, reuse it (no duplicates); otherwise create it straight into "estudando".
+ */
+export function formatQuickCreate(track: Pick<StudyTrack, 'id'>, format: string, items: StudyItem[]): FormatQuick {
+  const key = normalize(format)
+  const existing = items.find(
+    (i) =>
+      i.trackId === track.id &&
+      i.status !== 'finalizado' &&
+      normalize(i.title)
+        .split(/\s*[/·—]\s*|\s+-\s+/)
+        .some((part) => part === key),
+  )
+  if (existing) return { type: 'existing', item: existing }
+  const studying = items.filter((i) => i.status === 'estudando')
+  return {
+    type: 'create',
+    data: {
+      title: format.trim(),
+      kind: kindForFormat(format),
+      trackId: track.id,
+      status: 'estudando',
+      progress: 0,
+      order: studying.reduce((m, i) => Math.max(m, i.order), -1) + 1,
+    },
+  }
+}
+
+/** Add a format to a list, ignoring blanks and case/accents duplicates. */
+export function addFormat(formats: string[] | undefined, format: string): string[] {
+  const list = formats ?? []
+  const f = format.trim()
+  if (!f || list.some((x) => normalize(x) === normalize(f))) return list
+  return [...list, f]
+}
+
 /** Open (not finalizado) items per track. */
 export function trackCounts(items: StudyItem[]): Map<ID, number> {
   const m = new Map<ID, number>()

@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowRight, ArrowUp, Library, Pencil, Play, Plus, Settings2 } from 'lucide-react'
+import { ArrowRight, ArrowUp, Library, Pencil, Play, Plus, Settings2, X } from 'lucide-react'
 import { ROUTES } from '@/app/routes'
 import { openSheet, toast } from '@/app/ui-store'
 import { removeWithUndo } from '@/app/undo'
@@ -28,7 +28,6 @@ import { formatShortDate } from '@/lib/date'
 import { haptic } from '@/lib/haptics'
 import { SubmitIcon } from './components/SubmitIcon'
 import { cn } from '@/lib/cn'
-import { pluralize } from '@/lib/text'
 import { LocalSheet } from './components/LocalSheet'
 import { ProgressSlider } from './components/ProgressSlider'
 import { TrackEditor } from './components/TrackEditor'
@@ -36,25 +35,29 @@ import { WhatsNext } from './components/WhatsNext'
 import { BookCover } from './components/BookCover'
 import {
   STUDY_KIND_LABEL,
-  activeTracks,
+  TRACK_STATUS_LABEL,
   booksByStatus,
   clampProgress,
   finishStudyPatch,
+  formatQuickCreate,
   mergeSubsetOrder,
   nextStudyOf,
+  nextTrackStatus,
   parseCapture,
   promoteToNextPatch,
   startStudyPatch,
   studyList,
   topOrder,
-  trackCounts,
+  trackStatus,
+  tracksForDisplay,
   type StudyView,
 } from './selectors'
 
-const VIEWS: { value: StudyView; label: string }[] = [
-  { value: 'estudando', label: 'Estudando' },
-  { value: 'proximo', label: 'Próximo' },
+type BacklogView = Exclude<StudyView, 'estudando'>
+
+const VIEWS: { value: BacklogView; label: string }[] = [
   { value: 'backlog', label: 'Backlog' },
+  { value: 'proximo', label: 'Fila' },
   { value: 'finalizado', label: 'Finalizados' },
 ]
 
@@ -66,23 +69,45 @@ function startNow(item: StudyItem, items: StudyItem[]) {
   toast(`Bora: ${item.title} 📚`)
 }
 
+/** Tap a format chip ("Cambly") → open the existing item or create it straight into "estudando". */
+function quickFormat(track: StudyTrack, format: string, items: StudyItem[]) {
+  const res = formatQuickCreate(track, format, items)
+  if (res.type === 'existing') {
+    openSheet('study', { id: res.item.id })
+    return
+  }
+  const created = actions.create('studyItems', res.data)
+  haptic('light')
+  toast(`${track.emoji} ${format} anotado em “agora estou estudando”`, {
+    action: { label: 'editar', run: () => openSheet('study', { id: created.id }) },
+  })
+}
+
+function cycleTrackStatus(track: StudyTrack) {
+  const prev = track.status
+  const next = nextTrackStatus(track)
+  actions.update('studyTracks', track.id, { status: next })
+  haptic('light')
+  toast(`${track.name}: ${TRACK_STATUS_LABEL[next]}`, { action: { label: 'Desfazer', run: () => actions.update('studyTracks', track.id, { status: prev }) } })
+}
+
 export default function StudyPage() {
   const nav = useNavigate()
   const today = useToday()
   const items = useDB((db) => db.studyItems)
   const allTracks = useDB((db) => db.studyTracks)
   const books = useDB((db) => db.books)
-  const [view, setView] = useState<StudyView>('estudando')
+  const [view, setView] = useState<BacklogView>('backlog')
   const [trackId, setTrackId] = useState<string | undefined>()
   const [panel, setPanel] = useState<Panel>(null)
 
-  const tracks = useMemo(() => activeTracks(allTracks), [allTracks])
+  const tracks = useMemo(() => tracksForDisplay(allTracks), [allTracks])
   const trackById = useMemo(() => new Map(allTracks.map((t) => [t.id, t])), [allTracks])
-  const counts = useMemo(() => trackCounts(items), [items])
   const next = useMemo(() => nextStudyOf(items), [items])
+  const studying = useMemo(() => studyList(items, 'estudando'), [items])
   const list = useMemo(() => studyList(items, view, trackId), [items, view, trackId])
-  const studyingCount = useMemo(() => items.filter((i) => i.status === 'estudando').length, [items])
   const reading = useMemo(() => booksByStatus(books, 'lendo')[0] ?? booksByStatus(books, 'proximo')[0], [books])
+  const filterTrack = trackId ? trackById.get(trackId) : undefined
 
   const finish = (item: StudyItem) => {
     actions.update('studyItems', item.id, finishStudyPatch(today))
@@ -91,15 +116,14 @@ export default function StudyPage() {
     setPanel({ kind: 'finished', item })
   }
 
-  const newStudy = () =>
-    openSheet('study', { defaults: { trackId, status: view === 'finalizado' ? 'backlog' : view } })
+  const newStudy = () => openSheet('study', { defaults: { trackId, status: 'backlog' } })
 
   return (
     <Page>
       <PageHeader
         eyebrow="mente"
-        title="Estudos"
-        subtitle={studyingCount ? `${pluralize(studyingCount, 'coisa', 'coisas')} em andamento — e o próximo já guardado.` : 'o que estou aprendendo — e o que vem depois.'}
+        title="📚 Learning OS"
+        subtitle="o que estou aprendendo agora — e o próximo já guardado."
         actions={
           <>
             <IconButton label="Livros" onClick={() => nav(ROUTES.books)}>
@@ -112,6 +136,34 @@ export default function StudyPage() {
         }
       />
 
+      <SectionTitle className="mt-1">Agora estou estudando</SectionTitle>
+      <div className="space-y-2.5">
+        {studying.length ? (
+          studying.map((it, i) => (
+            <motion.div key={it.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
+              <StudyingCard item={it} track={it.trackId ? trackById.get(it.trackId) : undefined} onFinish={() => finish(it)} />
+            </motion.div>
+          ))
+        ) : (
+          <Card>
+            <EmptyState
+              compact
+              emoji="🌿"
+              title="Nada em andamento agora"
+              text="Começa o próximo quando quiser, sem pressa."
+              action={
+                next && (
+                  <Button size="sm" variant="primary" icon={<Play size={14} />} onClick={() => startNow(next, items)}>
+                    começar “{next.title}”
+                  </Button>
+                )
+              }
+            />
+          </Card>
+        )}
+      </div>
+
+      <SectionTitle>Próximo estudo</SectionTitle>
       <NextHero
         next={next}
         track={next?.trackId ? trackById.get(next.trackId) : undefined}
@@ -129,43 +181,44 @@ export default function StudyPage() {
       >
         Trilhas
       </SectionTitle>
-      <div className="flex gap-2.5 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
-        <TrackCard emoji="✦" name="Todas" count={items.filter((i) => i.status !== 'finalizado').length} selected={!trackId} onClick={() => setTrackId(undefined)} tone="ink" />
-        {tracks.map((t) => (
-          <TrackCard key={t.id} emoji={t.emoji} name={t.name} count={counts.get(t.id) ?? 0} tone={t.tone} selected={trackId === t.id} onClick={() => setTrackId(trackId === t.id ? undefined : t.id)} />
+      <div className="space-y-2.5">
+        {tracks.map((t, i) => (
+          <motion.div key={t.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
+            <TrackCard
+              track={t}
+              current={studying.filter((s) => s.trackId === t.id && s.status === 'estudando')}
+              selected={trackId === t.id}
+              onSelect={() => setTrackId(trackId === t.id ? undefined : t.id)}
+              onStatus={() => cycleTrackStatus(t)}
+              onFormat={(f) => quickFormat(t, f, items)}
+              onEdit={() => setPanel({ kind: 'tracks' })}
+            />
+          </motion.div>
         ))}
         <button
           type="button"
           onClick={() => setPanel({ kind: 'tracks' })}
-          className="shrink-0 w-[92px] h-[108px] rounded-2xl border border-dashed border-line text-muted flex flex-col items-center justify-center gap-1 text-[12.5px] active:scale-[0.98] transition"
+          className="w-full h-12 rounded-2xl border border-dashed border-line text-muted inline-flex items-center justify-center gap-1.5 text-[13.5px] active:scale-[0.99] transition"
         >
-          <Plus size={18} /> trilha
+          <Plus size={16} /> nova trilha
         </button>
       </div>
 
-      <Segmented className="mt-6" value={view} onChange={setView} options={VIEWS} />
+      <SectionTitle
+        action={
+          filterTrack && (
+            <button type="button" onClick={() => setTrackId(undefined)} className="text-[13px] text-muted h-8 -mb-1.5 px-1 inline-flex items-center gap-1">
+              {filterTrack.emoji} só {filterTrack.name} <X size={14} />
+            </button>
+          )
+        }
+      >
+        Learning backlog
+      </SectionTitle>
+      <Segmented value={view} onChange={setView} options={VIEWS} />
 
       <div className="mt-3 space-y-2.5">
         {view === 'backlog' && <BacklogCapture trackId={trackId} items={items} />}
-
-        {view === 'estudando' &&
-          (list.length ? (
-            list.map((it, i) => (
-              <motion.div key={it.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
-                <StudyingCard item={it} track={it.trackId ? trackById.get(it.trackId) : undefined} onFinish={() => finish(it)} />
-              </motion.div>
-            ))
-          ) : (
-            <Card>
-              <EmptyState
-                compact
-                emoji="🌿"
-                title={trackId ? 'Nada em andamento nessa trilha' : 'Nada em andamento agora'}
-                text="Começa o próximo quando quiser, sem pressa."
-                action={next && <Button size="sm" variant="primary" icon={<Play size={14} />} onClick={() => startNow(next, items)}>começar “{next.title}”</Button>}
-              />
-            </Card>
-          ))}
 
         {view === 'proximo' &&
           (list.length ? (
@@ -233,17 +286,21 @@ export default function StudyPage() {
           ))}
       </div>
 
-      {reading && (
-        <Card onPress={() => nav(ROUTES.books)} className="mt-8 flex items-center gap-4">
+      <Card onPress={() => nav(ROUTES.books)} className="mt-8 flex items-center gap-4">
+        {reading ? (
           <BookCover book={reading} width={48} />
-          <div className="flex-1 min-w-0">
-            <div className="eyebrow">{reading.status === 'lendo' ? 'lendo agora' : 'próximo livro'}</div>
-            <div className="font-display text-[18px] leading-tight truncate mt-0.5">{reading.title}</div>
-            <div className="text-[13px] text-muted">sua estante de livros</div>
-          </div>
-          <ArrowRight size={18} className="text-muted" />
-        </Card>
-      )}
+        ) : (
+          <span className="h-[72px] w-12 rounded-[3px_8px_8px_3px] border border-dashed border-line flex items-center justify-center text-[20px]" aria-hidden>
+            📖
+          </span>
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="eyebrow">{reading ? (reading.status === 'lendo' ? 'lendo agora' : 'próximo livro') : 'livros'}</div>
+          <div className="font-display text-[18px] leading-tight truncate mt-0.5">{reading ? reading.title : 'Sua estante'}</div>
+          <div className="text-[13px] text-muted">{reading ? 'sua estante de livros' : 'começa vazia — do jeito que tem que ser.'}</div>
+        </div>
+        <ArrowRight size={18} className="text-muted" />
+      </Card>
 
       <LocalSheet open={!!panel} onClose={() => setPanel(null)}>
         {panel?.kind === 'finished' && <WhatsNext finished={panel.item} onDone={() => setPanel(null)} />}
@@ -266,8 +323,7 @@ function NextHero({ next, track, hasBacklog, onStart, onPick }: { next?: StudyIt
   if (!next) {
     return (
       <div className="card p-5 relative overflow-hidden">
-        <div className="eyebrow">próximo estudo</div>
-        <div className="font-display text-[22px] leading-tight mt-1.5">Qual é o próximo?</div>
+        <div className="font-display text-[22px] leading-tight">Qual é o próximo?</div>
         <p className="text-[14px] text-muted mt-1">Deixa ele guardado aqui — quando terminar o atual, já sabe por onde seguir.</p>
         <div className="flex gap-2 mt-4">
           {hasBacklog && (
@@ -288,8 +344,7 @@ function NextHero({ next, track, hasBacklog, onStart, onPick }: { next?: StudyIt
       <div className="absolute -right-2 -top-3 text-[84px] leading-none opacity-[0.12] grayscale-[30%] select-none pointer-events-none" aria-hidden>
         {track?.emoji ?? '📚'}
       </div>
-      <div className={cn('eyebrow', t.text)}>próximo estudo</div>
-      <button type="button" onClick={() => openSheet('study', { id: next.id })} className="block text-left mt-1.5 pr-10">
+      <button type="button" onClick={() => openSheet('study', { id: next.id })} className="block text-left pr-10">
         <span className="font-display text-[26px] leading-[1.1] tracking-tight">{next.title}</span>
       </button>
       <div className="text-[13.5px] text-ink-2 mt-1.5">
@@ -310,24 +365,75 @@ function NextHero({ next, track, hasBacklog, onStart, onPick }: { next?: StudyIt
 
 // ─── Tracks ─────────────────────────────────────────────────────────────────
 
-function TrackCard({ emoji, name, count, tone, selected, onClick }: { emoji: string; name: string; count: number; tone: StudyTrack['tone']; selected: boolean; onClick: () => void }) {
+const STATUS_STYLE = {
+  ativo: 'bg-sage-soft text-sage',
+  continuo: 'bg-ocean-soft text-ocean',
+  pausado: 'bg-surface-2 text-muted',
+} as const
+
+function TrackCard({
+  track,
+  current,
+  selected,
+  onSelect,
+  onStatus,
+  onFormat,
+  onEdit,
+}: {
+  track: StudyTrack
+  current: StudyItem[]
+  selected: boolean
+  onSelect: () => void
+  onStatus: () => void
+  onFormat: (format: string) => void
+  onEdit: () => void
+}) {
+  const status = trackStatus(track)
+  const formats = track.formats ?? []
+  const tone = TONE[track.tone]
   return (
-    <button
-      type="button"
-      aria-pressed={selected}
-      onClick={onClick}
-      className={cn(
-        'shrink-0 w-[136px] h-[108px] rounded-2xl p-3 flex flex-col text-left transition active:scale-[0.98] border',
-        TONE[tone].soft,
-        selected ? 'border-ink shadow-[var(--shadow)]' : 'border-transparent',
+    <div className={cn('card p-3.5 border transition', selected ? 'border-ink' : 'border-transparent', status === 'pausado' && 'opacity-70')}>
+      <div className="flex items-center gap-3">
+        <button type="button" aria-pressed={selected} onClick={onSelect} className="flex-1 min-w-0 flex items-center gap-3 text-left min-h-11">
+          <span className={cn('h-11 w-11 shrink-0 rounded-2xl flex items-center justify-center text-[22px]', tone.soft)} aria-hidden>
+            {track.emoji}
+          </span>
+          <span className="min-w-0">
+            <span className="block text-[16px] font-medium leading-tight truncate">{track.name}</span>
+            <span className="block text-[12.5px] text-muted truncate mt-0.5">
+              {current.length ? `agora: ${current.map((c) => c.title).join(' · ')}` : status === 'pausado' ? 'pausada, sem pressa' : 'nada em andamento agora'}
+            </span>
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={onStatus}
+          aria-label={`Status de ${track.name}: ${TRACK_STATUS_LABEL[status]}. Tocar para mudar`}
+          className="shrink-0 h-11 -my-1 -mr-1 px-1 inline-flex items-center"
+        >
+          <span className={cn('inline-flex items-center h-7 px-3 rounded-full text-[12.5px] font-medium', STATUS_STYLE[status])}>{TRACK_STATUS_LABEL[status]}</span>
+        </button>
+      </div>
+      {formats.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5 mt-3">
+          {formats.map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => onFormat(f)}
+              aria-label={`Estudar ${f} agora`}
+              className="inline-flex items-center gap-1 h-9 pl-2.5 pr-3 rounded-full text-[13px] bg-surface-2 text-ink-2 active:scale-[0.97] transition"
+            >
+              <Plus size={13} className="text-muted" /> {f}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <button type="button" onClick={onEdit} className="mt-2 h-9 px-1 text-[13px] text-muted inline-flex items-center gap-1">
+          <Plus size={13} /> como você estuda isso?
+        </button>
       )}
-    >
-      <span className="text-[22px] leading-none" aria-hidden>
-        {emoji}
-      </span>
-      <span className="mt-auto text-[13.5px] font-medium leading-tight line-clamp-2">{name}</span>
-      <span className="text-[12px] text-muted mt-0.5">{count ? `${count} em aberto` : 'tranquilo'}</span>
-    </button>
+    </div>
   )
 }
 
@@ -385,10 +491,13 @@ function StudyingCard({ item, track, onFinish }: { item: StudyItem; track?: Stud
         </button>
       )}
 
-      <div className="flex items-center gap-3 mt-3">
-        <ProgressBar value={adjusting ? draft : item.progress} tone={tone} className="flex-1 h-2" />
-        <span className="text-[13px] font-medium tabular-nums w-10 text-right">{clampProgress(adjusting ? draft : item.progress)}%</span>
-      </div>
+      {/* ongoing things (a conversation class, a trilha) don't need a percent until she gives one */}
+      {(adjusting || item.progress > 0) && (
+        <div className="flex items-center gap-3 mt-3">
+          <ProgressBar value={adjusting ? draft : item.progress} tone={tone} className="flex-1 h-2" />
+          <span className="text-[13px] font-medium tabular-nums w-10 text-right">{clampProgress(adjusting ? draft : item.progress)}%</span>
+        </div>
+      )}
       {adjusting && (
         <ProgressSlider
           value={draft}
@@ -406,9 +515,11 @@ function StudyingCard({ item, track, onFinish }: { item: StudyItem; track?: Stud
           </Button>
         ) : (
           <>
-            <Button size="sm" variant="soft" onClick={() => setProgress(item.progress + 10)} disabled={item.progress >= 100}>
-              +10%
-            </Button>
+            {item.progress > 0 && (
+              <Button size="sm" variant="soft" onClick={() => setProgress(item.progress + 10)} disabled={item.progress >= 100}>
+                +10%
+              </Button>
+            )}
             <Button
               size="sm"
               variant={adjusting ? 'primary' : 'ghost'}
@@ -418,7 +529,7 @@ function StudyingCard({ item, track, onFinish }: { item: StudyItem; track?: Stud
                 setAdjusting((a) => !a)
               }}
             >
-              {adjusting ? 'ok' : 'ajustar'}
+              {adjusting ? 'ok' : item.progress > 0 ? 'ajustar' : 'marcar progresso'}
             </Button>
           </>
         )}
@@ -501,7 +612,7 @@ function BacklogCapture({ trackId, items }: { trackId?: string; items: StudyItem
     >
       <input
         className="input flex-1"
-        placeholder="joga aqui: artigo, curso, vídeo, tema, certificação…"
+        placeholder="joga aqui: curso, artigo, tema, link…"
         value={text}
         onChange={(e) => setText(e.target.value)}
         enterKeyHint="done"
