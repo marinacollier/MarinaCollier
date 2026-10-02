@@ -1,67 +1,80 @@
-import type { FeatureSeed } from '@/data/seed/context'
+import { seedId, type FeatureSeed } from '@/data/seed/context'
 import { SEED_IDS } from '@/data/seed/ids'
 import type { StudyTrack } from '@/data/types'
 
-const TRACKS: { id: string; name: string; emoji: string; tone: StudyTrack['tone'] }[] = [
-  { id: SEED_IDS.trackIngles, name: 'Inglês', emoji: '🇬🇧', tone: 'ocean' },
-  { id: SEED_IDS.trackPos, name: 'Pós-graduação', emoji: '🎓', tone: 'plum' },
-  { id: SEED_IDS.trackProduto, name: 'Produto', emoji: '🧭', tone: 'accent' },
-  { id: SEED_IDS.trackIA, name: 'Inteligência Artificial', emoji: '🤖', tone: 'sage' },
-  { id: SEED_IDS.trackTecnologia, name: 'Tecnologia', emoji: '💻', tone: 'ink' },
-  { id: SEED_IDS.trackLideranca, name: 'Liderança', emoji: '🌱', tone: 'sand' },
-  { id: SEED_IDS.trackCursos, name: 'Cursos e certificações', emoji: '📜', tone: 'ocean' },
+type TrackSeed = Pick<StudyTrack, 'id' | 'name' | 'emoji' | 'tone' | 'status'> & Partial<Pick<StudyTrack, 'formats' | 'notes'>>
+
+/**
+ * Learning OS — Marina's real trilhas (brief §17). No fixed classes: they work as tracks.
+ * The weekly English commitment lives in the calendar; its time is never invented here.
+ */
+const TRACKS: TrackSeed[] = [
+  {
+    id: SEED_IDS.trackIngles,
+    name: 'Inglês',
+    emoji: '🇬🇧',
+    tone: 'ocean',
+    status: 'ativo',
+    formats: ['Cambly', 'Estudo individual', 'Conversação', 'Vocabulário', 'Leitura', 'Listening'],
+    notes: 'Tem um compromisso recorrente de inglês na semana — o calendário conectado prevalece sobre o seed.',
+  },
+  { id: SEED_IDS.trackPos, name: 'Pós-graduação', emoji: '🎓', tone: 'plum', status: 'ativo' },
+  { id: seedId('learning', 'tera'), name: 'Tera', emoji: '✨', tone: 'sage', status: 'ativo' },
+  // one continuous track; reuses the old "Produto" id so an existing install doesn't grow a duplicate
+  { id: SEED_IDS.trackProduto, name: 'AI / Produto / Liderança', emoji: '🧭', tone: 'accent', status: 'continuo' },
 ]
 
-/** Study trilhas + a few honest starting points. No invented progress or reading history. */
+/** Trilhas + honest placeholders. No invented courses, books, progress or reading history. */
 export const seedLearning: FeatureSeed = (ctx) => ({
   studyTracks: TRACKS.map((t, i) => ctx.make('studyTracks', { ...t, order: i, archived: false })),
   studyItems: [
     ctx.make('studyItems', {
+      id: seedId('learning', 'ingles-cambly'),
       trackId: SEED_IDS.trackIngles,
-      title: 'Conversação semanal',
+      title: 'Cambly / conversação',
       kind: 'aula',
       status: 'estudando',
       progress: 0,
-      nextContent: 'definir tema da próxima conversa',
       order: 0,
     }),
     ctx.make('studyItems', {
+      id: seedId('learning', 'pos-disciplina-atual'),
       trackId: SEED_IDS.trackPos,
-      title: 'Disciplina atual da pós',
+      title: 'Pós-graduação — disciplina atual',
       kind: 'curso',
       status: 'estudando',
       progress: 0,
-      nextContent: 'definir',
+      nextContent: 'definir próximo conteúdo',
       order: 1,
     }),
     ctx.make('studyItems', {
-      trackId: SEED_IDS.trackIA,
-      title: 'Fundamentos de agentes de IA',
-      kind: 'tema',
-      status: 'proximo',
+      id: seedId('learning', 'tera-trilha-atual'),
+      trackId: seedId('learning', 'tera'),
+      title: 'Tera — trilha atual',
+      kind: 'curso',
+      status: 'estudando',
       progress: 0,
-      order: 0,
+      order: 2,
     }),
     ctx.make('studyItems', {
+      id: seedId('learning', 'temas-ia'),
       trackId: SEED_IDS.trackProduto,
-      title: 'Discovery contínuo',
+      title: 'Temas de IA para aprofundar',
       kind: 'tema',
       status: 'backlog',
       progress: 0,
       order: 0,
     }),
     ctx.make('studyItems', {
-      trackId: SEED_IDS.trackLideranca,
-      title: 'Feedback e 1:1s',
+      id: seedId('learning', 'lideranca-desenvolver'),
+      trackId: SEED_IDS.trackProduto,
+      title: 'Liderança — o que quero desenvolver',
       kind: 'tema',
       status: 'backlog',
       progress: 0,
       order: 1,
     }),
   ],
-  books: [
-    ctx.make('books', { title: 'Born to Run', author: 'Christopher McDougall', category: 'Corrida', status: 'proximo', progress: 0, quotes: [], order: 0 }),
-    ctx.make('books', { title: 'Continuous Discovery Habits', author: 'Teresa Torres', category: 'Produto', status: 'quero', progress: 0, quotes: [], order: 0 }),
-    ctx.make('books', { title: 'Inspired', author: 'Marty Cagan', category: 'Produto', status: 'quero', progress: 0, quotes: [], order: 1 }),
-  ],
+  // the library starts empty: books enter only when Marina adds them
+  books: [],
 })
