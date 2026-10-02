@@ -76,6 +76,14 @@ export interface SheetPropsMap {
   partnership: { id?: ID }
   /** Pet task (owner: features/life). */
   petTask: { id?: ID; defaults?: Partial<PetTask> }
+  /** Fuel timeline ONTEM → PRÉ → TREINO → INTRA → PÓS for a training (owner: features/nutrition). */
+  fuel: { workoutId: ID }
+  /** Quick check-in after a key session (owner: features/nutrition). */
+  postWorkoutCheckin: { workoutId: ID }
+  /** Create/edit a nutrition strategy (owner: features/nutrition). */
+  nutritionStrategy: { id?: ID }
+  /** Body composition entry (owner: features/nutrition). */
+  bodyComposition: { id?: ID }
   /** Open planning conflicts in a date range (owner: Architect, components/planning). */
   conflicts: { from: DateKey; to?: DateKey }
   /** Command palette / actions (owner: features/command). */

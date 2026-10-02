@@ -18,6 +18,7 @@ import { seedAgenda } from '@/features/agenda/seed'
 import { seedGoals } from '@/features/goals/seed'
 import { seedIntegrations } from '@/integrations/seed'
 import { seedProfile } from './profile'
+import { seedNutrition } from '@/features/nutrition/seed'
 
 const FEATURE_SEEDS: FeatureSeed[] = [
   seedProfile,
@@ -33,6 +34,7 @@ const FEATURE_SEEDS: FeatureSeed[] = [
   seedAgenda,
   seedGoals,
   seedIntegrations,
+  seedNutrition,
 ]
 
 export function buildSeed(today: DateKey): DB {
