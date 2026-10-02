@@ -7,7 +7,20 @@ import type { TripItem, TripSection } from '@/data/types'
 import { useToday } from '@/hooks/useToday'
 import { DateInput, Field, MoneyInput, MoreOptions, Select, SheetLayout, TextArea, TextInput, TimeInput, TitleInput } from '@/components/ui'
 import { cn } from '@/lib/cn'
-import { STATUS_META, STATUS_ORDER, SECTION_OPTIONS, defaultStatusFor, groupsOfTrip, itemsOfTrip, sortUpcoming, type ItemStatus } from './selectors'
+import {
+  PAYABLE_SECTIONS,
+  PAYMENT_META,
+  PAYMENT_ORDER,
+  STATUS_META,
+  STATUS_ORDER,
+  SECTION_OPTIONS,
+  defaultStatusFor,
+  groupsOfTrip,
+  itemsOfTrip,
+  sortUpcoming,
+  type ItemStatus,
+  type PaymentStatus,
+} from './selectors'
 
 export default function TripItemSheet({ id, tripId, section: sectionProp, group: groupProp }: SheetProps<'tripItem'>) {
   const trips = useDB((db) => db.trips)
@@ -23,6 +36,8 @@ export default function TripItemSheet({ id, tripId, section: sectionProp, group:
   const [statusTouched, setStatusTouched] = useState(!!existing)
   const [date, setDate] = useState(existing?.date)
   const [time, setTime] = useState(existing?.time)
+  const [endDate, setEndDate] = useState(existing?.endDate)
+  const [payment, setPayment] = useState<PaymentStatus | undefined>(existing?.paymentStatus)
   const [notes, setNotes] = useState(existing?.notes ?? '')
   const [url, setUrl] = useState(existing?.url ?? '')
   const [amountCents, setAmountCents] = useState(existing?.amountCents)
@@ -43,6 +58,8 @@ export default function TripItemSheet({ id, tripId, section: sectionProp, group:
       status,
       date,
       time: date ? time : undefined,
+      endDate: date && endDate && endDate > date ? endDate : undefined,
+      paymentStatus: payment,
       notes: notes.trim() || undefined,
       url: u ? (/^https?:\/\//i.test(u) ? u : `https://${u}`) : undefined,
       amountCents,
@@ -145,6 +162,26 @@ export default function TripItemSheet({ id, tripId, section: sectionProp, group:
         {status === 'a_confirmar' && <p className="text-[12px] text-muted mt-1.5 px-0.5">Fica “a confirmar” até você ter certeza — nada é dado como garantido.</p>}
       </div>
 
+      {(PAYABLE_SECTIONS.includes(section) || payment) && (
+        <div>
+          <div className="text-[13px] font-medium text-ink-2 mb-1.5 px-0.5">Pagamento</div>
+          <div className="flex flex-wrap gap-1.5">
+            {PAYMENT_ORDER.map((p) => (
+              <button
+                key={p}
+                type="button"
+                aria-pressed={payment === p}
+                onClick={() => setPayment(payment === p ? undefined : p)}
+                className={cn('h-9 px-3.5 rounded-full text-[13px] font-semibold border-2 transition', PAYMENT_META[p].cls, payment === p ? 'border-ink' : 'border-transparent opacity-80')}
+              >
+                {PAYMENT_META[p].label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[12px] text-muted mt-1.5 px-0.5">{payment ? 'Separado da reserva — só muda quando você mudar.' : 'Opcional. Nada é marcado como pago sozinho.'}</p>
+        </div>
+      )}
+
       <MoreOptions defaultOpen={!!(existing && (existing.date || existing.notes || existing.url || existing.amountCents != null || existing.confirmationCode))}>
         <div className="grid grid-cols-2 gap-2.5">
           <Field label="Data">
@@ -154,6 +191,11 @@ export default function TripItemSheet({ id, tripId, section: sectionProp, group:
             <TimeInput value={time} onChange={setTime} disabled={!date} />
           </Field>
         </div>
+        {date && (
+          <Field label="Até (vários dias)">
+            <DateInput value={endDate} onChange={setEndDate} min={date} />
+          </Field>
+        )}
         <Field label="Notas">
           <TextArea rows={3} placeholder="Detalhes, endereço, quem indicou…" value={notes} onChange={(e) => setNotes(e.target.value)} />
         </Field>

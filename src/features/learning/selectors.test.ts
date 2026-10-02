@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import type { Book, StudyItem } from '@/data/types'
-import { createSeedContext } from '@/data/seed/context'
+import type { Book, StudyItem, StudyTrack } from '@/data/types'
+import { createSeedContext, seedId } from '@/data/seed/context'
 import { SEED_IDS } from '@/data/seed/ids'
 import { seedLearning } from './seed'
 import {
+  TRACK_STATUS_LABEL,
+  addFormat,
   bookStatusPatch,
-  booksByStatus,
+  formatQuickCreate,
+  kindForFormat,
+  nextTrackStatus,
+  trackStatus,
+  tracksForDisplay,
   coverTone,
   coverVariant,
   finishStudyPatch,
@@ -160,27 +166,122 @@ describe('typographic covers', () => {
   })
 })
 
-describe('seed', () => {
+describe('seed — real life (Learning OS)', () => {
   const data = seedLearning(createSeedContext(T))
-  it('has the 7 trilhas with stable ids', () => {
-    expect(data.studyTracks?.map((t) => t.id)).toEqual([
-      SEED_IDS.trackIngles,
-      SEED_IDS.trackPos,
-      SEED_IDS.trackProduto,
-      SEED_IDS.trackIA,
-      SEED_IDS.trackTecnologia,
-      SEED_IDS.trackLideranca,
-      SEED_IDS.trackCursos,
-    ])
+  const tracks = data.studyTracks!
+  const items = data.studyItems!
+  const byName = (name: string) => tracks.find((t) => t.name === name)!
+
+  it('has exactly her 4 trilhas, with stable ids and statuses', () => {
+    expect(tracks.map((t) => t.name)).toEqual(['Inglês', 'Pós-graduação', 'Tera', 'AI / Produto / Liderança'])
+    expect(tracks.map((t) => t.status)).toEqual(['ativo', 'ativo', 'ativo', 'continuo'])
+    expect(byName('Inglês').id).toBe(SEED_IDS.trackIngles)
+    expect(byName('Pós-graduação').id).toBe(SEED_IDS.trackPos)
+    expect(byName('Tera').id).toBe(seedId('learning', 'tera'))
+    expect(tracks.every((t) => !t.archived)).toBe(true)
+    // ids are stable across builds (migration safety)
+    const again = seedLearning(createSeedContext(T))
+    expect(again.studyTracks!.map((t) => t.id)).toEqual(tracks.map((t) => t.id))
+    expect(again.studyItems!.map((t) => t.id)).toEqual(items.map((t) => t.id))
   })
-  it('items point to existing trilhas and there is a next study', () => {
-    const ids = new Set(data.studyTracks!.map((t) => t.id))
-    expect(data.studyItems!.every((i) => !i.trackId || ids.has(i.trackId))).toBe(true)
-    expect(nextStudyOf(data.studyItems!)?.title).toBe('Fundamentos de agentes de IA')
+
+  it('Inglês has her formats and a note that the calendar wins — no invented time', () => {
+    const en = byName('Inglês')
+    expect(en.formats).toEqual(['Cambly', 'Estudo individual', 'Conversação', 'Vocabulário', 'Leitura', 'Listening'])
+    expect(en.notes).toMatch(/calendário conectado prevalece/)
+    expect(en.notes).not.toMatch(/\d{1,2}[:h]\d{0,2}/)
   })
-  it('does not claim she is reading anything', () => {
-    expect(booksByStatus(data.books!, 'lendo')).toEqual([])
-    expect(booksByStatus(data.books!, 'proximo').map((b) => b.title)).toEqual(['Born to Run'])
-    expect(data.books!.every((b) => b.progress === 0 && !b.rating && !b.startDate)).toBe(true)
+
+  it('study items: only placeholders the brief implies, all pointing to existing trilhas', () => {
+    const ids = new Set(tracks.map((t) => t.id))
+    expect(items.every((i) => i.trackId && ids.has(i.trackId))).toBe(true)
+    expect(items.every((i) => i.id.startsWith('seed:learning:'))).toBe(true)
+    expect(studyList(items, 'estudando').map((i) => i.title)).toEqual(['Cambly / conversação', 'Pós-graduação — disciplina atual', 'Tera — trilha atual'])
+    expect(items.find((i) => i.title.startsWith('Cambly'))!.nextContent).toBeUndefined()
+    expect(items.find((i) => i.title.startsWith('Pós'))!.nextContent).toBe('definir próximo conteúdo')
+    const backlog = studyList(items, 'backlog')
+    expect(backlog.every((i) => i.kind === 'tema' && i.trackId === byName('AI / Produto / Liderança').id)).toBe(true)
+    // no invented progress, no "próximo" pretending she already chose
+    expect(items.every((i) => i.progress === 0 && !i.finishedAt && !i.link && !i.source)).toBe(true)
+    expect(nextStudyOf(items)).toBeUndefined()
+    // none of the old generic examples
+    const titles = items.map((i) => i.title).join(' | ')
+    expect(titles).not.toMatch(/Fundamentos de agentes|Discovery contínuo|Feedback e 1:1s|Conversação semanal/)
+  })
+
+  it('library starts empty — no invented books', () => {
+    expect(data.books).toEqual([])
+  })
+})
+
+describe('trilhas: status + formats', () => {
+  const track = (p: Partial<StudyTrack>): StudyTrack => ({ id: 't', createdAt: '', updatedAt: '', name: 'T', emoji: '📚', tone: 'sage', order: 0, archived: false, ...p })
+
+  it('status defaults to ativo and cycles ativo → contínuo → pausado → ativo', () => {
+    expect(trackStatus(track({}))).toBe('ativo')
+    expect(nextTrackStatus(track({}))).toBe('continuo')
+    expect(nextTrackStatus(track({ status: 'continuo' }))).toBe('pausado')
+    expect(nextTrackStatus(track({ status: 'pausado' }))).toBe('ativo')
+    expect(TRACK_STATUS_LABEL.continuo).toBe('contínuo')
+  })
+
+  it('applying a status edit keeps everything else', () => {
+    const t = track({ status: 'ativo', formats: ['Cambly'], notes: 'n' })
+    const edited = apply(t, { status: nextTrackStatus(t) })
+    expect(edited).toMatchObject({ status: 'continuo', formats: ['Cambly'], notes: 'n' })
+  })
+
+  it('paused trilhas sink to the end, archived ones disappear', () => {
+    const list = [
+      track({ id: 'a', order: 0, status: 'pausado' }),
+      track({ id: 'b', order: 1 }),
+      track({ id: 'c', order: 2, status: 'continuo' }),
+      track({ id: 'd', order: 3, archived: true }),
+    ]
+    expect(tracksForDisplay(list).map((t) => t.id)).toEqual(['b', 'c', 'a'])
+  })
+
+  it('kindForFormat guesses with generic keywords', () => {
+    expect(kindForFormat('Cambly')).toBe('aula')
+    expect(kindForFormat('Conversação')).toBe('aula')
+    expect(kindForFormat('Listening')).toBe('podcast')
+    expect(kindForFormat('Vocabulário')).toBe('tema')
+    expect(kindForFormat('Vídeo aula')).toBe('video')
+    expect(kindForFormat('Leitura')).toBe('outro')
+  })
+
+  it('formats quick-create: new item straight into estudando, at the end of the list', () => {
+    const t = track({ id: 'en' })
+    const items = [study({ status: 'estudando', order: 4, trackId: 'other' })]
+    const res = formatQuickCreate(t, 'Listening', items)
+    expect(res).toEqual({ type: 'create', data: { title: 'Listening', kind: 'podcast', trackId: 'en', status: 'estudando', progress: 0, order: 5 } })
+  })
+
+  it('formats quick-create: reuses an open item of the same format instead of duplicating', () => {
+    const t = track({ id: 'en' })
+    const cambly = study({ title: 'Cambly / conversação', trackId: 'en', status: 'estudando' })
+    expect(formatQuickCreate(t, 'Cambly', [cambly])).toEqual({ type: 'existing', item: cambly })
+    expect(formatQuickCreate(t, 'conversacao', [cambly])).toEqual({ type: 'existing', item: cambly })
+    // finished or other trilha → create again
+    expect(formatQuickCreate(t, 'Cambly', [{ ...cambly, status: 'finalizado' }]).type).toBe('create')
+    expect(formatQuickCreate(t, 'Cambly', [{ ...cambly, trackId: 'x' }]).type).toBe('create')
+    // hyphenated words are not split
+    expect(formatQuickCreate(t, 'Pós', [study({ title: 'Pós-graduação', trackId: 'en' })]).type).toBe('create')
+  })
+
+  it('works on the real seed: tapping Cambly opens the seeded item', () => {
+    const data = seedLearning(createSeedContext(T))
+    const en = data.studyTracks!.find((x) => x.id === SEED_IDS.trackIngles)!
+    const res = formatQuickCreate(en, 'Cambly', data.studyItems!)
+    expect(res.type).toBe('existing')
+    expect(formatQuickCreate(en, 'Vocabulário', data.studyItems!).type).toBe('create')
+  })
+
+  it('addFormat ignores blanks and accent/case duplicates', () => {
+    expect(addFormat(undefined, ' Aula ')).toEqual(['Aula'])
+    const list = ['Vocabulário']
+    expect(addFormat(list, 'vocabulario')).toBe(list)
+    expect(addFormat(list, '  ')).toBe(list)
+    expect(addFormat(list, 'Podcast')).toEqual(['Vocabulário', 'Podcast'])
   })
 })

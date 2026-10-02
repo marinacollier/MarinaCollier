@@ -1,11 +1,62 @@
 import { useMemo, useState } from 'react'
-import { Archive, ArchiveRestore } from 'lucide-react'
+import { Archive, ArchiveRestore, X } from 'lucide-react'
 import { toast } from '@/app/ui-store'
 import { actions, nextOrder, useDB } from '@/data/store'
 import type { StudyTrack, Tone } from '@/data/types'
-import { IconButton, SheetLayout, TONE, TONES } from '@/components/ui'
+import { IconButton, Segmented, SheetLayout, TONE, TONES } from '@/components/ui'
 import { SubmitIcon } from './SubmitIcon'
 import { cn } from '@/lib/cn'
+import { TRACK_STATUSES, TRACK_STATUS_LABEL, addFormat, trackStatus, type TrackStatus } from '../selectors'
+
+const STATUS_OPTIONS = TRACK_STATUSES.map((s) => ({ value: s, label: TRACK_STATUS_LABEL[s] }))
+
+/** Format chips with remove + a small add field. */
+function FormatsEditor({ track }: { track: StudyTrack }) {
+  const [text, setText] = useState('')
+  const formats = track.formats ?? []
+  const add = () => {
+    const next = addFormat(formats, text)
+    if (next !== formats) actions.update('studyTracks', track.id, { formats: next })
+    setText('')
+  }
+  return (
+    <div>
+      <div className="text-[12.5px] text-muted px-1 mb-1.5">como você estuda isso</div>
+      <div className="flex flex-wrap gap-1.5">
+        {formats.map((f) => (
+          <span key={f} className="inline-flex items-center h-9 pl-3 pr-0.5 rounded-full text-[13px] bg-surface-2 text-ink-2">
+            {f}
+            <button
+              type="button"
+              aria-label={`Remover formato ${f}`}
+              onClick={() => actions.update('studyTracks', track.id, { formats: formats.filter((x) => x !== f) })}
+              className="h-9 w-8 inline-flex items-center justify-center text-muted"
+            >
+              <X size={13} />
+            </button>
+          </span>
+        ))}
+        <form
+          className="inline-flex"
+          onSubmit={(e) => {
+            e.preventDefault()
+            add()
+          }}
+        >
+          <input
+            aria-label={`novo formato para ${track.name}`}
+            className="h-9 w-[150px] rounded-full border border-dashed border-line bg-transparent px-3 text-[13px] outline-none focus:border-ink/40"
+            placeholder="+ formato (ex.: aula)"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onBlur={() => text.trim() && add()}
+            enterKeyHint="done"
+          />
+        </form>
+      </div>
+    </div>
+  )
+}
 
 /** Keep only the last typed emoji (graphemes, so flags and ZWJ emojis survive). */
 function lastGrapheme(text: string): string {
@@ -38,7 +89,7 @@ function ToneDots({ value, onChange }: { value: Tone; onChange: (t: Tone) => voi
 
 function TrackRow({ track }: { track: StudyTrack }) {
   return (
-    <div className="card p-3 space-y-2.5">
+    <div className="card p-3 space-y-3">
       <div className="flex items-center gap-2">
         <input
           aria-label="emoji"
@@ -57,6 +108,20 @@ function TrackRow({ track }: { track: StudyTrack }) {
           <Archive size={18} />
         </IconButton>
       </div>
+      <Segmented<TrackStatus>
+        value={trackStatus(track)}
+        onChange={(status) => actions.update('studyTracks', track.id, { status })}
+        options={STATUS_OPTIONS}
+      />
+      <FormatsEditor track={track} />
+      <textarea
+        aria-label={`notas de ${track.name}`}
+        className="input min-h-[44px] py-2.5 text-[14px] resize-none"
+        rows={track.notes ? 2 : 1}
+        placeholder="nota (opcional)"
+        value={track.notes ?? ''}
+        onChange={(e) => actions.update('studyTracks', track.id, { notes: e.target.value || undefined })}
+      />
       <div className="pl-1">
         <ToneDots value={track.tone} onChange={(tone) => actions.update('studyTracks', track.id, { tone })} />
       </div>
@@ -64,7 +129,7 @@ function TrackRow({ track }: { track: StudyTrack }) {
   )
 }
 
-/** Small editor: add / rename / emoji / tone / archive. Changes apply as you type. */
+/** Small editor: add / rename / emoji / status / formats / note / tone / archive. Changes apply as you type. */
 export function TrackEditor({ onClose }: { onClose: () => void }) {
   const tracks = useDB((db) => db.studyTracks)
   const active = useMemo(() => tracks.filter((t) => !t.archived).sort((a, b) => a.order - b.order), [tracks])
@@ -75,14 +140,14 @@ export function TrackEditor({ onClose }: { onClose: () => void }) {
   const add = () => {
     const n = name.trim()
     if (!n) return
-    actions.create('studyTracks', { name: n, emoji: emoji || '📚', tone: TONES[tracks.length % TONES.length], order: nextOrder(tracks), archived: false })
+    actions.create('studyTracks', { name: n, emoji: emoji || '📚', tone: TONES[tracks.length % TONES.length], order: nextOrder(tracks), archived: false, status: 'ativo', formats: [] })
     setName('')
     setEmoji('✨')
     toast(`Trilha “${n}” criada 🌱`)
   }
 
   return (
-    <SheetLayout title="Trilhas" eyebrow="seus caminhos de estudo" onClose={onClose} primary={{ label: 'Pronto', onClick: onClose }}>
+    <SheetLayout title="Trilhas" eyebrow="learning os" onClose={onClose} primary={{ label: 'Pronto', onClick: onClose }}>
       <form
         className="flex gap-2"
         onSubmit={(e) => {

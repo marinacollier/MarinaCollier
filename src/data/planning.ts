@@ -497,6 +497,17 @@ export function proposeWeekFromTemplate(db: DB, anyDayOfWeek: DateKey): Template
           templateId: t.id,
           notes: t.notes,
           order: 0,
+          plannedDurationMaxMin: t.durationMaxMin,
+          sessionType: t.sessionType,
+          loadCategory: t.loadCategory,
+          isKeySession: t.isKeySession,
+          isLongSession: t.isLongSession,
+          requiresPreviousDayPrep: t.requiresPreviousDayPrep,
+          requiresPreWorkout: t.requiresPreWorkout,
+          requiresIntraWorkout: t.requiresIntraWorkout,
+          requiresPostWorkout: t.requiresPostWorkout,
+          recoveryPriority: t.recoveryPriority,
+          tags: t.tags,
         },
       })
     } else if (t.choice === 'rest') {

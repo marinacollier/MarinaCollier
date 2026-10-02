@@ -10,13 +10,14 @@ import { Button, EmptyState, IconButton, Page, PageHeader, SectionTitle } from '
 import { cn } from '@/lib/cn'
 import type { Trip, TripItem } from '@/data/types'
 import { Postcard, toneVars } from './Postcard'
-import { checklistProgress, itemsOfTrip, nextChecklistItem, tripBuckets, tripCountdown, tripDatesLabel } from './selectors'
+import { checklistProgress, itemsOfTrip, nextChecklistItem, reviewItems, tripBuckets, tripCountdown, tripDatesLabel } from './selectors'
 
 function HeroFooter({ trip, items }: { trip: Trip; items: TripItem[] }) {
   const mine = useMemo(() => itemsOfTrip(items, trip.id), [items, trip.id])
   const { done, total } = checklistProgress(mine)
-  const next = nextChecklistItem(mine)
-  if (!total) return <div className="text-[13px] text-ink-2">Abrir a viagem e começar o “antes de ir” ✨</div>
+  const review = reviewItems(mine)
+  const next = nextChecklistItem(mine) ?? review[0]
+  if (!total && !review.length) return <div className="text-[13px] text-ink-2">Abrir a viagem e começar o “antes de ir” ✨</div>
   return (
     <div className="flex items-center justify-between gap-3 text-[13px]">
       <div className="min-w-0">
@@ -26,11 +27,20 @@ function HeroFooter({ trip, items }: { trip: Trip; items: TripItem[] }) {
         <div className="text-ink truncate mt-0.5">{next ? next.title : 'Tudo pronto pra ir 💛'}</div>
       </div>
       <div className="shrink-0 text-right">
-        <div className="font-display text-[20px] leading-none">
-          {done}
-          <span className="text-muted text-[14px]">/{total}</span>
-        </div>
-        <div className="text-[11px] text-muted mt-1">antes de ir</div>
+        {review.length ? (
+          <>
+            <div className="font-display text-[20px] leading-none">{review.length}</div>
+            <div className="text-[11px] text-muted mt-1">pra revisar</div>
+          </>
+        ) : (
+          <>
+            <div className="font-display text-[20px] leading-none">
+              {done}
+              <span className="text-muted text-[14px]">/{total}</span>
+            </div>
+            <div className="text-[11px] text-muted mt-1">antes de ir</div>
+          </>
+        )}
       </div>
     </div>
   )
