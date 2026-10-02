@@ -36,5 +36,6 @@ export const SHEETS: Record<SheetName, AnySheet> = {
   content: lazy(() => import('@/features/creator/ContentSheet')),
   partnership: lazy(() => import('@/features/creator/PartnershipSheet')),
   petTask: lazy(() => import('@/features/life/PetTaskSheet')),
+  conflicts: lazy(() => import('@/components/planning/ConflictsSheet')),
   commandPalette: lazy(() => import('@/features/command/CommandPaletteSheet')),
 }

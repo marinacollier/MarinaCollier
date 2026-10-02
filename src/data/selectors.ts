@@ -13,6 +13,7 @@ import type {
   Expense,
   ID,
   Modality,
+  PlanType,
   Project,
   RoutineItem,
   StudyItem,
@@ -24,6 +25,7 @@ import type {
 import { diffDays, endOfMonth, endOfWeek, hmToMinutes, startOfMonth, startOfWeek, toDateKey } from '@/lib/date'
 import { isDue, lastDoneDate, occurrenceFor, occursOn } from '@/lib/recurrence'
 import { DEFAULT_MODALITIES } from './defaults'
+import { eventOccursOn, PERIOD_LABEL, PERIOD_RANGES, workBlocks } from './planning'
 
 const byOrder = <T extends { order: number }>(a: T, b: T) => a.order - b.order
 
@@ -92,14 +94,12 @@ export function eventsFor(db: DB, date: DateKey): CalendarEvent[] {
   return db.events
     .filter((e) => {
       if (db.calendarSources.length && !enabled.has(e.sourceId)) return false
-      if (e.recurrence) return e.date <= date && occursOn(e.recurrence, date)
-      if (e.endDate) return e.date <= date && date <= e.endDate
-      return e.date === date
+      return eventOccursOn(e, date)
     })
-    .sort((a, b) => (a.startTime ?? '00:00').localeCompare(b.startTime ?? '00:00'))
+    .sort((a, b) => (a.startTime ?? (a.period ? PERIOD_RANGES[a.period][0] : '00:00')).localeCompare(b.startTime ?? (b.period ? PERIOD_RANGES[b.period][0] : '00:00')))
 }
 
-export type AgendaEntryKind = 'event' | 'task' | 'workout'
+export type AgendaEntryKind = 'event' | 'task' | 'workout' | 'block'
 
 /** One row in a day timeline. Built from events, timed tasks and workouts. */
 export interface AgendaEntry {
@@ -115,6 +115,11 @@ export interface AgendaEntry {
   /** Tone token for the dot/accent. */
   tone: string
   subtitle?: string
+  /** Time derived from a DayPeriod ("noite"), not exact. */
+  approx?: boolean
+  planType?: PlanType
+  /** For kind 'block': 'work' | 'commute'. */
+  blockKind?: 'work' | 'commute'
 }
 
 export function workoutsOn(db: DB, date: DateKey): Workout[] {
@@ -131,22 +136,48 @@ export function modalityOf(db: DB, id: string): Modality {
   )
 }
 
-export function agendaFor(db: DB, date: DateKey): AgendaEntry[] {
+/**
+ * Everything on a day's timeline. Pass `{ includeBlocks: true }` to also get BASE work hours
+ * (and commute buffers on presencial days) as 'block' entries — the Agenda and planners use that;
+ * "Agora" and lists usually don't.
+ */
+export function agendaFor(db: DB, date: DateKey, opts: { includeBlocks?: boolean } = {}): AgendaEntry[] {
   const out: AgendaEntry[] = []
   for (const e of eventsFor(db, date)) {
+    const approx = !e.allDay && !e.startTime && !!e.period
     out.push({
       kind: 'event',
       id: e.id,
       title: e.title,
-      emoji: '📅',
+      emoji: e.kind === 'criatividade' ? '🏺' : e.kind === 'estudo' ? '📚' : '📅',
       date,
-      time: e.allDay ? undefined : e.startTime,
-      endTime: e.endTime,
+      time: e.allDay ? undefined : (e.startTime ?? (e.period ? PERIOD_RANGES[e.period][0] : undefined)),
+      endTime: e.allDay ? undefined : (e.endTime ?? (approx && e.period ? PERIOD_RANGES[e.period][1] : undefined)),
       allDay: e.allDay,
       done: false,
-      tone: e.kind === 'trabalho' ? 'ink' : 'accent',
-      subtitle: e.location,
+      tone: e.kind === 'trabalho' ? 'ink' : e.kind === 'criatividade' ? 'plum' : 'accent',
+      subtitle: approx && e.period ? `${PERIOD_LABEL[e.period]} · horário a definir` : e.location,
+      approx,
+      planType: e.planType,
     })
+  }
+  if (opts.includeBlocks) {
+    for (const b of workBlocks(db.profile, date)) {
+      out.push({
+        kind: 'block',
+        id: `block:${b.kind}:${date}:${b.start}`,
+        title: b.title,
+        emoji: b.kind === 'commute' ? '🚗' : b.mode === 'presencial' ? '📍' : '💻',
+        date,
+        time: b.start,
+        endTime: b.end,
+        allDay: false,
+        done: false,
+        tone: 'ink',
+        planType: 'base',
+        blockKind: b.kind,
+      })
+    }
   }
   for (const w of workoutsOn(db, date)) {
     if (w.status === 'descanso') continue
@@ -158,12 +189,14 @@ export function agendaFor(db: DB, date: DateKey): AgendaEntry[] {
       title: w.title || m.label,
       emoji: m.emoji,
       date,
-      time: w.time,
-      endTime: w.time && dur ? minutesToHMSafe(hmToMinutes(w.time) + dur) : undefined,
+      time: w.time ?? (w.period ? PERIOD_RANGES[w.period][0] : undefined),
+      endTime: w.time && dur ? minutesToHMSafe(hmToMinutes(w.time) + dur) : w.period && !w.time ? PERIOD_RANGES[w.period][1] : undefined,
       allDay: false,
       done: w.status === 'feito' || w.status === 'adaptado',
       tone: m.tone,
       subtitle: w.goal,
+      approx: !w.time && !!w.period,
+      planType: w.planType,
     })
   }
   for (const t of tasksForDay(db, date)) {

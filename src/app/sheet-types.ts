@@ -5,6 +5,12 @@
  */
 import type {
   BookStatus,
+  CalendarEvent,
+  ContentItem,
+  Goal,
+  PetTask,
+  TimeHM,
+  Workout,
   DateKey,
   Expense,
   GoalLevel,
@@ -37,7 +43,7 @@ export interface SheetPropsMap {
   /** Meal (owner: features/body). */
   meal: { id?: ID; date?: DateKey; slot?: MealSlot }
   /** Plan/edit workout (owner: features/body). */
-  workout: { id?: ID; date?: DateKey }
+  workout: { id?: ID; date?: DateKey; defaults?: Partial<Workout> }
   /** Quick post-workout log (owner: features/body). */
   workoutLog: { id: ID }
   /** Body check-in (owner: features/body). */
@@ -45,7 +51,7 @@ export interface SheetPropsMap {
   /** Sport goal (owner: features/body). */
   workoutGoal: { id?: ID }
   /** Goal of any level (owner: features/goals). */
-  goal: { id?: ID; level?: GoalLevel }
+  goal: { id?: ID; level?: GoalLevel; defaults?: Partial<Goal> }
   /** Study item (owner: features/learning). */
   study: { id?: ID; defaults?: Partial<StudyItem> }
   /** Book (owner: features/learning). */
@@ -55,7 +61,7 @@ export interface SheetPropsMap {
   /** Trip item (owner: features/travel). */
   tripItem: { id?: ID; tripId?: ID; section?: TripSection; group?: string }
   /** Calendar event (owner: features/agenda). */
-  event: { id?: ID; date?: DateKey }
+  event: { id?: ID; date?: DateKey; time?: TimeHM; defaults?: Partial<CalendarEvent> }
   /** Project (owner: features/work). */
   project: { id?: ID }
   /** Professional win (owner: features/work). */
@@ -65,11 +71,13 @@ export interface SheetPropsMap {
   /** Meeting notes (owner: features/work). */
   meeting: { id?: ID; projectId?: ID }
   /** Content idea/piece (owner: features/creator). */
-  content: { id?: ID }
+  content: { id?: ID; defaults?: Partial<ContentItem> }
   /** Brand partnership (owner: features/creator). */
   partnership: { id?: ID }
   /** Pet task (owner: features/life). */
-  petTask: { id?: ID }
+  petTask: { id?: ID; defaults?: Partial<PetTask> }
+  /** Open planning conflicts in a date range (owner: Architect, components/planning). */
+  conflicts: { from: DateKey; to?: DateKey }
   /** Command palette / actions (owner: features/command). */
   commandPalette: { query?: string }
 }

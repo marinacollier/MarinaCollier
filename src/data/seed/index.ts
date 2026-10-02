@@ -17,8 +17,10 @@ import { seedLife } from '@/features/life/seed'
 import { seedAgenda } from '@/features/agenda/seed'
 import { seedGoals } from '@/features/goals/seed'
 import { seedIntegrations } from '@/integrations/seed'
+import { seedProfile } from './profile'
 
 const FEATURE_SEEDS: FeatureSeed[] = [
+  seedProfile,
   seedToday,
   seedInbox,
   seedBody,
@@ -38,10 +40,15 @@ export function buildSeed(today: DateKey): DB {
   const db = emptyDB()
   db.financialCategories = defaultCategories(ctx.now)
   for (const seed of FEATURE_SEEDS) {
-    const part = seed(ctx)
+    const { profile, ...part } = seed(ctx)
+    if (profile) db.profile = { ...db.profile, ...profile }
     for (const [key, items] of Object.entries(part) as [CollectionKey, unknown[]][]) {
       ;(db[key] as unknown[]) = [...(db[key] as unknown[]), ...items]
     }
   }
+  db.profile.seedVersion = LIFE_SEED_VERSION
   return db
 }
+
+/** Bump when the life seed gains records that existing installs should receive (see migrate.ts). */
+export const LIFE_SEED_VERSION = 2

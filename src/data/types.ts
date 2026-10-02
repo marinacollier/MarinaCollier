@@ -102,6 +102,20 @@ export type Area = 'pessoal' | 'corpo' | 'profissional' | 'estudo' | 'financeiro
 
 export type Priority = 'alta' | 'media' | 'baixa'
 
+/**
+ * How firmly something sits in Marina's life. Shown as a small label, used by the planner.
+ * - fixo: normally preserved in the calendar (reviews, presencial work, booked things)
+ * - base: current pattern, may change week to week (natação 07h, cerâmica)
+ * - flexivel: wanted, but the app may suggest another moment (yoga 1x/semana)
+ * - a_confirmar: incomplete or unproven — never treated as a confirmed commitment
+ */
+export type PlanType = 'fixo' | 'base' | 'flexivel' | 'a_confirmar'
+
+/** Approximate part of the day, for things without an exact time ("cerâmica — noite"). */
+export type DayPeriod = 'manha' | 'almoco' | 'tarde' | 'noite'
+
+export type WorkDayMode = 'presencial' | 'remoto' | 'flexivel' | 'off'
+
 /** Where a task lives in Marina's head. */
 export type Bucket = 'hoje' | 'semana' | 'algum_dia'
 
@@ -109,6 +123,10 @@ export type LifeAdminCategory =
   | 'casa'
   | 'carro'
   | 'bike'
+  | 'surf'
+  | 'running'
+  | 'luna'
+  | 'viagens'
   | 'documentos'
   | 'manutencao'
   | 'compras'
@@ -135,7 +153,10 @@ export interface Occurrence extends Entity {
   parentId: ID
   date: DateKey
   status: 'done' | 'skipped'
+  /** Free text written on that day (e.g. journaling inside the morning routine). */
   note?: string
+  /** Indexes of RoutineItem.steps checked that day. */
+  stepsDone?: number[]
 }
 
 // ─── Profile & customization ────────────────────────────────────────────────
@@ -176,6 +197,12 @@ export type HomeWidgetId =
   | 'luna'
   | 'countdown'
   | 'fechamento'
+  /** "HOJE · 📍 Trabalho presencial · 🏊 Natação · 💻 projeto prioritário" */
+  | 'resumo_dia'
+  /** Quick capture entry. */
+  | 'brain_dump'
+  /** Evening: "Amanhã é presencial 👜" prep checklist / tomorrow at a glance. */
+  | 'amanha'
 
 export interface Modality {
   id: string
@@ -187,7 +214,13 @@ export interface Modality {
   active: boolean
   /** Distance is meaningful for this modality (corrida, bike...). */
   hasDistance: boolean
+  /** Bucket used by "Meu treino da semana" (fallback: modalityGroup() in data/planning.ts). */
+  group?: TrainingGroup
+  /** Long sessions need big logistics (pedal longo): planner warns on presencial days. */
+  heavyLogistics?: boolean
 }
+
+export type TrainingGroup = 'corrida' | 'natacao' | 'bike' | 'forca' | 'mobilidade' | 'fun' | 'off'
 
 export type Tone = 'accent' | 'sage' | 'ocean' | 'sand' | 'plum' | 'ink'
 
@@ -235,6 +268,29 @@ export interface UserProfile {
   onboardedAt?: ISODateTime
   /** Optional overrides of the time-of-day boundaries used by the contextual home (hours, 0-23). */
   dayParts: { morningStart: number; middayStart: number; eveningStart: number }
+  homeBase?: string
+  /** A few lines about Marina's current context (shown in Ajustes, used by Mari). */
+  about?: string
+  /** Base rhythm. Never a streak: if she wakes later, the day just adapts. */
+  rhythm: { wakeTime: TimeHM; sleepTime: TimeHM }
+  work: WorkSchedule
+  /** Version of the life seed applied to this database (see data/seed/migrate.ts). */
+  seedVersion?: number
+}
+
+export interface WorkSchedule {
+  /** BASE working hours (not an absolute block). */
+  start: TimeHM
+  end: TimeHM
+  /** Presencial location label. */
+  location?: string
+  /** Mode per weekday (0 = domingo). */
+  days: Record<Weekday, WorkDayMode>
+  /** Editable commute buffers around presencial hours. */
+  commuteBeforeMin: number
+  commuteAfterMin: number
+  /** Optional checklist shown the evening before a presencial day. */
+  presencialChecklist: string[]
 }
 
 // ─── Today / tasks / routines ───────────────────────────────────────────────
@@ -266,6 +322,9 @@ export interface Task extends Entity {
   /** 'trabalho' tasks show in Work OS, 'vida_real' in Vida real, 'luna' in Luna, etc. */
   context?: 'geral' | 'trabalho' | 'vida_real' | 'luna' | 'viagem' | 'conteudo' | 'estudo'
   lifeAdminCategory?: LifeAdminCategory
+  /** Life admin flavour: manutenção / comprar / resolver (waiting uses status 'waiting'). */
+  adminKind?: 'manutencao' | 'comprar' | 'resolver'
+  planType?: PlanType
   projectId?: ID
   tripId?: ID
   partnershipId?: ID
@@ -284,6 +343,8 @@ export interface Task extends Entity {
 /** "Minhas 3 prioridades de hoje". Max 3 per date. Can point at any entity. */
 export interface DayPriority extends Entity {
   date: DateKey
+  /** Top 3 per domain (max 3 each). Undefined = the day's main Top 3. */
+  domain?: 'trabalho' | 'corpo' | 'vida'
   title: string
   order: number
   done: boolean
@@ -298,6 +359,13 @@ export interface Routine extends Entity {
   emoji?: string
   order: number
   active: boolean
+  planType?: PlanType
+  /** Base start time (e.g. 04:40). Adapts if the day starts later — never a streak. */
+  startTime?: TimeHM
+  /** Has a short "Essential" version (items with essential=true). Choosing it never breaks the routine. */
+  hasEssential?: boolean
+  /** Label for the short version, e.g. "Essential". */
+  essentialName?: string
 }
 
 export interface RoutineItem extends Entity {
@@ -308,6 +376,19 @@ export interface RoutineItem extends Entity {
   recurrence: Recurrence
   order: number
   active: boolean
+  /** Base time within the routine (e.g. 04:40 Despertar). */
+  time?: TimeHM
+  /** Optional sub-checklist (Higiene: raspar língua, lavar rosto...). Checks live in Occurrence.stepsDone. */
+  steps?: string[]
+  /** Part of the short version; `essentialLabel` replaces the title there ("5 min de leitura"). */
+  essential?: boolean
+  essentialLabel?: string
+  /** Not counted as missing when skipped (e.g. Luna at daycare). */
+  optional?: boolean
+  /** Accepts text for the day (journaling) — stored in Occurrence.note. */
+  acceptsText?: boolean
+  /** Short hint shown when expanded ("depende do treino do dia"). */
+  hint?: string
 }
 
 // ─── Calendar ───────────────────────────────────────────────────────────────
@@ -340,7 +421,16 @@ export interface CalendarEvent extends Entity {
   location?: string
   notes?: string
   url?: string
-  kind?: 'pessoal' | 'trabalho' | 'treino' | 'viagem' | 'saude' | 'luna' | 'outro'
+  kind?: 'pessoal' | 'trabalho' | 'treino' | 'viagem' | 'saude' | 'luna' | 'criatividade' | 'estudo' | 'outro'
+  /** Life category label shown on the event ("Vida / Criatividade"). */
+  category?: string
+  planType?: PlanType
+  /** When there is no exact time: approximate part of the day. */
+  period?: DayPeriod
+  /** Dates of a recurring event cancelled for that week only. */
+  exdates?: DateKey[]
+  /** Checklist template opened with the event (Weekly CEO Review topics). */
+  template?: string[]
   projectId?: ID
   tripId?: ID
   recurrence?: Recurrence
@@ -370,6 +460,11 @@ export interface Workout extends Entity {
   workoutGoalId?: ID
   order: number
   external?: ExternalRef
+  planType?: PlanType
+  /** Approximate window when there's no exact time. */
+  period?: DayPeriod
+  /** Created from a WeekTemplateItem. */
+  templateId?: ID
 }
 
 export interface Milestone {
@@ -393,6 +488,13 @@ export interface WorkoutGoal extends Entity {
   notes?: string
   status: 'ativa' | 'concluida' | 'pausada'
   tripId?: ID
+  planType?: PlanType
+  /** Flexible weekly intent ("Yoga — 1x/semana"): the planner suggests free windows. */
+  perWeek?: number
+  /** Fun goals (circo) are never counted as an obligation. */
+  obligation?: boolean
+  /** Preferred weekdays for suggestions (circo → sábado). */
+  preferredWeekdays?: Weekday[]
 }
 
 export type MealSlot = 'cafe' | 'lanche_manha' | 'almoco' | 'lanche_tarde' | 'jantar' | 'extra'
@@ -433,6 +535,8 @@ export interface DailyCheckIn extends Entity {
     vegetais: boolean
     refeicoesPlanejadas: boolean
   }
+  /** "Hoje vou de versão curta": routineId → mode for that day. */
+  routineModes?: Record<ID, 'completa' | 'essential'>
   closing?: {
     mood: 'bom' | 'neutro' | 'cansado'
     closedAt: ISODateTime
@@ -533,6 +637,12 @@ export interface Project extends Entity {
   /** 'creator' marks the UGC/Content front, which gets the Creator OS view. */
   kind: 'default' | 'creator'
   order: number
+  /** Work areas inside the project (Day One AI: Planner, Match, Smart Flight...). Tasks use Task.group. */
+  sections?: string[]
+  /** Content series tied to a trip ("Um mês sozinha na África do Sul"). */
+  tripId?: ID
+  /** Content categories for creator projects. */
+  categories?: string[]
 }
 
 export interface ProjectMilestone extends Entity {
@@ -541,6 +651,10 @@ export interface ProjectMilestone extends Entity {
   date?: DateKey
   done: boolean
   order: number
+  /** Roadmap lane ("Infra / catálogo", "Busca", "Produto"...). */
+  group?: string
+  /** Roadmap state; never assume 'pendente' for seeded items. done mirrors status === 'feito'. */
+  status?: 'roadmap' | 'em_andamento' | 'feito'
 }
 
 export type WinKind =
@@ -616,6 +730,10 @@ export interface StudyTrack extends Entity {
   tone: Tone
   order: number
   archived: boolean
+  status?: 'ativo' | 'continuo' | 'pausado'
+  /** Ways of studying this track (Inglês: Cambly, conversação, vocabulário...). */
+  formats?: string[]
+  notes?: string
 }
 
 export type StudyStatus = 'estudando' | 'proximo' | 'backlog' | 'pausado' | 'finalizado'
@@ -705,6 +823,10 @@ export interface TripItem extends Entity {
   amountCents?: number
   confirmationCode?: string
   order: number
+  /** Multi-day items (Safari 14–15/11). */
+  endDate?: DateKey
+  /** Payment is tracked separately from the plan; never inferred from an itinerary. */
+  paymentStatus?: 'a_confirmar' | 'pendente' | 'pago' | 'nao_se_aplica'
 }
 
 // ─── Content / UGC ──────────────────────────────────────────────────────────
@@ -725,6 +847,8 @@ export interface ContentItem extends Entity {
   deadline?: DateKey
   publishedAt?: DateKey
   partnershipId?: ID
+  /** Series / creator project (e.g. the South Africa series). */
+  projectId?: ID
   links: Link[]
   order: number
 }
@@ -852,6 +976,56 @@ export interface MonthlyReview extends Entity {
   completedAt?: ISODateTime
 }
 
+// ─── Planning ───────────────────────────────────────────────────────────────
+
+/**
+ * A rule the planner checks (it never blocks, it only warns).
+ * - max_checkins_per_day: e.g. "TotalPass — 1 check-in/dia" for the listed modalities.
+ * - max_minutes_per_day: e.g. "Yoga App — até 1h/dia" for a project's tasks/blocks.
+ */
+export interface SchedulingConstraint extends Entity {
+  name: string
+  kind: 'max_checkins_per_day' | 'max_minutes_per_day'
+  limit: number
+  /** Modalities that consume the check-in. */
+  modalities?: string[]
+  projectId?: ID
+  active: boolean
+  notes?: string
+}
+
+/** One line of the editable weekly training template ("SEG · 🏃 corrida · BASE"). */
+export interface WeekTemplateItem extends Entity {
+  weekday: Weekday
+  /** One modality, or options to choose from (QUI: bike OU corrida; SÁB: fun day). */
+  modalities: string[]
+  /** fixed = this modality; one_of = pick one; optional = possible, not expected; rest = OFF/recovery. */
+  choice: 'fixed' | 'one_of' | 'optional' | 'rest'
+  title?: string
+  time?: TimeHM
+  period?: DayPeriod
+  durationMin?: number
+  planType: PlanType
+  notes?: string
+  order: number
+  active: boolean
+}
+
+/** Marina's decision about a detected conflict (never auto-resolved). */
+export interface ConflictAck extends Entity {
+  /** Stable conflict key from data/planning.ts. */
+  key: string
+  decision: 'manter' | 'ignorar'
+  date: DateKey
+}
+
+/** "Montar minha semana" result for a week. */
+export interface WeekPlan extends Entity {
+  weekStart: DateKey
+  confirmedAt?: ISODateTime
+  notes?: string
+}
+
 // ─── Database shape ─────────────────────────────────────────────────────────
 
 export interface DB {
@@ -905,6 +1079,11 @@ export interface DB {
   monthlyReviews: MonthlyReview[]
 
   integrations: IntegrationConnection[]
+
+  constraints: SchedulingConstraint[]
+  weekTemplate: WeekTemplateItem[]
+  conflictAcks: ConflictAck[]
+  weekPlans: WeekPlan[]
 }
 
 /** Keys of DB that hold arrays of entities. */

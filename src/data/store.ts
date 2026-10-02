@@ -10,6 +10,7 @@
 import { create } from 'zustand'
 import { emptyDB, migrate } from './defaults'
 import { buildSeed } from './seed'
+import { applyLifeSeed } from './seed/migrate'
 import { createIndexedDBAdapter, type StorageAdapter } from './storage'
 import type {
   CollectionKey,
@@ -168,9 +169,10 @@ export async function hydrate(storage: StorageAdapter = createIndexedDBAdapter()
   } catch (err) {
     console.error('[marina-os] load failed, starting from seed', err)
   }
-  const db = raw ? migrate(raw) : buildSeed(todayKey())
+  const migrated = raw ? migrate(raw) : null
+  const db = migrated ? applyLifeSeed(migrated, todayKey()) : buildSeed(todayKey())
   useStore.setState({ db, hydrated: true })
-  if (!raw) await storage.save(db)
+  if (!raw || db !== migrated) await storage.save(db)
 
   unsubscribe = useStore.subscribe((s, prev) => {
     if (s.db === prev.db) return

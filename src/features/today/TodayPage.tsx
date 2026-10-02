@@ -47,6 +47,10 @@ const WIDGETS: Record<HomeWidgetId, ComponentType<{ ctx: WidgetCtx }>> = {
   luna: LunaWidget,
   countdown: CountdownWidget,
   fechamento: ClosingWidget,
+  // Placeholders until the Today agent implements them (Real Life Seed phase).
+  resumo_dia: () => null,
+  brain_dump: () => null,
+  amanha: () => null,
 }
 
 export default function TodayPage() {

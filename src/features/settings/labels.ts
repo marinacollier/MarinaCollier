@@ -18,6 +18,9 @@ export const WIDGET_META: Record<HomeWidgetId, { label: string; text: string; em
   luna: { label: 'Luna', text: 'os cuidados de hoje com ela', emoji: '🐾' },
   countdown: { label: 'Contagem regressiva', text: 'dias até algo especial', emoji: '⏳' },
   fechamento: { label: 'Fechamento do dia', text: 'à noite, um respiro pra encerrar', emoji: '🌙' },
+  resumo_dia: { label: 'Hoje em uma linha', text: 'trabalho, treino e o projeto do dia', emoji: '📍' },
+  brain_dump: { label: 'Brain dump', text: 'tirar isso da cabeça em um toque', emoji: '🧠' },
+  amanha: { label: 'Amanhã', text: 'à noite: o que preparar pro dia seguinte', emoji: '👜' },
 }
 
 export interface ModuleEntry {

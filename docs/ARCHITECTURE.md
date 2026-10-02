@@ -105,3 +105,19 @@ See `src/app/routes.tsx` (`ROUTES` constants). Bottom nav: Hoje · Agenda · Vid
 See `docs/INTEGRATIONS.md`. Providers implement interfaces from `src/integrations/types.ts`.
 Components never call providers directly. No tokens in the browser. Flags in `profile.featureFlags`.
 Unavailable integrations show "Disponível em breve" or "Configuração necessária" — never a fake "Conectar".
+
+## Real Life Seed (v2) — rules
+
+- Marina's life enters **only as data** through the same models the UI uses. No component or
+  selector may special-case names ("Luna", "TotalPass", "Interlagos", project names). Behaviour comes
+  from generic data: `profile.work`, `profile.rhythm`, `constraints`, `weekTemplate`, modalities' `group`
+  / `heavyLogistics`, `planType`, `period`, `exdates`, routine `essential` items.
+- Four kinds of information (`PlanType`): **fixo**, **base**, **flexivel**, **a_confirmar**. Uncertain
+  things are never turned into confirmed commitments (trip items `a_confirmar`, payments
+  `paymentStatus`, tasks `review`).
+- Every seed record has a stable id (`seedId(area, slug)` or `SEED_IDS`). `data/seed/migrate.ts`
+  adds missing seed records to existing databases by id (additive, idempotent, never overwrites).
+  Bump `LIFE_SEED_VERSION` when existing installs should receive new seed records.
+- Planning logic lives in `data/planning.ts` (presencial days, work blocks, conflicts, suggestions,
+  week template). It never blocks or deletes; conflicts are shown with `ConflictCard`
+  (Mover / Manter assim / Ignorar → `ConflictAck`).
