@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { Check } from 'lucide-react'
+import { AlertTriangle, Check, Utensils } from 'lucide-react'
 import { actions, getDB, nextOrder, useDB } from '@/data/store'
-import type { Workout, WorkoutStatus } from '@/data/types'
+import type { DayPeriod, LoadCategory, SessionType, Workout, WorkoutStatus } from '@/data/types'
+import { isPresencial, PERIOD_LABEL } from '@/data/planning'
 import { closeSheet, replaceSheet, toast } from '@/app/ui-store'
 import { removeWithUndo } from '@/app/undo'
 import type { SheetProps } from '@/app/sheet-types'
@@ -10,19 +11,46 @@ import { todayKey, relativeDay } from '@/lib/date'
 import { cn } from '@/lib/cn'
 import { INTENSITY, REST_MODALITY, STATUS_META } from './constants'
 import { orderedModalities } from './selectors'
+import { draftConflicts, PLAN_TYPE_LABEL, PLAN_TYPES } from './planner'
 
 const DURATIONS = [30, 45, 60, 90]
+const PERIODS: DayPeriod[] = ['manha', 'almoco', 'tarde', 'noite']
+const SESSION_TYPES: { value: SessionType; label: string }[] = [
+  { value: 'endurance', label: 'endurance' },
+  { value: 'longo', label: 'longo' },
+  { value: 'forca', label: 'força' },
+  { value: 'qualidade', label: 'qualidade' },
+  { value: 'tecnica', label: 'técnica' },
+  { value: 'mobilidade', label: 'mobilidade' },
+  { value: 'recuperacao', label: 'recuperação' },
+  { value: 'fun', label: 'fun' },
+  { value: 'outro', label: 'outro' },
+]
+const LOADS: { value: LoadCategory; label: string }[] = [
+  { value: 'key', label: '🔥 key' },
+  { value: 'moderada', label: 'moderada' },
+  { value: 'leve', label: 'leve' },
+]
+const FLAGS: { key: 'isKeySession' | 'isLongSession' | 'requiresPreviousDayPrep' | 'requiresPreWorkout' | 'requiresIntraWorkout' | 'requiresPostWorkout'; label: string }[] = [
+  { key: 'isKeySession', label: '🔥 key session' },
+  { key: 'isLongSession', label: 'sessão longa' },
+  { key: 'requiresPreviousDayPrep', label: 'prep na véspera' },
+  { key: 'requiresPreWorkout', label: 'pré' },
+  { key: 'requiresIntraWorkout', label: 'intra' },
+  { key: 'requiresPostWorkout', label: 'pós' },
+]
 const STATUSES: WorkoutStatus[] = ['planejado', 'feito', 'adaptado', 'descanso', 'pulado']
 
-export default function WorkoutSheet({ id, date }: SheetProps<'workout'>) {
+export default function WorkoutSheet({ id, date, defaults }: SheetProps<'workout'>) {
   const db = useDB()
   const existing = id ? db.workouts.find((w) => w.id === id) : undefined
   const [draft, setDraft] = useState<Partial<Workout>>(
     () =>
       existing ?? {
-        date: date ?? todayKey(),
         status: 'planejado',
         modality: orderedModalities(getDB().profile.modalities)[0]?.id ?? 'corrida',
+        ...defaults,
+        date: defaults?.date ?? date ?? todayKey(),
       },
   )
   const set = (p: Partial<Workout>) => setDraft((d) => ({ ...d, ...p }))
@@ -33,6 +61,12 @@ export default function WorkoutSheet({ id, date }: SheetProps<'workout'>) {
   const shown = showAll ? modalities : modalities.filter((m) => m.favorite || m.id === draft.modality)
   const isRest = draft.status === 'descanso'
   const goals = db.workoutGoals.filter((g) => g.status === 'ativa' || g.id === draft.workoutGoalId)
+  // Live, informational: what would this plan bump into? (never blocks saving)
+  const conflicts = useMemo(
+    () => (draft.date && draft.modality && !isRest ? draftConflicts(db, { ...draft, date: draft.date, modality: draft.modality }, existing?.id) : []),
+    [db, draft, isRest, existing?.id],
+  )
+  const presencial = draft.date ? isPresencial(db.profile, draft.date) : false
 
   if (id && !existing) {
     return (
@@ -133,10 +167,30 @@ export default function WorkoutSheet({ id, date }: SheetProps<'workout'>) {
         </Field>
         {!isRest && (
           <Field label="Horário">
-            <TimeInput value={draft.time} onChange={(time) => set({ time })} />
+            <TimeInput value={draft.time} onChange={(time) => set({ time, ...(time ? { period: undefined } : {}) })} />
           </Field>
         )}
       </div>
+
+      {!isRest && !draft.time && (
+        <Field label="Sem horário? Escolhe um período">
+          <ChipSelect value={draft.period} clearable onChange={(period) => set({ period })} options={PERIODS.map((p) => ({ value: p, label: PERIOD_LABEL[p] }))} />
+        </Field>
+      )}
+
+      {(presencial || conflicts.length > 0) && (
+        <div className="space-y-2">
+          {presencial && <div className="text-[12.5px] text-ink-2 px-0.5">📍 dia presencial{db.profile.work?.location ? ` · ${db.profile.work.location}` : ''}</div>}
+          {conflicts.map((c) => (
+            <div key={c.key} className={cn('rounded-2xl px-3.5 py-2.5 flex gap-2.5', c.severity === 'warn' ? 'bg-sand-soft' : 'bg-surface-2')} role="status">
+              <AlertTriangle size={15} className={cn('shrink-0 mt-0.5', c.severity === 'warn' ? 'text-sand' : 'text-muted')} />
+              <div className="text-[13px] leading-snug text-ink-2">
+                {c.message.replace(/^⚠️\s*/, '')} <span className="text-muted">Dá pra salvar mesmo assim.</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {!isRest && (
         <Field label="Duração prevista">
@@ -157,6 +211,18 @@ export default function WorkoutSheet({ id, date }: SheetProps<'workout'>) {
         </Field>
       )}
 
+      {existing && !isRest && (
+        <Button variant="soft" block icon={<Utensils size={16} />} onClick={() => replaceSheet('fuel', { workoutId: existing.id })}>
+          Ver estratégia{existing.isKeySession ? ' · 🔥 key session' : ''}
+        </Button>
+      )}
+
+      {!isRest && (
+        <Field label="Firmeza">
+          <ChipSelect value={draft.planType} clearable onChange={(planType) => set({ planType })} options={PLAN_TYPES.map((p) => ({ value: p, label: PLAN_TYPE_LABEL[p].toLowerCase() }))} />
+        </Field>
+      )}
+
       <MoreOptions defaultOpen={!!existing && !!(existing.goal || existing.notes)}>
         {!isRest && current?.hasDistance && (
           <Field label="Distância prevista (km)">
@@ -172,6 +238,42 @@ export default function WorkoutSheet({ id, date }: SheetProps<'workout'>) {
           <Field label="Intensidade">
             <ChipSelect value={draft.intensity} onChange={(intensity) => set({ intensity })} options={INTENSITY} clearable />
           </Field>
+        )}
+        {!isRest && (
+          <div className="space-y-3">
+            <div className="eyebrow">carga e combustível</div>
+            <Field label="Tipo de sessão">
+              <ChipSelect value={draft.sessionType} clearable onChange={(sessionType) => set({ sessionType })} options={SESSION_TYPES} />
+            </Field>
+            <Field label="Carga">
+              <ChipSelect
+                value={draft.loadCategory}
+                clearable
+                onChange={(loadCategory) => set({ loadCategory, ...(loadCategory === 'key' ? { isKeySession: true } : {}) })}
+                options={LOADS}
+              />
+            </Field>
+            <Field label="Duração máxima (min)" hint="pra faixas tipo 60–75 min">
+              <NumberInput value={draft.plannedDurationMaxMin} placeholder="ex: 75" onChange={(v) => set({ plannedDurationMaxMin: v ? Math.round(v) : undefined })} />
+            </Field>
+            <div className="flex flex-wrap gap-2">
+              {FLAGS.map((f) => (
+                <Chip key={f.key} selected={!!draft[f.key]} onClick={() => set({ [f.key]: !draft[f.key] })}>
+                  {f.label}
+                </Chip>
+              ))}
+              <Chip selected={draft.recoveryPriority === 'alta'} onClick={() => set({ recoveryPriority: draft.recoveryPriority === 'alta' ? undefined : 'alta' })}>
+                recuperação importante
+              </Chip>
+            </div>
+            <Field label="Tags">
+              <TextInput
+                defaultValue={(draft.tags ?? []).join(', ')}
+                placeholder="long-run, key-session, fuel-required…"
+                onBlur={(e) => set({ tags: e.target.value.split(',').map((t) => t.trim()).filter(Boolean) })}
+              />
+            </Field>
+          </div>
         )}
         <Field label="Status">
           <ChipSelect
