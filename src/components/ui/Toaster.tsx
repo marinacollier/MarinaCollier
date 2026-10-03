@@ -16,7 +16,7 @@ export function Toaster() {
             exit={{ opacity: 0, y: 8, scale: 0.98 }}
             className={cn(
               'pointer-events-auto flex items-center gap-3 rounded-full pl-5 pr-2 min-h-12 shadow-xl max-w-[440px]',
-              t.tone === 'win' ? 'bg-accent text-white' : 'bg-ink text-bg',
+              t.tone === 'win' ? 'bg-accent text-bg' : 'bg-ink text-bg',
             )}
           >
             <span className="text-[14px] py-2">{t.message}</span>

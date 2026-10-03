@@ -193,7 +193,7 @@ export function AmanhaWidget({ ctx }: { ctx: WidgetCtx }) {
                   return (
                     <li key={item}>
                       <button type="button" role="checkbox" aria-checked={on} onClick={() => toggle(i)} className="w-full flex items-center gap-3 min-h-[42px] text-left">
-                        <span className={cn('h-5 w-5 rounded-md border-[1.5px] shrink-0 flex items-center justify-center text-[11px] text-white transition-colors', on ? 'bg-sage border-sage' : 'border-muted/50')} aria-hidden>
+                        <span className={cn('h-5 w-5 rounded-md border-[1.5px] shrink-0 flex items-center justify-center text-[11px] text-bg transition-colors', on ? 'bg-sage border-sage' : 'border-muted/50')} aria-hidden>
                           {on ? '✓' : ''}
                         </span>
                         <span className={cn('text-[14.5px]', on ? 'text-muted line-through decoration-muted/40' : 'text-ink')}>{item}</span>

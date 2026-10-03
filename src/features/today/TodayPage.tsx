@@ -75,7 +75,7 @@ export default function TodayPage() {
             <IconButton label={inboxCount ? `Inbox, ${inboxCount} itens` : 'Inbox'} onClick={() => nav(ROUTES.inbox)} className="relative">
               <Inbox size={20} />
               {inboxCount > 0 && (
-                <span className="absolute top-1.5 right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-accent text-white text-[10.5px] font-semibold leading-[18px] text-center tabular-nums">
+                <span className="absolute top-1.5 right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-accent text-bg text-[10.5px] font-semibold leading-[18px] text-center tabular-nums">
                   {inboxCount > 99 ? '99+' : inboxCount}
                 </span>
               )}

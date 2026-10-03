@@ -236,7 +236,7 @@ export function Timeline({ date, today, entries, blocks = [], nowMinutes, freeSl
       {showNow && (
         <div className="absolute left-0 right-0 pointer-events-none flex items-center z-10" style={{ top: y(nowMinutes!) - 9 }}>
           <span className="w-[46px] pr-1 flex justify-end">
-            <span className="rounded-full bg-accent text-white text-[10.5px] font-semibold tabular-nums px-1.5 py-[2px] leading-none">
+            <span className="rounded-full bg-accent text-bg text-[10.5px] font-semibold tabular-nums px-1.5 py-[2px] leading-none">
               {minutesToHM(nowMinutes!)}
             </span>
           </span>

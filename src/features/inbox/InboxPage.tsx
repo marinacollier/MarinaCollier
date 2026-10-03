@@ -54,7 +54,7 @@ function CaptureBar() {
         className="flex-1 bg-transparent outline-none resize-none py-2.5 leading-snug placeholder:text-muted/80 max-h-32 field-sizing-content"
       />
       {text.trim() ? (
-        <button type="button" onClick={save} aria-label="Guardar" className="h-10 w-10 mb-0.5 rounded-full bg-accent text-white inline-flex items-center justify-center shrink-0 active:scale-95 transition">
+        <button type="button" onClick={save} aria-label="Guardar" className="h-10 w-10 mb-0.5 rounded-full bg-accent text-bg inline-flex items-center justify-center shrink-0 active:scale-95 transition">
           <ArrowUp size={19} strokeWidth={2.4} />
         </button>
       ) : (

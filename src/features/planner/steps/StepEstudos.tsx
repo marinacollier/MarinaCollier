@@ -74,7 +74,7 @@ export function StepEstudos({ db, weekStart, draft, setDraft }: StepProps) {
                   {already ? ' · já é foco dessa semana' : ''}
                 </span>
               </span>
-              <span className={cn('h-7 w-7 rounded-full inline-flex items-center justify-center shrink-0 border-[1.5px]', sel ? 'bg-accent border-accent text-white' : 'border-muted/50')}>
+              <span className={cn('h-7 w-7 rounded-full inline-flex items-center justify-center shrink-0 border-[1.5px]', sel ? 'bg-accent border-accent text-bg' : 'border-muted/50')}>
                 {sel && <Check size={15} strokeWidth={3} />}
               </span>
             </button>

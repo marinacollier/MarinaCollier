@@ -70,26 +70,30 @@ export function EmojiBubble({ emoji, className }: { emoji: string; className?: s
   )
 }
 
-/** The app mark: terracotta sun + two waves (same drawing as public/favicon.svg). */
+/** The app mark: sand sun, forest mountain, moss wave (same drawing as public/favicon.svg). */
 export function AppMark({ size = 96, animated = false, className }: { size?: number; animated?: boolean; className?: string }) {
-  const draw = (delay: number) =>
-    animated
-      ? { initial: { pathLength: 0, opacity: 0 }, animate: { pathLength: 1, opacity: 1 }, transition: { duration: 1.1, delay, ease: 'easeOut' as const } }
-      : {}
   return (
-    <svg viewBox="40 100 432 330" width={size} height={(size * 330) / 432} className={className} aria-hidden>
+    <svg viewBox="60 100 400 330" width={size} height={(size * 330) / 400} className={className} aria-hidden>
       <motion.circle
-        cx="256"
-        cy="214"
-        r="92"
-        fill="var(--accent)"
-        {...(animated
-          ? { initial: { scale: 0.4, opacity: 0, y: 30 }, animate: { scale: 1, opacity: 1, y: 0 }, transition: { type: 'spring', bounce: 0.3, duration: 1.1 } }
-          : {})}
-        style={{ transformOrigin: '256px 214px' }}
+        cx="318"
+        cy="186"
+        r="66"
+        fill="var(--sand)"
+        {...(animated ? { initial: { opacity: 0, y: 60 }, animate: { opacity: 1, y: 0 }, transition: { type: 'spring', bounce: 0.25, duration: 1.2, delay: 0.25 } } : {})}
       />
-      <motion.path d="M96 334c40-30 80-30 120 0s80 30 120 0 80-30 120 0" fill="none" stroke="var(--ink)" strokeWidth="22" strokeLinecap="round" {...draw(0.35)} />
-      <motion.path d="M136 394c30-22 60-22 90 0s60 22 90 0 60-22 90 0" fill="none" stroke="var(--sage)" strokeWidth="18" strokeLinecap="round" {...draw(0.6)} />
+      <motion.path
+        d="M84 344 L198 200 L262 276 L314 222 L428 344 Z"
+        fill="var(--ink)"
+        {...(animated ? { initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.7, ease: 'easeOut' } } : {})}
+      />
+      <motion.path
+        d="M96 400c40-26 80-26 120 0s80 26 120 0 80-26 120 0"
+        fill="none"
+        stroke="var(--accent)"
+        strokeWidth="22"
+        strokeLinecap="round"
+        {...(animated ? { initial: { pathLength: 0, opacity: 0 }, animate: { pathLength: 1, opacity: 1 }, transition: { duration: 1.1, delay: 0.5, ease: 'easeOut' } } : {})}
+      />
     </svg>
   )
 }
