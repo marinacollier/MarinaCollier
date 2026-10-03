@@ -18,8 +18,7 @@ import type {
   MealSlot,
   StudyItem,
   Task,
-  TripSection,
-} from '@/data/types'
+  TripSection, FoodItem } from '@/data/types'
 
 export interface SheetPropsMap {
   /** Global + menu (owner: app shell). */
@@ -42,6 +41,10 @@ export interface SheetPropsMap {
   expense: { id?: ID; defaults?: Partial<Expense> }
   /** Meal (owner: features/body). */
   meal: { id?: ID; date?: DateKey; slot?: MealSlot }
+  /** Planned meal detail: plan, quantities, macros, trocas, Lumos (owner: features/nutrition). ref = '<planId>#<meal index>'. */
+  mealDetail: { date: DateKey; ref: string }
+  /** Meus alimentos: add from label / edit (owner: features/nutrition). */
+  myFood: { id?: ID; defaults?: Partial<FoodItem> }
   /** Plan/edit workout (owner: features/body). */
   workout: { id?: ID; date?: DateKey; defaults?: Partial<Workout> }
   /** Quick post-workout log (owner: features/body). */
