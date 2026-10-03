@@ -548,6 +548,8 @@ export interface Meal extends Entity {
   purpose?: MealPurpose
   /** Training this meal relates to (before/after/intra). */
   workoutId?: ID
+  /** Prescribed meal it follows: '<NutritionDayPlan.id>#<meal index>'. */
+  planMealRef?: string
 }
 
 export type MealPurpose =

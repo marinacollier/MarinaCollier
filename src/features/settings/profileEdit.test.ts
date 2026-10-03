@@ -23,7 +23,7 @@ describe('profile editing helpers', () => {
     const known = Object.keys(WIDGET_META) as HomeWidgetId[]
     const seed = buildSeed('2026-10-02').profile.homeWidgets
     const merged = mergeWidgets(seed, known)
-    expect(merged.slice(0, 8).map((w) => w.id)).toEqual(['agora', 'top3', 'manha', 'proximo_compromisso', 'treino', 'work_focus', 'proxima_viagem', 'brain_dump'])
+    expect(merged.slice(0, 8).map((w) => w.id)).toEqual(['agora', 'top3', 'manha', 'proximo_compromisso', 'treino', 'refeicoes', 'work_focus', 'proxima_viagem'])
     expect(merged.map((w) => w.id).sort()).toEqual([...known].sort())
     const partial = mergeWidgets([{ id: 'top3' as HomeWidgetId, visible: true }], known)
     expect(partial[0]).toEqual({ id: 'top3', visible: true })

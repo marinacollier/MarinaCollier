@@ -7,7 +7,7 @@ export const WIDGET_META: Record<HomeWidgetId, { label: string; text: string; em
   manha: { label: 'Rotina da manhã', text: 'uma rotina só, que abre quando você quiser', emoji: '☀️' },
   proximo_compromisso: { label: 'Agenda', text: 'os compromissos do dia', emoji: '📅' },
   treino: { label: 'Treino de hoje', text: 'o treino planejado e o check-in', emoji: '🏃‍♀️' },
-  refeicoes: { label: 'Refeições', text: 'o que você comeu ou planejou', emoji: '🥗' },
+  refeicoes: { label: 'Dieta de hoje', text: 'o plano do nutri pro tipo de treino do dia', emoji: '🥗' },
   gastos: { label: 'Gastos', text: 'quanto saiu hoje e no mês', emoji: '💸' },
   tarefas: { label: 'Tarefas de hoje', text: 'o que está no seu dia', emoji: '✓' },
   proxima_viagem: { label: 'Próxima viagem', text: 'contagem e o que falta', emoji: '✈️' },

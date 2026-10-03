@@ -9,7 +9,7 @@ const ctx = (p: Partial<LayoutContext> = {}): LayoutContext => ({ part: 'manha',
 describe('orderWidgets', () => {
   it('follows Marina’s order (§42) with Agora first; HOJE line lives in the header', () => {
     const o = orderWidgets(widgets, ctx())
-    expect(o.slice(0, 9)).toEqual(['agora', 'top3', 'manha', 'proximo_compromisso', 'treino', 'work_focus', 'proxima_viagem', 'brain_dump', 'refeicoes'])
+    expect(o.slice(0, 9)).toEqual(['agora', 'top3', 'manha', 'proximo_compromisso', 'treino', 'refeicoes', 'work_focus', 'proxima_viagem', 'brain_dump'])
     expect(o).not.toContain('resumo_dia')
   })
 
