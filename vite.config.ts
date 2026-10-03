@@ -9,6 +9,10 @@ const preview = process.env.VITE_PREVIEW === '1'
 
 export default defineConfig({
   base: preview ? './' : '/',
+  // Preview builds keep stable file names so republishing the private preview replaces files instead of piling up.
+  build: preview
+    ? { rollupOptions: { output: { entryFileNames: 'assets/[name].js', chunkFileNames: 'assets/[name].js', assetFileNames: 'assets/[name][extname]' } } }
+    : undefined,
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
