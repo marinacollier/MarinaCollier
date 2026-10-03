@@ -201,6 +201,7 @@ export default function NutritionPage() {
 
       <SectionTitle>corpo</SectionTitle>
       <ListCard>
+        <ListRow leading={<span className="text-xl">🍱</span>} title="Meal prep da semana" subtitle="marmitas, lista de mercado e kits dos dias presenciais" chevron onPress={() => nav(ROUTES.mealPrep)} />
         <ListRow leading={<span className="text-xl">🌿</span>} title="Evolução" subtitle="composição corporal — referência, não placar" chevron onPress={() => nav(ROUTES.bodyEvolution)} />
       </ListCard>
     </Page>

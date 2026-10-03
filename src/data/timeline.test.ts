@@ -183,3 +183,30 @@ describe('scheduleRoutine — modes', () => {
     expect(slots[1].start).toBe(7 * 60)
   })
 })
+
+describe('dayTimeline — meal prep checklist', () => {
+  it('shows the presencial kit items with their times, ticked from the week plan', async () => {
+    const { prepChecklistFor } = await import('./mealprep')
+    const db = buildSeed(FRIDAY)
+    // Find a day in the next week that has kit items (Tue/Wed presencial or the evening before).
+    let day = FRIDAY
+    for (let i = 0; i < 7 && prepChecklistFor(db, day).length === 0; i++) day = addDaysKey(day, 1)
+    const items = prepChecklistFor(db, day)
+    expect(items.length).toBeGreaterThan(0)
+    const rows = dayTimeline(db, day).filter((e) => e.kind === 'prep')
+    expect(rows.map((r) => r.ref.id).sort()).toEqual(items.map((i) => i.key).sort())
+    expect(rows.every((r) => r.start && r.status === 'pending')).toBe(true)
+    const { startOfWeek } = await import('@/lib/date')
+    const ticked: DB = {
+      ...db,
+      mealPrepPlans: [{ id: 'p', createdAt: '', updatedAt: '', weekStart: startOfWeek(items[0].date), choices: {}, pantry: [], checked: [items[0].key], by: 'marina' }],
+    }
+    expect(dayTimeline(ticked, day).find((e) => e.ref.id === items[0].key)?.status).toBe('done')
+  })
+})
+
+function addDaysKey(d: string, n: number): string {
+  const t = new Date(d + 'T12:00:00Z')
+  t.setUTCDate(t.getUTCDate() + n)
+  return t.toISOString().slice(0, 10)
+}

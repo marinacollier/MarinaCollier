@@ -37,6 +37,7 @@ export interface ModuleEntry {
 export const MORE_MODULES: ModuleEntry[] = [
   { key: 'corpo', label: 'Corpo', emoji: '🏃‍♀️', to: ROUTES.body, module: 'corpo', tone: 'accent' },
   { key: 'nutricao', label: 'Nutrição', emoji: '🍽️', to: ROUTES.nutrition, module: 'corpo', tone: 'sage' },
+  { key: 'mealprep', label: 'Meal prep', emoji: '🍱', to: ROUTES.mealPrep, module: 'corpo', tone: 'sand' },
   { key: 'evolucao', label: 'Evolução', emoji: '🌿', to: ROUTES.bodyEvolution, module: 'corpo', tone: 'sage' },
   { key: 'dinheiro', label: 'Dinheiro', emoji: '💸', to: ROUTES.money, module: 'dinheiro', tone: 'sage' },
   { key: 'metas', label: 'Metas', emoji: '🎯', to: ROUTES.goals, module: 'metas', tone: 'accent' },

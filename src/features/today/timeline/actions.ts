@@ -7,6 +7,8 @@ import { actions, getDB } from '@/data/store'
 import { applyOps, cancelOn, clearOverride, planSetDefault, setAnytimeOn, setTimeOn, type Undo } from '@/data/schedule'
 import { overrideFor, slotForTime, type ScheduleRef } from '@/data/timeline'
 import type { DateKey, TimeHM, TimelineEntry } from '@/data/types'
+import { emptyPlanData } from '@/data/mealprep'
+import { startOfWeek } from '@/lib/date'
 import { haptic } from '@/lib/haptics'
 import { nowISO } from '@/lib/id'
 import { occurrenceFor } from '@/lib/recurrence'
@@ -48,6 +50,12 @@ export function toggleEntry(e: TimelineEntry): boolean | undefined {
   } else if (e.ref.type === 'petTask') {
     done = actions.toggleOccurrence('petTask', e.ref.id, e.date)
     if (done) stampOccurrence('petTask', e.ref.id, e.date)
+  } else if (e.ref.type === 'mealPrep') {
+    // Prep keys carry their own date ('mealprep:<date>:<slug>'); the tick lives in that week's plan.
+    const week = startOfWeek(e.ref.id.split(':')[1] ?? e.date)
+    const plan = db.mealPrepPlans.find((p) => p.weekStart === week) ?? actions.create('mealPrepPlans', emptyPlanData(week, 'marina'))
+    done = !plan.checked.includes(e.ref.id)
+    actions.update('mealPrepPlans', plan.id, { checked: done ? [...plan.checked, e.ref.id] : plan.checked.filter((k) => k !== e.ref.id) })
   }
   if (done) haptic('success')
   return done

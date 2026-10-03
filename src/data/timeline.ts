@@ -41,7 +41,8 @@ import type {
 import { checkinFor, eventsFor, isTaskDoneOn, modalityOf, petTasksDue, routineItemsFor, tasksForDay } from './selectors'
 import { contextWorkouts, dayPlanFor } from './fuel'
 import { PERIOD_LABEL, PERIOD_RANGES, workBlocks } from './planning'
-import { hmToMinutes, toTimeHM } from '@/lib/date'
+import { hmToMinutes, startOfWeek, toTimeHM } from '@/lib/date'
+import { prepChecklistFor } from './mealprep'
 import { occurrenceFor } from '@/lib/recurrence'
 
 /** Minutes assumed for a routine item without durationMin / stepDurations. */
@@ -270,7 +271,7 @@ export interface DayTimelineOptions {
   includeAnytime?: boolean
 }
 
-const KIND_RANK: Record<TimelineKind, number> = { work: 0, event: 1, workout: 2, meal: 3, routine: 4, routineItem: 4, task: 5, petTask: 6 }
+const KIND_RANK: Record<TimelineKind, number> = { work: 0, event: 1, workout: 2, meal: 3, routine: 4, routineItem: 4, task: 5, petTask: 6, prep: 5 }
 
 const WORKOUT_DONE = new Set<Workout['status']>(['feito', 'adaptado'])
 
@@ -521,6 +522,31 @@ export function dayTimeline(db: DB, date: DateKey, opts: DayTimelineOptions = {}
       const s = hmToMinutes(o.time)
       out.push(entry({ ...base, startMin: s, endMin: s + DEFAULT_MEAL_MIN, timeSource: 'override' }))
     } else out.push(entry({ ...base, timeSource: 'anytime' }))
+  }
+
+  // 8. Meal prep checklist (kit dos dias presenciais, freezer → geladeira). Done-state lives in that week's MealPrepPlan.
+  for (const p of prepChecklistFor(db, date)) {
+    const ref = { type: 'mealPrep' as const, id: p.key }
+    const o = overrideFor(db, date, 'mealPrep', p.key)
+    if (o?.cancelled) continue
+    const done = !!db.mealPrepPlans.find((x) => x.weekStart === startOfWeek(p.date))?.checked.includes(p.key)
+    const s = hmToMinutes(o?.time ?? p.time)
+    out.push(
+      entry({
+        kind: 'prep' as const,
+        ref,
+        key: refKey(ref),
+        date,
+        title: p.title,
+        subtitle: p.detail,
+        emoji: '🎒',
+        status: done ? ('done' as const) : ('pending' as const),
+        editable: { time: true, reorder: false, check: true },
+        startMin: s,
+        endMin: s + 5,
+        timeSource: o?.time ? 'override' : 'fixed',
+      }),
+    )
   }
 
   const timed = out.filter((e) => e.timeSource !== 'anytime' && e.start)

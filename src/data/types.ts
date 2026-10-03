@@ -178,7 +178,7 @@ export interface TimeWindow {
 }
 
 /** What a per-day override points at. `planMeal` refId = '<NutritionDayPlan.id>#<meal index>'; `routineStep` refId = '<RoutineItem.id>#<step index>'. */
-export type ScheduleRefType = 'routineItem' | 'routineStep' | 'workout' | 'planMeal' | 'event' | 'task' | 'petTask' | 'weekTemplate'
+export type ScheduleRefType = 'routineItem' | 'routineStep' | 'workout' | 'planMeal' | 'event' | 'task' | 'petTask' | 'weekTemplate' | 'mealPrep'
 
 /**
  * Change to ONE day only ("nesta quinta yoga às 20:00"). The recurring default never changes.
@@ -200,7 +200,8 @@ export interface ScheduleOverride extends Entity {
 }
 
 /** One row of the unified day (rotina + treino + comida + agenda + tarefas). Derived, never stored. */
-export type TimelineKind = 'routine' | 'routineItem' | 'workout' | 'meal' | 'event' | 'work' | 'task' | 'petTask'
+/** 'prep' = meal-prep checklist items (marmita na bolsa, freezer → geladeira); refId = PrepItem.key. */
+export type TimelineKind = 'routine' | 'routineItem' | 'workout' | 'meal' | 'event' | 'work' | 'task' | 'petTask' | 'prep'
 
 export type TimelineTimeSource = 'fixed' | 'window' | 'derived' | 'override' | 'anytime' | 'approx'
 
