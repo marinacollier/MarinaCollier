@@ -8,7 +8,7 @@ import type { DateKey } from '@/data/types'
 import { conflictsOn, workMode } from '@/data/planning'
 import { cn } from '@/lib/cn'
 import { ceilQuarter, findFreeSlots, fitIntoSlots } from './free-slots'
-import { allDayOnly, blocksOnly, dayEntries, looseItemsFor, timedOnly, type LooseItem } from './selectors'
+import { allDayOnly, blocksOnly, dayEntries, lifeEntries, looseItemsFor, timedOnly, type LooseItem } from './selectors'
 import { Timeline } from './Timeline'
 import { completeLoose, EntryDot, openEntry, openLoose } from './ui'
 
@@ -24,7 +24,8 @@ export function DayView({ date, today, nowMinutes, autoScroll }: DayViewProps) {
   const db = useDB()
   const isToday = date === today
   const entries = useMemo(() => dayEntries(db, date, { includeBlocks: true }), [db, date])
-  const timed = useMemo(() => timedOnly(entries), [entries])
+  // One life: the routine and the day's meals sit in the grid with the same times as Hoje.
+  const timed = useMemo(() => [...timedOnly(entries), ...lifeEntries(db, date)], [entries, db, date])
   const blocks = useMemo(() => blocksOnly(entries), [entries])
   const conflicts = useMemo(() => conflictsOn(db, date), [db, date])
   const mode = workMode(db.profile, date)

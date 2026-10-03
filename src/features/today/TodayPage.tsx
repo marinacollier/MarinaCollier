@@ -26,14 +26,14 @@ import {
   WorkFocusWidget,
 } from './widgets/InfoWidgets'
 import { MorningWidget } from './widgets/MorningWidget'
+import { LinhaDoDiaWidget } from './timeline/LinhaDoDia'
 import { TasksWidget } from './widgets/TasksWidget'
 import { Top3Widget } from './widgets/Top3Widget'
 import type { WidgetCtx } from './widgets/shared'
 
 const WIDGETS: Record<HomeWidgetId, ComponentType<{ ctx: WidgetCtx }>> = {
   agora: AgoraCard,
-  // Placeholder until the Life Timeline lands (features/today/timeline).
-  linha_do_dia: () => null,
+  linha_do_dia: LinhaDoDiaWidget,
   top3: Top3Widget,
   manha: MorningWidget,
   proximo_compromisso: NextUpWidget,

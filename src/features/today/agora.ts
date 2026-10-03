@@ -139,7 +139,8 @@ export function pickAgora(db: DB, today: DateKey, minutes: number): AgoraPick {
           emoji: routine.emoji ?? '☀️',
           title: mode === 'essential' ? `${routine.name} · ${routine.essentialName ?? 'Essential'}` : routine.name,
           subtitle: done === 0 ? `${total} coisinhas pra começar bem` : `${done} de ${total} ✓ — faltam ${total - done}`,
-          action: { kind: 'scroll', target: 'manha' },
+          // The routine lives in the Linha do dia unless Marina keeps the separate card visible.
+          action: { kind: 'scroll', target: db.profile.homeWidgets.some((w) => w.id === 'manha' && w.visible) || !db.profile.homeWidgets.some((w) => w.id === 'linha_do_dia' && w.visible) ? 'manha' : 'linha_do_dia' },
           tone: 'sand',
           reason: 'routine',
         }
