@@ -40,9 +40,8 @@ const WEEKDAY_WORDS: Record<string, Weekday> = {
 
 export const CONNECTORS = new Set(['por', 'pra', 'para', 'p', 'pro', 'pelo', 'pela', 'pros', 'pras'])
 const SWAP_VERBS = ['troc', 'mud', 'substitu']
-const MOVE_VERBS = ['pass', 'mov', 'jog', 'lev', 'empurr', 'adi', 'antecip', 'transfer']
 const MOVE_EXACT = new Set(['passa', 'passar', 'passo', 'move', 'mover', 'movo', 'joga', 'jogar', 'jogo', 'leva', 'levar', 'levo', 'empurra', 'empurrar', 'empurro', 'adia', 'adiar', 'adio', 'antecipa', 'antecipar', 'antecipo', 'transfere', 'transferir', 'transfiro'])
-const SKIP_EXACT = new Set(['pular', 'pulo', 'pula', 'pulando', 'cancelar', 'cancela', 'cancelo', 'folga', 'descansar', 'descanso', 'descanса'])
+const SKIP_EXACT = new Set(['pular', 'pulo', 'pula', 'pulando', 'cancelar', 'cancela', 'cancelo', 'folga', 'descansar', 'descanso'])
 const LONG_WORDS = new Set(['longa', 'longo', 'longao', 'long'])
 const GENERIC_TRAINING = new Set(['treino', 'treinar', 'treinos', 'treinao', 'sessao'])
 
@@ -105,7 +104,7 @@ function resolveDay(tokens: string[], i: number, today: DateKey): { date: DateKe
   const t = tokens[i]
   if (t === 'hoje') return { date: today, len: 1 }
   if (t === 'depois' && tokens[i + 1] === 'de' && tokens[i + 2] === 'amanha') return { date: addDays(today, 2), len: 3 }
-  if (t === 'amanha' && tokens[i - 1] !== 'de') return { date: addDays(today, 1), len: 1 }
+  if (t === 'amanha' && tokens[i - 2] !== 'depois') return { date: addDays(today, 1), len: 1 }
   const wd = WEEKDAY_WORDS[t]
   if (wd === undefined) return undefined
   // "sex" / "qua" / "qui" alone are only days when they look like one.
@@ -131,7 +130,7 @@ function hm(h: number, m: number): TimeHM {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
-const TIME_PREV = new Set(['as', 'a', 'das', 'pelas', 'umas', 'lá'])
+const TIME_PREV = new Set(['as', 'a', 'das', 'pelas', 'umas'])
 const DURATION_PREV = new Set(['de', 'por', 'durar', 'dura', 'durante', 'com', 'em'])
 
 /** Times ("às 7h", "19:30") and durations ("de 4h", "90 min", "1h30") from the tokens. */
@@ -221,7 +220,7 @@ function hasPhrase(tokens: string[], phrase: string[]): number {
   return -1
 }
 
-const QUESTION_START = new Set(['quando', 'qual', 'quais', 'quanto', 'quantos', 'quantas', 'como', 'onde', 'porque', 'por que', 'que', 'o'])
+const QUESTION_START = new Set(['quando', 'qual', 'quais', 'quanto', 'quantos', 'quantas', 'como', 'onde', 'porque', 'que', 'o', 'tem', 'tenho'])
 
 export function lex(db: DB, raw: string, today: DateKey): Lexed {
   const tokens = tokenizeAdjust(raw)
@@ -235,7 +234,7 @@ export function lex(db: DB, raw: string, today: DateKey): Lexed {
   }
   const { time, duration } = numbers(tokens)
   const swapVerbAt = tokens.findIndex((t) => SWAP_VERBS.some((v) => t.startsWith(v)))
-  const moveVerbAt = tokens.findIndex((t) => MOVE_EXACT.has(t) || (MOVE_VERBS.some((v) => t.startsWith(v)) && t.length <= 9 && MOVE_EXACT.has(t)))
+  const moveVerbAt = tokens.findIndex((t) => MOVE_EXACT.has(t))
   let insteadAt: number | undefined
   for (const phrase of [['em', 'vez', 'de'], ['em', 'vez', 'do'], ['em', 'vez', 'da'], ['ao', 'inves', 'de'], ['ao', 'inves', 'do'], ['ao', 'inves', 'da'], ['no', 'lugar', 'de'], ['no', 'lugar', 'do'], ['no', 'lugar', 'da']]) {
     const at = hasPhrase(tokens, phrase)
@@ -248,7 +247,7 @@ export function lex(db: DB, raw: string, today: DateKey): Lexed {
   const skip =
     tokens.some((t) => SKIP_EXACT.has(t)) ||
     hasPhrase(tokens, ['sem', 'treino']) >= 0 ||
-    (nao >= 0 && ['vou', 'vai', 'rola', 'da', 'consigo', 'quero', 'treino', 'vou'].includes(tokens[nao + 1] ?? '') && insteadAt === undefined)
+    (nao >= 0 && ['vou', 'vai', 'rola', 'da', 'consigo', 'quero', 'treino'].includes(tokens[nao + 1] ?? '') && insteadAt === undefined)
   let becomesAt: number | undefined
   for (const phrase of [['vai', 'ser'], ['fica', 'pro'], ['fica', 'pra'], ['fica', 'para'], ['vai', 'pro'], ['vai', 'pra']]) {
     const at = hasPhrase(tokens, phrase)
