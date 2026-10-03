@@ -121,7 +121,7 @@ export const seedTravel: FeatureSeed = (ctx) => {
     item(A, 'ida-johannesburg', 'roteiro', 'Johannesburg', 'Ida para a região de Johannesburg', { date: '2026-11-13', paymentStatus: 'a_confirmar' }),
     item(A, 'confirmar-horarios', 'roteiro', 'Johannesburg', 'Confirmar horários'),
     item(A, 'safari-dias', 'roteiro', 'Safari', 'Safari', { date: '2026-11-14', endDate: '2026-11-15', paymentStatus: 'a_confirmar' }),
-    item(A, 'safari', 'reserva', 'Safari', 'Safari'),
+    item(A, 'safari', 'reserva', 'Safari', 'Reserva do safari'),
     // Flights
     item(A, 'voo-retorno', 'voo', 'Flights', 'Retorno internacional — voo 10:00, OR Tambo', {
       date: '2026-11-16',
