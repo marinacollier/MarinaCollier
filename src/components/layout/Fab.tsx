@@ -1,10 +1,17 @@
 import { Plus } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { useLocation } from 'react-router-dom'
 import { openSheet } from '@/app/ui-store'
+import { ROUTES } from '@/app/routes'
+
+/** Step-by-step flows have their own footer actions; the global + would cover them. */
+const HIDDEN_ON: string[] = [ROUTES.weekPlanner, ROUTES.weeklyReview]
 import { haptic } from '@/lib/haptics'
 
 /** Global quick add. Sits above the bottom nav, inside the safe area. */
 export function Fab() {
+  const { pathname } = useLocation()
+  if (HIDDEN_ON.includes(pathname)) return null
   return (
     <motion.button
       whileTap={{ scale: 0.92 }}
