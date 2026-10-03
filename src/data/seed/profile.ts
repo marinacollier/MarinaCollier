@@ -35,8 +35,12 @@ export const seedProfile: FeatureSeed = (ctx) => ({
     },
     homeWidgets: [
       { id: 'agora', visible: true },
+      // The unified day (rotina + treino + comida + agenda) right after Agora. It covers the morning
+      // routine (items, steps, journaling, versão curta), so the separate card starts hidden — one tap
+      // in Personalizar brings it back.
+      { id: 'linha_do_dia', visible: true },
       { id: 'top3', visible: true },
-      { id: 'manha', visible: true },
+      { id: 'manha', visible: false },
       { id: 'proximo_compromisso', visible: true },
       { id: 'treino', visible: true },
       { id: 'refeicoes', visible: true },

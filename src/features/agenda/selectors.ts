@@ -1,7 +1,9 @@
 /**
  * Agenda-specific reads on top of the shared `agendaFor`. Pure (db, args) functions.
  */
-import type { CalendarEvent, DateKey, DayPeriod, DB, ID, PlanType, Tone, WorkDayMode } from '@/data/types'
+import type { CalendarEvent, DateKey, DayPeriod, DB, ID, PlanType, TimelineEntry, Tone, WorkDayMode } from '@/data/types'
+import { dayTimeline, endMin, routineBlocks, startMin } from '@/data/timeline'
+import { minutesToHM } from '@/lib/date'
 import { agendaFor, isTaskDoneOn, isTaskOpen, prioritiesFor, tasksForDay, type AgendaEntry } from '@/data/selectors'
 import { conflictsOn, PERIOD_LABEL, PERIOD_RANGES, workMode, type Conflict } from '@/data/planning'
 import { addDays, formatShortDate, weekDays } from '@/lib/date'
@@ -25,7 +27,13 @@ export function kindMeta(kind: CalendarEvent['kind']) {
   return EVENT_KINDS.find((k) => k.value === kind) ?? { value: 'outro' as const, label: 'compromisso', emoji: '📅', tone: 'accent' as Tone }
 }
 
-export interface DayEntry extends AgendaEntry {
+export interface DayEntry extends Omit<AgendaEntry, 'kind'> {
+  /** Agenda kinds + the Linha do dia's routine blocks and planned meals (day grid only). */
+  kind: AgendaEntry['kind'] | 'routine' | 'meal'
+  /** For 'routine' / 'meal': the timeline row(s) behind it (same times as Hoje). */
+  timeline?: TimelineEntry
+  /** For 'routine': the routine id. */
+  routineId?: ID
   /** Unique key for React lists. */
   key: string
   /** CSS color of a non-local calendar source (Google, Outlook, ICS…). */
@@ -91,7 +99,14 @@ export function dayEntries(db: DB, date: DateKey, opts: { includeBlocks?: boolea
   const keyWorkouts = new Set(db.workouts.filter((w) => w.isKeySession).map((w) => w.id))
   const sources = new Map(db.calendarSources.map((s) => [s.id, s]))
   const markers = conflictMarkers(conflictsOn(db, date))
-  return agendaFor(db, date, opts).map((a) => {
+  // Per-day changes made on Hoje (ScheduleOverride: "só hoje às 20:00", "hoje não") show here too.
+  const tl = new Map(dayTimeline(db, date).map((e) => [e.key, e]))
+  return agendaFor(db, date, opts).flatMap((a): AgendaEntry[] => {
+    const t = tl.get(`${a.kind}:${a.id}`)
+    if (t?.status === 'cancelled') return []
+    if (t?.timeSource === 'override') return [{ ...a, time: t.start, endTime: t.end, approx: false }]
+    return [a]
+  }).map((a) => {
     const key = `${a.kind}:${a.id}`
     const base: DayEntry = {
       ...a,
@@ -120,6 +135,68 @@ export function dayEntries(db: DB, date: DateKey, opts: { includeBlocks?: boolea
       hasTemplate: !!ev.template?.length,
     }
   })
+}
+
+/**
+ * The Linha do dia inside the Agenda grid (same times as Hoje): one block per routine stretch
+ * ("☀️ Milagre da Manhã 04:40–06:00", split where the training sits) + the day's planned meals.
+ */
+export function lifeEntries(db: DB, date: DateKey): DayEntry[] {
+  const tl = dayTimeline(db, date, { includeAnytime: false })
+  const out: DayEntry[] = []
+  for (const b of routineBlocks(db, tl)) {
+    const sorted = [...b.entries].sort((x, y) => (startMin(x) ?? 0) - (startMin(y) ?? 0))
+    let run: TimelineEntry[] = []
+    const flush = () => {
+      if (!run.length) return
+      const s = startMin(run[0])!
+      const e = Math.max(...run.map((x) => endMin(x)!))
+      const done = run.filter((x) => x.status === 'done').length
+      out.push({
+        kind: 'routine',
+        id: `${b.routine.id}:${s}`,
+        key: `routine:${b.routine.id}:${s}`,
+        routineId: b.routine.id,
+        timeline: run[0],
+        title: b.routine.name,
+        emoji: b.routine.emoji,
+        date,
+        time: minutesToHM(s),
+        endTime: minutesToHM(e),
+        allDay: false,
+        done: done === run.length,
+        tone: 'sand',
+        subtitle: `${done}/${run.length}`,
+        planType: b.routine.planType,
+      })
+      run = []
+    }
+    for (const x of sorted) {
+      const last = run.at(-1)
+      if (last && (startMin(x) ?? 0) > (endMin(last) ?? 0)) flush()
+      run.push(x)
+    }
+    flush()
+  }
+  for (const m of tl) {
+    if (m.kind !== 'meal' || m.status === 'cancelled') continue
+    out.push({
+      kind: 'meal',
+      id: m.ref.id,
+      key: m.key,
+      timeline: m,
+      title: m.title,
+      emoji: m.emoji,
+      date,
+      time: m.start,
+      endTime: m.end,
+      allDay: false,
+      done: m.status === 'done',
+      tone: 'sand',
+      subtitle: m.subtitle,
+    })
+  }
+  return out
 }
 
 export const timedOnly = (list: DayEntry[]) => list.filter((e) => e.kind !== 'block' && !e.allDay && !!e.time)

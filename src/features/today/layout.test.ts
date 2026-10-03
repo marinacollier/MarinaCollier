@@ -7,20 +7,21 @@ const widgets = buildSeed('2026-10-02').profile.homeWidgets
 const ctx = (p: Partial<LayoutContext> = {}): LayoutContext => ({ part: 'manha', mode: 'normal', hasWorkoutToday: true, ...p })
 
 describe('orderWidgets', () => {
-  it('follows Marina’s order (§42) with Agora first; HOJE line lives in the header', () => {
+  it('follows Marina’s order (§42) with Agora first, then the Linha do dia; HOJE line lives in the header', () => {
     const o = orderWidgets(widgets, ctx())
-    expect(o.slice(0, 9)).toEqual(['agora', 'top3', 'manha', 'proximo_compromisso', 'treino', 'refeicoes', 'work_focus', 'proxima_viagem', 'brain_dump'])
+    expect(o.slice(0, 9)).toEqual(['agora', 'linha_do_dia', 'top3', 'proximo_compromisso', 'treino', 'refeicoes', 'work_focus', 'proxima_viagem', 'brain_dump'])
+    expect(o).not.toContain('manha') // the routine lives in the Linha do dia (card can be turned back on)
     expect(o).not.toContain('resumo_dia')
   })
 
   it('evening-only cards show only at night, right after the Top 3', () => {
     expect(orderWidgets(widgets, ctx())).not.toContain('amanha')
     expect(orderWidgets(widgets, ctx({ part: 'dia' }))).not.toContain('fechamento')
-    expect(orderWidgets(widgets, ctx({ part: 'noite' })).slice(0, 4)).toEqual(['agora', 'top3', 'amanha', 'fechamento'])
+    expect(orderWidgets(widgets, ctx({ part: 'noite' })).slice(0, 5)).toEqual(['agora', 'linha_do_dia', 'top3', 'amanha', 'fechamento'])
   })
 
   it('energy baixa: only Agora, agenda, treino (if planned), one priority, brain dump', () => {
-    expect(orderWidgets(widgets, ctx({ mode: 'baixa' }))).toEqual(['agora', 'top3', 'proximo_compromisso', 'treino', 'brain_dump'])
+    expect(orderWidgets(widgets, ctx({ mode: 'baixa' }))).toEqual(['agora', 'linha_do_dia', 'top3', 'proximo_compromisso', 'treino', 'brain_dump'])
     expect(orderWidgets(widgets, ctx({ mode: 'baixa', hasWorkoutToday: false }))).not.toContain('treino')
   })
 
@@ -31,7 +32,7 @@ describe('orderWidgets', () => {
 
   it('weekend: activity and travel first, work at the end', () => {
     const o = orderWidgets(widgets, ctx({ mode: 'fds' }))
-    expect(o.slice(0, 3)).toEqual(['agora', 'treino', 'proxima_viagem'])
+    expect(o.slice(0, 4)).toEqual(['agora', 'linha_do_dia', 'treino', 'proxima_viagem'])
     expect(o.indexOf('work_focus')).toBeGreaterThan(o.indexOf('lendo_agora'))
   })
 

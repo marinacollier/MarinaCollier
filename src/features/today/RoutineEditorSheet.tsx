@@ -3,9 +3,10 @@ import { ArrowUp, ChevronDown, Trash2 } from 'lucide-react'
 import { closeSheet } from '@/app/ui-store'
 import { removeWithUndo } from '@/app/undo'
 import type { SheetProps } from '@/app/sheet-types'
-import { Chip, EmptyState, SheetLayout, SortableList, TitleInput, WeekdayPicker } from '@/components/ui'
+import { Chip, ChipSelect, EmptyState, Field, MoreOptions, NumberInput, SheetLayout, SortableList, TimeInput, TitleInput, WeekdayPicker } from '@/components/ui'
 import { actions, getDB, nextOrder, useDB } from '@/data/store'
-import type { Recurrence, RoutineItem, Weekday } from '@/data/types'
+import type { Recurrence, RoutineItem, TimeMode, Weekday } from '@/data/types'
+import { itemDuration, itemTimeMode } from '@/data/timeline'
 import { describeRecurrence } from '@/lib/recurrence'
 import { cn } from '@/lib/cn'
 import { lastGrapheme } from './refs'
@@ -16,6 +17,94 @@ function weekdaysOf(r: Recurrence): Weekday[] {
   if (r.kind === 'daily') return ALL_DAYS
   if (r.kind === 'weekly') return r.weekdays
   return ALL_DAYS
+}
+
+const MODES: { value: TimeMode; label: string }[] = [
+  { value: 'fixed', label: 'Horário fixo' },
+  { value: 'sequence', label: 'Em sequência' },
+  { value: 'window', label: 'Janela' },
+  { value: 'anytime', label: 'Qualquer momento' },
+]
+
+/** "04:40", "em sequência · 10 min", "05:00–05:30", "qualquer momento". */
+export function timeLabel(item: RoutineItem): string {
+  const mode = itemTimeMode(item)
+  if (mode === 'fixed' && item.time) return item.time
+  if (mode === 'window' && item.window) return `${item.window.start}–${item.window.end}`
+  if (mode === 'anytime') return 'qualquer hora'
+  return `em seq. · ${itemDuration(item)}min`
+}
+
+/** Time settings of one item: mode, time/window, duration; step minutes in "mais opções". */
+function TimeFields({ item }: { item: RoutineItem }) {
+  const mode = itemTimeMode(item)
+  const set = (patch: Partial<RoutineItem>) => actions.update('routineItems', item.id, patch)
+  const steps = item.steps ?? []
+  return (
+    <div className="space-y-3">
+      <ChipSelect
+        value={mode}
+        onChange={(m) => {
+          if (!m) return
+          if (m === 'fixed') set({ timeMode: m, time: item.time ?? item.window?.start ?? '06:00' })
+          else if (m === 'window') set({ timeMode: m, window: item.window ?? { start: item.time ?? '06:00', end: item.time ? item.time : '06:30' } })
+          else set({ timeMode: m })
+        }}
+        options={MODES}
+      />
+      <div className="flex items-end gap-2">
+        {mode === 'fixed' && (
+          <Field label="Horário" className="flex-1">
+            <TimeInput value={item.time} onChange={(time) => time && set({ time })} />
+          </Field>
+        )}
+        {mode === 'window' && (
+          <>
+            <Field label="De" className="flex-1">
+              <TimeInput value={item.window?.start} onChange={(start) => start && set({ window: { start, end: item.window?.end ?? start } })} />
+            </Field>
+            <Field label="Até" className="flex-1">
+              <TimeInput value={item.window?.end} onChange={(end) => end && set({ window: { start: item.window?.start ?? end, end } })} />
+            </Field>
+          </>
+        )}
+        {mode !== 'anytime' && (
+          <Field label="Minutos" className="w-[96px] shrink-0">
+            <NumberInput value={item.durationMin} placeholder={String(itemDuration(item))} onChange={(n) => set({ durationMin: n && n > 0 ? Math.round(n) : undefined })} />
+          </Field>
+        )}
+      </div>
+      {mode === 'sequence' && <p className="text-[12.5px] text-muted -mt-1">Começa quando o item anterior termina — o horário se ajusta sozinho.</p>}
+      {mode === 'anytime' && <p className="text-[12.5px] text-muted -mt-1">Aparece em “ao longo do dia”, sem horário.</p>}
+      {(steps.length > 0 || mode !== 'anytime') && (
+        <MoreOptions label="passos e flexibilidade">
+          {steps.length > 0 && (
+            <div className="space-y-1.5">
+              <div className="eyebrow">Minutos por passo</div>
+              {steps.map((st, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <span className="flex-1 min-w-0 truncate text-[14px] text-ink-2">{st}</span>
+                  <NumberInput
+                    aria-label={`Minutos de ${st}`}
+                    value={item.stepDurations?.[i]}
+                    className="w-[76px] min-h-11"
+                    onChange={(n) => {
+                      const next = steps.map((_, j) => item.stepDurations?.[j] ?? 0)
+                      next[i] = n && n > 0 ? Math.round(n) : 0
+                      set({ stepDurations: next.some((x) => x > 0) ? next : undefined })
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+          <Chip selected={!!item.timeFlexible} onClick={() => set({ timeFlexible: !item.timeFlexible })}>
+            {item.timeFlexible ? '✓ Pode deslizar' : 'Pode deslizar'}
+          </Chip>
+        </MoreOptions>
+      )}
+    </div>
+  )
 }
 
 function ItemEditor({ item, handle }: { item: RoutineItem; handle: React.ReactNode }) {
@@ -39,13 +128,15 @@ function ItemEditor({ item, handle }: { item: RoutineItem; handle: React.ReactNo
           className={cn('flex-1 min-w-0 bg-transparent outline-none py-2 pl-1.5 text-[16px]', !item.active && 'text-muted')}
         />
         <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="h-11 pl-1.5 pr-1 inline-flex items-center gap-0.5 text-[12px] text-muted whitespace-nowrap">
-          {item.active ? describeRecurrence(item.recurrence) : 'pausado'}
+          <span className="tabular-nums">{item.active ? timeLabel(item) : 'pausado'}</span>
           <ChevronDown size={14} className={cn('transition-transform', open && 'rotate-180')} />
         </button>
         {handle}
       </div>
       {open && (
         <div className="px-3 pb-3 pt-1 space-y-3">
+          <TimeFields item={item} />
+          <div className="eyebrow pt-1">Dias · {describeRecurrence(item.recurrence)}</div>
           <WeekdayPicker value={days} onChange={(weekdays) => actions.update('routineItems', item.id, { recurrence: { kind: 'weekly', weekdays } })} />
           <div className="flex items-center justify-between">
             <Chip selected={item.active} onClick={() => actions.update('routineItems', item.id, { active: !item.active })}>
@@ -86,6 +177,10 @@ export default function RoutineEditorSheet({ routineId }: SheetProps<'routineEdi
       routineId: routine.id,
       title,
       recurrence: { kind: 'weekly', weekdays: ALL_DAYS },
+      // Gets a time right away: it follows the previous item (editable to fixed / janela / qualquer momento).
+      timeMode: 'sequence',
+      durationMin: 10,
+      source: 'marina',
       order: nextOrder(getDB().routineItems.filter((i) => i.routineId === routine.id)),
       active: true,
     })
@@ -113,7 +208,7 @@ export default function RoutineEditorSheet({ routineId }: SheetProps<'routineEdi
         <Chip selected={routine.active} onClick={() => actions.update('routines', routine.id, { active: !routine.active })}>
           {routine.active ? '✓ Aparece no Hoje' : 'Pausada'}
         </Chip>
-        <span className="text-[12.5px] text-muted">toque no dia de cada item para escolher quando aparece</span>
+        <span className="text-[12.5px] text-muted">toque no horário de um item para ajustar tempo e dias</span>
       </div>
 
       {items.length > 0 ? (

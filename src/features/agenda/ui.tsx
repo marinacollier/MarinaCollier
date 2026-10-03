@@ -6,11 +6,14 @@ import { cn } from '@/lib/cn'
 import { haptic } from '@/lib/haptics'
 import { nowISO } from '@/lib/id'
 import { PLAN_LABEL, type DayEntry, type LooseItem } from './selectors'
+import { openEntryFlow } from '@/features/today/timeline/actions'
 
 /** Open the right sheet for a timeline entry. */
 export function openEntry(e: DayEntry, today: DateKey) {
   haptic('light')
   if (e.kind === 'block') return
+  if (e.kind === 'routine') return e.routineId && openSheet('routineEditor', { routineId: e.routineId })
+  if (e.kind === 'meal') return e.timeline && openEntryFlow(e.timeline, today)
   // The day travels along so a recurring event can be changed "só nesse dia".
   if (e.kind === 'event') openSheet('event', { id: e.id, date: e.startsOn ? undefined : e.date })
   else if (e.kind === 'workout') {

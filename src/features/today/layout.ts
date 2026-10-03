@@ -16,9 +16,9 @@ import type { HomeContext } from './context'
 /** Widgets that only make sense in some parts of the day. */
 const ONLY_AT_NIGHT: HomeWidgetId[] = ['fechamento', 'amanha']
 
-const LOW_ENERGY: HomeWidgetId[] = ['agora', 'proximo_compromisso', 'treino', 'top3', 'brain_dump', 'fechamento']
+const LOW_ENERGY: HomeWidgetId[] = ['agora', 'linha_do_dia', 'proximo_compromisso', 'treino', 'top3', 'brain_dump', 'fechamento']
 const FRIDAY_HIDE: HomeWidgetId[] = ['tarefas', 'work_focus', 'waiting_for']
-const WEEKEND_FIRST: HomeWidgetId[] = ['treino', 'proxima_viagem', 'proximo_compromisso', 'top3', 'manha', 'luna']
+const WEEKEND_FIRST: HomeWidgetId[] = ['linha_do_dia', 'treino', 'proxima_viagem', 'proximo_compromisso', 'top3', 'manha', 'luna']
 const WEEKEND_LAST: HomeWidgetId[] = ['work_focus', 'waiting_for', 'tarefas']
 
 export type LayoutContext = Pick<HomeContext, 'part' | 'mode' | 'hasWorkoutToday'> & { tripSoon?: unknown }

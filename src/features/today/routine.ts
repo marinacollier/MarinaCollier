@@ -15,6 +15,7 @@ import { isPresencial } from '@/data/planning'
 import { SEED_IDS } from '@/data/seed/ids'
 import type { DateKey, DB, ID, Occurrence, Routine, RoutineItem } from '@/data/types'
 import { hmToMinutes } from '@/lib/date'
+import { nowISO } from '@/lib/id'
 import { occurrenceFor } from '@/lib/recurrence'
 import { ensureCheckin } from './closing'
 
@@ -115,7 +116,8 @@ function cleanupIfEmpty(item: RoutineItem, date: DateKey): void {
 /** Tap on the item itself: checks it directly (steps don't need to be ticked). Returns the new state. */
 export function toggleItem(item: RoutineItem, date: DateKey): boolean {
   const done = isItemDone(getDB(), item, date)
-  upsertOccurrence(item, date, { status: done ? 'skipped' : 'done' })
+  // The real moment it happened ("✓ 05:12") — the timeline shows it next to the planned time.
+  upsertOccurrence(item, date, { status: done ? 'skipped' : 'done', completedAt: done ? undefined : nowISO() })
   if (done) cleanupIfEmpty(item, date)
   return !done
 }
@@ -132,7 +134,8 @@ export function toggleStep(item: RoutineItem, index: number, date: DateKey): { i
   const wasDone = isItemDone(getDB(), item, date)
   // Adding a step never undoes the item; un-ticking a step of a done item reopens it.
   const status: Occurrence['status'] = all || (wasDone && !removing) ? 'done' : 'skipped'
-  upsertOccurrence(item, date, { stepsDone, status })
+  const completedAt = status === 'done' ? (wasDone ? itemOccurrence(getDB(), item, date)?.completedAt : undefined) ?? nowISO() : undefined
+  upsertOccurrence(item, date, { stepsDone, status, completedAt })
   cleanupIfEmpty(item, date)
   return { itemDone: status === 'done' }
 }
