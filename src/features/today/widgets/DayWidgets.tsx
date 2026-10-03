@@ -1,17 +1,18 @@
 /** Corpo + dinheiro widgets on Hoje: treino, refeições, gastos. */
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus } from 'lucide-react'
-import { openSheet, toast } from '@/app/ui-store'
+import { openSheet } from '@/app/ui-store'
 import { ROUTES } from '@/app/routes'
-import { removeWithUndo } from '@/app/undo'
-import { actions } from '@/data/store'
 import { DAY_TYPE_LABEL, dayPlanFor, dayTrainingContext } from '@/data/fuel'
 import { hmToMinutes } from '@/lib/date'
-import { haptic } from '@/lib/haptics'
 import { Pill, TONE, tone as toneOf } from '@/components/ui'
 import { categoryOf, expensesBetween, mealsOn, modalityOf, sumCents, workoutsOn } from '@/data/selectors'
-import type { MealSlot, NutritionDayPlan, PlannedMeal, Workout, WorkoutStatus } from '@/data/types'
+import { consumedTimeOf, dayMeals, shortFood, slotForPlannedMeal as engineSlotForPlannedMeal, type PlanMealView } from '@/data/nutrition'
+import { NutritionSheetHost, openNutritionSheet } from '@/features/nutrition/sheet-host'
+import { AdjustmentCard, SourceBadge } from '@/features/nutrition/nutri-ui'
+import { toggleEaten } from '@/features/nutrition/feedback'
+import type { MealSlot, PlannedMeal, Workout, WorkoutStatus } from '@/data/types'
 import { formatBRL } from '@/lib/money'
 import { cn } from '@/lib/cn'
 import { HeaderLink, SoftAction, Widget, WidgetEmpty, type WidgetCtx } from './shared'
@@ -106,19 +107,11 @@ export function currentMealSlot(minutes: number): MealSlot {
 export function RefeicoesWidget({ ctx }: { ctx: WidgetCtx }) {
   const { db, today } = ctx
   const plan = useMemo(() => dayPlanFor(db, today), [db, today])
-  return plan ? <DietaWidget ctx={ctx} plan={plan} /> : <SlotsWidget ctx={ctx} />
+  return plan ? <DietaWidget ctx={ctx} /> : <SlotsWidget ctx={ctx} />
 }
 
 /** Which slot a prescribed meal falls into (training meals go to 'extra'). */
-export function slotForPlannedMeal(m: PlannedMeal): MealSlot {
-  if (m.phase === 'pre' || m.phase === 'intra') return 'extra'
-  const min = m.time ? hmToMinutes(m.time) : 12 * 60
-  if (min < 10 * 60 + 30) return 'cafe'
-  if (min < 11 * 60 + 30) return 'lanche_manha'
-  if (min < 15 * 60) return 'almoco'
-  if (min < 18 * 60 + 30) return 'lanche_tarde'
-  return 'jantar'
-}
+export const slotForPlannedMeal = (m: PlannedMeal): MealSlot => engineSlotForPlannedMeal(m)
 
 /** Index of the meal to highlight: the last one whose time has started, or the first. */
 export function currentPlannedMeal(meals: PlannedMeal[], minutes: number): number {
@@ -129,133 +122,100 @@ export function currentPlannedMeal(meals: PlannedMeal[], minutes: number): numbe
   return idx
 }
 
-const PHASE_LABEL: Partial<Record<NonNullable<PlannedMeal['phase']>, string>> = { pre: 'pré-treino', intra: 'intra', pos: 'pós-treino' }
+/** "cuscuz · ovo · queijo muçarela" — the meal in a few words. */
+export function mealSummary(items: { food: string }[], max = 3): string {
+  const names = [...new Set(items.map((i) => shortFood(i.food)))]
+  return names.length > max ? `${names.slice(0, max).join(' · ')} +${names.length - max}` : names.join(' · ')
+}
 
-/** "Dieta de hoje": the nutritionist's plan for today's training type, meal by meal. */
-function DietaWidget({ ctx, plan }: { ctx: WidgetCtx; plan: NutritionDayPlan }) {
+/** The meal that deserves the "comi" emphasis: the first not eaten whose time has started (or the next). */
+export function focusMeal(meals: PlanMealView[], minutes: number): string | undefined {
+  const lastDone = meals.reduce((acc, m, i) => (m.status === 'consumed' || m.status === 'skipped' ? i : acc), -1)
+  const open = meals.filter((m, i) => i > lastDone && (m.status === 'future' || m.status === 'past'))
+  const started = open.filter((m) => m.plannedTime && hmToMinutes(m.plannedTime) <= minutes + 30)
+  return (started[started.length - 1] ?? open[0])?.ref
+}
+
+const PHASE_LABEL: Partial<Record<NonNullable<PlannedMeal['phase']>, string>> = { pre: 'pré', intra: 'intra', pos: 'pós' }
+
+/** "Dieta de hoje": the nutritionist's plan for today's training type — light, one line per meal. */
+function DietaWidget({ ctx }: { ctx: WidgetCtx }) {
   const { db, today, minutes } = ctx
   const nav = useNavigate()
-  const [open, setOpen] = useState<number | null>(null)
   const context = useMemo(() => dayTrainingContext(db, today), [db, today])
-  const logged = useMemo(() => mealsOn(db, today), [db, today])
-  const keyWorkout = context.key ?? context.workouts[0]
-  const current = currentPlannedMeal(plan.meals, minutes)
-  const refOf = (i: number) => `${plan.id}#${i}`
+  const day = useMemo(() => dayMeals(db, today, minutes), [db, today, minutes])
+  const focus = focusMeal(day.meals, minutes)
+  const proposal = day.meals.find((m) => m.proposed)?.proposed
+  const open = (ref: string) => openNutritionSheet('mealDetail', { date: today, ref })
 
-  const markEaten = (m: PlannedMeal, i: number) => {
-    const existing = logged.find((x) => x.planMealRef === refOf(i))
-    if (existing) {
-      removeWithUndo('meals', existing.id, 'Desmarcado')
-      return
-    }
-    const phase = m.phase
-    actions.create('meals', {
-      date: today,
-      slot: slotForPlannedMeal(m),
-      time: m.time,
-      description: m.items.map((it) => it.food).join(' + '),
-      done: true,
-      planned: true,
-      tags: [],
-      planMealRef: refOf(i),
-      purpose: phase === 'pre' ? 'pre_treino' : phase === 'intra' ? 'intra_treino' : phase === 'pos' ? 'pos_treino' : 'geral',
-      workoutId: phase && phase !== 'refeicao' ? keyWorkout?.id : undefined,
-    })
-    haptic('success')
-    toast(`${m.name} ✓`)
-  }
-
-  const extras = logged.filter((x) => !x.planMealRef)
   return (
     <Widget
       id="refeicoes"
       eyebrow="Dieta de hoje"
       flush
       action={
-        <HeaderLink onClick={() => nav(ROUTES.nutrition)} label="Ver estratégia nutricional">
-          plano
+        <HeaderLink onClick={() => nav(ROUTES.nutrition)} label="Detalhes do dia">
+          detalhes
         </HeaderLink>
       }
     >
-      <div className="px-4 pb-2 -mt-1 text-[13px] text-muted">
-        {DAY_TYPE_LABEL[context.dayType]} · plano “{plan.name}” do nutri
+      <NutritionSheetHost />
+      <div className="px-4 pb-1.5 -mt-1 text-[12.5px] text-muted">
+        {DAY_TYPE_LABEL[context.dayType]} · plano “{day.plan!.name}” do nutri
       </div>
-      <div className="divide-y divide-line/60">
-        {plan.meals.map((m, i) => {
-          const eaten = logged.some((x) => x.planMealRef === refOf(i))
-          const isNow = i === current && !eaten
-          const expanded = open === i
-          const phaseLabel = m.phase ? PHASE_LABEL[m.phase] : undefined
+      <ul className="divide-y divide-line/50">
+        {day.meals.map((m) => {
+          const eaten = m.status === 'consumed'
+          const isFocus = m.ref === focus
+          const phase = m.phase ? PHASE_LABEL[m.phase] : undefined
           return (
-            <div key={i} className={cn(isNow && 'bg-accent-soft/40')}>
-              <div className="flex items-start gap-3 px-4 py-2.5">
-                <button
-                  type="button"
-                  onClick={() => setOpen(expanded ? null : i)}
-                  aria-expanded={expanded}
-                  className="flex-1 min-w-0 flex items-start gap-3 text-left"
-                >
-                  <span className={cn('font-sport text-[15px] w-11 shrink-0 pt-0.5', isNow ? 'text-accent' : 'text-muted')}>{m.time ?? ''}</span>
-                  <span className="min-w-0">
-                    <span className={cn('block text-[14.5px] leading-snug', eaten ? 'text-muted line-through decoration-muted/40' : isNow ? 'font-semibold text-ink' : 'text-ink-2')}>
-                      {m.name}
-                      {phaseLabel && <span className="ml-1.5 align-middle text-[11px] font-sport uppercase tracking-wider text-sand">{phaseLabel}</span>}
-                    </span>
-                    <span className={cn('block text-[13px] text-muted', !expanded && 'truncate')}>{m.items.map((it) => it.food).join(' · ')}</span>
+            <li key={m.ref} className={cn('flex items-center gap-3 pl-4 pr-3 min-h-[54px] py-1.5', isFocus && 'bg-accent-soft/35')}>
+              <button type="button" onClick={() => open(m.ref)} className="flex-1 min-w-0 flex items-center gap-3 text-left active:opacity-70">
+                <span className={cn('font-sport text-[14.5px] w-11 shrink-0 tabular-nums', isFocus ? 'text-accent' : 'text-muted')}>{m.plannedTime ?? ''}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-1.5">
+                    <span className={cn('text-[14.5px] leading-snug truncate', eaten ? 'text-ink-2' : m.status === 'skipped' ? 'text-muted' : isFocus ? 'font-semibold text-ink' : 'text-ink')}>{m.name}</span>
+                    {phase && <span className="text-[10.5px] font-sport uppercase tracking-wider text-sand shrink-0">{phase}</span>}
+                    {m.badge !== 'nutri' && <SourceBadge source={m.badge} />}
                   </span>
+                  <span className="block text-[12.5px] text-muted truncate">{m.status === 'skipped' ? 'fora hoje' : mealSummary(m.items)}</span>
+                </span>
+              </button>
+              {eaten ? (
+                <button type="button" onClick={() => toggleEaten(today, m.ref, m.name)} aria-label={`Desmarcar ${m.name}`} className="shrink-0 h-11 px-2 text-[13px] text-sage font-medium tabular-nums">
+                  ✓ {m.consumedTime}
                 </button>
+              ) : m.status !== 'skipped' ? (
                 <button
                   type="button"
-                  onClick={() => markEaten(m, i)}
-                  aria-pressed={eaten}
-                  aria-label={eaten ? `Desmarcar ${m.name}` : `Marcar ${m.name} como feito`}
-                  className={cn(
-                    'shrink-0 h-9 px-3 rounded-full text-[13px] font-medium transition active:scale-95',
-                    eaten ? 'bg-sage-soft text-sage' : isNow ? 'bg-ink text-bg' : 'bg-surface-2 text-ink-2',
-                  )}
+                  onClick={() => toggleEaten(today, m.ref, m.name)}
+                  aria-label={`Comi ${m.name}`}
+                  className={cn('shrink-0 h-9 px-3.5 rounded-full text-[13px] font-medium transition active:scale-95', isFocus ? 'bg-ink text-bg' : 'text-muted border border-line/80')}
                 >
-                  {eaten ? '✓ feito' : 'comi'}
+                  comi
                 </button>
-              </div>
-              {expanded && (
-                <div className="px-4 pb-3 pl-[4.25rem] space-y-1.5">
-                  {m.items.map((it, j) => (
-                    <div key={j} className="text-[13.5px]">
-                      <span className="text-ink">{it.food}</span>
-                      {it.qty && <span className="text-muted"> — {it.qty}</span>}
-                      {!!it.substitutions?.length && (
-                        <details className="mt-0.5">
-                          <summary className="text-[12.5px] text-accent cursor-pointer">trocas possíveis</summary>
-                          <ul className="mt-1 space-y-0.5 text-[12.5px] text-muted">
-                            {it.substitutions.map((sub, k) => (
-                              <li key={k}>{sub}</li>
-                            ))}
-                          </ul>
-                        </details>
-                      )}
-                    </div>
-                  ))}
-                  {m.notes && <div className="text-[12.5px] text-ink-2 italic">{m.notes}</div>}
-                  {m.phase && m.phase !== 'refeicao' && keyWorkout && !keyWorkout.id.startsWith('template:') && (
-                    <button type="button" onClick={() => openSheet('fuel', { workoutId: keyWorkout.id })} className="text-[13px] font-medium text-accent h-8">
-                      ver estratégia do treino →
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
+              ) : null}
+            </li>
           )
         })}
-        {extras.map((m) => (
-          <button key={m.id} type="button" onClick={() => openSheet('meal', { id: m.id })} className="w-full flex items-center gap-3 px-4 min-h-[44px] text-left active:bg-surface-2">
-            <span className="font-sport text-[15px] w-11 text-muted">{m.time ?? '+'}</span>
-            <span className="flex-1 min-w-0 text-[13.5px] text-ink-2 truncate">{m.description}</span>
-            <span className="text-sage text-[13px]">✓</span>
-          </button>
+        {day.extras.map((x) => (
+          <li key={x.id}>
+            <button type="button" onClick={() => openSheet('meal', { id: x.id })} className="w-full flex items-center gap-3 pl-4 pr-4 min-h-[48px] text-left active:bg-surface-2">
+              <span className="font-sport text-[14.5px] w-11 text-muted tabular-nums">{consumedTimeOf(x) ?? '+'}</span>
+              <span className="flex-1 min-w-0 text-[14px] text-ink-2 truncate">{x.description}</span>
+              <span className="text-[11px] text-muted uppercase tracking-wider">extra</span>
+              <span className="text-sage text-[13px]">✓</span>
+            </button>
+          </li>
         ))}
-      </div>
-      <div className="px-4 py-3 border-t border-line/60">
-        <button type="button" onClick={() => openSheet('meal', { date: today })} className="text-[14px] font-medium text-accent inline-flex items-center gap-1.5 h-9">
+      </ul>
+      {proposal && (
+        <div className="px-3 pt-3">
+          <AdjustmentCard db={db} adj={proposal} nowMinutes={minutes} />
+        </div>
+      )}
+      <div className="px-4 py-2.5 mt-1 border-t border-line/60">
+        <button type="button" onClick={() => openSheet('meal', { date: today })} className="text-[14px] font-medium text-accent inline-flex items-center gap-1.5 h-10">
           <Plus size={16} /> registrar outra coisa
         </button>
       </div>

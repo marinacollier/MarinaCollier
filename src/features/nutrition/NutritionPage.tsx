@@ -15,6 +15,8 @@ import { PlannedMealBlock, SourceNote } from './components'
 import { durationRange, SOURCE_LABEL, sourceLine, workoutEmoji, workoutTitle } from './format'
 import { weekRows } from './logic'
 import { buildNutritionReport } from './report'
+import { DayDetails, MyFoods } from './DaySections'
+import { NutritionSheetHost } from './sheet-host'
 
 type Selection = { kind: 'day'; date: DateKey } | { kind: 'plan'; id: string }
 
@@ -34,6 +36,9 @@ export default function NutritionPage() {
   return (
     <Page>
       <PageHeader eyebrow="corpo · alimentação" title="Estratégia Nutricional" subtitle="O plano do nutri, organizado pelos seus treinos." back />
+      <NutritionSheetHost />
+
+      <DayDetails />
 
       {/* Week view */}
       <SectionTitle>essa semana</SectionTitle>
@@ -189,6 +194,8 @@ export default function NutritionPage() {
           ))}
         </div>
       )}
+
+      <MyFoods />
 
       <ReportCard />
 

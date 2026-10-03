@@ -6,14 +6,16 @@ import { modalityOf } from '@/data/selectors'
 import { closeSheet, toast } from '@/app/ui-store'
 import { removeWithUndo } from '@/app/undo'
 import type { SheetProps } from '@/app/sheet-types'
-import { ChipSelect, DateInput, Field, MoreOptions, MultiChipSelect, SheetLayout, TitleInput } from '@/components/ui'
-import { hmToMinutes, minutesOfDay, relativeDay, todayKey } from '@/lib/date'
+import { ChipSelect, DateInput, Field, MoreOptions, MultiChipSelect, SheetLayout, TimeInput, TitleInput } from '@/components/ui'
+import { consumedTimeOf } from '@/data/nutrition'
+import { hmToMinutes, minutesOfDay, relativeDay, toInstant, todayKey } from '@/lib/date'
 import { MEAL_PURPOSE_LABEL, SLOT_MINUTES, suggestMealLink } from './mealLink'
 import { cn } from '@/lib/cn'
 import { haptic } from '@/lib/haptics'
 import { FOOD_TAGS, SLOT_LABEL } from './constants'
 import { applyMealTags } from './mutations'
 import { slotForMinutes } from './selectors'
+import { FoodComposer } from '@/features/nutrition/FoodComposer'
 
 const SLOT_OPTIONS: { value: MealSlot; label: string }[] = (['cafe', 'lanche_manha', 'almoco', 'lanche_tarde', 'jantar', 'extra'] as MealSlot[]).map((s) => ({
   value: s,
@@ -22,7 +24,12 @@ const SLOT_OPTIONS: { value: MealSlot; label: string }[] = (['cafe', 'lanche_man
 
 const PURPOSES: MealPurpose[] = ['pre_treino', 'intra_treino', 'pos_treino', 'recovery', 'prep_dia_anterior', 'pre_long_run', 'post_long_run', 'pre_long_ride', 'post_long_ride', 'geral']
 
-export default function MealSheet({ id, date, slot }: SheetProps<'meal'>) {
+/** New meal → the smart composer ("o que você comeu?"); existing meal → edit form. */
+export default function MealSheet(props: SheetProps<'meal'>) {
+  return props.id ? <EditMealSheet {...props} /> : <FoodComposer date={props.date} slot={props.slot} />
+}
+
+function EditMealSheet({ id, date, slot }: SheetProps<'meal'>) {
   const db = useDB()
   const existing = id ? db.meals.find((m) => m.id === id) : undefined
   const [mealDate, setMealDate] = useState(existing?.date ?? date ?? todayKey())
@@ -35,6 +42,7 @@ export default function MealSheet({ id, date, slot }: SheetProps<'meal'>) {
   const [purpose, setPurpose] = useState<MealPurpose | undefined>(existing?.purpose)
   const [workoutId, setWorkoutId] = useState<string | undefined>(existing?.workoutId)
   const [linkTouched, setLinkTouched] = useState(!!existing)
+  const [timeVal, setTimeVal] = useState<string | undefined>(existing ? consumedTimeOf(existing) : undefined)
   const suggestion = useMemo(() => suggestMealLink(db, mealDate, existing?.time ? hmToMinutes(existing.time) : SLOT_MINUTES[mealSlot]), [db, mealDate, mealSlot, existing?.time])
   // Until Marina touches it, follow the suggestion (moment of the day changes → suggestion changes).
   const linkedId = linkTouched ? workoutId : suggestion?.workout.id
@@ -53,7 +61,19 @@ export default function MealSheet({ id, date, slot }: SheetProps<'meal'>) {
   const save = () => {
     const text = description.trim()
     if (!text) return
-    const data = { date: mealDate, slot: mealSlot, description: text, tags, planned, templateId, done: true, purpose: linkedPurpose, workoutId: linked?.id }
+    const timeChanged = !!existing && timeVal !== consumedTimeOf(existing)
+    const data = {
+      date: mealDate,
+      slot: mealSlot,
+      description: text,
+      tags,
+      planned,
+      templateId,
+      done: true,
+      purpose: linkedPurpose,
+      workoutId: linked?.id,
+      ...(timeChanged ? { time: timeVal, consumedAt: timeVal ? toInstant(mealDate, timeVal).toISOString() : undefined } : {}),
+    }
     if (existing) actions.update('meals', existing.id, data)
     else actions.create('meals', data)
     applyMealTags(mealDate, tags, planned)
@@ -203,6 +223,30 @@ export default function MealSheet({ id, date, slot }: SheetProps<'meal'>) {
           />
         </div>
       )}
+
+      {existing?.foods && existing.foods.length > 0 && (
+        <div className="rounded-2xl bg-surface-2 px-3.5 py-2.5">
+          <div className="eyebrow mb-1">o que entrou</div>
+          <ul className="space-y-1">
+            {existing.foods.map((f, i) => (
+              <li key={i} className="flex items-baseline justify-between gap-3 text-[13.5px]">
+                <span className="min-w-0 truncate">
+                  {f.qty !== 1 ? `${f.qty} × ` : ''}
+                  {f.name}
+                </span>
+                <span className="text-[12px] text-muted shrink-0">
+                  {f.nutrients ? `P ${Math.round(f.nutrients.protein)} · C ${Math.round(f.nutrients.carbs)} · G ${Math.round(f.nutrients.fat)}` : 'sem números'}
+                  {f.confidence === 'estimated' ? ' · estimativa' : ''}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <Field label="Horário" hint={existing?.plannedTime ? `planejado ${existing.plannedTime}` : undefined}>
+        <TimeInput value={timeVal} onChange={setTimeVal} />
+      </Field>
 
       <MoreOptions>
         <Field label="Dia">
