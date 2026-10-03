@@ -66,3 +66,21 @@ describe('selectors timezone', () => {
     expect(tasksForDay(getDB(), '2026-10-03').some((x) => x.id === t.id)).toBe(false)
   })
 })
+
+describe('migrate · Linha do dia', () => {
+  it('slots linha_do_dia right after agora on existing profiles and hides the separate morning card', async () => {
+    const { migrate, emptyDB } = await import('./defaults')
+    const old = emptyDB()
+    old.profile.homeWidgets = [
+      { id: 'agora', visible: true },
+      { id: 'top3', visible: true },
+      { id: 'manha', visible: true },
+    ]
+    const ids = migrate(old).profile.homeWidgets
+    expect(ids.slice(0, 3).map((w) => w.id)).toEqual(['agora', 'linha_do_dia', 'top3'])
+    expect(ids.find((w) => w.id === 'manha')?.visible).toBe(false)
+    // Already migrated profiles keep their own choices.
+    const again = migrate({ ...old, profile: { ...old.profile, homeWidgets: [...ids.map((w) => (w.id === 'manha' ? { ...w, visible: true } : w))] } })
+    expect(again.profile.homeWidgets.find((w) => w.id === 'manha')?.visible).toBe(true)
+  })
+})

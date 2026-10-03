@@ -217,6 +217,13 @@ export function migrate(raw: unknown): DB {
   for (const m of DEFAULT_MODALITIES) if (!p.modalities.some((x) => x.id === m.id)) p.modalities.push(m)
   p.modalities = p.modalities.map((m) => ({ ...m, group: m.group ?? DEFAULT_MODALITIES.find((d) => d.id === m.id)?.group }))
   // New widgets/modules added in later versions get appended (hidden widgets stay hidden).
+  // The Linha do dia arrives right after Agora and takes over the separate morning card (one tap brings it back).
+  if (input.profile?.homeWidgets && !p.homeWidgets.some((x) => x.id === 'linha_do_dia')) {
+    const at = p.homeWidgets.findIndex((x) => x.id === 'agora') + 1
+    p.homeWidgets = [...p.homeWidgets.slice(0, at), { id: 'linha_do_dia' as const, visible: true }, ...p.homeWidgets.slice(at)].map((w) =>
+      w.id === 'manha' ? { ...w, visible: false } : w,
+    )
+  }
   for (const w of dp.homeWidgets) if (!p.homeWidgets.some((x) => x.id === w.id)) p.homeWidgets.push(w)
   for (const m of dp.modules) if (!p.modules.some((x) => x.id === m.id)) p.modules.push(m)
   out.profile = p
