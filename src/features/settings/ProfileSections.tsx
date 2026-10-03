@@ -121,7 +121,7 @@ export function WorkSection() {
                     }}
                     className={cn(
                       'h-9 px-2 rounded-full text-[12px] border whitespace-nowrap transition active:scale-[0.97]',
-                      on ? (o.value === 'presencial' ? 'bg-accent text-white border-accent' : 'bg-ink text-bg border-ink') : 'bg-surface border-line text-ink-2',
+                      on ? (o.value === 'presencial' ? 'bg-accent text-bg border-accent' : 'bg-ink text-bg border-ink') : 'bg-surface border-line text-ink-2',
                     )}
                   >
                     {o.short}

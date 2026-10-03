@@ -6,7 +6,7 @@ type Size = 'sm' | 'md' | 'lg'
 
 const VARIANT: Record<Variant, string> = {
   primary: 'bg-ink text-bg active:opacity-85',
-  accent: 'bg-accent text-white active:opacity-85',
+  accent: 'bg-accent text-bg active:opacity-85',
   soft: 'bg-surface-2 text-ink active:bg-line',
   ghost: 'bg-transparent text-ink-2 active:bg-surface-2',
   danger: 'bg-transparent text-accent active:bg-accent-soft',

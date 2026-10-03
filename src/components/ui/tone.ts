@@ -2,11 +2,11 @@ import type { Tone } from '@/data/types'
 
 /** Static class maps so Tailwind can see every class name. */
 export const TONE: Record<Tone, { soft: string; text: string; solid: string; border: string; dot: string }> = {
-  accent: { soft: 'bg-accent-soft', text: 'text-accent', solid: 'bg-accent text-white', border: 'border-accent', dot: 'bg-accent' },
-  sage: { soft: 'bg-sage-soft', text: 'text-sage', solid: 'bg-sage text-white', border: 'border-sage', dot: 'bg-sage' },
-  ocean: { soft: 'bg-ocean-soft', text: 'text-ocean', solid: 'bg-ocean text-white', border: 'border-ocean', dot: 'bg-ocean' },
-  sand: { soft: 'bg-sand-soft', text: 'text-sand', solid: 'bg-sand text-white', border: 'border-sand', dot: 'bg-sand' },
-  plum: { soft: 'bg-plum-soft', text: 'text-plum', solid: 'bg-plum text-white', border: 'border-plum', dot: 'bg-plum' },
+  accent: { soft: 'bg-accent-soft', text: 'text-accent', solid: 'bg-accent text-bg', border: 'border-accent', dot: 'bg-accent' },
+  sage: { soft: 'bg-sage-soft', text: 'text-sage', solid: 'bg-sage text-bg', border: 'border-sage', dot: 'bg-sage' },
+  ocean: { soft: 'bg-ocean-soft', text: 'text-ocean', solid: 'bg-ocean text-bg', border: 'border-ocean', dot: 'bg-ocean' },
+  sand: { soft: 'bg-sand-soft', text: 'text-sand', solid: 'bg-sand text-bg', border: 'border-sand', dot: 'bg-sand' },
+  plum: { soft: 'bg-plum-soft', text: 'text-plum', solid: 'bg-plum text-bg', border: 'border-plum', dot: 'bg-plum' },
   ink: { soft: 'bg-surface-2', text: 'text-ink', solid: 'bg-ink text-bg', border: 'border-ink', dot: 'bg-ink' },
 }
 

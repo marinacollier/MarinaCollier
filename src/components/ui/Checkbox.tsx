@@ -39,7 +39,7 @@ export function Checkbox({ checked, onChange, label, size = 'md', className }: C
         <svg viewBox="0 0 24 24" width={dim - 8} height={dim - 8} fill="none">
           <motion.path
             d="M5 12.5l4.2 4.2L19 7"
-            stroke="white"
+            stroke="var(--bg)"
             strokeWidth={3}
             strokeLinecap="round"
             strokeLinejoin="round"

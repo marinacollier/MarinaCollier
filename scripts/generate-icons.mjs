@@ -19,7 +19,7 @@ for (const t of targets) {
   const inner = Math.round(t.size * (1 - t.pad * 2))
   await page.setViewportSize({ width: t.size, height: t.size })
   await page.setContent(
-    `<html><body style="margin:0;background:#F5F0E8;display:grid;place-items:center;width:${t.size}px;height:${t.size}px">
+    `<html><body style="margin:0;background:#ECEBE4;display:grid;place-items:center;width:${t.size}px;height:${t.size}px">
       <div style="width:${inner}px;height:${inner}px">${body.replace('<svg ', `<svg width="${inner}" height="${inner}" `)}</div>
     </body></html>`,
   )

@@ -1,55 +1,60 @@
-@import '@fontsource-variable/fraunces';
-@import '@fontsource-variable/dm-sans';
+@import '@fontsource-variable/bodoni-moda';
+@import '@fontsource-variable/figtree';
+@import '@fontsource/barlow-condensed/500.css';
+@import '@fontsource/barlow-condensed/600.css';
 @import 'tailwindcss';
 
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * MARINA OS design tokens.
- * Linen background, espresso ink, terracotta accent, sage + ocean + sand as natural supports.
- * Every color is a CSS variable so dark mode is a token swap, never a second stylesheet.
+ * MARINA OS — identidade "terra & mata".
+ * Neutros de pedra com um leve tom verde, tinta verde-mata, musgo como cor de ação,
+ * eucalipto, areia, cacau e um verde-mar frio. Nada de creme + terracota.
+ * Token names stay generic (accent / sage / ocean / sand / plum) so every component follows.
  */
 :root {
-  --bg: #f5f0e8;
-  --surface: #fffcf7;
-  --surface-2: #efe8dc;
-  --ink: #1e1a16;
-  --ink-2: #4a4239;
-  --muted: #877b6e;
-  --line: #e6ddcf;
-  --accent: #c2582f;
-  --accent-soft: #f4e0d4;
-  --sage: #7e8b6a;
-  --sage-soft: #e5e8dc;
-  --ocean: #3f6e78;
-  --ocean-soft: #dde8e8;
-  --sand: #c9a46a;
-  --sand-soft: #f2e7d3;
-  --plum: #8a5a6b;
-  --plum-soft: #eedfe3;
-  --shadow: 0 1px 2px rgb(60 40 20 / 0.04), 0 8px 24px -12px rgb(60 40 20 / 0.12);
+  --bg: #ecebe4; /* pedra */
+  --surface: #f7f6f1; /* papel de algodão */
+  --surface-2: #e2e0d6;
+  --ink: #1d221b; /* mata */
+  --ink-2: #41463c;
+  --muted: #777a6c;
+  --line: #d6d3c6;
+  --accent: #4d5b2c; /* musgo — ações */
+  --accent-soft: #dce1cd;
+  --sage: #7f957a; /* eucalipto */
+  --sage-soft: #e0e6dc;
+  --ocean: #4a6b68; /* mar frio — natação, surf */
+  --ocean-soft: #d9e3e1;
+  --sand: #a88b62; /* areia */
+  --sand-soft: #ece3d2;
+  --plum: #6d4a37; /* cacau */
+  --plum-soft: #e9ddd3;
+  --scrim: rgb(29 34 27 / 0.38);
+  --shadow: 0 1px 2px rgb(29 34 27 / 0.05), 0 10px 28px -14px rgb(29 34 27 / 0.18);
   color-scheme: light;
 }
 
 .dark {
-  --bg: #15120f;
-  --surface: #201c18;
-  --surface-2: #2a251f;
-  --ink: #f3ece2;
-  --ink-2: #d6ccbf;
-  --muted: #a09382;
-  --line: #352f28;
-  --accent: #e0774c;
-  --accent-soft: #3a2519;
-  --sage: #a3b18c;
-  --sage-soft: #262b20;
-  --ocean: #7fb0ba;
-  --ocean-soft: #1c2a2d;
-  --sand: #d9b77f;
-  --sand-soft: #2f2719;
-  --plum: #c595a6;
-  --plum-soft: #2e2025;
-  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -12px rgb(0 0 0 / 0.5);
+  --bg: #131611; /* mata à noite */
+  --surface: #1b1f18;
+  --surface-2: #252a21;
+  --ink: #eceae1;
+  --ink-2: #cfcdc1;
+  --muted: #97988a;
+  --line: #2f342b;
+  --accent: #a6b97a; /* líquen */
+  --accent-soft: #2a3220;
+  --sage: #a9bca2;
+  --sage-soft: #222a20;
+  --ocean: #8fb3ae;
+  --ocean-soft: #1b2827;
+  --sand: #cdb48c;
+  --sand-soft: #2c2619;
+  --plum: #c49c84;
+  --plum-soft: #2d221c;
+  --scrim: rgb(0 0 0 / 0.5);
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.35), 0 10px 28px -14px rgb(0 0 0 / 0.6);
   color-scheme: dark;
 }
 
@@ -71,10 +76,11 @@
   --color-sand-soft: var(--sand-soft);
   --color-plum: var(--plum);
   --color-plum-soft: var(--plum-soft);
-  --font-display: 'Fraunces Variable', ui-serif, Georgia, serif;
-  --font-sans: 'DM Sans Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: 'Bodoni Moda Variable', 'Bodoni 72', 'Didot', ui-serif, Georgia, serif;
+  --font-sans: 'Figtree Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-sport: 'Barlow Condensed', 'Arial Narrow', ui-sans-serif, sans-serif;
   --shadow-card: var(--shadow);
-  --radius-card: 1.375rem;
+  --radius-card: 1.125rem;
 }
 
 @layer base {
@@ -109,10 +115,19 @@
 }
 
 @layer components {
+  /* Editorial titles: Bodoni, a touch tighter; italics are used for greetings and quotes. */
   .font-display {
     font-family: var(--font-display);
     font-optical-sizing: auto;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.015em;
+    font-weight: 500;
+  }
+  /* Race-bib / trail-sign numerals and labels. */
+  .font-sport {
+    font-family: var(--font-sport);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
   }
   .card {
     background: var(--surface);
@@ -121,8 +136,9 @@
     border: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
   }
   .eyebrow {
-    font-size: 11px;
-    letter-spacing: 0.14em;
+    font-family: var(--font-sport);
+    font-size: 13px;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
     color: var(--muted);
     font-weight: 600;

@@ -4,11 +4,11 @@ import { cn } from '@/lib/cn'
 import { coverTone, coverVariant } from '../selectors'
 
 const JACKET: Record<string, string> = {
-  accent: 'bg-accent text-white',
-  sage: 'bg-sage text-white',
-  ocean: 'bg-ocean text-white',
-  plum: 'bg-plum text-white',
-  sand: 'bg-sand text-white',
+  accent: 'bg-accent text-bg',
+  sage: 'bg-sage text-bg',
+  ocean: 'bg-ocean text-bg',
+  plum: 'bg-plum text-bg',
+  sand: 'bg-sand text-bg',
   ink: 'bg-ink text-bg',
 }
 

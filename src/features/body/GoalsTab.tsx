@@ -153,7 +153,7 @@ function GoalCard({ goal: g, today }: { goal: WorkoutGoal; today: DateKey }) {
                   <span
                     className={cn(
                       'h-7 w-7 rounded-full inline-flex items-center justify-center text-[12px] font-semibold',
-                      !fun && p.target && w.count >= p.target ? 'bg-sage text-white' : w.count ? 'bg-sage-soft text-ink-2' : 'bg-surface-2 text-muted',
+                      !fun && p.target && w.count >= p.target ? 'bg-sage text-bg' : w.count ? 'bg-sage-soft text-ink-2' : 'bg-surface-2 text-muted',
                     )}
                   >
                     {w.count}

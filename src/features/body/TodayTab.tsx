@@ -230,7 +230,7 @@ function HabitsCard({ date }: { date: DateKey }) {
             >
               <span className="text-[17px]">{h.emoji}</span>
               <span className="flex-1 leading-tight">{h.label}</span>
-              <span className={cn('h-5 w-5 rounded-full inline-flex items-center justify-center', on ? 'bg-sage text-white' : 'border border-muted/50')}>
+              <span className={cn('h-5 w-5 rounded-full inline-flex items-center justify-center', on ? 'bg-sage text-bg' : 'border border-muted/50')}>
                 {on && <Check size={12} strokeWidth={3} />}
               </span>
             </button>

@@ -20,7 +20,7 @@ export function Fab() {
         openSheet('quickAdd')
       }}
       aria-label="Adicionar"
-      className="fixed z-40 right-4 h-14 w-14 rounded-full bg-accent text-white shadow-[0_10px_30px_-8px_rgb(194_88_47/0.6)] flex items-center justify-center md:right-[max(1rem,calc(50%-304px))]"
+      className="fixed z-40 right-4 h-14 w-14 rounded-full bg-accent text-bg shadow-[0_12px_28px_-10px_rgb(29_34_27/0.55)] flex items-center justify-center md:right-[max(1rem,calc(50%-304px))]"
       style={{ bottom: 'calc(env(safe-area-inset-bottom) + 76px)' }}
     >
       <Plus size={26} strokeWidth={2.2} />

@@ -123,7 +123,7 @@ function ItemRow({ db, item, date, mode }: { db: DB; item: RoutineItem; date: Da
                         >
                           <span
                             className={cn(
-                              'h-[18px] w-[18px] rounded-md border-[1.5px] shrink-0 transition-colors flex items-center justify-center text-[11px] text-white',
+                              'h-[18px] w-[18px] rounded-md border-[1.5px] shrink-0 transition-colors flex items-center justify-center text-[11px] text-bg',
                               on ? 'bg-sage border-sage' : 'border-muted/50',
                             )}
                             aria-hidden

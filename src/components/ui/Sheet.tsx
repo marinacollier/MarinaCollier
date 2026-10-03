@@ -25,7 +25,7 @@ export function SheetFrame({ onClose, children, depth = 0, isTop = true }: { onC
   return (
     <div className="fixed inset-0 z-50" style={{ zIndex: 50 + depth }} role="dialog" aria-modal="true">
       <motion.div
-        className="absolute inset-0 bg-[#1e1a16]/35 backdrop-blur-[2px]"
+        className="absolute inset-0 bg-[var(--scrim)] backdrop-blur-[2px]"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}

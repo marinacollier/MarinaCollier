@@ -73,7 +73,7 @@ export function WeekView({ date, today, onDate, onOpenDay }: { date: DateKey; to
                 <span
                   className={cn(
                     'h-8 min-w-8 px-1 rounded-full flex items-center justify-center font-display text-[17px] tabular-nums',
-                    isToday && 'bg-accent text-white',
+                    isToday && 'bg-accent text-bg',
                   )}
                 >
                   {Number(d.slice(8))}

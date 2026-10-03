@@ -45,4 +45,5 @@ para ganhar sincronização (Supabase) sem mudar as telas.
 ## Documentação
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — contratos, pastas, regras de dados e de UI
+- [`docs/BRAND.md`](docs/BRAND.md) — identidade "terra & mata" e prompt para o Lovable
 - [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md) — calendários, Outlook/Teams, Organizze, Toki, segurança e sync

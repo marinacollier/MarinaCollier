@@ -531,7 +531,7 @@ function ChipBody({ db, workout: w, lifted }: { db: DB; workout: Workout; lifted
       {when && !rest && <span className="text-[12px] font-normal text-ink-2/80 whitespace-nowrap">{when}</span>}
       <PlanTypeTag planType={w.planType} />
       {done && (
-        <span className={cn('h-[18px] w-[18px] rounded-full inline-flex items-center justify-center text-white shrink-0', w.status === 'adaptado' ? 'bg-sand' : 'bg-sage')}>
+        <span className={cn('h-[18px] w-[18px] rounded-full inline-flex items-center justify-center text-bg shrink-0', w.status === 'adaptado' ? 'bg-sand' : 'bg-sage')}>
           <Check size={11} strokeWidth={3.2} />
         </span>
       )}
