@@ -1,5 +1,5 @@
 /**
- * What happens when Marina taps a search result, a command or an item in a Mari answer.
+ * What happens when Marina taps a search result, a command or an item in a Lumos answer.
  * Results only *describe* the action (pure data, easy to test); `runAction` performs it.
  */
 import { closeSheet, openSheet, replaceSheet, toast } from '@/app/ui-store'
@@ -13,7 +13,7 @@ export type SheetCall = { [N in SheetName]: { name: N; props?: SheetProps<N> } }
 export type ResultAction =
   | { kind: 'route'; to: string }
   | ({ kind: 'sheet' } & SheetCall)
-  /** One-tap creation (e.g. "planejar yoga quinta 19:00" from a Mari suggestion). Always undoable. */
+  /** One-tap creation (e.g. "planejar yoga quinta 19:00" from a Lumos suggestion). Always undoable. */
   | { kind: 'createWorkout'; data: NewItem<'workouts'>; message: string }
 
 export function routeAction(to: string): ResultAction {

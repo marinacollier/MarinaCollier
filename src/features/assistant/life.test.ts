@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { buildLifeFixture, LIFE_TODAY } from '@/features/search/life-fixture'
-import { askMari } from './chief'
-import type { AnswerBlock, MariAnswer } from './types'
+import { askLumos } from './chief'
+import type { AnswerBlock, LumosAnswer } from './types'
 
 const db = buildLifeFixture()
-const ask = (q: string, today = LIFE_TODAY, minutes = 8 * 60): MariAnswer => JSON.parse(JSON.stringify(askMari(db, q, today, minutes)).replace(/\u00a0/g, ' '))
-const lists = (a: MariAnswer) => a.blocks.filter((b): b is Extract<AnswerBlock, { kind: 'list' }> => b.kind === 'list')
-const list = (a: MariAnswer, title: string) => lists(a).find((l) => l.title === title)
-const texts = (a: MariAnswer) => a.blocks.filter((b): b is Extract<AnswerBlock, { kind: 'text' }> => b.kind === 'text').map((b) => b.text)
+const ask = (q: string, today = LIFE_TODAY, minutes = 8 * 60): LumosAnswer => JSON.parse(JSON.stringify(askLumos(db, q, today, minutes)).replace(/\u00a0/g, ' '))
+const lists = (a: LumosAnswer) => a.blocks.filter((b): b is Extract<AnswerBlock, { kind: 'list' }> => b.kind === 'list')
+const list = (a: LumosAnswer, title: string) => lists(a).find((l) => l.title === title)
+const texts = (a: LumosAnswer) => a.blocks.filter((b): b is Extract<AnswerBlock, { kind: 'text' }> => b.kind === 'text').map((b) => b.text)
 
-describe('Mari · planning intents (life-shaped data)', () => {
+describe('Lumos · planning intents (life-shaped data)', () => {
   it('"Quando consigo encaixar yoga?" respects the check-in rule and creates a flexible workout on tap', () => {
     const a = ask('Quando consigo encaixar yoga?')
     expect(a.agents.map((x) => x.id)).toEqual(['training']) // the "Yoga App" project doesn't hijack it
@@ -49,7 +49,7 @@ describe('Mari · planning intents (life-shaped data)', () => {
     ])
     // acknowledged conflicts disappear
     const acked = { ...db, conflictAcks: block.items.map((i) => ({ id: i.conflict.key, createdAt: '', updatedAt: '', key: i.conflict.key, decision: 'manter' as const, date: i.conflict.date })) }
-    expect(askMari(acked, 'Tem conflito essa semana?', LIFE_TODAY, 480).headline).toMatch(/^Nenhum conflito essa semana/)
+    expect(askLumos(acked, 'Tem conflito essa semana?', LIFE_TODAY, 480).headline).toMatch(/^Nenhum conflito essa semana/)
   })
 
   it('"O que tenho pendente antes da África?" → sub-areas + trip task, Recife mentioned first', () => {
@@ -77,7 +77,7 @@ describe('Mari · planning intents (life-shaped data)', () => {
   })
 })
 
-describe('Mari · training fuel (only registered guidance)', () => {
+describe('Lumos · training fuel (only registered guidance)', () => {
   it('"Qual minha estratégia pra amanhã?" the day before a key long ride', () => {
     const a = ask('Qual minha estratégia pra amanhã?', '2026-10-10', 19 * 60)
     expect(a.agents.map((x) => x.id)).toEqual(['fuel'])
@@ -99,7 +99,7 @@ describe('Mari · training fuel (only registered guidance)', () => {
     expect(ask('Qual minha estratégia pra amanhã?').headline).toBe('🎪 Circo / Aéreos amanhã. Ainda não tem estratégia cadastrada pra isso.')
     expect(ask('Qual minha estratégia pra amanhã?', '2026-10-06').headline).toMatch(/^Amanhã não tem treino no plano/)
     const none = { ...db, nutritionStrategies: [], nutritionDayPlans: [] }
-    expect(askMari(none, 'o que comer antes do pedal?', '2026-10-10', 480).headline).toMatch(/Ainda não tem estratégia cadastrada pra isso/)
+    expect(askLumos(none, 'o que comer antes do pedal?', '2026-10-10', 480).headline).toMatch(/Ainda não tem estratégia cadastrada pra isso/)
   })
 
   it('"Como foi minha semana de treinos-chave?" → key sessions + post check-in, no body numbers', () => {

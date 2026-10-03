@@ -1,5 +1,5 @@
 /**
- * Planning engine shared by Hoje, Agenda, Corpo, "Montar minha semana" and Mari.
+ * Planning engine shared by Hoje, Agenda, Corpo, "Montar minha semana" and Lumos.
  *
  * Principles
  * - It never blocks or deletes anything: it only *describes* conflicts and suggests windows.

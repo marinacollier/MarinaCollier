@@ -1,5 +1,5 @@
 /**
- * Cross-domain read helpers shared by Hoje, Agenda, Mari, Search and reviews.
+ * Cross-domain read helpers shared by Hoje, Agenda, Lumos, Search and reviews.
  * Pure functions of (db, args). Use inside useMemo: `useMemo(() => tasksForDay(db, today), [db, today])`.
  * Feature-specific selectors belong in the feature folder.
  */

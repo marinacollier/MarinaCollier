@@ -16,7 +16,7 @@ import { AdjustCard, type AdjustStatus } from './adjust/AdjustCard'
 import { applyPlan, undoPlan } from './adjust/apply'
 import { ADJUST_EXAMPLES, planAdjustment, visibleChanges } from './adjust/planner'
 import type { ChangePlan } from './adjust/types'
-import { askMari, EXAMPLE_QUESTIONS } from './chief'
+import { askLumos, EXAMPLE_QUESTIONS } from './chief'
 import { buildInsights, type Insight } from './insights'
 import { ADJUST_PILL, GENERATIVE_PILL } from './llm'
 
@@ -54,7 +54,7 @@ export default function AssistantPage() {
 
   const insights = useMemo(() => buildInsights(db, today, minutes), [db, today, minutes])
   const answers = useMemo(
-    () => exchanges.map((e) => ({ ...e, answer: e.adjust || e.fromLink ? undefined : askMari(db, e.question, today, minutes) })),
+    () => exchanges.map((e) => ({ ...e, answer: e.adjust || e.fromLink ? undefined : askLumos(db, e.question, today, minutes) })),
     [db, exchanges, today, minutes],
   )
 
@@ -124,7 +124,7 @@ export default function AssistantPage() {
           <>
             Oi, {db.profile.name || 'Marina'}.
             <br />
-            Eu sou a Mari ✨
+            Eu sou a Lumos ✨
           </>
         } subtitle="Pergunte sobre seu dia, projetos, gastos, treinos, viagens e livros — ou me conte uma mudança no treino." />
 
@@ -248,7 +248,7 @@ export default function AssistantPage() {
               onChange={(e) => setDraft(e.target.value)}
               enterKeyHint="send"
               autoComplete="off"
-              aria-label="Pergunte para a Mari"
+              aria-label="Pergunte para a Lumos"
               placeholder="Ex.: amanhã troco a corrida longa por surf"
               className="input h-12 pr-12 rounded-full bg-surface border-line placeholder:text-[14px]"
             />

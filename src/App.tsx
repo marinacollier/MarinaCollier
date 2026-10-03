@@ -1,7 +1,7 @@
 import { Suspense, lazy, useEffect } from 'react'
 import { BrowserRouter, MemoryRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useStore } from '@/data/store'
-import { routeTable } from '@/app/routes'
+import { ROUTES, routeTable } from '@/app/routes'
 import { openSheet } from '@/app/ui-store'
 import { useTheme } from '@/app/useTheme'
 import { BottomNav } from '@/components/layout/BottomNav'
@@ -60,6 +60,8 @@ export default function App() {
           {routeTable.map(({ path, Component }) => (
             <Route key={path} path={path} element={<Component />} />
           ))}
+          {/* The assistant was called Mari before Lumos; old links keep working. */}
+          <Route path="/mari" element={<Navigate to={ROUTES.assistant} replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>

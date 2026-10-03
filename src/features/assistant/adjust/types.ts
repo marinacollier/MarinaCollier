@@ -36,7 +36,7 @@ export interface PlanChoiceOption {
 }
 
 export interface ChangePlan {
-  /** One line, Mari's voice: "Amanhã: 🚴 Pedal longo → 🏄‍♀️ Surf". */
+  /** One line, Lumos's voice: "Amanhã: 🚴 Pedal longo → 🏄‍♀️ Surf". */
   summary: string
   changes: PlanChange[]
   /** What else moves with it (day type / nutritionist's day plan / PREP / strategy). */

@@ -12,7 +12,7 @@ import { runAction, sheetAction, type ResultAction } from '@/features/search/act
 import { search, topResults } from '@/features/search/engine'
 import { pushRecent } from '@/features/search/recent'
 import { ResultRow } from '@/features/search/ResultViews'
-import { askMariCommand, buildCommands, filterCommands, SECTION_LABEL } from './commands'
+import { askLumosCommand, buildCommands, filterCommands, SECTION_LABEL } from './commands'
 
 interface Row {
   key: string
@@ -62,7 +62,7 @@ export default function CommandPaletteSheet({ query: initial = '' }: SheetProps<
       if (out.length === 0) {
         out.push({ key: 'dump', section: 'Criar', emoji: '🧠', title: `Tirar da cabeça: “${q}”`, action: sheetAction('brainDump', { text: q }) })
       }
-      const mari = askMariCommand(q)
+      const mari = askLumosCommand(q)
       out.push({ key: mari.id, section: SECTION_LABEL.mari, emoji: mari.emoji, title: mari.label, action: mari.action })
     }
     return out

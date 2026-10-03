@@ -55,16 +55,16 @@ describe('lexicon', () => {
     expect(lex(db, 'pedal', TODAY).mods[0].id).toBe('bike')
   })
 
-  it('questions Mari already answers are not adjustments', () => {
+  it('questions Lumos already answers are not adjustments', () => {
     const db = seed()
     for (const q of EXAMPLE_QUESTIONS) expect(planAdjustment(db, q, TODAY), q).toBeUndefined()
     expect(planAdjustment(db, 'Qual minha estratégia pra amanhã?', TODAY)).toBeUndefined()
-    expect(planAdjustment(db, 'oi Mari', TODAY)).toBeUndefined()
+    expect(planAdjustment(db, 'oi Lumos', TODAY)).toBeUndefined()
   })
 })
 
 describe('swap', () => {
-  it('Marina’s exact sentence on the real seed: tomorrow is the long ride, so Mari asks which one', () => {
+  it('Marina’s exact sentence on the real seed: tomorrow is the long ride, so Lumos asks which one', () => {
     const p = plan(seed(), 'amanhã vou mudar meu treino de corrida longa p surf')
     expect(p.changes).toEqual([])
     expect(p.needsChoice?.question).toMatch(/Amanhã não tem corrida longa/)

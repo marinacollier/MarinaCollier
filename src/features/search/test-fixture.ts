@@ -1,5 +1,5 @@
 /**
- * Hand-made DB used by the search / Mari / command tests and for screenshots.
+ * Hand-made DB used by the search / Lumos / command tests and for screenshots.
  * Not imported by app code. Dates are relative to `today` (tests use 2026-10-02, a Friday).
  * Money values here are test data only — never seed data.
  */

@@ -14,7 +14,7 @@ export function EmojiBadge({ emoji, className }: { emoji?: string; className?: s
   )
 }
 
-/** One tappable row: emoji, title, subtitle, chevron. Shared by search, palette and Mari. */
+/** One tappable row: emoji, title, subtitle, chevron. Shared by search, palette and Lumos. */
 export function ResultRow({
   emoji,
   title,

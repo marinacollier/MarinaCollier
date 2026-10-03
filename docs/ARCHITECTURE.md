@@ -39,7 +39,7 @@ src/
     life/         Vida hub, Vida real (life admin), Luna                          [Life Admin]
     goals/        metas (dia/semana/maior)                                       [Goals & Reviews]
     reviews/      revisão semanal, meu mês                                       [Goals & Reviews]
-    search/ assistant/ command/   busca universal, Mari, command palette         [Mari & Search]
+    search/ assistant/ command/   busca universal, Lumos, command palette         [Lumos & Search]
     settings/     Mais, ajustes, personalizar, dados/backup, notificações, Welcome [Settings & Platform]
     integrations/ IntegrationsPage (UI for src/integrations)                      [Integrations]
 ```

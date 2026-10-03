@@ -20,7 +20,7 @@ import { SESSION_SPECIFIC, sessionDefaults } from './defaults'
 import { CONNECTORS, lex, splitClauses, type Lexed, type ModMention } from './lexicon'
 import type { ChangePlan, PlanChange, WorkoutDraft } from './types'
 
-/** Example chips on the Mari page. */
+/** Example chips on the Lumos page. */
 export const ADJUST_EXAMPLES = ['Amanhã troco a corrida longa por surf', 'Domingo o pedal vai ser de 4h', 'Hoje não vou treinar']
 
 const WINDOW_DAYS = 7

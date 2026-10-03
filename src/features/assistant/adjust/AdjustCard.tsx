@@ -69,7 +69,7 @@ export function AdjustCard({ db, today, plan, status, onConfirm, onFineTune, onC
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', bounce: 0, duration: 0.45 }} className="card p-4 space-y-3.5">
       <div>
-        <div className="eyebrow">✨ Mari · ajustar por conversa</div>
+        <div className="eyebrow">✨ Lumos · ajustar por conversa</div>
         {plan.needsChoice ? (
           <p className="font-display text-[19px] leading-snug mt-1">{plan.needsChoice.question}</p>
         ) : changes.length ? (

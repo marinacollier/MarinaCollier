@@ -1,5 +1,5 @@
 /**
- * 2–4 gentle, deterministic observations for the top of the Mari page.
+ * 2–4 gentle, deterministic observations for the top of the Lumos page.
  * Facts + a next step. Never scores, never guilt.
  */
 import type { DateKey, DB, Tone, Trip } from '@/data/types'
@@ -17,7 +17,7 @@ export interface Insight {
   text: string
   tone: Tone
   action?: ResultAction
-  /** Follow-up question to ask Mari when tapped (preferred over action). */
+  /** Follow-up question to ask Lumos when tapped (preferred over action). */
   ask?: string
 }
 

@@ -24,7 +24,7 @@ export const SECTION_LABEL: Record<CommandSection, string> = {
   criar: 'Criar',
   abrir: 'Abrir',
   ir: 'Ir para',
-  mari: 'Mari',
+  mari: 'Lumos',
 }
 
 const MAIN_ROUTES: { label: string; emoji: string; to: string; keywords?: string[] }[] = [
@@ -48,7 +48,7 @@ const MAIN_ROUTES: { label: string; emoji: string; to: string; keywords?: string
   { label: 'Montar minha semana', emoji: '🧭', to: ROUTES.weekPlanner, keywords: ['semana', 'planejar', 'planner', 'treinos da semana', 'conflitos'] },
   { label: 'Revisão semanal', emoji: '🗓️', to: ROUTES.weeklyReview, keywords: ['review'] },
   { label: 'Meu mês', emoji: '🌙', to: ROUTES.monthlyReview, keywords: ['review', 'mes'] },
-  { label: 'Mari', emoji: '✨', to: ROUTES.assistant, keywords: ['assistente', 'chief of staff', 'perguntar'] },
+  { label: 'Lumos', emoji: '✨', to: ROUTES.assistant, keywords: ['assistente', 'chief of staff', 'perguntar', 'mari'] },
   { label: 'Busca', emoji: '🔎', to: ROUTES.search, keywords: ['procurar', 'buscar'] },
   { label: 'Mais', emoji: '⋯', to: ROUTES.more },
   { label: 'Ajustes', emoji: '⚙️', to: ROUTES.settings, keywords: ['configuracoes', 'settings'] },
@@ -146,11 +146,11 @@ export function filterCommands(commands: Command[], query: string, limit = 8): C
     .map((x) => x.c)
 }
 
-/** "Perguntar à Mari" for whatever was typed. */
-export function askMariCommand(query: string): Command {
+/** "Perguntar à Lumos" for whatever was typed. */
+export function askLumosCommand(query: string): Command {
   return {
-    id: 'ask-mari',
-    label: `Perguntar à Mari: “${query.trim()}”`,
+    id: 'ask-lumos',
+    label: `Perguntar à Lumos: “${query.trim()}”`,
     emoji: '✨',
     section: 'mari',
     keywords: [],

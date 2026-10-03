@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import { emptyDB } from '@/data/defaults'
 import { buildFixture, FIXTURE_TODAY } from '@/features/search/test-fixture'
-import { askMari, EXAMPLE_QUESTIONS } from './chief'
+import { askLumos, EXAMPLE_QUESTIONS } from './chief'
 import { parseQuestion } from './parse'
-import type { AnswerBlock, MariAnswer } from './types'
+import type { AnswerBlock, LumosAnswer } from './types'
 
 const db = buildFixture()
 const today = FIXTURE_TODAY // Friday
 const EIGHT_AM = 8 * 60
-const nbsp = (a: MariAnswer): MariAnswer => JSON.parse(JSON.stringify(a).replace(/\u00a0/g, ' '))
-const ask = (q: string, minutes = EIGHT_AM) => nbsp(askMari(db, q, today, minutes))
+const nbsp = (a: LumosAnswer): LumosAnswer => JSON.parse(JSON.stringify(a).replace(/\u00a0/g, ' '))
+const ask = (q: string, minutes = EIGHT_AM) => nbsp(askLumos(db, q, today, minutes))
 
-const lists = (a: MariAnswer) => a.blocks.filter((b): b is Extract<AnswerBlock, { kind: 'list' }> => b.kind === 'list')
-const list = (a: MariAnswer, title: string) => lists(a).find((l) => l.title === title)
+const lists = (a: LumosAnswer) => a.blocks.filter((b): b is Extract<AnswerBlock, { kind: 'list' }> => b.kind === 'list')
+const list = (a: LumosAnswer, title: string) => lists(a).find((l) => l.title === title)
 
 describe('parseQuestion', () => {
   it('resolves entities accent-insensitively', () => {
@@ -26,7 +26,7 @@ describe('parseQuestion', () => {
   })
 })
 
-describe('Mari answers', () => {
+describe('Lumos answers', () => {
   it('every example question gets a real (non-fallback) answer', () => {
     for (const q of EXAMPLE_QUESTIONS) {
       const a = ask(q)
@@ -56,7 +56,7 @@ describe('Mari answers', () => {
   })
 
   it('urgent question on an empty db is calm', () => {
-    const a = askMari(emptyDB(), 'Tenho alguma coisa urgente hoje?', today, EIGHT_AM)
+    const a = askLumos(emptyDB(), 'Tenho alguma coisa urgente hoje?', today, EIGHT_AM)
     expect(a.headline).toMatch(/Nada urgente/)
   })
 

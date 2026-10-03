@@ -1,7 +1,7 @@
 /**
  * Where generative answers would plug in — not active.
  *
- * Today Mari is 100% deterministic (./chief.ts + ./agents): she parses the question with rules and
+ * Today Lumos is 100% deterministic (./chief.ts + ./agents): she parses the question with rules and
  * reads the local DB. A generative provider would run SERVER-SIDE ONLY (API keys never reach the
  * browser), behind `profile.featureFlags.aiAssistantEnabled` (default off), and would receive a
  * minimal, already-filtered context built by the agents — never the whole DB, never corporate
@@ -106,4 +106,4 @@ export const CHANGE_PLAN_SCHEMA = {
   },
 } as const
 
-export const ADJUST_PILL = 'Mari entende frases comuns e sempre mostra antes de mudar.'
+export const ADJUST_PILL = 'Lumos entende frases comuns e sempre mostra antes de mudar.'

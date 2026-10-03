@@ -57,7 +57,7 @@ export interface Agent {
   answer(ctx: AgentContext): AnswerBlock[]
 }
 
-export interface MariAnswer {
+export interface LumosAnswer {
   question: string
   headline: string
   blocks: AnswerBlock[]

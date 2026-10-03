@@ -5,7 +5,7 @@ import { ConflictCard } from '@/components/planning/ConflictCard'
 import { openSheet } from '@/app/ui-store'
 import { runAction } from '@/features/search/actions'
 import { ResultRow } from '@/features/search/ResultViews'
-import type { AnswerBlock, MariAnswer } from './types'
+import type { AnswerBlock, LumosAnswer } from './types'
 
 function Block({ block, onAsk }: { block: AnswerBlock; onAsk: (q: string) => void }) {
   const navigate = useNavigate()
@@ -93,8 +93,8 @@ function Block({ block, onAsk }: { block: AnswerBlock; onAsk: (q: string) => voi
   }
 }
 
-export function AnswerCard({ answer, onAsk }: { answer: MariAnswer; onAsk: (q: string) => void }) {
-  const via = answer.agents.length ? answer.agents.map((a) => `${a.emoji} ${a.name}`).join(' · ') : '✨ Mari'
+export function AnswerCard({ answer, onAsk }: { answer: LumosAnswer; onAsk: (q: string) => void }) {
+  const via = answer.agents.length ? answer.agents.map((a) => `${a.emoji} ${a.name}`).join(' · ') : '✨ Lumos'
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', bounce: 0, duration: 0.45 }} className="card p-4 space-y-3.5">
       <div>

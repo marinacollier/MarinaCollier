@@ -1094,7 +1094,7 @@ export function search(db: DB, query: string, today: DateKey): SearchResponse {
   return { query: trimmed, groups: groupResults(results), total: results.length }
 }
 
-/** Best results across groups, for compact lists (command palette, Mari fallback). */
+/** Best results across groups, for compact lists (command palette, Lumos fallback). */
 export function topResults(res: SearchResponse, n: number): SearchResult[] {
   return res.groups
     .flatMap((g) => g.results)

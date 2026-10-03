@@ -61,7 +61,7 @@ export function AboutSection() {
           <TextArea value={about} rows={4} placeholder="O que você faz, o que tá rolando agora…" onChange={(e) => setAbout(e.target.value)} onBlur={() => save({ about })} />
         </label>
       </Card>
-      <Hint>Ajuda a Mari e as sugestões a entenderem seu contexto. Fica só no seu aparelho.</Hint>
+      <Hint>Ajuda a Lumos e as sugestões a entenderem seu contexto. Fica só no seu aparelho.</Hint>
     </>
   )
 }

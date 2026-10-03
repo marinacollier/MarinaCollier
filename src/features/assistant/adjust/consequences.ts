@@ -1,6 +1,6 @@
 /**
  * What else changes when a session changes — computed by the real engines (data/fuel.ts,
- * data/planning.ts) on a simulated copy of the DB. Diet follows the training: Mari only reports
+ * data/planning.ts) on a simulated copy of the DB. Diet follows the training: Lumos only reports
  * which prescribed day plan / registered strategy applies after the change. She never invents food.
  */
 import { DAY_TYPE_LABEL, dayPlanFor, dayTrainingContext, durationReviewSuggested, strategyFor } from '@/data/fuel'

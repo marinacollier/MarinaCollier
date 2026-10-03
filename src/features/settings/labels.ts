@@ -49,7 +49,7 @@ export const MORE_MODULES: ModuleEntry[] = [
   { key: 'tarefas', label: 'Tarefas', emoji: '✓', to: ROUTES.tasks, tone: 'sage' },
   { key: 'revisao', label: 'Revisão da semana', emoji: '🗓️', to: ROUTES.weeklyReview, module: 'revisao', tone: 'sage' },
   { key: 'mes', label: 'Meu mês', emoji: '🌙', to: ROUTES.monthlyReview, module: 'mes', tone: 'plum' },
-  { key: 'mari', label: 'Mari', emoji: '✨', to: ROUTES.assistant, module: 'mari', tone: 'accent' },
+  { key: 'mari', label: 'Lumos', emoji: '✨', to: ROUTES.assistant, module: 'mari', tone: 'accent' },
   { key: 'busca', label: 'Busca', emoji: '🔎', to: ROUTES.search, tone: 'ink' },
 ]
 

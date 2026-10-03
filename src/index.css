@@ -83,22 +83,29 @@
   --radius-card: 1.125rem;
 }
 
+/*
+ * Unlayered on purpose: a host page (e.g. a preview wrapper) may inject its own unlayered
+ * body colours, which would beat anything inside @layer base and leave dark text on dark cards.
+ */
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  background: var(--bg);
+  color-scheme: inherit;
+}
+html body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+  min-height: 100dvh;
+}
+
 @layer base {
-  html {
-    -webkit-text-size-adjust: 100%;
-    -webkit-tap-highlight-color: transparent;
-    background: var(--bg);
-  }
-  body {
-    background: var(--bg);
-    color: var(--ink);
-    font-family: var(--font-sans);
-    font-size: 15px;
-    line-height: 1.45;
-    -webkit-font-smoothing: antialiased;
-    overscroll-behavior-y: none;
-    min-height: 100dvh;
-  }
   /* 16px on inputs stops iOS Safari from zooming on focus. */
   input,
   textarea,

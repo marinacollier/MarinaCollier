@@ -178,7 +178,7 @@ export type ModuleId =
   | 'inbox'
   | 'revisao'
   | 'mes'
-  | 'mari'
+  | 'mari' // the assistant (Lumos); key kept so saved module settings stay valid
 
 export type HomeWidgetId =
   | 'agora'
@@ -269,7 +269,7 @@ export interface UserProfile {
   /** Optional overrides of the time-of-day boundaries used by the contextual home (hours, 0-23). */
   dayParts: { morningStart: number; middayStart: number; eveningStart: number }
   homeBase?: string
-  /** A few lines about Marina's current context (shown in Ajustes, used by Mari). */
+  /** A few lines about Marina's current context (shown in Ajustes, used by Lumos). */
   about?: string
   /** Base rhythm. Never a streak: if she wakes later, the day just adapts. */
   rhythm: { wakeTime: TimeHM; sleepTime: TimeHM }

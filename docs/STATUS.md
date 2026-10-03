@@ -23,12 +23,12 @@ Auditoria honesta da primeira versão: produto, engenharia, UX e QA.
 - **Montar minha semana** (7 passos), **Trabalho** (5 frentes, roadmap FashionFinder, rituais CEO Review /
   Monthly Board, Waiting For, Wins, Work Inbox manual), **Creator** (pipeline, série África), **Dinheiro**
   (consciência diária, compras planejadas, possíveis duplicados), **Estudos** (Learning OS), **Livros**,
-  **Viagens** (Trip OS com tudo "revisar"), **Vida real**, **Luna**, **Metas**, **Revisões**, **Mari**
+  **Viagens** (Trip OS com tudo "revisar"), **Vida real**, **Luna**, **Metas**, **Revisões**, **Lumos**
   (respostas por regras com seus dados), **Busca universal**, **⌘K**, **Personalizar**, **Backup JSON/CSV**.
 
 ## O que está limitado ou mockado
 
-- **Mari** não usa IA generativa (interface pronta, flag desligada). Responde com regras.
+- **Lumos** não usa IA generativa (interface pronta, flag desligada). Responde com regras.
 - **Integrações**: só .ics funciona hoje. Google Calendar, Outlook/Teams e Organizze têm código escrito
   segundo a documentação oficial (Supabase Edge Functions), mas nunca foram implantados → aparecem como
   "Configuração necessária". Toki não tem API pública: o app lê os calendários que ele sincroniza e
@@ -74,5 +74,5 @@ Veja o README. Prévia privada (sem instalação/offline): https://claude.ai/art
 6. Organizze (proxy já escrito) com revisão de duplicados.
 7. Persistir checks de pauta/checklists (OccurrenceParent 'event').
 8. Push notifications (Web Push) para véspera de treino-chave e presencial.
-9. Mari com IA generativa no servidor, usando as mesmas regras como contexto.
+9. Lumos com IA generativa no servidor, usando as mesmas regras como contexto.
 10. Testes E2E no iPhone (Safari) dos fluxos: manhã, captura, treino, gasto, fechar o dia.

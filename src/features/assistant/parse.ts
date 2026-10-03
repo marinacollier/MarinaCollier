@@ -1,5 +1,5 @@
 /**
- * Question parsing for Mari: pt-BR keywords (accent-insensitive) + entity resolution
+ * Question parsing for Lumos: pt-BR keywords (accent-insensitive) + entity resolution
  * (projects, trips incl. "África" → "África do Sul", modalities, time words, months).
  */
 import type { DB } from '@/data/types'
