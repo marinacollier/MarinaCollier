@@ -194,6 +194,7 @@ export function emptyDB(): DB {
     scheduleOverrides: [],
     foods: [],
     mealAdjustments: [],
+    mealPrepPlans: [],
   }
 }
 

@@ -74,6 +74,7 @@ export const COLLECTION_LABELS: Partial<Record<CollectionKey, string>> = {
   scheduleOverrides: 'Ajustes de horário do dia',
   foods: 'Meus alimentos',
   mealAdjustments: 'Ajustes de refeição',
+  mealPrepPlans: 'Meal prep da semana',
 }
 
 export interface BackupPreview {

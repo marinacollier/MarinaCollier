@@ -356,6 +356,8 @@ export interface UserProfile {
   seedVersion?: number
   /** Lumos may apply small meal adjustments without asking (off by default; always undoable). */
   lumosAutoApplySmall?: boolean
+  /** Food likes / aversions Lumos respects when choosing among the nutritionist's substitutions. */
+  foodPrefs?: { likes: string[]; dislikes: string[] }
 }
 
 export interface WorkSchedule {
@@ -656,6 +658,28 @@ export interface Meal extends Entity {
   contentSource?: ContentSource
   /** How it was registered ("comi um YoPRO" → 'lumos'). */
   loggedVia?: 'botao' | 'lumos' | 'formulario'
+}
+
+// ─── Meal prep (operationalizes the plan for a week) ─────────────────────────
+
+/**
+ * One week of meal prep ("faz minhas marmitas"). Derived content (menu, shopping list, batch steps,
+ * pots, kits) is computed from the plans + this record's choices; only decisions and progress are stored.
+ * Keys: plan item = '<NutritionDayPlan.id>#<meal index>#<item index>'; pot = '<DateKey>#<meal index>'.
+ */
+export interface MealPrepPlan extends Entity {
+  /** Monday of the week (DateKey). One active plan per week. */
+  weekStart: DateKey
+  /** Substitution picked for a given day's plan item (text exactly as in PlannedFood.substitutions). Key: '<DateKey>#<meal index>#<item index>'. */
+  choices: Record<string, string>
+  /** Ingredients Marina says she already has at home (lowercase names). */
+  pantry: string[]
+  /** Shopping-list keys / batch-step keys / pot keys she ticked. */
+  checked: string[]
+  /** Where each prepared pot is ('geladeira' | 'freezer') and whether it's been eaten. */
+  pots?: Record<string, 'geladeira' | 'freezer' | 'consumido'>
+  notes?: string
+  by: 'lumos' | 'marina'
 }
 
 // ─── Nutrition ledger (execution layer over the nutritionist's plan) ────────
@@ -1395,6 +1419,7 @@ export interface DB {
   scheduleOverrides: ScheduleOverride[]
   foods: FoodItem[]
   mealAdjustments: MealAdjustment[]
+  mealPrepPlans: MealPrepPlan[]
 }
 
 /** Keys of DB that hold arrays of entities. */
