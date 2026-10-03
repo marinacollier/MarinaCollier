@@ -20,7 +20,7 @@ export const seedGoals: FeatureSeed = (ctx) => ({
       level: 'maior',
       title: 'South Africa 2026 pronta pra embarcar',
       category: 'viagem',
-      deadline: '2026-10-24',
+      deadline: '2026-10-22',
       big: true,
       status: 'ativa',
       order: 0,

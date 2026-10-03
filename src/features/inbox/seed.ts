@@ -10,9 +10,9 @@ export const INBOX_GROUPS = ['Hoje', 'Trabalho', 'África do Sul', 'Recife', 'UG
  */
 const ITEMS: [group: (typeof INBOX_GROUPS)[number], text: string][] = [
   ['Trabalho', 'Day One AI: qual o próximo foco — ranking do Match ou padronização do Planner?'],
-  ['África do Sul', 'Conferir pendências da África antes do dia 24'],
+  ['África do Sul', 'Conferir pendências da África antes do dia 22'],
   ['África do Sul', 'Johannesburg / safari (13–16/11): o que ainda falta confirmar?'],
-  ['Recife', 'Recife: confirmar voo e logística (dia 22)'],
+  ['Recife', 'Recife: definir data, voo e logística'],
   ['UGC', 'Banco de ideias pra série “Um mês sozinha na África do Sul”'],
   ['Estudos', 'Definir próximo foco da pós / Tera'],
   ['Vida', 'Montar minha semana no domingo'],

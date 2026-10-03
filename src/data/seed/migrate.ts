@@ -7,6 +7,8 @@
  * - records from the previous example seed that were never touched (same creation stamp as the
  *   original seed and createdAt === updatedAt) are upgraded to the new seed version, or retired
  *   when the new seed no longer has them — so generic examples don't linger next to her real life;
+ * - any record with a seed id that was never edited (createdAt === updatedAt) is refreshed to the
+ *   current seed version, so corrections to the life seed reach existing installs;
  * - profile fields introduced by the seed (rhythm, work, about, homeBase, widget order) are applied
  *   only when the stored profile still has the generic defaults for them.
  */
@@ -47,10 +49,14 @@ export function applyLifeSeed(db: DB, today: DateKey): DB {
     const fresh = new Map((list as Rec[]).map((x) => [x.id, x]))
     const kept: Rec[] = []
     for (const r of out[k] as Rec[]) {
+      const upgraded = fresh.get(r.id)
       if (untouchedOldSeed(r)) {
-        const upgraded = fresh.get(r.id)
         if (upgraded) kept.push(upgraded) // untouched example → new version
         // else: untouched example the new seed dropped → retired
+      } else if (upgraded && r.createdAt === r.updatedAt) {
+        // A seed record (stable id) Marina never edited → refreshed with corrected seed data
+        // (e.g. a trip date she later corrected in the brief). Edited records are never touched.
+        kept.push(upgraded)
       } else kept.push(r)
     }
     const ids = new Set(kept.map((x) => x.id))

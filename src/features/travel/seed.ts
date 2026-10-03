@@ -15,15 +15,15 @@ export const seedTravel: FeatureSeed = (ctx) => {
     name: 'Recife',
     flag: '🇧🇷',
     place: 'Recife, PE',
-    startDate: '2026-10-22',
-    datesConfirmed: true,
-    summary: 'Recife em outubro ☀️ — viagem própria, mesmo colada na África do Sul.',
+    dateLabel: 'data a confirmar',
+    datesConfirmed: false,
+    summary: 'Recife ☀️ — viagem própria. Data ainda a confirmar.',
     interests: [],
     tone: 'accent',
     links: [],
-    notes: 'Data de ida: 22/10. Volta / próximo deslocamento ainda a confirmar.',
+    notes: 'Datas ainda a confirmar.',
     status: 'planejando',
-    order: 0,
+    order: 1,
   })
 
   const africa = ctx.make('trips', {
@@ -31,7 +31,7 @@ export const seedTravel: FeatureSeed = (ctx) => {
     name: 'South Africa 2026',
     flag: '🇿🇦',
     place: 'Cape Town (base) · Johannesburg',
-    startDate: '2026-10-24',
+    startDate: '2026-10-22',
     endDate: '2026-11-16',
     datesConfirmed: true,
     summary: 'Um mês vivendo Cape Town: estudo, mar, montanha e gente nova — fechando com safari em Johannesburg.',
@@ -52,9 +52,9 @@ export const seedTravel: FeatureSeed = (ctx) => {
     companions: 'maior parte solo',
     tone: 'sand',
     links: [],
-    notes: 'Datas como período-base: 24/10 → 16/11. Reservas e pagamentos têm status próprio — nada é “pago” só por estar no roteiro.',
+    notes: 'Datas como período-base: 22/10 → 16/11. Reservas e pagamentos têm status próprio — nada é “pago” só por estar no roteiro.',
     status: 'planejando',
-    order: 1,
+    order: 0,
   })
 
   const itacare = ctx.make('trips', {
@@ -160,7 +160,7 @@ export const seedTravel: FeatureSeed = (ctx) => {
     item(R, 'pessoas', 'quero_ir', undefined, 'Pessoas'),
     item(R, 'compras', 'comprar', undefined, 'Compras'),
     item(R, 'logistica', 'transporte', undefined, 'Logística'),
-    item(R, 'retorno', 'transporte', undefined, 'Retorno / próximo deslocamento', { notes: 'Conecta com a África do Sul no dia 24?' }),
+    item(R, 'retorno', 'transporte', undefined, 'Retorno / próximo deslocamento', { notes: 'A confirmar.' }),
   ]
 
   // ── Réveillon — Itacaré (§30) ─────────────────────────────────────────────

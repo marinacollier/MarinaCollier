@@ -260,10 +260,11 @@ describe('seed', () => {
   it('seeds the three trips with stable ids and her dates', () => {
     expect(trips.map((t) => t.id).sort()).toEqual([SEED_IDS.tripAfrica, SEED_IDS.tripItacare, SEED_IDS.tripRecife].sort())
     const recife = byId(SEED_IDS.tripRecife)
-    expect(recife).toMatchObject({ startDate: '2026-10-22', datesConfirmed: true, status: 'planejando' })
-    expect(recife.endDate).toBeUndefined()
+    // Marina, 03/10: "22 de outubro viajo p África do Sul, não p Recife" — Recife's date is unknown.
+    expect(recife).toMatchObject({ dateLabel: 'data a confirmar', datesConfirmed: false, status: 'planejando' })
+    expect(recife.startDate).toBeUndefined()
     const africa = byId(SEED_IDS.tripAfrica)
-    expect(africa).toMatchObject({ name: 'South Africa 2026', flag: '🇿🇦', startDate: '2026-10-24', endDate: '2026-11-16', datesConfirmed: true })
+    expect(africa).toMatchObject({ name: 'South Africa 2026', flag: '🇿🇦', startDate: '2026-10-22', endDate: '2026-11-16', datesConfirmed: true })
     expect(africa.notes).toMatch(/período-base/)
     const itacare = byId(SEED_IDS.tripItacare)
     expect(itacare).toMatchObject({ place: 'Itacaré, Bahia', dateLabel: 'fim de 2026 / Réveillon', datesConfirmed: false })
@@ -277,12 +278,12 @@ describe('seed', () => {
     expect(seedTravel(createSeedContext('2027-01-01')).tripItems!.map((i) => i.id)).toEqual(items.map((i) => i.id))
   })
 
-  it('orders countdowns Recife → South Africa → Itacaré (local + shared selector)', () => {
-    const order = [SEED_IDS.tripRecife, SEED_IDS.tripAfrica, SEED_IDS.tripItacare]
+  it('orders countdowns: South Africa (22/10) first, undated trips after (local + shared selector)', () => {
+    const order = [SEED_IDS.tripAfrica, SEED_IDS.tripRecife, SEED_IDS.tripItacare]
     expect(sortUpcoming(trips, TODAY).map((t) => t.id)).toEqual(order)
     const db = { trips } as unknown as DB
     expect(upcomingTrips(db, TODAY).map((t) => t.id)).toEqual(order)
-    expect(tripBuckets(trips, TODAY).next?.id).toBe(SEED_IDS.tripRecife)
+    expect(tripBuckets(trips, TODAY).next?.id).toBe(SEED_IDS.tripAfrica)
   })
 
   it('never invents money, confirmations or payments', () => {
@@ -317,12 +318,11 @@ describe('seed', () => {
     expect(reviewItems(mine)).toHaveLength(mine.length)
   })
 
-  it('Recife: §29 items a confirmar, return phrased as a question; back-to-back note', () => {
+  it('Recife: §29 items a confirmar, no date yet so no back-to-back note', () => {
     const mine = items.filter((i) => i.tripId === SEED_IDS.tripRecife)
     expect(mine.map((i) => i.title)).toEqual(['Voo', 'Mala', 'Compromissos', 'Pessoas', 'Compras', 'Logística', 'Retorno / próximo deslocamento'])
-    expect(mine.at(-1)!.notes).toMatch(/\?$/)
-    const f = followingTrip(byId(SEED_IDS.tripRecife), trips)
-    expect(f && followingTripLabel(f)).toBe('2 dias depois: South Africa 2026 🇿🇦')
+    expect(mine.every((i) => i.status === 'a_confirmar')).toBe(true)
+    expect(followingTrip(byId(SEED_IDS.tripRecife), trips)).toBeUndefined()
   })
 
   it('Itacaré: §30 items, no budget', () => {

@@ -91,7 +91,7 @@ describe('goals seed', () => {
   it('only long-term goals grounded in the brief, stable ids, no weekly goals, no invented progress', () => {
     const goals = seedGoals(createSeedContext('2026-10-02')).goals!
     expect(goals.map((x) => [x.title, x.category, x.deadline])).toEqual([
-      ['South Africa 2026 pronta pra embarcar', 'viagem', '2026-10-24'],
+      ['South Africa 2026 pronta pra embarcar', 'viagem', '2026-10-22'],
       ['FashionFinder — roadmap até 20/11', 'profissional', '2026-11-20'],
       ['Manter yoga na rotina', 'corpo', undefined],
     ])

@@ -49,3 +49,19 @@ describe('life seed migration — old example cleanup', () => {
     expect(r.name).toBe(fresh.name)
   })
 })
+
+describe('life seed migration — corrections reach existing installs', () => {
+  it('refreshes never-edited seed records and keeps edited ones', () => {
+    const fresh = buildSeed('2026-10-03')
+    const old = structuredClone(fresh)
+    old.profile.seedVersion = 3
+    const africa = old.trips.find((t) => t.id === 'trip-africa-do-sul')!
+    africa.startDate = '2026-10-24' // stale seed value, never edited (createdAt === updatedAt)
+    const itacare = old.trips.find((t) => t.id === 'trip-itacare')!
+    itacare.summary = 'minha versão'
+    itacare.updatedAt = '2026-10-03T12:00:00.000Z' // edited by Marina
+    const next = applyLifeSeed(old, '2026-10-03')
+    expect(next.trips.find((t) => t.id === 'trip-africa-do-sul')!.startDate).toBe('2026-10-22')
+    expect(next.trips.find((t) => t.id === 'trip-itacare')!.summary).toBe('minha versão')
+  })
+})

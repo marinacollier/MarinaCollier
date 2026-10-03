@@ -103,6 +103,6 @@ describe('inbox seed', () => {
     expect(seed.brainDump.every((b) => b.id.startsWith('seed:inbox:') && b.status === 'inbox')).toBe(true)
     expect(new Set(seed.brainDump.map((b) => b.id)).size).toBe(seed.brainDump.length)
     expect(seed.brainDump.some((b) => /seed/i.test(b.text))).toBe(false)
-    expect(seed.brainDump.map((b) => b.text)).toContain('Recife: confirmar voo e logística (dia 22)')
+    expect(seed.brainDump.map((b) => b.text)).toContain('Recife: definir data, voo e logística')
   })
 })
