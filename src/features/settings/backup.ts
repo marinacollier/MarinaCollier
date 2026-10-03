@@ -71,6 +71,9 @@ export const COLLECTION_LABELS: Partial<Record<CollectionKey, string>> = {
   nutritionStrategies: 'Estratégias nutricionais',
   nutritionDayPlans: 'Planos alimentares',
   bodyComposition: 'Composição corporal',
+  scheduleOverrides: 'Ajustes de horário do dia',
+  foods: 'Meus alimentos',
+  mealAdjustments: 'Ajustes de refeição',
 }
 
 export interface BackupPreview {

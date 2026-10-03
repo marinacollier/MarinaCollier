@@ -3,6 +3,7 @@ import { ROUTES } from '@/app/routes'
 
 export const WIDGET_META: Record<HomeWidgetId, { label: string; text: string; emoji: string }> = {
   agora: { label: 'Agora / Próximo', text: 'o que importa agora e o que vem depois', emoji: '✨' },
+  linha_do_dia: { label: 'Linha do dia', text: 'rotina, treino, comida e agenda numa linha só', emoji: '🕰️' },
   top3: { label: 'Top 3', text: 'o que realmente importa hoje', emoji: '🎯' },
   manha: { label: 'Rotina da manhã', text: 'uma rotina só, que abre quando você quiser', emoji: '☀️' },
   proximo_compromisso: { label: 'Agenda', text: 'os compromissos do dia', emoji: '📅' },

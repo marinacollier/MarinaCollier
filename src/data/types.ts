@@ -157,7 +157,83 @@ export interface Occurrence extends Entity {
   note?: string
   /** Indexes of RoutineItem.steps checked that day. */
   stepsDone?: number[]
+  /** Real moment it was checked (the time she actually did it). */
+  completedAt?: ISODateTime
 }
+
+// ─── Time-aware day (one life, one timeline) ────────────────────────────────
+
+/**
+ * How an item gets its time on a given day.
+ * - fixed: `time` (and optional `endTime`)
+ * - window: somewhere inside `window` (shown as "05:00–05:30")
+ * - sequence: starts when the previous item of the same routine ends (derived from durations)
+ * - anytime: explicit "ao longo do dia" — a decision, never a default
+ */
+export type TimeMode = 'fixed' | 'window' | 'sequence' | 'anytime'
+
+export interface TimeWindow {
+  start: TimeHM
+  end: TimeHM
+}
+
+/** What a per-day override points at. `planMeal` refId = '<NutritionDayPlan.id>#<meal index>'; `routineStep` refId = '<RoutineItem.id>#<step index>'. */
+export type ScheduleRefType = 'routineItem' | 'routineStep' | 'workout' | 'planMeal' | 'event' | 'task' | 'petTask' | 'weekTemplate'
+
+/**
+ * Change to ONE day only ("nesta quinta yoga às 20:00"). The recurring default never changes.
+ * At most one per (date, refType, refId); the latest write wins.
+ */
+export interface ScheduleOverride extends Entity {
+  date: DateKey
+  refType: ScheduleRefType
+  refId: string
+  time?: TimeHM
+  endTime?: TimeHM
+  /** Not happening that day ("amanhã cancelei meu inglês"). Frees the slot; prep linked by `dependsOn` goes too. */
+  cancelled?: boolean
+  /** Explicit "qualquer momento" for that day. */
+  anytime?: boolean
+  /** Who changed it — Lumos changes are always undoable and shown as such. */
+  by: 'marina' | 'lumos'
+  reason?: string
+}
+
+/** One row of the unified day (rotina + treino + comida + agenda + tarefas). Derived, never stored. */
+export type TimelineKind = 'routine' | 'routineItem' | 'workout' | 'meal' | 'event' | 'work' | 'task' | 'petTask'
+
+export type TimelineTimeSource = 'fixed' | 'window' | 'derived' | 'override' | 'anytime' | 'approx'
+
+export interface TimelineEntry {
+  /** Stable key for React + drag (e.g. 'routineItem:<id>', 'planMeal:<plan>#2'). */
+  key: string
+  kind: TimelineKind
+  /** Target for ScheduleOverride when the time is edited. */
+  ref: { type: ScheduleRefType; id: string }
+  date: DateKey
+  start?: TimeHM
+  end?: TimeHM
+  timeSource: TimelineTimeSource
+  /** Shown when timeSource is 'window'. */
+  window?: TimeWindow
+  title: string
+  subtitle?: string
+  emoji?: string
+  status: 'pending' | 'done' | 'skipped' | 'cancelled'
+  /** Real time it happened (HH:MM, São Paulo) — "✓ 08:17". */
+  doneAt?: TimeHM
+  /** Group rows (Despertar, Higiene) carry their steps; times derived from durations when not explicit. */
+  children?: TimelineEntry[]
+  planType?: PlanType
+  /** Fuel phase for meals/prep around trainings. */
+  phase?: FuelPhase | 'refeicao'
+  /** Where the content comes from (meals: nutri / troca / lumos). */
+  badge?: ContentSource
+  editable: { time: boolean; reorder: boolean; check: boolean }
+}
+
+/** Badge for content shown inside a meal / suggestion. */
+export type ContentSource = 'nutri' | 'troca' | 'lumos' | 'marina'
 
 // ─── Profile & customization ────────────────────────────────────────────────
 
@@ -203,6 +279,8 @@ export type HomeWidgetId =
   | 'brain_dump'
   /** Evening: "Amanhã é presencial 👜" prep checklist / tomorrow at a glance. */
   | 'amanha'
+  /** The unified day: rotina + treino + comida + agenda + tarefas in one time-ordered list. */
+  | 'linha_do_dia'
 
 export interface Modality {
   id: string
@@ -276,6 +354,8 @@ export interface UserProfile {
   work: WorkSchedule
   /** Version of the life seed applied to this database (see data/seed/migrate.ts). */
   seedVersion?: number
+  /** Lumos may apply small meal adjustments without asking (off by default; always undoable). */
+  lumosAutoApplySmall?: boolean
 }
 
 export interface WorkSchedule {
@@ -376,8 +456,24 @@ export interface RoutineItem extends Entity {
   recurrence: Recurrence
   order: number
   active: boolean
-  /** Base time within the routine (e.g. 04:40 Despertar). */
+  /** Default scheduled time (e.g. 04:40 Despertar). Per-day changes live in ScheduleOverride. */
   time?: TimeHM
+  /** Default end (scheduledEndTime). */
+  endTime?: TimeHM
+  /** Expected minutes; used to derive the next item's time in 'sequence' mode and the end time. */
+  durationMin?: number
+  /** Missing = 'fixed' when `time` is set, otherwise 'sequence'. 'anytime' must be set explicitly. */
+  timeMode?: TimeMode
+  /** preferredTimeWindow, e.g. 05:00–05:30. */
+  window?: TimeWindow
+  /** Can slide without it being a conflict. */
+  timeFlexible?: boolean
+  /** Minutes per step (same index as `steps`) so each step gets its own derived time. */
+  stepDurations?: number[]
+  /** Must happen after these (RoutineItem ids, or 'workout' = after the day's first training). */
+  dependsOn?: (ID | 'workout')[]
+  /** Where the default came from. */
+  source?: 'seed' | 'marina' | 'lumos'
   /** Optional sub-checklist (Higiene: raspar língua, lavar rosto...). Checks live in Occurrence.stepsDone. */
   steps?: string[]
   /** Part of the short version; `essentialLabel` replaces the title there ("5 min de leitura"). */
@@ -550,6 +646,78 @@ export interface Meal extends Entity {
   workoutId?: ID
   /** Prescribed meal it follows: '<NutritionDayPlan.id>#<meal index>'. */
   planMealRef?: string
+  /** Time the plan had for it (kept next to the real time). */
+  plannedTime?: TimeHM
+  /** Real moment she ate (set automatically by "comi"). `time` mirrors its HH:MM for older screens. */
+  consumedAt?: ISODateTime
+  /** What was actually eaten, with nutrients when known. Empty = followed the plan as prescribed. */
+  foods?: LoggedFood[]
+  /** Who decided the content: the plan, a plan swap, a Lumos suggestion or Marina herself. */
+  contentSource?: ContentSource
+  /** How it was registered ("comi um YoPRO" → 'lumos'). */
+  loggedVia?: 'botao' | 'lumos' | 'formulario'
+}
+
+// ─── Nutrition ledger (execution layer over the nutritionist's plan) ────────
+
+export interface Nutrients {
+  kcal: number
+  protein: number
+  carbs: number
+  fat: number
+  fiber?: number
+}
+
+/**
+ * How much to trust the numbers.
+ * label = rótulo do produto informado; reference = tabela de composição (TACO/IBGE) por gramas;
+ * plan = calculado das gramas do plano; estimated = estimativa declarada; unknown = sem números.
+ */
+export type NutrientConfidence = 'label' | 'reference' | 'plan' | 'estimated' | 'unknown'
+
+/** "Meus alimentos" + the built-in reference foods. One serving = `serving`. */
+export interface FoodItem extends Entity {
+  name: string
+  /** Lowercase, accent-free names used by the parser ("yopro", "iogurte proteico"). */
+  aliases: string[]
+  emoji?: string
+  serving: { label: string; grams?: number; ml?: number }
+  /** Nutrients of ONE serving. */
+  nutrients: Nutrients
+  confidence: NutrientConfidence
+  /** Where the numbers came from ("rótulo YoPRO 250 ml", "TACO 4ª ed."). */
+  sourceNote?: string
+  /** Saved by Marina → shows first, one-tap logging. */
+  mine?: boolean
+  uses?: number
+  lastUsedAt?: ISODateTime
+}
+
+export interface LoggedFood {
+  name: string
+  /** Servings of `foodId` (1 YoPRO = 1). */
+  qty: number
+  unitLabel?: string
+  grams?: number
+  foodId?: ID
+  nutrients?: Nutrients
+  confidence: NutrientConfidence
+}
+
+/** A proposed or applied change to a FUTURE planned meal of one day. Original plan is never edited. */
+export interface MealAdjustment extends Entity {
+  date: DateKey
+  /** '<NutritionDayPlan.id>#<meal index>' */
+  planMealRef: string
+  kind: 'manter' | 'adaptar' | 'trocar' | 'pular'
+  /** Resulting items; each carries its badge (nutri = unchanged, troca = plan equivalence, lumos = suggestion). */
+  items: (PlannedFood & { badge: ContentSource })[]
+  /** One short human line ("Como você adicionou YoPRO às 14:30…"). */
+  reason: string
+  status: 'proposed' | 'applied' | 'dismissed'
+  /** Meal id that triggered it (the extra). */
+  triggerMealId?: ID
+  by: 'lumos' | 'marina'
 }
 
 export type MealPurpose =
@@ -622,6 +790,11 @@ export type NutritionDayType = 'descanso' | 'leve' | 'moderado' | 'forca_pesada'
 export interface PlannedFood {
   food: string
   qty?: string
+  /** Grams parsed from qty ("2 Fatia(s) (50g)" → 50). */
+  grams?: number
+  /** Computed from a reference table when the plan has no numbers. */
+  nutrients?: Nutrients
+  nutrientConfidence?: NutrientConfidence
   /** "Opções de substituição" exactly as prescribed. */
   substitutions?: string[]
 }
@@ -1218,6 +1391,10 @@ export interface DB {
   nutritionStrategies: NutritionStrategy[]
   nutritionDayPlans: NutritionDayPlan[]
   bodyComposition: BodyComposition[]
+
+  scheduleOverrides: ScheduleOverride[]
+  foods: FoodItem[]
+  mealAdjustments: MealAdjustment[]
 }
 
 /** Keys of DB that hold arrays of entities. */

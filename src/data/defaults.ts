@@ -73,6 +73,7 @@ export function defaultProfile(): UserProfile {
     theme: 'system',
     homeWidgets: [
       { id: 'agora', visible: true },
+      { id: 'linha_do_dia', visible: true },
       { id: 'top3', visible: true },
       { id: 'manha', visible: true },
       { id: 'treino', visible: true },
@@ -190,6 +191,9 @@ export function emptyDB(): DB {
     nutritionStrategies: [],
     nutritionDayPlans: [],
     bodyComposition: [],
+    scheduleOverrides: [],
+    foods: [],
+    mealAdjustments: [],
   }
 }
 
