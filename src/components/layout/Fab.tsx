@@ -5,7 +5,8 @@ import { openSheet } from '@/app/ui-store'
 import { ROUTES } from '@/app/routes'
 
 /** Step-by-step flows have their own footer actions; the global + would cover them. */
-const HIDDEN_ON: string[] = [ROUTES.weekPlanner, ROUTES.weeklyReview]
+// Lumos has its own composer at the bottom; the + would sit on top of its send button.
+const HIDDEN_ON: string[] = [ROUTES.weekPlanner, ROUTES.weeklyReview, ROUTES.assistant]
 import { haptic } from '@/lib/haptics'
 
 /** Global quick add. Sits above the bottom nav, inside the safe area. */
