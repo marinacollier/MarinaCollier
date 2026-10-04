@@ -26,6 +26,7 @@ import {
   WorkFocusWidget,
 } from './widgets/InfoWidgets'
 import { MorningWidget } from './widgets/MorningWidget'
+import { LumosComposer } from '@/features/assistant/LumosComposer'
 import { LinhaDoDiaWidget } from './timeline/LinhaDoDia'
 import { TasksWidget } from './widgets/TasksWidget'
 import { Top3Widget } from './widgets/Top3Widget'
@@ -98,6 +99,8 @@ export default function TodayPage() {
           {showSummary && <DaySummaryLine db={db} today={today} />}
           <EnergyPicker db={db} today={today} />
           {home.mode === 'baixa' && <LowEnergyNote />}
+          {/* One life, one timeline, one AI: say what changed and Lumos reorganizes the day. */}
+          <LumosComposer className="mt-4" />
         </motion.div>
       </header>
 
