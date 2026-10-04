@@ -1,11 +1,13 @@
 import { motion } from 'framer-motion'
-import { AlertTriangle, ArrowDown, Info } from 'lucide-react'
+import { AlertTriangle, ArrowDown, Info, Undo2 } from 'lucide-react'
 import { Button, Chip } from '@/components/ui'
 import { findModality } from '@/data/planning'
 import { PERIOD_LABEL } from '@/data/planning'
 import type { DateKey, DB, Workout } from '@/data/types'
 import { cn } from '@/lib/cn'
 import { capitalize, dayLabel } from '../agents/common'
+import { ChecklistRows, DayRows } from '../lumos-ui'
+import { hasWork } from './apply'
 import { durationText, visibleChanges } from './planner'
 import type { ChangePlan, PlanChange, WorkoutDraft } from './types'
 
@@ -59,26 +61,38 @@ export interface AdjustCardProps {
   onCancel: () => void
   onChoose: (plan: ChangePlan) => void
   onFollowUp: (kind: 'strategy' | 'week' | 'newStrategy') => void
+  /** "Desfazer" inside the card once applied. */
+  onUndo?: () => void
+  /** Opens a route (Meal prep). */
+  onLink?: (to: string) => void
 }
 
-export function AdjustCard({ db, today, plan, status, onConfirm, onFineTune, onCancel, onChoose, onFollowUp }: AdjustCardProps) {
+function title(plan: ChangePlan, status: AdjustStatus, work: boolean): string {
+  if (!work) return plan.previewTitle ?? plan.summary
+  if (status === 'applied') return plan.doneTitle ?? 'Feito ✓ Ficou assim:'
+  if (status === 'cancelled') return 'Ok, deixei tudo como estava.'
+  if (status === 'undone') return 'Desfeito — voltou como era.'
+  return plan.previewTitle ?? 'Vou ajustar assim:'
+}
+
+export function AdjustCard({ db, today, plan, status, onConfirm, onFineTune, onCancel, onChoose, onFollowUp, onUndo, onLink }: AdjustCardProps) {
   const changes = visibleChanges(plan)
   const primary = changes[0]
   const fuelable = primary && primary.after.status !== 'pulado' && primary.kind !== 'remove'
+  const work = hasWork(plan)
+  const dayOnly = !changes.length
+  const showBody = !plan.needsChoice && status !== 'cancelled'
+  const eyebrow = plan.checklist ? '✨ Lumos · checklist' : changes.length ? '✨ Lumos · ajustar por conversa' : '✨ Lumos · seu dia'
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', bounce: 0, duration: 0.45 }} className="card p-4 space-y-3.5">
       <div>
-        <div className="eyebrow">✨ Lumos · ajustar por conversa</div>
-        {plan.needsChoice ? (
-          <p className="font-display text-[19px] leading-snug mt-1">{plan.needsChoice.question}</p>
-        ) : changes.length ? (
-          <p className="font-display text-[19px] leading-snug mt-1">
-            {status === 'applied' ? 'Feito ✓ Ficou assim:' : status === 'cancelled' ? 'Ok, deixei tudo como estava.' : status === 'undone' ? 'Desfeito — voltou como era.' : 'Vou ajustar assim:'}
-          </p>
-        ) : (
-          <p className="font-display text-[19px] leading-snug mt-1">{plan.summary}</p>
+        <div className="eyebrow">{eyebrow}</div>
+        <p className="font-display text-[19px] leading-snug mt-1">{plan.needsChoice ? plan.needsChoice.question : title(plan, status, work)}</p>
+        {!plan.needsChoice && work && status === 'preview' && plan.previewTitle && plan.summary && dayOnly && !plan.checklist && !plan.dayRows?.length && (
+          <p className="text-[13.5px] text-ink-2 mt-1 leading-snug">{plan.summary}</p>
         )}
+        {!plan.needsChoice && plan.subtitle && <p className="text-[12.5px] text-muted mt-1 leading-snug">{plan.subtitle}</p>}
       </div>
 
       {plan.needsChoice && (
@@ -91,70 +105,86 @@ export function AdjustCard({ db, today, plan, status, onConfirm, onFineTune, onC
         </div>
       )}
 
-      {!plan.needsChoice && changes.length > 0 && status !== 'cancelled' && (
-        <>
-          <div className="space-y-2">
-            {changes.map((c) => (
-              <ChangeRows key={c.after.id} db={db} c={c} today={today} />
+      {showBody && changes.length > 0 && (
+        <div className="space-y-2">
+          {changes.map((c) => (
+            <ChangeRows key={c.after.id} db={db} c={c} today={today} />
+          ))}
+          {plan.changes.length > changes.length && <p className="text-[12px] text-muted px-0.5">O resto do dia fica como estava no seu template.</p>}
+        </div>
+      )}
+
+      {showBody && !!plan.dayRows?.length && status !== 'undone' && (
+        <section>
+          {plan.dayDate && changes.length > 0 && <div className="text-[13px] font-semibold text-ink-2 px-0.5 mb-1.5">Linha do dia · {dayLabel(plan.dayDate, today)}</div>}
+          <DayRows rows={plan.dayRows} />
+        </section>
+      )}
+
+      {showBody && !!plan.checklist?.length && <ChecklistRows lines={plan.checklist} />}
+
+      {showBody && plan.consequences.length > 0 && (
+        <section>
+          <div className="text-[13px] font-semibold text-ink-2 px-0.5 mb-1.5">{changes.length || plan.scheduleOps?.length ? 'Isso muda também:' : 'Bom saber:'}</div>
+          <ul className="space-y-1.5">
+            {plan.consequences.map((t) => (
+              <li key={t} className="flex gap-2 text-[13.5px] leading-snug text-ink-2">
+                <span className="text-muted shrink-0" aria-hidden>
+                  •
+                </span>
+                <span>{t}</span>
+              </li>
             ))}
-            {plan.changes.length > changes.length && <p className="text-[12px] text-muted px-0.5">O resto do dia fica como estava no seu template.</p>}
-          </div>
+          </ul>
+        </section>
+      )}
 
-          {plan.consequences.length > 0 && (
-            <section>
-              <div className="text-[13px] font-semibold text-ink-2 px-0.5 mb-1.5">Isso muda também:</div>
-              <ul className="space-y-1.5">
-                {plan.consequences.map((t) => (
-                  <li key={t} className="flex gap-2 text-[13.5px] leading-snug text-ink-2">
-                    <span className="text-muted shrink-0" aria-hidden>
-                      •
-                    </span>
-                    <span>{t}</span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
+      {showBody && plan.warnings.length > 0 && (
+        <div className="space-y-1.5">
+          {plan.warnings.map((w) => {
+            const warn = w.severity === 'warn'
+            return (
+              <div key={w.key} className={cn('flex gap-2.5 rounded-2xl px-3.5 py-2.5', warn ? 'bg-sand-soft' : 'bg-surface-2')} role="status">
+                {warn ? <AlertTriangle size={16} className="text-sand shrink-0 mt-0.5" /> : <Info size={16} className="text-muted shrink-0 mt-0.5" />}
+                <div className="min-w-0 text-[13.5px] leading-snug">
+                  {w.message.replace(/^⚠️\s*/, '')}
+                  <span className="text-muted"> · {w.title}</span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
-          {plan.warnings.length > 0 && (
-            <div className="space-y-1.5">
-              {plan.warnings.map((w) => {
-                const warn = w.severity === 'warn'
-                return (
-                  <div key={w.key} className={cn('flex gap-2.5 rounded-2xl px-3.5 py-2.5', warn ? 'bg-sand-soft' : 'bg-surface-2')} role="status">
-                    {warn ? <AlertTriangle size={16} className="text-sand shrink-0 mt-0.5" /> : <Info size={16} className="text-muted shrink-0 mt-0.5" />}
-                    <div className="min-w-0 text-[13.5px] leading-snug">
-                      {w.message.replace(/^⚠️\s*/, '')}
-                      <span className="text-muted"> · {w.title}</span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+      {!plan.needsChoice && work && status === 'preview' && (
+        <div className="flex flex-wrap gap-2 pt-0.5">
+          <Button size="sm" onClick={onConfirm}>
+            {plan.confirmLabel ?? 'Confirmar'}
+          </Button>
+          {changes.length > 0 && (
+            <Button size="sm" variant="soft" onClick={onFineTune}>
+              Ajustar
+            </Button>
           )}
+          <Button size="sm" variant="ghost" onClick={onCancel}>
+            {plan.confirmLabel === 'Aplicar' ? 'Agora não' : 'Cancelar'}
+          </Button>
+        </div>
+      )}
 
-          {status === 'preview' && (
-            <div className="flex flex-wrap gap-2 pt-0.5">
-              <Button size="sm" onClick={onConfirm}>
-                Confirmar
-              </Button>
-              <Button size="sm" variant="soft" onClick={onFineTune}>
-                Ajustar
-              </Button>
-              <Button size="sm" variant="ghost" onClick={onCancel}>
-                Cancelar
-              </Button>
-            </div>
+      {(status === 'applied' || (plan.link && status !== 'cancelled')) && !plan.needsChoice && (
+        <div className="flex flex-wrap gap-2">
+          {status === 'applied' && onUndo && (
+            <Chip onClick={onUndo}>
+              <Undo2 size={14} aria-hidden />
+              Desfazer
+            </Chip>
           )}
-
-          {status === 'applied' && (
-            <div className="flex flex-wrap gap-2">
-              {fuelable && <Chip onClick={() => onFollowUp('strategy')}>Ver estratégia</Chip>}
-              {plan.offerStrategy && <Chip onClick={() => onFollowUp('newStrategy')}>Cadastrar estratégia</Chip>}
-              <Chip onClick={() => onFollowUp('week')}>Ver semana</Chip>
-            </div>
-          )}
-        </>
+          {status === 'applied' && fuelable && <Chip onClick={() => onFollowUp('strategy')}>Ver estratégia</Chip>}
+          {status === 'applied' && plan.offerStrategy && <Chip onClick={() => onFollowUp('newStrategy')}>Cadastrar estratégia</Chip>}
+          {status === 'applied' && changes.length > 0 && <Chip onClick={() => onFollowUp('week')}>Ver semana</Chip>}
+          {plan.link && onLink && <Chip onClick={() => onLink(plan.link!.to)}>{plan.link.label} →</Chip>}
+        </div>
       )}
     </motion.div>
   )

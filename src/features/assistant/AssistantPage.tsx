@@ -3,7 +3,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowUp, Sparkles } from 'lucide-react'
 import { Chip, Page, PageHeader, SectionTitle, tone } from '@/components/ui'
+import { describeFoods, saveAdjustment, toLoggedFood } from '@/data/nutrition'
 import { useDB, useStore } from '@/data/store'
+import type { DB, LoggedFood } from '@/data/types'
 import { useNow } from '@/hooks/useToday'
 import { useKeyboardInset } from '@/hooks/useKeyboardInset'
 import { cn } from '@/lib/cn'
@@ -13,23 +15,76 @@ import { ROUTES } from '@/app/routes'
 import { openSheet, toast } from '@/app/ui-store'
 import { AnswerCard } from './AnswerCard'
 import { AdjustCard, type AdjustStatus } from './adjust/AdjustCard'
-import { applyPlan, undoPlan } from './adjust/apply'
-import { ADJUST_EXAMPLES, planAdjustment, visibleChanges } from './adjust/planner'
+import { applyPlan, undoPlan, type ApplySnapshot } from './adjust/apply'
+import { ADJUST_EXAMPLES, visibleChanges } from './adjust/planner'
 import type { ChangePlan } from './adjust/types'
 import { askLumos, EXAMPLE_QUESTIONS } from './chief'
+import { answerFood, type FoodReply } from './food/answer'
+import { FoodAnswerCard, FoodLogCard, type FoodLogState } from './food/FoodCards'
+import { logFromChat, needsAnswer, parseLog, type Savable } from './food/log'
+import { MealPrepCard } from './food/MealPrepCard'
 import { buildInsights, type Insight } from './insights'
 import { ADJUST_PILL, GENERATIVE_PILL } from './llm'
+import { understand, type LumosTurn } from './router'
+
+/** "Lumos controla o dia" — examples with her own sentences. */
+export const DAY_EXAMPLES = ['Amanhã cancelei meu inglês', 'Amanhã quero acordar 5h30', 'Acordei agora', ...ADJUST_EXAMPLES.slice(0, 1)]
+export const FOOD_EXAMPLES = ['Comi um YoPRO', 'Como estão meus macros hoje?', 'Posso manter o jantar normal?', 'Faz minhas marmitas']
 
 interface Exchange {
   id: number
   question: string
-  /** Set when the message reads as a change to the plan ("amanhã troco a corrida por surf"). */
-  adjust?: { plan: ChangePlan; status: AdjustStatus }
-  /** Came from ?q= before the data was loaded: read it as an adjustment once it is. */
+  /** Came from ?q= before the data was loaded: read it once it is. */
   fromLink?: boolean
+  turn?: LumosTurn
+  /** A change to the day / training (preview → Confirmar → Desfazer). */
+  adjust?: { plan: ChangePlan; status: AdjustStatus }
+  food?: FoodLogState
+  reply?: FoodReply
+  skipUndo?: () => void
+  skipUndone?: boolean
 }
 
 let nextId = 1
+
+/** Turn + the effects she asked for by saying it ("comi…", "não vou fazer lanche"), each with undo. */
+function begin(db: DB, question: string, today: string, minutes: number, id = nextId++): Exchange {
+  const turn = understand(db, question, today, minutes)
+  const ex: Exchange = { id, question, turn }
+  if (turn.kind === 'adjust') ex.adjust = { plan: turn.plan, status: 'preview' }
+  if (turn.kind === 'foodLog') {
+    const parsed = parseLog(db, turn.intent.text)
+    if (!parsed.items.length && !needsAnswer(parsed)) {
+      ex.turn = { kind: 'answer' }
+      return ex
+    }
+    ex.food = needsAnswer(parsed) ? { status: 'resolving' } : logNow(parsed.items.map(toLoggedFood), [], turn.intent.at)
+  }
+  if (turn.kind === 'food') {
+    const reply = answerFood(db, turn.intent, today, minutes)
+    ex.reply = reply
+    if (reply.skip) {
+      ex.skipUndo = saveAdjustment(reply.skip.draft).undo
+      haptic('success')
+    }
+  }
+  return ex
+}
+
+function logNow(foods: LoggedFood[], savable: Savable[], at?: string): FoodLogState {
+  const r = logFromChat({ foods, at })
+  haptic('success')
+  return {
+    status: 'logged',
+    mealId: r.meal.id,
+    adjustmentIds: r.adjustments.map((a) => a.id),
+    summary: r.adapt?.summary ?? `Registrei ${describeFoods(foods)} ✓`,
+    autoApplied: r.autoApplied,
+    foods,
+    savable,
+    undo: r.undo,
+  }
+}
 
 export default function AssistantPage() {
   const db = useDB()
@@ -47,6 +102,7 @@ export default function AssistantPage() {
   const [draft, setDraft] = useState('')
   const lastRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const snaps = useRef(new Map<number, ApplySnapshot>())
 
   useEffect(() => {
     if (params.get('q')) setParams({}, { replace: true })
@@ -54,20 +110,17 @@ export default function AssistantPage() {
 
   const insights = useMemo(() => buildInsights(db, today, minutes), [db, today, minutes])
   const answers = useMemo(
-    () => exchanges.map((e) => ({ ...e, answer: e.adjust || e.fromLink ? undefined : askLumos(db, e.question, today, minutes) })),
+    () => exchanges.map((e) => ({ ...e, answer: e.turn?.kind === 'answer' ? askLumos(db, e.question, today, minutes) : undefined })),
     [db, exchanges, today, minutes],
   )
 
   useEffect(() => {
-    if (!hydrated || !exchanges.some((e) => e.fromLink)) return
-    setExchanges((list) =>
-      list.map((e) => {
-        if (!e.fromLink) return e
-        const plan = planAdjustment(db, e.question, today)
-        return { id: e.id, question: e.question, adjust: plan ? { plan, status: 'preview' } : undefined }
-      }),
-    )
-  }, [hydrated, exchanges, db, today])
+    if (!hydrated) return
+    const pending = exchanges.filter((e) => e.fromLink)
+    if (!pending.length) return
+    const ready = new Map(pending.map((e) => [e.id, begin(db, e.question, today, minutes, e.id)]))
+    setExchanges((list) => list.map((e) => ready.get(e.id) ?? e))
+  }, [hydrated, exchanges, db, today, minutes])
 
   useEffect(() => {
     if (exchanges.length) lastRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -77,28 +130,32 @@ export default function AssistantPage() {
     const q = question.trim()
     if (!q) return
     haptic('light')
-    const plan = planAdjustment(db, q, today)
-    setExchanges((list) => [...list, { id: nextId++, question: q, adjust: plan ? { plan, status: 'preview' } : undefined }])
+    const ex = begin(db, q, today, minutes)
+    setExchanges((list) => [...list, ex])
     setDraft('')
     inputRef.current?.blur()
   }
 
-  const setAdjust = (id: number, next: Exchange['adjust']) => setExchanges((list) => list.map((e) => (e.id === id ? { ...e, adjust: next } : e)))
+  const patch = (id: number, p: Partial<Exchange>) => setExchanges((list) => list.map((e) => (e.id === id ? { ...e, ...p } : e)))
+  const setAdjust = (id: number, next: Exchange['adjust']) => patch(id, { adjust: next })
+
+  const undoAdjust = (e: Exchange) => {
+    const snap = snaps.current.get(e.id)
+    if (!snap || !e.adjust) return
+    undoPlan(snap)
+    snaps.current.delete(e.id)
+    setAdjust(e.id, { ...e.adjust, status: 'undone' })
+  }
 
   /** Applies the plan (snapshot first) and offers "Desfazer" for every touched record. */
   const confirm = (e: Exchange) => {
     if (!e.adjust) return
     const snap = applyPlan(e.adjust.plan)
+    snaps.current.set(e.id, snap)
     haptic('success')
     setAdjust(e.id, { ...e.adjust, status: 'applied' })
-    toast('Feito ✓', {
-      action: {
-        label: 'Desfazer',
-        run: () => {
-          undoPlan(snap)
-          setAdjust(e.id, { ...e.adjust!, status: 'undone' })
-        },
-      },
+    toast(e.adjust.plan.doneTitle?.split('✓')[0].trim() ? `${e.adjust.plan.doneTitle.split('✓')[0].trim()} ✓` : 'Feito ✓', {
+      action: { label: 'Desfazer', run: () => undoAdjust({ ...e, adjust: { ...e.adjust!, status: 'applied' } }) },
     })
     return visibleChanges(e.adjust.plan)[0]
   }
@@ -116,17 +173,22 @@ export default function AssistantPage() {
   }
 
   const asked = new Set(exchanges.map((e) => e.question))
-  const moreQuestions = EXAMPLE_QUESTIONS.filter((q) => !asked.has(q))
+  const moreQuestions = [...FOOD_EXAMPLES.slice(1, 3), ...EXAMPLE_QUESTIONS].filter((q) => !asked.has(q))
 
   return (
     <Page>
-      <PageHeader back eyebrow="Chief of Staff" title={
+      <PageHeader
+        back
+        eyebrow="Chief of Staff"
+        title={
           <>
             Oi, {db.profile.name || 'Marina'}.
             <br />
             Eu sou a Lumos ✨
           </>
-        } subtitle="Pergunte sobre seu dia, projetos, gastos, treinos, viagens e livros — ou me conte uma mudança no treino." />
+        }
+        subtitle="Me conta uma mudança no dia ou o que você comeu — ou pergunte sobre projetos, gastos, treinos e viagens."
+      />
 
       <div className="inline-flex items-start gap-1.5 rounded-2xl bg-plum-soft text-plum px-3 py-1.5 text-[12.5px] leading-snug -mt-1">
         <Sparkles size={14} className="shrink-0 mt-[2px]" />
@@ -161,20 +223,26 @@ export default function AssistantPage() {
 
       {exchanges.length === 0 && (
         <>
-          <SectionTitle>Ajustar por conversa</SectionTitle>
-          <p className="text-[13.5px] text-muted leading-snug -mt-1 mb-2.5">{ADJUST_PILL} Nada muda sem você confirmar.</p>
+          <SectionTitle>Mudar o dia</SectionTitle>
+          <p className="text-[13.5px] text-muted leading-snug -mt-1 mb-2.5">{ADJUST_PILL} Nada muda sem você confirmar — e tudo tem Desfazer.</p>
           <div className="flex flex-wrap gap-2">
-            {ADJUST_EXAMPLES.map((q) => (
+            {[...DAY_EXAMPLES, ...ADJUST_EXAMPLES.slice(1)].map((q) => (
               <Chip key={q} onClick={() => ask(q)} className="h-auto min-h-9 py-1.5 text-left">
                 {q}
               </Chip>
             ))}
           </div>
-        </>
-      )}
 
-      {exchanges.length === 0 && (
-        <>
+          <SectionTitle>Comida</SectionTitle>
+          <p className="text-[13.5px] text-muted leading-snug -mt-1 mb-2.5">Eu sigo o plano do seu nutri — registro, organizo e adapto sem compensar.</p>
+          <div className="flex flex-wrap gap-2">
+            {FOOD_EXAMPLES.map((q) => (
+              <Chip key={q} onClick={() => ask(q)} className="h-auto min-h-9 py-1.5 text-left">
+                {q}
+              </Chip>
+            ))}
+          </div>
+
           <SectionTitle>Pergunte</SectionTitle>
           <div className="flex flex-wrap gap-2">
             {EXAMPLE_QUESTIONS.map((q) => (
@@ -207,7 +275,38 @@ export default function AssistantPage() {
                   onCancel={() => setAdjust(e.id, { ...e.adjust!, status: 'cancelled' })}
                   onChoose={(plan) => setAdjust(e.id, { plan, status: 'preview' })}
                   onFollowUp={(kind) => followUp(e.adjust!.plan, kind)}
+                  onUndo={() => undoAdjust(e)}
+                  onLink={(to) => navigate(to)}
                 />
+              ) : e.turn?.kind === 'foodLog' && e.food ? (
+                <FoodLogCard
+                  db={db}
+                  date={today}
+                  nowMinutes={minutes}
+                  intent={e.turn.intent}
+                  state={e.food}
+                  onLog={(foods, savable) => patch(e.id, { food: logNow(foods, savable, e.turn?.kind === 'foodLog' ? e.turn.intent.at : undefined) })}
+                  onUndo={() => {
+                    e.food?.undo?.()
+                    patch(e.id, { food: { status: 'undone' } })
+                    toast('Registro desfeito')
+                  }}
+                />
+              ) : e.turn?.kind === 'food' && e.reply ? (
+                <FoodAnswerCard
+                  reply={e.reply}
+                  skipUndone={e.skipUndone}
+                  onUndoSkip={
+                    e.skipUndo
+                      ? () => {
+                          e.skipUndo?.()
+                          patch(e.id, { skipUndone: true, skipUndo: undefined })
+                        }
+                      : undefined
+                  }
+                />
+              ) : e.turn?.kind === 'mealprep' ? (
+                <MealPrepCard db={db} today={today} nowMinutes={minutes} intent={e.turn.intent} onOpen={(to) => navigate(to)} />
               ) : (
                 e.answer && <AnswerCard answer={e.answer} onAsk={ask} />
               )}
@@ -248,13 +347,13 @@ export default function AssistantPage() {
               onChange={(e) => setDraft(e.target.value)}
               enterKeyHint="send"
               autoComplete="off"
-              aria-label="Pergunte para a Lumos"
-              placeholder="Ex.: amanhã troco a corrida longa por surf"
+              aria-label="Fale com a Lumos"
+              placeholder="Ex.: amanhã cancelei meu inglês"
               className="input h-12 pr-12 rounded-full bg-surface border-line placeholder:text-[14px]"
             />
             <button
               type="submit"
-              aria-label="Enviar pergunta"
+              aria-label="Enviar"
               disabled={!draft.trim()}
               className="absolute right-1.5 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-ink text-bg flex items-center justify-center transition active:scale-95 disabled:opacity-30"
             >

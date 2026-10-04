@@ -41,7 +41,7 @@ const WEEKDAY_WORDS: Record<string, Weekday> = {
 export const CONNECTORS = new Set(['por', 'pra', 'para', 'p', 'pro', 'pelo', 'pela', 'pros', 'pras'])
 const SWAP_VERBS = ['troc', 'mud', 'substitu']
 const MOVE_EXACT = new Set(['passa', 'passar', 'passo', 'move', 'mover', 'movo', 'joga', 'jogar', 'jogo', 'leva', 'levar', 'levo', 'empurra', 'empurrar', 'empurro', 'adia', 'adiar', 'adio', 'antecipa', 'antecipar', 'antecipo', 'transfere', 'transferir', 'transfiro'])
-const SKIP_EXACT = new Set(['pular', 'pulo', 'pula', 'pulando', 'cancelar', 'cancela', 'cancelo', 'folga', 'descansar', 'descanso'])
+const SKIP_EXACT = new Set(['pular', 'pulo', 'pula', 'pulando', 'cancelar', 'cancela', 'cancelo', 'cancelei', 'cancelou', 'folga', 'descansar', 'descanso'])
 const LONG_WORDS = new Set(['longa', 'longo', 'longao', 'long'])
 const GENERIC_TRAINING = new Set(['treino', 'treinar', 'treinos', 'treinao', 'sessao'])
 
@@ -247,7 +247,7 @@ export function lex(db: DB, raw: string, today: DateKey): Lexed {
   const skip =
     tokens.some((t) => SKIP_EXACT.has(t)) ||
     hasPhrase(tokens, ['sem', 'treino']) >= 0 ||
-    (nao >= 0 && ['vou', 'vai', 'rola', 'da', 'consigo', 'quero', 'treino'].includes(tokens[nao + 1] ?? '') && insteadAt === undefined)
+    (nao >= 0 && ['vou', 'vai', 'rola', 'da', 'consigo', 'quero', 'treino', 'faco'].includes(tokens[nao + 1] ?? '') && insteadAt === undefined)
   let becomesAt: number | undefined
   for (const phrase of [['vai', 'ser'], ['fica', 'pro'], ['fica', 'pra'], ['fica', 'para'], ['vai', 'pro'], ['vai', 'pra']]) {
     const at = hasPhrase(tokens, phrase)

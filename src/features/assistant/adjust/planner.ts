@@ -404,7 +404,7 @@ function verbOf(intent: Intent): string {
   return { swap: 'trocar', move: 'mudar de dia', skip: 'pular', update: 'ajustar', create: 'fazer' }[intent.kind]
 }
 
-function parseClauses(db: DB, text: string, today: DateKey): Clause[] | undefined {
+function parseClauses(db: DB, text: string, today: DateKey, defaultDay?: DateKey): Clause[] | undefined {
   const whole = lex(db, text, today)
   if (whole.isQuestion) return undefined
   const parts = splitClauses(text)
@@ -418,7 +418,7 @@ function parseClauses(db: DB, text: string, today: DateKey): Clause[] | undefine
       if (lexed.length === 1) return undefined
       continue
     }
-    clauses.push({ lx, intent, day: sourceDay(lx, intent) })
+    clauses.push({ lx, intent, day: sourceDay(lx, intent) ?? defaultDay })
   }
   if (!clauses.length) return undefined
   // "vou nadar cedo e fazer perna à noite": clauses without a day share the day of the others.
@@ -470,8 +470,8 @@ function build(db: DB, clauses: Clause[], today: DateKey, forced: Map<number, Wo
 }
 
 /** A ChangePlan when the sentence is an adjustment of the training plan; undefined otherwise. */
-export function planAdjustment(db: DB, text: string, today: DateKey): ChangePlan | undefined {
-  const clauses = parseClauses(db, text, today)
+export function planAdjustment(db: DB, text: string, today: DateKey, opts: { defaultDay?: DateKey } = {}): ChangePlan | undefined {
+  const clauses = parseClauses(db, text, today, opts.defaultDay)
   if (!clauses) return undefined
   return build(db, clauses, today, new Map())
 }
