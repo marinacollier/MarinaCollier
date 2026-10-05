@@ -95,11 +95,11 @@ export function addFormat(formats: string[] | undefined, format: string): string
   return [...list, f]
 }
 
-/** Open (not finalizado) items per track. */
+/** Open (not finalizado) items per track. References (newsletters, temas) never count. */
 export function trackCounts(items: StudyItem[]): Map<ID, number> {
   const m = new Map<ID, number>()
   for (const it of items) {
-    if (!it.trackId || it.status === 'finalizado') continue
+    if (!it.trackId || it.status === 'finalizado' || it.reference) continue
     m.set(it.trackId, (m.get(it.trackId) ?? 0) + 1)
   }
   return m
@@ -107,11 +107,45 @@ export function trackCounts(items: StudyItem[]): Map<ID, number> {
 
 // ─── Study items ────────────────────────────────────────────────────────────
 
+/**
+ * Reference content (Product Talk, Lenny's, temas que ela acompanha): shown only on demand in
+ * "Conteúdos salvos". Never a task, never in a queue, never "atrasado".
+ */
+export function isReference(item: Pick<StudyItem, 'reference' | 'kind'>): boolean {
+  return !!item.reference || item.kind === 'newsletter'
+}
+
+/** Things she studies (everything that is not reference content). */
+export function studyItemsOnly(items: StudyItem[]): StudyItem[] {
+  return items.filter((i) => !isReference(i))
+}
+
+export interface SavedGroup {
+  key: 'fontes' | 'temas' | 'links'
+  label: string
+  items: StudyItem[]
+}
+
+/**
+ * "Conteúdos salvos": sources she follows, themes she wants to go deeper into, and other saved
+ * references. Empty groups are left out. Calm order: hers (order), no dates.
+ */
+export function savedContent(items: StudyItem[]): SavedGroup[] {
+  const refs = items.filter((i) => isReference(i) && i.status !== 'finalizado').sort(byOrder)
+  const groups: SavedGroup[] = [
+    { key: 'fontes', label: 'Fontes que eu acompanho', items: refs.filter((i) => i.kind === 'newsletter' || i.kind === 'podcast') },
+    { key: 'temas', label: 'Temas pra aprofundar', items: refs.filter((i) => i.kind === 'tema') },
+    { key: 'links', label: 'Guardados', items: refs.filter((i) => !['newsletter', 'podcast', 'tema'].includes(i.kind)) },
+  ]
+  return groups.filter((g) => g.items.length > 0)
+}
+
 export type StudyView = 'estudando' | 'proximo' | 'backlog' | 'finalizado'
 
 /** Items for a list view. "Estudando" also shows paused items at the end; finalizados newest first. */
 export function studyList(items: StudyItem[], view: StudyView, trackId?: ID): StudyItem[] {
-  const inTrack = trackId ? items.filter((i) => i.trackId === trackId) : items
+  const own = studyItemsOnly(items)
+  const inTrack = trackId ? own.filter((i) => i.trackId === trackId) : own
   if (view === 'finalizado') {
     return inTrack
       .filter((i) => i.status === 'finalizado')
@@ -126,7 +160,7 @@ export function studyList(items: StudyItem[], view: StudyView, trackId?: ID): St
 }
 
 export function nextStudyOf(items: StudyItem[]): StudyItem | undefined {
-  return items.filter((s) => s.status === 'proximo').sort(byOrder)[0]
+  return studyItemsOnly(items).filter((s) => s.status === 'proximo').sort(byOrder)[0]
 }
 
 /** Order value that puts an item at the top of its list. */
@@ -162,7 +196,7 @@ export function promotionCandidates(items: StudyItem[], finished: Pick<StudyItem
     const sb = finished.trackId && b.trackId === finished.trackId ? 0 : 1
     return sa - sb || a.order - b.order
   }
-  const pool = items.filter((i) => i.id !== finished.id)
+  const pool = studyItemsOnly(items).filter((i) => i.id !== finished.id)
   const proximos = pool.filter((i) => i.status === 'proximo').sort(sameTrackFirst)
   const backlog = pool.filter((i) => i.status === 'backlog').sort(sameTrackFirst)
   return [...proximos, ...backlog].slice(0, limit)
@@ -170,7 +204,7 @@ export function promotionCandidates(items: StudyItem[], finished: Pick<StudyItem
 
 /** True when nothing is lined up after finishing (no estudando, no próximo). */
 export function needsSomethingNext(items: StudyItem[]): boolean {
-  return !items.some((i) => i.status === 'estudando' || i.status === 'proximo')
+  return !studyItemsOnly(items).some((i) => i.status === 'estudando' || i.status === 'proximo')
 }
 
 export const STUDY_STATUS_LABEL: Record<StudyStatus, string> = {
@@ -277,6 +311,57 @@ export const BOOK_STATUS_LABEL: Record<BookStatus, string> = {
   proximo: 'Próximo',
   quero: 'Quero ler',
   finalizado: 'Lido',
+}
+
+export interface Shelf {
+  status: BookStatus
+  label: string
+  books: Book[]
+}
+
+const SHELF_LABEL: Record<BookStatus, string> = { lendo: 'Lendo', proximo: 'Próximo', quero: 'Quero ler', finalizado: 'Lidos' }
+
+/**
+ * The library: Lendo · Próximo · Quero ler · Lidos. Empty shelves are left out
+ * (no "Livros — 0"). Lidos newest first; the rest in her order.
+ */
+export function libraryShelves(books: Book[]): Shelf[] {
+  return (['lendo', 'proximo', 'quero', 'finalizado'] as BookStatus[])
+    .map((status) => {
+      const list =
+        status === 'finalizado'
+          ? books.filter((b) => b.status === 'finalizado').sort((a, b) => (b.endDate ?? '').localeCompare(a.endDate ?? '') || a.order - b.order)
+          : booksByStatus(books, status)
+      return { status, label: SHELF_LABEL[status], books: list }
+    })
+    .filter((s) => s.books.length > 0)
+}
+
+/**
+ * Where she is in a book, in her words: chapter first, then page ("p. 190 de 320"), then a percent
+ * only when there is one. Nothing invented: no data → undefined.
+ */
+export function readingWhere(book: Pick<Book, 'currentChapter' | 'currentPage' | 'totalPages' | 'progress'>): string | undefined {
+  const parts: string[] = []
+  if (book.currentChapter?.trim()) parts.push(book.currentChapter.trim())
+  if (book.currentPage) parts.push(book.totalPages ? `p. ${book.currentPage} de ${book.totalPages}` : `p. ${book.currentPage}`)
+  if (!parts.length && book.progress > 0) parts.push(`${clampProgress(book.progress)}%`)
+  return parts.length ? parts.join(' · ') : undefined
+}
+
+/**
+ * Patch from the one-tap "onde estou?" editor. Page + total pages → percent; chapter is free text.
+ * Blank fields clear. A page past the total is capped; reaching the last page doesn't finish the
+ * book by itself (she says "terminei").
+ */
+export function bookProgressPatch(input: { chapter?: string; page?: number; totalPages?: number }): Partial<Book> {
+  const valid = (n?: number) => (n && Number.isFinite(n) && n > 0 ? Math.round(n) : undefined)
+  const totalPages = valid(input.totalPages)
+  let page = valid(input.page)
+  if (page && totalPages && page > totalPages) page = totalPages
+  const patch: Partial<Book> = { currentChapter: input.chapter?.trim() || undefined, currentPage: page, totalPages }
+  if (page && totalPages) patch.progress = Math.min(99, clampProgress((page / totalPages) * 100))
+  return patch
 }
 
 // ─── Covers ─────────────────────────────────────────────────────────────────

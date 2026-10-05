@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { buildSeed } from '@/data/seed'
 import type { DB } from '@/data/types'
 import { daySummary, homeContext, showCarried, sortForFocus, tripPriorityItems, weekWrap } from './context'
-import { keySessionCard, trainingMorning } from './training'
 import { db as emptyWith, hm, make } from './test-utils'
 
 const FRI = '2026-10-02'
@@ -80,28 +79,5 @@ describe('weekWrap', () => {
     const old = make('workouts', { date: '2026-09-27', modality: 'corrida', status: 'feito', order: 0 })
     const pr = make('priorities', { date: '2026-09-29', title: 'x', order: 0, done: true })
     expect(weekWrap(world({ workouts: [w, old], priorities: [pr] }), FRI)).toMatchObject({ workoutsDone: 1, prioritiesDone: 1 })
-  })
-})
-
-describe('training-aware Home', () => {
-  const longRun = (date: string) =>
-    make('workouts', { id: 'lr', date, time: '06:00', modality: 'corrida', title: 'Long Z2', status: 'planejado', plannedDurationMin: 60, plannedDurationMaxMin: 75, isKeySession: true, order: 0 })
-
-  it('evening card for a key session tomorrow — follows the training, not the weekday', () => {
-    expect(keySessionCard(world({ workouts: [longRun(FRI)] }), '2026-10-01')?.line).toBe('Amanhã é dia de corrida 🏃‍♀️ · 06:00 · Long Z2 · 60–75 min')
-    // moved to Saturday → Friday is now the prep evening, Thursday isn't
-    const moved = world({ workouts: [longRun(SAT)] })
-    expect(keySessionCard(moved, '2026-10-01')).toBeUndefined()
-    expect(keySessionCard(moved, FRI)?.workout.id).toBe('lr')
-  })
-
-  it('early training reorganizes the morning: items before it stay, the rest comes after', () => {
-    const seed = buildSeed(FRI)
-    const items = seed.routineItems.filter((i) => i.routineId === 'routine-manha').sort((a, b) => a.order - b.order)
-    const tm = trainingMorning(world({ workouts: [longRun(FRI)] }), FRI, items)!
-    expect(tm.title).toBe('Treino 06:00 · Long Z2')
-    expect(tm.before.map((i) => i.title)).toEqual(['Despertar'])
-    expect(tm.after).toHaveLength(items.length - 1)
-    expect(trainingMorning(world(), FRI, items)).toBeUndefined()
   })
 })

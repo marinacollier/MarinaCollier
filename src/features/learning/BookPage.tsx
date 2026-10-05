@@ -15,7 +15,7 @@ import { uid } from '@/lib/id'
 import { cn } from '@/lib/cn'
 import { BookCover } from './components/BookCover'
 import { LocalSheet } from './components/LocalSheet'
-import { ProgressSlider } from './components/ProgressSlider'
+import { ReadingSpot } from './components/ReadingSpot'
 import { Stars } from './components/Stars'
 import { isImageUrl, resizeImageFile } from './image'
 import { BOOK_STATUS_LABEL, bookStatusPatch, clampProgress } from './selectors'
@@ -203,25 +203,22 @@ function InlineText({ value, onSave, className, placeholder, label }: { value: s
   )
 }
 
+/** Where she is (capítulo · página, one tap to update) — a percent only when pages give one. */
 function ReadingProgress({ book, onFinish }: { book: Book; onFinish: () => void }) {
-  const [draft, setDraft] = useState(book.progress)
-  useEffect(() => setDraft(book.progress), [book.progress])
-  const commit = (v: number) => actions.update('books', book.id, { progress: clampProgress(v) })
   return (
     <Card>
-      <div className="flex items-baseline justify-between">
-        <div className="eyebrow">{book.startDate ? `lendo desde ${formatShortDate(book.startDate)}` : 'lendo'}</div>
-        <div className="font-display text-[30px] leading-none tabular-nums">
-          {clampProgress(draft)}
-          <span className="text-[16px] text-muted">%</span>
-        </div>
+      <div className="flex items-baseline justify-between gap-3">
+        <div className="eyebrow">{book.startDate ? `lendo desde ${formatShortDate(book.startDate)}` : 'onde estou'}</div>
+        {book.progress > 0 && (
+          <div className="font-display text-[22px] leading-none tabular-nums">
+            {clampProgress(book.progress)}
+            <span className="text-[13px] text-muted">%</span>
+          </div>
+        )}
       </div>
-      <ProgressBar value={draft} tone="accent" className="h-2 mt-3" />
-      <ProgressSlider value={draft} onChange={setDraft} onCommit={commit} label="Progresso de leitura" />
-      <div className="flex gap-2">
-        <Button size="sm" variant="soft" disabled={book.progress >= 100} onClick={() => commit(book.progress + 10)}>
-          +10%
-        </Button>
+      <ReadingSpot book={book} size="lg" className="mt-1 -mx-1 px-1" />
+      {book.progress > 0 && <ProgressBar value={book.progress} tone="accent" className="h-1.5 mt-2" />}
+      <div className="flex gap-2 mt-3">
         <Button size="sm" variant="accent" className="ml-auto" onClick={onFinish}>
           terminei 🎉
         </Button>

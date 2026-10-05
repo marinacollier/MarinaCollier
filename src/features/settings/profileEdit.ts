@@ -26,17 +26,6 @@ export function normalizeChecklist(items: string[]): string[] {
   return out
 }
 
-/**
- * The home widget list for Personalizar: the profile order first (unknown ids dropped), then any
- * known widget missing from the profile, appended hidden — so new widgets can be switched on.
- */
-export function mergeWidgets<Id extends string>(profileWidgets: { id: Id; visible: boolean }[], known: readonly Id[]): { id: Id; visible: boolean }[] {
-  const knownSet = new Set<string>(known)
-  const listed = profileWidgets.filter((w) => knownSet.has(w.id))
-  const have = new Set<string>(listed.map((w) => w.id))
-  return [...listed, ...known.filter((id) => !have.has(id)).map((id) => ({ id, visible: false }))]
-}
-
 /** "presencial: ter, qua" style summary of a work week. */
 export function workWeekSummary(days: WorkSchedule['days']): string {
   const short = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb']

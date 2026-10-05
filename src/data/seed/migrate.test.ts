@@ -42,7 +42,8 @@ describe('life seed migration — old example cleanup', () => {
     ]
     old.routines = [{ id: 'routine-manha', name: 'Minha manhã', period: 'manha', order: 0, active: true, createdAt: stamp, updatedAt: stamp }]
     const next = applyLifeSeed(old, '2026-10-02')
-    expect(next.books.map((b) => b.id)).toEqual(['b-edited'])
+    // the untouched example is retired; her edited one stays; the real current book arrives
+    expect(next.books.map((b) => b.id)).toEqual(['b-edited', 'seed:learning:book-continuous-discovery-habits'])
     // untouched routine with a stable id is upgraded to the new seed's version
     const r = next.routines.find((x) => x.id === 'routine-manha')!
     const fresh = buildSeed('2026-10-02').routines.find((x) => x.id === 'routine-manha')!

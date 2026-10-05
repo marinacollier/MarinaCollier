@@ -1,11 +1,7 @@
 import type { ReactNode } from 'react'
-import type { NavigateFunction } from 'react-router-dom'
-import { openSheet } from '@/app/ui-store'
-import type { SheetName } from '@/app/sheet-types'
 import type { DateKey, DB, HomeWidgetId } from '@/data/types'
 import type { DayPart } from '@/lib/date'
 import { cn } from '@/lib/cn'
-import type { AgoraAction } from '../agora'
 import type { HomeContext } from '../context'
 
 /** Everything a Hoje widget needs, computed once per render of the page. */
@@ -16,19 +12,6 @@ export interface WidgetCtx {
   part: DayPart
   /** Contextual rules for the day (energy, weekend, Friday evening, trip soon…). */
   home: HomeContext
-}
-
-export function runAction(action: AgoraAction, nav: NavigateFunction) {
-  if (action.kind === 'route') nav(action.to)
-  else if (action.kind === 'sheet') openSheet(action.name as SheetName, action.props as never)
-  else scrollToWidget(action.target)
-}
-
-export function scrollToWidget(id: HomeWidgetId) {
-  const el = document.getElementById(`w-${id}`)
-  if (!el) return
-  el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  el.animate?.([{ transform: 'scale(1)' }, { transform: 'scale(1.015)' }, { transform: 'scale(1)' }], { duration: 450, delay: 350, easing: 'ease-out' })
 }
 
 export interface WidgetProps {

@@ -9,9 +9,9 @@ import { useToday } from '@/hooks/useToday'
 import { haptic } from '@/lib/haptics'
 import { WhatsNext } from './components/WhatsNext'
 import { ProgressSlider } from './components/ProgressSlider'
-import { STUDY_KIND_LABEL, STUDY_STATUS_LABEL, activeTracks, clampProgress, finishStudyPatch, parseCapture, topOrder } from './selectors'
+import { STUDY_KIND_LABEL, STUDY_STATUS_LABEL, activeTracks, clampProgress, finishStudyPatch, isReference, parseCapture, topOrder } from './selectors'
 
-type Form = Pick<StudyItem, 'title' | 'kind' | 'status' | 'progress'> & Partial<Pick<StudyItem, 'trackId' | 'source' | 'link' | 'nextContent' | 'notes'>>
+type Form = Pick<StudyItem, 'title' | 'kind' | 'status' | 'progress'> & Partial<Pick<StudyItem, 'trackId' | 'source' | 'link' | 'nextContent' | 'notes' | 'reference'>>
 
 const KINDS = Object.keys(STUDY_KIND_LABEL) as StudyItem['kind'][]
 const STATUSES: StudyStatus[] = ['estudando', 'proximo', 'backlog', 'pausado', 'finalizado']
@@ -37,6 +37,7 @@ export default function StudySheet({ id, defaults }: SheetProps<'study'>) {
     link: existing?.link ?? defaults?.link,
     nextContent: existing?.nextContent ?? defaults?.nextContent,
     notes: existing?.notes ?? defaults?.notes,
+    reference: existing ? isReference(existing) : defaults?.reference,
   }))
   const [finished, setFinished] = useState<Pick<StudyItem, 'id' | 'title' | 'trackId'> | null>(null)
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }))
@@ -57,7 +58,7 @@ export default function StudySheet({ id, defaults }: SheetProps<'study'>) {
     }
     const items = getDB().studyItems
     const wasFinished = existing?.status === 'finalizado'
-    const nowFinished = form.status === 'finalizado'
+    const nowFinished = !form.reference && form.status === 'finalizado'
     const patch: Partial<StudyItem> = {
       ...form,
       title,
@@ -66,6 +67,7 @@ export default function StudySheet({ id, defaults }: SheetProps<'study'>) {
       nextContent: form.nextContent?.trim() || undefined,
       notes: form.notes?.trim() || undefined,
       progress: clampProgress(form.progress),
+      reference: form.reference || undefined,
     }
     if (nowFinished && !wasFinished) Object.assign(patch, finishStudyPatch(today))
     if (!nowFinished) patch.finishedAt = undefined
@@ -92,7 +94,7 @@ export default function StudySheet({ id, defaults }: SheetProps<'study'>) {
       setFinished(saved)
       return
     }
-    toast(existing ? 'Atualizado' : form.status === 'backlog' ? 'Guardado no backlog 📥' : 'Anotado 📚')
+    toast(existing ? 'Atualizado' : form.reference ? 'Guardado nos conteúdos salvos 💡' : form.status === 'backlog' ? 'Guardado no backlog 📥' : 'Anotado 📚')
     closeSheet()
   }
 
@@ -131,16 +133,30 @@ export default function StudySheet({ id, defaults }: SheetProps<'study'>) {
       <Field label="Tipo">
         <ChipSelect value={form.kind} onChange={(v) => v && set('kind', v)} options={KINDS.map((k) => ({ value: k, label: STUDY_KIND_LABEL[k] }))} />
       </Field>
-      <Field label="Status">
-        <ChipSelect value={form.status} onChange={(v) => v && set('status', v)} options={STATUSES.map((s) => ({ value: s, label: STUDY_STATUS_LABEL[s] }))} />
+      <Field label="Guardar como" hint={form.reference ? 'fica em “Conteúdos salvos”: sem fila, sem prazo.' : undefined}>
+        <ChipSelect
+          value={form.reference ? 'ref' : 'estudo'}
+          onChange={(v) => v && set('reference', v === 'ref')}
+          options={[
+            { value: 'estudo', label: 'pra estudar' },
+            { value: 'ref', label: 'referência' },
+          ]}
+        />
       </Field>
+      {!form.reference && (
+        <Field label="Status">
+          <ChipSelect value={form.status} onChange={(v) => v && set('status', v)} options={STATUSES.map((s) => ({ value: s, label: STUDY_STATUS_LABEL[s] }))} />
+        </Field>
+      )}
       <MoreOptions defaultOpen={!!existing && (form.status === 'estudando' || !!form.nextContent)}>
         <Field label="Próximo conteúdo" hint="o próximo passo, pra retomar sem pensar">
           <TextInput value={form.nextContent ?? ''} placeholder="ex.: módulo 3, aula de quinta…" onChange={(e) => set('nextContent', e.target.value)} />
         </Field>
-        <Field label={`Progresso · ${clampProgress(form.progress)}%`}>
-          <ProgressSlider value={form.progress} onChange={(v) => set('progress', v)} />
-        </Field>
+        {!form.reference && (
+          <Field label={`Progresso · ${clampProgress(form.progress)}%`}>
+            <ProgressSlider value={form.progress} onChange={(v) => set('progress', v)} />
+          </Field>
+        )}
         <Field label="Fonte">
           <TextInput value={form.source ?? ''} placeholder="Alura, Coursera, professora…" onChange={(e) => set('source', e.target.value)} />
         </Field>

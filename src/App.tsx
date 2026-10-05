@@ -5,7 +5,6 @@ import { ROUTES, routeTable } from '@/app/routes'
 import { openSheet } from '@/app/ui-store'
 import { useTheme } from '@/app/useTheme'
 import { BottomNav } from '@/components/layout/BottomNav'
-import { Fab } from '@/components/layout/Fab'
 import { SheetHost } from '@/components/layout/SheetHost'
 import { Toaster } from '@/components/ui/Toaster'
 import { useLocalReminders } from '@/features/settings/useLocalReminders'
@@ -62,10 +61,11 @@ export default function App() {
           ))}
           {/* The assistant was called Mari before Lumos; old links keep working. */}
           <Route path="/mari" element={<Navigate to={ROUTES.assistant} replace />} />
+          {/* "Mais" became Espaços (settings live behind the avatar on Início). */}
+          <Route path={ROUTES.more} element={<Navigate to={ROUTES.spaces} replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
-      <Fab />
       <BottomNav />
       <SheetHost />
       <Toaster />

@@ -1,104 +1,83 @@
-import { useState } from 'react'
+/**
+ * AJUSTES — reached from the avatar on Início (not a tab). Seven doors, nothing else:
+ * Conexões · Perfil · Lumos Memory · Notificações · Design · Backup · Privacidade.
+ */
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import { Bell, CalendarRange, Database, Plug, SlidersHorizontal } from 'lucide-react'
-import { Card, ListCard, ListRow, Page, PageHeader, SectionTitle, Segmented, TextInput } from '@/components/ui'
-import { actions, useDB } from '@/data/store'
+import { AnimatePresence, motion } from 'framer-motion'
+import { Bell, Brain, Database, Palette, Plug, Share, Shield, SquarePlus, UserRound, X } from 'lucide-react'
+import { IconButton, ListCard, ListRow, Page, PageHeader } from '@/components/ui'
+import { useDB } from '@/data/store'
 import { ROUTES } from '@/app/routes'
-import { toast } from '@/app/ui-store'
-import { Hint, Stepper } from './components'
-import { AboutSection, RhythmSection, WorkSection } from './ProfileSections'
-import { THEME_OPTIONS } from './labels'
+import { AppMark } from './components'
+import { APP_VERSION, isStandalone, lsGet, lsSet } from './platform'
 
-const hour = (h: number) => `${String(h).padStart(2, '0')}h`
+const INSTALL_HINT_KEY = 'marina-os-install-hint-dismissed'
 
 export default function SettingsPage() {
   const nav = useNavigate()
   const profile = useDB((db) => db.profile)
-  const [name, setName] = useState(profile.name)
-  const dp = profile.dayParts
-
-  const saveName = () => {
-    const next = name.trim() || 'Marina'
-    setName(next)
-    if (next !== profile.name) {
-      actions.setProfile({ name: next })
-      toast('Nome salvo ✨')
-    }
-  }
-
-  const setPart = (key: keyof typeof dp, v: number) => actions.setProfile({ dayParts: { ...dp, [key]: v } })
+  const memoryCount = useDB((db) => db.memory.length)
+  const [hintDismissed, setHintDismissed] = useState(() => lsGet(INSTALL_HINT_KEY) === '1')
+  const standalone = useMemo(() => isStandalone(), [])
+  const name = profile.name?.trim() || 'Marina'
+  const theme = profile.theme === 'dark' ? 'escuro' : profile.theme === 'light' ? 'claro' : 'automático'
 
   return (
     <Page>
-      <PageHeader title="Ajustes" back backTo={ROUTES.more} search={false} subtitle="O básico, do seu jeito." />
+      <PageHeader title="Ajustes" back backTo={ROUTES.today} search={false} />
 
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-        <SectionTitle className="mt-2">Você</SectionTitle>
-        <Card>
-          <label className="block">
-            <span className="block text-[13px] font-medium text-ink-2 mb-1.5 px-0.5">Como posso te chamar?</span>
-            <TextInput
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              onBlur={saveName}
-              onKeyDown={(e) => e.key === 'Enter' && (e.currentTarget as HTMLInputElement).blur()}
-              autoComplete="given-name"
-              enterKeyHint="done"
-            />
-          </label>
-          <div className="mt-4">
-            <div className="text-[13px] font-medium text-ink-2 mb-1.5 px-0.5">Tema</div>
-            <Segmented value={profile.theme} onChange={(theme) => actions.setProfile({ theme })} options={THEME_OPTIONS} />
-          </div>
-        </Card>
+        <button type="button" onClick={() => nav(ROUTES.profile)} className="w-full flex items-center gap-4 py-2 text-left active:opacity-80">
+          <span className="h-14 w-14 rounded-full bg-accent-soft text-accent font-display text-[26px] inline-flex items-center justify-center shrink-0">{name.slice(0, 1).toUpperCase()}</span>
+          <span className="min-w-0">
+            <span className="block font-display text-[22px] leading-tight">{name}</span>
+            <span className="block text-[13.5px] text-muted mt-0.5 truncate">{profile.homeBase || 'em constante movimento'}</span>
+          </span>
+        </button>
 
-        <RhythmSection />
-        <AboutSection />
-        <WorkSection />
+        <AnimatePresence initial={false}>
+          {!standalone && !hintDismissed && (
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+              <div className="card relative p-4 pr-12 mt-4 bg-accent-soft border-transparent">
+                <div className="flex items-start gap-3">
+                  <SquarePlus size={20} className="text-accent shrink-0 mt-0.5" />
+                  <p className="text-[13.5px] text-ink-2 leading-snug">
+                    Instale no iPhone: Safari → Compartilhar <Share size={13} className="inline -mt-0.5" /> → Adicionar à Tela de Início.
+                  </p>
+                </div>
+                <IconButton label="Dispensar dica" size="sm" className="absolute top-2 right-2" onClick={() => (lsSet(INSTALL_HINT_KEY, '1'), setHintDismissed(true))}>
+                  <X size={16} />
+                </IconButton>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        <SectionTitle>Corpo</SectionTitle>
-        <Card>
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-[15px]">Meta de água</div>
-              <div className="text-[13px] text-muted">copos por dia 💧</div>
-            </div>
-            <Stepper label="meta de água" value={profile.waterGoal} min={1} max={20} onChange={(waterGoal) => actions.setProfile({ waterGoal })} />
-          </div>
-        </Card>
-
-        <SectionTitle>Horários do seu dia</SectionTitle>
-        <ListCard>
-          <PartRow emoji="☀️" label="Manhã começa" value={dp.morningStart} min={0} max={dp.middayStart - 1} onChange={(v) => setPart('morningStart', v)} />
-          <PartRow emoji="🌤️" label="Dia começa" value={dp.middayStart} min={dp.morningStart + 1} max={dp.eveningStart - 1} onChange={(v) => setPart('middayStart', v)} />
-          <PartRow emoji="🌙" label="Noite começa" value={dp.eveningStart} min={dp.middayStart + 1} max={23} onChange={(v) => setPart('eveningStart', v)} />
-        </ListCard>
-        <Hint>A tela Hoje muda sozinha conforme o horário: manhã com rotina, dia com foco, noite com fechamento.</Hint>
-
-        <SectionTitle>Mais ajustes</SectionTitle>
-        <ListCard>
-          <ListRow leading={<CalendarRange size={19} className="text-ocean" />} title="Montar minha semana" subtitle="treinos, estudos, entregas e vida, em 7 passos" chevron onPress={() => nav(ROUTES.weekPlanner)} />
-          <ListRow leading={<SlidersHorizontal size={19} className="text-accent" />} title="Personalizar meu MARINA OS" chevron onPress={() => nav(ROUTES.customize)} />
-          <ListRow leading={<Bell size={19} className="text-sand" />} title="Notificações" chevron onPress={() => nav(ROUTES.notifications)} />
-          <ListRow leading={<Plug size={19} className="text-ocean" />} title="Integrações" chevron onPress={() => nav(ROUTES.integrations)} />
-          <ListRow leading={<Database size={19} className="text-sage" />} title="Meus dados & backup" chevron onPress={() => nav(ROUTES.data)} />
+        <ListCard className="mt-6">
+          <ListRow leading={<Plug size={19} className="text-ocean" />} title="Conexões" subtitle="agenda, e-mail, finanças" chevron onPress={() => nav(ROUTES.integrations)} />
+          <ListRow leading={<UserRound size={19} className="text-accent" />} title="Perfil" subtitle="ritmo, trabalho, sobre mim" chevron onPress={() => nav(ROUTES.profile)} />
+          <ListRow
+            leading={<Brain size={19} className="text-plum" />}
+            title="O que Lumos sabe sobre mim"
+            subtitle={memoryCount ? `${memoryCount} ${memoryCount === 1 ? 'coisa' : 'coisas'} — edite, corrija, apague` : 'fatos, preferências e o momento atual'}
+            chevron
+            onPress={() => nav(ROUTES.memory)}
+          />
+          <ListRow leading={<Bell size={19} className="text-sand" />} title="Notificações" subtitle="poucos lembretes, só do que importa" chevron onPress={() => nav(ROUTES.notifications)} />
+          <ListRow leading={<Palette size={19} className="text-sage" />} title="Design" subtitle={`tema ${theme} · espaços · modalidades`} chevron onPress={() => nav(ROUTES.customize)} />
+          <ListRow leading={<Database size={19} className="text-ocean" />} title="Backup" subtitle="exportar, importar, CSV" chevron onPress={() => nav(ROUTES.data)} />
+          <ListRow leading={<Shield size={19} className="text-ink-2" />} title="Privacidade" subtitle="onde seus dados ficam" chevron onPress={() => nav(ROUTES.privacy)} />
         </ListCard>
       </motion.div>
-    </Page>
-  )
-}
 
-function PartRow({ emoji, label, value, min, max, onChange }: { emoji: string; label: string; value: number; min: number; max: number; onChange: (v: number) => void }) {
-  return (
-    <div className="flex items-center justify-between gap-3 min-h-[60px] px-4 py-2">
-      <div className="flex items-center gap-3">
-        <span aria-hidden className="text-[18px]">
-          {emoji}
-        </span>
-        <span className="text-[15px]">{label}</span>
-      </div>
-      <Stepper label={label.toLowerCase()} value={value} min={min} max={max} format={hour} onChange={onChange} />
-    </div>
+      <footer className="mt-12 flex flex-col items-center text-center gap-2 pb-2">
+        <AppMark size={36} />
+        <p className="text-[12.5px] text-muted leading-snug max-w-[28ch]">
+          <span className="font-semibold tracking-wide">MARINA OS</span> · em constante movimento: corpo, mente e vida.
+        </p>
+        <p className="text-[11.5px] text-muted/80">versão {APP_VERSION}</p>
+      </footer>
+    </Page>
   )
 }
