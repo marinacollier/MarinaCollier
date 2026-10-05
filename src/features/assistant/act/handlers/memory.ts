@@ -216,7 +216,9 @@ function patternAnswer(input: HandlerInput): LumosReply | undefined {
   const no = !yes && (/considera/.test(n) || ctx.lastRef?.type === 'memory') ? NO.exec(n) : null
   const m = yes ?? no
   if (!m) return undefined
-  const byText = m[1] ? findMemoryByText(db, m[1]) : undefined
+  // Answers from the attention queue quote the pattern: sim, considera "…" como preferência / não, "…" não é preferência.
+  const quoted = m[1]?.replace(/["“”]/g, '').replace(/\s*(?:nao e|como)\s+preferencia\s*$/, '').trim()
+  const byText = quoted ? findMemoryByText(db, quoted) : undefined
   const item = byText ?? (ctx.lastRef?.type === 'memory' ? db.memory.find((x) => x.id === ctx.lastRef!.id) : undefined)
   if (!item || item.status !== 'observed') return undefined
   if (yes) {
@@ -239,14 +241,14 @@ function patternAnswer(input: HandlerInput): LumosReply | undefined {
 // ─── "o que você sabe sobre mim?" ───────────────────────────────────────────
 
 const ABOUT_ME = /\bo que (?:voce|vc|a lumos) sabe (?:sobre|de) mim\b|\bminha memoria\b|\bo que voce lembra de mim\b/
-const LAYER: Record<MemoryLayer, string> = { fact: 'Fatos', preference: 'Preferências', state: 'Agora', exception: 'Só dessa vez', pattern: 'Padrões que reparei' }
+const LAYER: Record<MemoryLayer, string> = { fact: 'Fatos', preference: 'Preferências', state: 'Agora', exception: 'Só dessa vez', pattern: 'Padrões que reparei', history: 'Histórico' }
 
 function aboutMe(input: HandlerInput): LumosReply | undefined {
   const { db, n, now } = input
   if (!ABOUT_ME.test(n)) return undefined
   const view = memoryView(db, now as Now)
   if (!view.length) return { area: AREA, text: 'Ainda sei pouco — vou aprendendo com o que você me conta, e nada vira regra sem você confirmar.', link: { label: 'O que Lumos sabe sobre mim', to: ROUTES.settings } }
-  const order: MemoryLayer[] = ['state', 'preference', 'fact', 'pattern', 'exception']
+  const order: MemoryLayer[] = ['state', 'preference', 'fact', 'pattern', 'exception', 'history']
   const sections = order
     .map((layer) => ({ layer, items: view.filter((v) => v.layer === layer) }))
     .filter((s) => s.items.length)

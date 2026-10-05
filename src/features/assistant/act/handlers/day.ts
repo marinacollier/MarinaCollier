@@ -318,7 +318,8 @@ function week(input: HandlerInput): LumosReply | undefined {
   const news = p.days.reduce((s, d) => s + d.items.filter((i) => i.isNew).length, 0)
   return {
     area: 'sua semana',
-    text: `Semana de ${formatDayMonth(p.weekStart)}: ${p.summary || 'montei por camadas — fixos, treinos-chave, preparo, prazos, estudo e vida.'}`,
+    // The planner's summary already starts with "Semana de dd/mm:".
+    text: p.summary || `Semana de ${formatDayMonth(p.weekStart)}: montei por camadas — fixos, treinos-chave, preparo, prazos, estudo e vida.`,
     sub: news ? `${plural(news, 'coisa nova', 'coisas novas')} entra${news === 1 ? '' : 'm'} quando você aplicar. Descanso e espaço livre ficam preservados.` : 'Nada novo pra colocar — sua semana já está montada.',
     sections,
     options: [{ label: 'Mudar algo', prefill: 'na semana, ' }],

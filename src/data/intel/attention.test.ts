@@ -58,3 +58,15 @@ describe('NeedsAttention', () => {
     expect(needsAttention(getDB(), { date: '2026-10-04', minutes: 600 }).some((i) => i.key === first.key)).toBe(true)
   })
 })
+
+describe('NeedsAttention · quiet Waiting For', () => {
+  it('a Waiting For without follow-up date surfaces after a quiet week, not before', () => {
+    const add = (since: string) =>
+      actions.create('tasks', { title: 'Retorno sobre o roadmap', status: 'waiting', waiting: { who: 'Fran', since }, order: 99 })
+    const fresh = add('2026-09-30')
+    expect(needsAttention(getDB(), now).some((i) => i.ref?.id === fresh.id)).toBe(false)
+    const quiet = add('2026-09-20')
+    const item = needsAttention(getDB(), now).find((i) => i.ref?.id === quiet.id)!
+    expect(item.options?.[0]).toEqual({ label: 'Fran respondeu', ask: 'Fran me respondeu' })
+  })
+})

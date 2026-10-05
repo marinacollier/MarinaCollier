@@ -20,6 +20,9 @@ export function isAcked(db: DB, key: string, today: DateKey): boolean {
   return (db.attentionAcks ?? []).some((a) => a.key === key && (a.how !== 'snoozed' || !a.until || a.until > today))
 }
 
+/** A Waiting For with no follow-up date surfaces after a quiet week. */
+export const WAITING_QUIET_DAYS = 7
+
 export function needsAttention(db: DB, now: Now): AttentionItem[] {
   const today = now.date
   const until = addDays(today, NEAR_DAYS - 1)
@@ -139,17 +142,20 @@ export function needsAttention(db: DB, now: Now): AttentionItem[] {
       ref: { type: 'expense', id: dup[0].id },
     })
 
-  // 4. Waiting for someone, follow-up due.
+  // 4. Waiting for someone: follow-up day reached, or a week with no answer and no follow-up date.
   for (const t of db.tasks) {
-    if (t.status !== 'waiting' || !t.waiting?.followUpOn || t.waiting.followUpOn > today) continue
+    if (t.status !== 'waiting' || !t.waiting) continue
+    const due = t.waiting.followUpOn ? t.waiting.followUpOn <= today : diffDays(t.waiting.since, today) >= WAITING_QUIET_DAYS
+    if (!due) continue
+    const who = t.waiting.who || 'alguém'
     out.push({
-      key: `waiting:${t.id}:${t.waiting.followUpOn}`,
+      key: `waiting:${t.id}:${t.waiting.followUpOn ?? t.waiting.since}`,
       kind: 'waiting_reply',
-      title: `Esperando ${t.waiting.who}: ${t.title}`,
+      title: `Esperando ${who}: ${t.title}`,
       detail: `desde ${t.waiting.since.slice(8, 10)}/${t.waiting.since.slice(5, 7)}`,
       options: [
-        { label: 'Respondeu', ask: `${t.waiting.who} me respondeu` },
-        { label: 'Cobrar depois', ask: `lembra de cobrar ${t.waiting.who} semana que vem` },
+        { label: `${who} respondeu`, ask: `${who} me respondeu` },
+        { label: 'Cobrar depois', ask: `lembra de cobrar ${who} semana que vem` },
       ],
       provenance: 'fact',
       ref: { type: 'task', id: t.id },

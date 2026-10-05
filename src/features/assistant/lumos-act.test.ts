@@ -83,7 +83,7 @@ describe('her 10 scenarios', () => {
     expect(r.sections?.[0].title).toBe('KIT QUINTA — PRESENCIAL')
     expect(workModeOn(getDB(), '2026-10-08')).toBe('presencial')
     expect(workModeOn(getDB(), '2026-10-15')).toBe('remoto')
-    expect(events()).toEqual([expect.stringMatching(/^Quinta virou presencial/)])
+    expect(events()).toEqual(['Quinta ficou presencial', 'Kit presencial de quinta montado'])
     undoReply(e.id)
     expect(workModeOn(getDB(), '2026-10-08')).toBe('remoto')
     expect(getDB().lifeLog).toHaveLength(0)
@@ -166,12 +166,16 @@ describe('her 10 scenarios', () => {
     expect(r.sections?.length).toBeGreaterThan(0)
     if (!r.action) return
     expect(e.lumos?.status).toBe('pending')
-    const before = getDB().workouts.length
+    expect(r.text).toMatch(/^Semana de 05\/10: /)
+    expect(r.text).not.toMatch(/Semana de 05\/10:.*Semana de 05\/10:/)
+    const size = () => getDB().workouts.length + getDB().tasks.length + getDB().scheduleOverrides.length
+    const before = size()
     confirmReply(e.id)
-    expect(getDB().workouts.length).toBeGreaterThan(before)
+    expect(size()).toBeGreaterThan(before)
     expect(getDB().lifeLog.length).toBeGreaterThan(0)
     undoReply(e.id)
-    expect(getDB().workouts.length).toBe(before)
+    expect(size()).toBe(before)
+    expect(getDB().lifeLog).toHaveLength(0)
   })
 
   it('"o que mudou desde ontem?" → real deltas from what Lumos did', () => {
@@ -182,13 +186,21 @@ describe('her 10 scenarios', () => {
   })
 
   it('"o que realmente precisa de mim?" → one queue with tappable answers; "deixa pra lá" acks it', () => {
+    // The real seed already has decisions waiting (e.g. the trip); once she answers them the queue is calm.
+    const first = reply(talk('o que realmente precisa de mim?'))
+    expect(first.lines?.length).toBeGreaterThan(0)
+    for (const l of first.lines ?? []) {
+      const dismiss = l.options?.find((o) => /deixa pra l/i.test(o.label))
+      if (dismiss) runOption(dismiss)
+    }
+    const acked = getDB().attentionAcks.length
     expect(reply(talk('o que realmente precisa de mim?')).text).toMatch(/Nada precisa de você/)
     useStore.setState({ db: waitingFran(getDB(), '2026-09-20') })
     const r = reply(talk('o que realmente precisa de mim?'))
     const line = r.lines!.find((l) => /Fran/.test(l.text))!
-    expect(line.options?.map((o) => o.label)).toEqual(['Fran respondeu', 'Deixa pra lá'])
-    runOption(line.options![1])
-    expect(getDB().attentionAcks).toHaveLength(1)
+    expect(line.options?.map((o) => o.label)).toEqual(['Fran respondeu', 'Cobrar depois', 'Deixa pra lá'])
+    runOption(line.options![2])
+    expect(getDB().attentionAcks).toHaveLength(acked + 1)
     expect(reply(talk('o que realmente precisa de mim?')).text).toMatch(/Nada precisa de você/)
   })
 })
