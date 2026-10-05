@@ -11,6 +11,7 @@ import { proposeAdjustments, type AdaptResult, type AdjustmentDraft } from './ad
 import { dayMeals, type BadgedFood } from './ledger'
 import { plannedFoodInfo } from './nutrients'
 import { describeFoods } from './parse'
+import { logLife } from '@/data/intel/log'
 
 export type Undo = () => void
 
@@ -137,6 +138,12 @@ export function logFood(input: LogFoodInput): LogResult {
     adjustments = stored.created
     autoApplied = stored.autoApplied
     undos.push(stored.undo)
+  }
+  // Lumos writes always land in the life timeline (history + "o que mudou?"); the same undo takes it out.
+  if (input.via === 'lumos') {
+    undos.push(
+      logLife({ kind: 'logged', title: `Comeu ${meal.description}${meal.time ? ` às ${meal.time}` : ''}`, date, area: 'alimentacao', ref: { type: 'meal', id: meal.id }, by: 'lumos', provenance: 'user', at: now.toISOString() }).undo,
+    )
   }
   return { meal: getDB().meals.find((m) => m.id === meal.id) ?? meal, adapt, adjustments, autoApplied, undo: chain(...undos) }
 }

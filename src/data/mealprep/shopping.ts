@@ -7,6 +7,7 @@ import { normalize } from '@/lib/text'
 import { buyKeyOf, SHOP_CATEGORY_EMOJI, SHOP_CATEGORY_LABEL, SHOP_CATEGORY_ORDER, type Ingredient, type ShopCategory } from './catalog'
 import { formatWeight } from './parse'
 import { planFor, weekMenu, type WeekMenu } from './menu'
+import { pantryNames, preparedStock, type PreparedStock } from './pantry'
 
 export interface ShoppingLine {
   /** 'shop:<buyKey>' — MealPrepPlan.checked key. */
@@ -26,6 +27,8 @@ export interface ShoppingLine {
   /** Value to store in MealPrepPlan.pantry when she says she has it. */
   pantryName: string
   inPantry: boolean
+  /** Prepared food at home that covers part (or all) of this line ("6 porções de frango grelhado prontas"). */
+  prepared?: string
 }
 
 export interface ShoppingGroup {
@@ -49,6 +52,8 @@ interface Acc {
   unit: 'g' | 'ml'
   servings: number
   freeMeals: number
+  prepared?: string
+  coveredAll?: boolean
 }
 
 const BUFFER = 1.05
@@ -149,7 +154,7 @@ export function inPantry(pantry: string[], line: { label: string; buyKey: string
   })
 }
 
-export function shoppingFromMenu(menu: WeekMenu, pantry: string[] = []): ShoppingList {
+export function shoppingFromMenu(menu: WeekMenu, pantry: string[] = [], prepared: PreparedStock[] = []): ShoppingList {
   const acc = new Map<string, Acc>()
   for (const day of menu.days)
     for (const meal of day.meals)
@@ -163,6 +168,19 @@ export function shoppingFromMenu(menu: WeekMenu, pantry: string[] = []): Shoppin
         acc.set(k, a)
       }
 
+  // Prepared food at home covers servings first (ready grams per portion, or the week's average portion).
+  for (const p of prepared) {
+    const a = acc.get(p.buyKey)
+    if (!a || a.total <= 0 || p.portions <= 0) continue
+    const perServing = a.servings ? a.total / a.servings : 0
+    const covered = p.grams ? p.portions * p.grams : p.portions * perServing
+    a.total = Math.max(0, a.total - covered)
+    a.servings = Math.max(0, a.servings - p.portions)
+    const label = `${p.portions} ${p.portions === 1 ? 'porção' : 'porções'} de ${p.name} prontas`
+    a.prepared = a.prepared ? `${a.prepared} + ${label}` : label
+    if (a.total < 1) a.coveredAll = true
+  }
+
   const lines: ShoppingLine[] = [...acc.entries()].map(([buyKey, a]) => {
     const p = purchaseFor(a.ing, a.total, a.unit, a.freeMeals)
     const base = { label: a.ing.buyLabel, buyKey, pantryName: normalize(a.ing.buyLabel.replace(/\s*\(.*$/, '')) }
@@ -171,12 +189,13 @@ export function shoppingFromMenu(menu: WeekMenu, pantry: string[] = []): Shoppin
       ...base,
       category: a.ing.category,
       buy: p.buy,
-      detail: p.detail,
+      detail: a.prepared ? `${a.coveredAll ? 'já pronto' : 'descontando'}: ${a.prepared}${p.detail && !a.coveredAll ? ` · ${p.detail}` : ''}` : p.detail,
       approx: p.approx,
       total: Math.round(a.total * 10) / 10,
       unit: a.unit,
       servings: a.servings,
-      inPantry: inPantry(pantry, base),
+      inPantry: !!a.coveredAll || inPantry(pantry, base),
+      ...(a.prepared ? { prepared: a.prepared } : {}),
     }
   })
 
@@ -191,7 +210,7 @@ export function shoppingFromMenu(menu: WeekMenu, pantry: string[] = []): Shoppin
   return { weekStart: menu.weekStart, groups, atHome, count: groups.reduce((s, g) => s + g.lines.length, 0) }
 }
 
-/** Consolidated list by category, realistic quantities, minus `pantry`. */
+/** Consolidated list by category, realistic quantities, minus what's at home (plan pantry, db.pantry, prepared food). */
 export function shoppingList(db: DB, weekStart: DateKey, plan: MealPrepPlan | undefined = planFor(db, weekStart)): ShoppingList {
-  return shoppingFromMenu(weekMenu(db, weekStart, plan), plan?.pantry ?? [])
+  return shoppingFromMenu(weekMenu(db, weekStart, plan), pantryNames(db, plan), preparedStock(db))
 }

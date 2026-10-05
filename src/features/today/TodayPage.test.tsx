@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { actions, getDB, hydrate } from '@/data/store'
 import { createMemoryAdapter } from '@/data/storage'
 import { buildSeed } from '@/data/seed'
+import { needsAttention } from '@/data/intel'
 import { LumosInline } from './home/lumos'
 import TodayPage from './TodayPage'
 
@@ -61,7 +62,14 @@ describe('Início (Lumos-first Home)', () => {
     expect(screen.queryByText('Quatro')).toBeNull()
   })
 
-  it('the needs-attention row is absent when the queue is empty', () => {
+  it('the needs-attention row follows the real queue and disappears once everything is acked', () => {
+    const now = { date: '2026-10-02', minutes: 600 }
+    const items = needsAttention(getDB(), now)
+    renderHome()
+    if (items.length) expect(screen.getByLabelText('Precisa de você')).toBeTruthy()
+    cleanup()
+    for (const it of items) actions.create('attentionAcks', { key: it.key, how: 'dismissed' })
+    expect(needsAttention(getDB(), now)).toEqual([])
     renderHome()
     expect(screen.queryByLabelText('Precisa de você')).toBeNull()
   })

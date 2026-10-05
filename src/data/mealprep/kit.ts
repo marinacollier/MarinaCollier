@@ -157,7 +157,7 @@ function buildKit(db: DB, day: MenuDay, pots: Pot[], hasPrep: boolean): Presenci
 
 /** KIT <DIA> — PRESENCIAL for a date (undefined when it isn't a presencial day). */
 export function presencialKit(db: DB, date: DateKey, plan: MealPrepPlan | undefined = planFor(db, date)): PresencialKit | undefined {
-  if (!isPresencial(db.profile, date)) return undefined
+  if (!isPresencial(db, date)) return undefined
   const menu = weekMenu(db, startOfWeek(date), plan)
   const day = menu.days.find((d) => d.date === date)!
   const all = potsFromMenu(menu, plan)

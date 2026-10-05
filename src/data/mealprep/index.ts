@@ -27,6 +27,7 @@
  * - prepChecklistFor(db, date)            { key, date, time, title }[] happening on `date` — merged by the Life Timeline
  * - recipeFor(db, date, mealIndex, 1|4)   template recipe preserving the plan's quantities, or "monte assim…"
  * - weekReport(db, weekStart, plan?)      everything above in the section-15 order
+ * - pantry: pantryNames / preparedStock (read) · addToPantry / removeFromPantry / recordPrepared / usePrepared (writes, logged + undo)
  */
 export { emptyPlanData, NOT_PRESCRIBED } from './constants'
 export { INGREDIENTS, ingredientOf, KIT_ICON, SHOP_CATEGORY_LABEL, SHOP_CATEGORY_ORDER, type Ingredient, type KitIcon, type ShopCategory } from './catalog'
@@ -40,3 +41,4 @@ export { storage, type StoragePlan, type StorageTip, type Transfer } from './sto
 export { prepChecklistFor, presencialKit, presencialKits, type KitMeal, type PrepItem, type PresencialKit } from './kit'
 export { recipeFor, recipeForMeal, type Recipe, type Servings } from './recipes'
 export { weekReport, type WeekReport } from './report'
+export { addToPantry, pantryNames, preparedStock, recordPrepared, removeFromPantry, usePrepared, type PreparedStock } from './pantry'

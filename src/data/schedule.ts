@@ -14,7 +14,8 @@
  *   own time updated — the record already belongs to that day only.
  * - Cancelling a recurring calendar event uses its `exdates` (the app-wide "só nessa semana").
  */
-import type { CollectionKey, DateKey, DB, ID, ScheduleOverride, TimeHM, TimelineEntry } from './types'
+import type { CollectionKey, DateKey, DB, ID, LifeEvent, ScheduleOverride, TimeHM, TimelineEntry } from './types'
+import { logLife } from './intel/log'
 import { actions, getDB } from './store'
 import { hmToMinutes, minutesToHM } from '@/lib/date'
 import { nowISO, uid } from '@/lib/id'
@@ -59,8 +60,25 @@ export interface Proposal {
 
 const clampHM = (min: number): TimeHM => minutesToHM(Math.max(0, Math.min(24 * 60 - 1, Math.round(min))))
 
-function proposal(ops: ScheduleOp[], summary: string): Proposal {
-  return { ops, summary, apply: () => applyOps(ops) }
+/**
+ * A proposal; when Lumos is the author (`by: 'lumos'`), applying it also writes a LifeEvent (life
+ * timeline + "o que mudou?") that the same undo takes out.
+ */
+function proposal(ops: ScheduleOp[], summary: string, by?: By, kind: LifeEvent['kind'] = 'changed'): Proposal {
+  return {
+    ops,
+    summary,
+    apply: () => {
+      const undo = applyOps(ops)
+      if (by !== 'lumos' || !ops.length) return undo
+      const date = ops.find((o): o is Exclude<ScheduleOp, { op: 'update' }> => o.op !== 'update')?.date ?? (ops[0].op === 'update' ? (ops[0].patch.date as DateKey | undefined) : undefined)
+      const log = logLife({ kind, title: summary, ...(date ? { date } : {}), area: 'rotina', by: 'lumos', provenance: 'user' })
+      return () => {
+        log.undo()
+        undo()
+      }
+    },
+  }
 }
 
 // ─── Reads ──────────────────────────────────────────────────────────────────
@@ -252,7 +270,7 @@ export function cancelOn(db: DB, date: DateKey, ref: ScheduleRef, by: By = 'mari
   const freed = target?.start && target.end ? { start: target.start, end: target.end } : undefined
   const title = target?.title ?? 'Isso'
   const extra = cancelled.length > 1 ? ` (e o preparo junto)` : ''
-  return { ...proposal(ops, `${title} fica de fora nesse dia${extra}`), cancelled, freed }
+  return { ...proposal(ops, `${title} fica de fora nesse dia${extra}`, by, 'cancelled'), cancelled, freed }
 }
 
 // ─── Move after / reorder / shift ───────────────────────────────────────────
@@ -265,7 +283,7 @@ export function moveAfter(db: DB, date: DateKey, ref: ScheduleRef, afterRef: Sch
   const at = after ? endMin(after) : undefined
   if (at === undefined || !target) return proposal([], 'Nada pra mudar')
   const time = clampHM(at)
-  return proposal(planSetTime(db, date, ref, time, by), `${target.title} vai pra ${time}, depois de ${after!.title}`)
+  return proposal(planSetTime(db, date, ref, time, by), `${target.title} vai pra ${time}, depois de ${after!.title}`, by, 'moved')
 }
 
 /** The single key that moved between two orders (arrayMove), if exactly one did. */
@@ -308,7 +326,7 @@ export function reorderDay(db: DB, date: DateKey, orderedKeys: string[], by: By 
     ops.push(...step)
     lines.push(`${e.title} → ${time}`)
   }
-  return proposal(ops, lines.join(' · ') || 'Nada pra mudar')
+  return proposal(ops, lines.join(' · ') || 'Nada pra mudar', by, 'moved')
 }
 
 /** "Amanhã quero acordar 5h30": the routine's chain slides; fixed items move by the same delta. */
@@ -326,7 +344,7 @@ export function shiftRoutine(db: DB, date: DateKey, routineId: ID, newStart: Tim
     ops.push({ op: 'override', date, ref: e.ref, patch: { time: clampHM((startMin(e) ?? 0) + delta), endTime: undefined, anytime: undefined }, by })
   }
   const routine = db.routines.find((r) => r.id === routineId)
-  return proposal(ops, `${routine?.name ?? 'Rotina'} começa às ${newStart}`)
+  return proposal(ops, `${routine?.name ?? 'Rotina'} começa às ${newStart}`, by, 'moved')
 }
 
 // ─── "Acordei agora" ────────────────────────────────────────────────────────
@@ -436,7 +454,7 @@ export function replanFrom(db: DB, date: DateKey, nowMinutes: number, opts: Repl
     : ''
   const message = `São ${nowHM}. ${anchorText}${short ? 'Montei uma manhã curta pra você:' : 'Reorganizei o resto da manhã:'}`
   const summary = lines.map((l) => `${l.time} ${l.title}`).join(' · ')
-  return { ...proposal(ops, summary), message, lines, drops: drops.map((e) => ({ title: label(e), ref: e.ref })), anchor }
+  return { ...proposal(ops, `Dia reorganizado a partir das ${nowHM}`, by, 'changed'), summary, message, lines, drops: drops.map((e) => ({ title: label(e), ref: e.ref })), anchor }
 }
 
 /** Every override written on a date (for "restaurar o dia"). */
