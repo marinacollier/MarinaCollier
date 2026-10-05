@@ -69,6 +69,7 @@ export interface LifeContext {
 }
 
 export function lifeContext(db: DB, now: Now): LifeContext {
+  void db
   const empty = (date: DateKey): DayContext => ({ date, workMode: 'remoto', presencial: false, trainings: [], commitments: [], free: [], notes: [] })
   return { now, today: empty(now.date), tomorrow: empty(now.date), week: [] }
 }
