@@ -126,8 +126,8 @@ export interface WeekProposal {
 
 // ─── TemporalMemory ─────────────────────────────────────────────────────────
 
-/** Permanent facts, preferences, temporary states, one-occurrence exceptions, observed patterns. */
-export type MemoryLayer = 'fact' | 'preference' | 'state' | 'exception' | 'pattern'
+/** Permanent facts, preferences, temporary states, one-occurrence exceptions, history, observed patterns. */
+export type MemoryLayer = 'fact' | 'preference' | 'state' | 'exception' | 'history' | 'pattern'
 
 export interface MemoryView {
   layer: MemoryLayer

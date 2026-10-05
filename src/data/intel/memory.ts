@@ -17,22 +17,26 @@ import type { MemoryLayer, MemoryView, Now, Undo } from './types'
 /** Evidence needed before Lumos asks "quer que eu considere isso como preferência?". */
 export const PATTERN_EVIDENCE = 3
 
-const LAYER_ORDER: MemoryLayer[] = ['fact', 'preference', 'state', 'exception', 'pattern']
+const LAYER_ORDER: MemoryLayer[] = ['fact', 'preference', 'state', 'exception', 'history', 'pattern']
 
+/**
+ * Provenance: observed -> inference; seed (her brief) -> 'fact' for facts, 'user' for preferences/state/
+ * history (she said it, it's not a verified fact); Marina -> user; Lumos-written -> inference.
+ */
 function provenanceOf(m: MemoryItem): Provenance {
   if (m.status === 'observed') return 'inference'
-  if (m.source === 'marina' || m.source === 'seed') return 'user'
+  if (m.source === 'seed') return m.kind === 'fact' ? 'fact' : 'user'
+  if (m.source === 'marina') return 'user'
   return 'inference'
 }
 
 function confidenceOf(m: MemoryItem): Confidence {
-  if (m.status === 'confirmed') return 'high'
-  return (m.evidence ?? 0) >= PATTERN_EVIDENCE ? 'medium' : 'low'
+  if (m.status === 'observed') return (m.evidence ?? 0) >= PATTERN_EVIDENCE ? 'medium' : 'low'
+  return m.source === 'lumos' ? 'medium' : 'high'
 }
 
 function layerOf(m: MemoryItem): MemoryLayer {
-  if (m.status === 'observed') return 'pattern'
-  return m.kind === 'history' ? 'fact' : m.kind
+  return m.status === 'observed' ? 'pattern' : m.kind
 }
 
 /** Short human description of a one-day exception. */
