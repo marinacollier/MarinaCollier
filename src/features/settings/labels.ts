@@ -1,28 +1,5 @@
-import type { HomeWidgetId, ModuleId, ThemePref } from '@/data/types'
+import type { ModuleId, ThemePref } from '@/data/types'
 import { ROUTES } from '@/app/routes'
-
-export const WIDGET_META: Record<HomeWidgetId, { label: string; text: string; emoji: string }> = {
-  agora: { label: 'Agora / Próximo', text: 'o que importa agora e o que vem depois', emoji: '✨' },
-  linha_do_dia: { label: 'Linha do dia', text: 'rotina, treino, comida e agenda numa linha só', emoji: '🕰️' },
-  top3: { label: 'Top 3', text: 'o que realmente importa hoje', emoji: '🎯' },
-  manha: { label: 'Rotina da manhã', text: 'uma rotina só, que abre quando você quiser', emoji: '☀️' },
-  proximo_compromisso: { label: 'Agenda', text: 'os compromissos do dia', emoji: '📅' },
-  treino: { label: 'Treino de hoje', text: 'o treino planejado e o check-in', emoji: '🏃‍♀️' },
-  refeicoes: { label: 'Dieta de hoje', text: 'o plano do nutri pro tipo de treino do dia', emoji: '🥗' },
-  gastos: { label: 'Gastos', text: 'quanto saiu hoje e no mês', emoji: '💸' },
-  tarefas: { label: 'Tarefas de hoje', text: 'o que está no seu dia', emoji: '✓' },
-  proxima_viagem: { label: 'Próxima viagem', text: 'contagem e o que falta', emoji: '✈️' },
-  lendo_agora: { label: 'Leitura', text: 'o livro do momento', emoji: '📖' },
-  estudo_atual: { label: 'Estudo atual', text: 'agora estou estudando + próximo estudo', emoji: '📚' },
-  waiting_for: { label: 'Esperando retorno', text: 'o que depende de outra pessoa', emoji: '⏳' },
-  work_focus: { label: 'Precisa de mim — trabalho', text: 'o que no trabalho depende de você', emoji: '💻' },
-  luna: { label: 'Luna', text: 'os cuidados de hoje com ela', emoji: '🐾' },
-  countdown: { label: 'Contagem regressiva', text: 'dias até algo especial', emoji: '⏳' },
-  fechamento: { label: 'Fechamento do dia', text: 'à noite, um respiro pra encerrar', emoji: '🌙' },
-  resumo_dia: { label: 'Hoje em uma linha', text: 'trabalho, treino e o projeto do dia', emoji: '📍' },
-  brain_dump: { label: 'Brain dump', text: 'tirar isso da cabeça em um toque', emoji: '🧠' },
-  amanha: { label: 'Amanhã', text: 'à noite: o que preparar pro dia seguinte', emoji: '👜' },
-}
 
 export interface ModuleEntry {
   key: string
@@ -34,29 +11,18 @@ export interface ModuleEntry {
   tone: 'accent' | 'sage' | 'ocean' | 'sand' | 'plum' | 'ink'
 }
 
-export const MORE_MODULES: ModuleEntry[] = [
+/** Modules that can be hidden from Espaços (Design). Nothing is deleted when hidden. */
+export const HIDEABLE_MODULES: (ModuleEntry & { module: ModuleId })[] = [
   { key: 'corpo', label: 'Corpo', emoji: '🏃‍♀️', to: ROUTES.body, module: 'corpo', tone: 'accent' },
-  { key: 'nutricao', label: 'Nutrição', emoji: '🍽️', to: ROUTES.nutrition, module: 'corpo', tone: 'sage' },
-  { key: 'mealprep', label: 'Meal prep', emoji: '🍱', to: ROUTES.mealPrep, module: 'corpo', tone: 'sand' },
-  { key: 'evolucao', label: 'Evolução', emoji: '🌿', to: ROUTES.bodyEvolution, module: 'corpo', tone: 'sage' },
-  { key: 'dinheiro', label: 'Dinheiro', emoji: '💸', to: ROUTES.money, module: 'dinheiro', tone: 'sage' },
-  { key: 'metas', label: 'Metas', emoji: '🎯', to: ROUTES.goals, module: 'metas', tone: 'accent' },
+  { key: 'creator', label: 'Creator / UGC', emoji: '🎬', to: ROUTES.creator, module: 'creator', tone: 'plum' },
   { key: 'estudos', label: 'Estudos', emoji: '📚', to: ROUTES.study, module: 'estudos', tone: 'ocean' },
   { key: 'livros', label: 'Livros', emoji: '📖', to: ROUTES.books, module: 'livros', tone: 'plum' },
   { key: 'viagens', label: 'Viagens', emoji: '✈️', to: ROUTES.trips, module: 'viagens', tone: 'ocean' },
-  { key: 'creator', label: 'Creator / UGC', emoji: '🎬', to: ROUTES.creator, module: 'creator', tone: 'plum' },
-  { key: 'vida_real', label: 'Vida real', emoji: '🏡', to: ROUTES.lifeAdmin, module: 'vida_real', tone: 'sand' },
+  { key: 'dinheiro', label: 'Finanças', emoji: '💸', to: ROUTES.money, module: 'dinheiro', tone: 'sage' },
   { key: 'luna', label: 'Luna', emoji: '🐾', to: ROUTES.luna, module: 'luna', tone: 'sand' },
-  { key: 'inbox', label: 'Inbox', emoji: '🧠', to: ROUTES.inbox, module: 'inbox', tone: 'ink' },
-  { key: 'tarefas', label: 'Tarefas', emoji: '✓', to: ROUTES.tasks, tone: 'sage' },
-  { key: 'revisao', label: 'Revisão da semana', emoji: '🗓️', to: ROUTES.weeklyReview, module: 'revisao', tone: 'sage' },
-  { key: 'mes', label: 'Meu mês', emoji: '🌙', to: ROUTES.monthlyReview, module: 'mes', tone: 'plum' },
-  { key: 'mari', label: 'Lumos', emoji: '✨', to: ROUTES.assistant, module: 'mari', tone: 'accent' },
-  { key: 'busca', label: 'Busca', emoji: '🔎', to: ROUTES.search, tone: 'ink' },
+  { key: 'vida_real', label: 'Casa & admin', emoji: '🏡', to: ROUTES.lifeAdmin, module: 'vida_real', tone: 'sand' },
+  { key: 'inbox', label: 'Inbox & notas', emoji: '🧠', to: ROUTES.inbox, module: 'inbox', tone: 'ink' },
 ]
-
-/** Modules Marina can hide (the bottom-nav tabs and Hoje always stay). */
-export const HIDEABLE_MODULES = MORE_MODULES.filter((m) => m.module) as (ModuleEntry & { module: ModuleId })[]
 
 export const THEME_OPTIONS: { value: ThemePref; label: string }[] = [
   { value: 'light', label: 'Claro' },

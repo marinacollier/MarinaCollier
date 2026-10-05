@@ -105,7 +105,7 @@ export default function DataPage() {
 
   return (
     <Page>
-      <PageHeader title="Meus dados" back backTo={ROUTES.more} search={false} subtitle="Seus dados são seus. Leve, guarde, traga de volta." />
+      <PageHeader title="Meus dados" back backTo={ROUTES.settings} search={false} subtitle="Seus dados são seus. Leve, guarde, traga de volta." />
 
       <Card className="mt-1">
         <div className="flex items-start gap-3">

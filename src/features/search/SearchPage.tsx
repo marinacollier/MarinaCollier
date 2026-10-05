@@ -1,22 +1,18 @@
 import { useMemo, useRef, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { History, Search, X } from 'lucide-react'
-import { openSheet } from '@/app/ui-store'
-import { Button, Chip, EmptyState, IconButton, ListCard, Page, PageHeader, SectionTitle } from '@/components/ui'
+import { Chip, IconButton, ListCard, Page, PageHeader, SectionTitle } from '@/components/ui'
 import { useDB } from '@/data/store'
 import { useToday } from '@/hooks/useToday'
-import { runAction } from './actions'
-import { search, type SearchResult } from './engine'
 import { clearRecent, loadRecent, pushRecent } from './recent'
-import { MoneySummaryCard, ResultGroup, ResultRow } from './ResultViews'
-
-export const SEARCH_SUGGESTIONS = ['FashionFinder', 'Cape Town', 'bike', 'gastos viagem', 'estudo IA', 'Luna', 'safari', 'UGC']
+import { SearchResults } from './SearchResults'
+import { searchSuggestions } from './suggestions'
 
 export default function SearchPage() {
   const db = useDB()
   const today = useToday()
-  const navigate = useNavigate()
+  const suggestions = useMemo(() => searchSuggestions(db, today), [db, today])
   const [params, setParams] = useSearchParams()
   const [query, setQueryState] = useState(() => params.get('q') ?? '')
   const [recent, setRecent] = useState(loadRecent)
@@ -27,15 +23,9 @@ export default function SearchPage() {
     setParams(q ? { q } : {}, { replace: true })
   }
 
-  const res = useMemo(() => search(db, query, today), [db, query, today])
   const hasQuery = query.trim().length > 0
 
   const remember = () => setRecent(pushRecent(query))
-
-  const open = (r: SearchResult) => {
-    remember()
-    runAction(r.action, navigate)
-  }
 
   return (
     <Page>
@@ -84,7 +74,7 @@ export default function SearchPage() {
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
           <SectionTitle className="mt-4">Experimente</SectionTitle>
           <div className="flex flex-wrap gap-2">
-            {SEARCH_SUGGESTIONS.map((s) => (
+            {suggestions.map((s) => (
               <Chip key={s} onClick={() => setQuery(s)}>
                 {s}
               </Chip>
@@ -131,41 +121,7 @@ export default function SearchPage() {
         </motion.div>
       )}
 
-      {hasQuery && (
-        <div>
-          {res.summary && <MoneySummaryCard summary={res.summary} onOpen={() => (remember(), runAction(res.summary!.action, navigate))} />}
-
-          {res.groups.length > 0 && !res.summary && (
-            <p className="text-[13px] text-muted px-1 mt-3">
-              {res.total === 1 ? '1 resultado' : `${res.total} resultados`}
-              {res.groups.length > 1 && ` em ${res.groups.length} áreas`}
-            </p>
-          )}
-
-          {res.groups.map((g, i) => (
-            <ResultGroup key={`${query}:${g.key}`} group={g} index={i} onOpen={open} />
-          ))}
-
-          {res.total === 0 && !res.summary && (
-            <EmptyState
-              emoji="🌾"
-              title="Nada por aqui com esse nome."
-              text="Quer jogar no brain dump?"
-              action={
-                <Button variant="primary" onClick={() => openSheet('brainDump', { text: query.trim() })}>
-                  🧠 Jogar no brain dump
-                </Button>
-              }
-            />
-          )}
-
-          {res.intent === 'money' && res.total === 0 && (
-            <ListCard className="mt-4">
-              <ResultRow emoji="💸" title="Adicionar um gasto" onPress={() => openSheet('expense')} />
-            </ListCard>
-          )}
-        </div>
-      )}
+      {hasQuery && <SearchResults query={query} onOpen={remember} />}
     </Page>
   )
 }

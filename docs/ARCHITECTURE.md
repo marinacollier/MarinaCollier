@@ -98,7 +98,7 @@ Prefer "ficou de ontem", "quando der", "sem pressa", "que bom!".
 
 ## Routes
 
-See `src/app/routes.tsx` (`ROUTES` constants). Bottom nav: Hoje · Agenda · Vida · Trabalho · Mais.
+See `src/app/routes.tsx` (`ROUTES` constants). Bottom nav: Início · Agenda · Espaços (Ajustes pelo avatar).
 
 ## Integrations
 
