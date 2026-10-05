@@ -178,7 +178,8 @@ export interface TimeWindow {
 }
 
 /** What a per-day override points at. `planMeal` refId = '<NutritionDayPlan.id>#<meal index>'; `routineStep` refId = '<RoutineItem.id>#<step index>'. */
-export type ScheduleRefType = 'routineItem' | 'routineStep' | 'workout' | 'planMeal' | 'event' | 'task' | 'petTask' | 'weekTemplate' | 'mealPrep'
+/** 'work' refId = the DateKey (one per day): per-day work mode ('amanhã fiquei presencial'). */
+export type ScheduleRefType = 'routineItem' | 'routineStep' | 'workout' | 'planMeal' | 'event' | 'task' | 'petTask' | 'weekTemplate' | 'mealPrep' | 'work'
 
 /**
  * Change to ONE day only ("nesta quinta yoga às 20:00"). The recurring default never changes.
@@ -194,6 +195,10 @@ export interface ScheduleOverride extends Entity {
   cancelled?: boolean
   /** Explicit "qualquer momento" for that day. */
   anytime?: boolean
+  /** Duration for that day only ("domingo o pedal passou pra 4h" → 240). */
+  durationMin?: number
+  /** refType 'work': that day's work mode ("amanhã fiquei presencial"). */
+  workMode?: WorkDayMode
   /** Who changed it — Lumos changes are always undoable and shown as such. */
   by: 'marina' | 'lumos'
   reason?: string
@@ -357,6 +362,8 @@ export interface UserProfile {
   seedVersion?: number
   /** Lumos may apply small meal adjustments without asking (off by default; always undoable). */
   lumosAutoApplySmall?: boolean
+  /** Last time Marina talked to Lumos / opened Home — ChangeFeed baseline ("o que mudou?"). */
+  lumosLastSeenAt?: ISODateTime
   /** Food likes / aversions Lumos respects when choosing among the nutritionist's substitutions. */
   foodPrefs?: { likes: string[]; dislikes: string[] }
 }
@@ -697,6 +704,39 @@ export interface PantryItem extends Entity {
   recurring?: boolean
   /** Plan item it covers, when known ('<planId>#<meal>#<item>' or a food name). */
   covers?: string[]
+}
+
+// ─── Lumos intelligence layer (provenance, life log, attention) ─────────────
+
+/** Where a piece of information came from — Lumos must always know. */
+export type Provenance = 'user' | 'fact' | 'integration' | 'inference' | 'suggestion'
+export type Confidence = 'high' | 'medium' | 'low'
+
+/**
+ * Something that really happened (or really changed), kept for history and "o que mudou?".
+ * Written by Lumos actions, ActionGraph propagation, integrations and important manual changes.
+ */
+export interface LifeEvent extends Entity {
+  at: ISODateTime
+  /** Day it concerns (may differ from `at`: "amanhã fiquei presencial"). */
+  date: DateKey
+  kind: 'done' | 'logged' | 'changed' | 'moved' | 'cancelled' | 'created' | 'finished' | 'resolved' | 'learned' | 'integration'
+  /** Short human line in pt-BR ("Pedal de domingo passou pra 4h"). */
+  title: string
+  area?: MemoryArea
+  ref?: { type: EntityType | ScheduleRefType | 'pantry' | 'memory'; id: string }
+  by: 'marina' | 'lumos' | 'integration' | 'system'
+  provenance: Provenance
+  confidence?: Confidence
+  /** Other events caused by this one (ActionGraph): ids of LifeEvents. */
+  causedBy?: ID
+}
+
+/** A NeedsAttention item Marina resolved or dismissed (items themselves are derived, keyed). */
+export interface AttentionAck extends Entity {
+  key: string
+  how: 'resolved' | 'dismissed' | 'snoozed'
+  until?: DateKey
 }
 
 // ─── Lumos memory (what Lumos knows about Marina; editable) ─────────────────
@@ -1471,6 +1511,8 @@ export interface DB {
   mealPrepPlans: MealPrepPlan[]
   pantry: PantryItem[]
   memory: MemoryItem[]
+  lifeLog: LifeEvent[]
+  attentionAcks: AttentionAck[]
 }
 
 /** Keys of DB that hold arrays of entities. */

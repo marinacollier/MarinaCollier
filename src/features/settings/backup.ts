@@ -77,6 +77,8 @@ export const COLLECTION_LABELS: Partial<Record<CollectionKey, string>> = {
   mealPrepPlans: 'Meal prep da semana',
   pantry: 'Em casa (despensa e preparados)',
   memory: 'O que a Lumos sabe sobre mim',
+  lifeLog: 'Linha da vida (acontecimentos)',
+  attentionAcks: 'Decisões resolvidas',
 }
 
 export interface BackupPreview {

@@ -197,6 +197,8 @@ export function emptyDB(): DB {
     mealPrepPlans: [],
     pantry: [],
     memory: [],
+    lifeLog: [],
+    attentionAcks: [],
   }
 }
 
