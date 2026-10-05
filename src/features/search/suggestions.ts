@@ -8,15 +8,16 @@ import type { DateKey, DB } from '@/data/types'
 export function searchSuggestions(db: DB, today: DateKey, max = 6): string[] {
   const out: string[] = []
   const add = (s?: string) => {
-    const v = s?.trim()
+    // Short, searchable words: "Cape Town (base) · Johannesburg" → "Cape Town".
+    const v = s?.split(/[,(·/]/)[0]?.trim()
     if (v && !out.some((x) => x.toLowerCase() === v.toLowerCase())) out.push(v)
   }
   const projects = db.projects.filter((p) => p.status === 'ativo').sort((a, b) => a.order - b.order)
   add(projects[0]?.name)
   const trip = upcomingTrips(db, today)[0]
   if (trip) {
-    add(trip.place?.split(',')[0] ?? trip.name)
-    add(db.tripItems.find((i) => i.tripId === trip.id && i.group)?.group?.split('/')[0])
+    add(trip.place ?? trip.name)
+    add(db.tripItems.find((i) => i.tripId === trip.id && i.group)?.group)
   }
   add(db.profile.modalities.find((m) => m.favorite && m.active)?.label.toLowerCase())
   const book = readingNow(db)[0]

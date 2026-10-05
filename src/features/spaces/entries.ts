@@ -94,7 +94,7 @@ function aprender(db: DB): SpaceEntry[] {
     out.push({ key: 'livros', label: 'Livros', emoji: '📖', to: ROUTES.books, tone: 'plum', module: 'livros', hint: reading ? `lendo: ${reading.title}` : done ? plural(done, 'lido', 'lidos') : undefined })
   }
   const refs = db.studyItems.filter((s) => s.reference || s.kind === 'newsletter')
-  if (refs.length) out.push({ key: 'salvos', label: 'Conteúdos salvos', emoji: '🔖', to: ROUTES.study, tone: 'sand', module: 'estudos', hint: refs.map((r) => r.source || r.title).slice(0, 2).join(' · ') })
+  if (refs.length) out.push({ key: 'salvos', label: 'Conteúdos salvos', emoji: '🔖', to: ROUTES.saved, tone: 'sand', module: 'estudos', hint: refs.map((r) => r.source || r.title).slice(0, 2).join(' · ') })
   return out
 }
 

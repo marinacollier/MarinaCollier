@@ -24,6 +24,8 @@ export const ROUTES = {
   wins: '/trabalho/wins',
   creator: '/trabalho/creator',
   study: '/estudos',
+  /** Reference content (newsletters, saved themes) — never tasks. */
+  saved: '/estudos?v=salvos',
   books: '/livros',
   book: (id: string) => `/livros/${id}`,
   trips: '/viagens',
