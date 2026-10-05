@@ -1,7 +1,8 @@
-import { useMemo, useState, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowRight, ArrowUp, Library, Pencil, Play, Plus, Settings2, X } from 'lucide-react'
+import { SavedContent } from './components/SavedContent'
 import { ROUTES } from '@/app/routes'
 import { openSheet, toast } from '@/app/ui-store'
 import { removeWithUndo } from '@/app/undo'
@@ -10,7 +11,6 @@ import type { StudyItem, StudyTrack } from '@/data/types'
 import {
   Button,
   Card,
-  EmptyState,
   IconButton,
   Page,
   PageHeader,
@@ -18,7 +18,6 @@ import {
   ProgressBar,
   SectionTitle,
   Segmented,
-  SheetLayout,
   SortableList,
   SwipeRow,
   TONE,
@@ -45,7 +44,10 @@ import {
   nextTrackStatus,
   parseCapture,
   promoteToNextPatch,
+  readingWhere,
+  savedContent,
   startStudyPatch,
+  studyItemsOnly,
   studyList,
   topOrder,
   trackStatus,
@@ -61,7 +63,7 @@ const VIEWS: { value: BacklogView; label: string }[] = [
   { value: 'finalizado', label: 'Finalizados' },
 ]
 
-type Panel = { kind: 'finished'; item: StudyItem } | { kind: 'tracks' } | { kind: 'pickNext' } | null
+type Panel = { kind: 'finished'; item: StudyItem } | { kind: 'tracks' } | null
 
 function startNow(item: StudyItem, items: StudyItem[]) {
   actions.update('studyItems', item.id, { ...startStudyPatch(item), order: nextOrder(items.filter((i) => i.status === 'estudando')) })
@@ -94,20 +96,30 @@ function cycleTrackStatus(track: StudyTrack) {
 export default function StudyPage() {
   const nav = useNavigate()
   const today = useToday()
+  const [params] = useSearchParams()
   const items = useDB((db) => db.studyItems)
   const allTracks = useDB((db) => db.studyTracks)
   const books = useDB((db) => db.books)
   const [view, setView] = useState<BacklogView>('backlog')
   const [trackId, setTrackId] = useState<string | undefined>()
   const [panel, setPanel] = useState<Panel>(null)
+  const savedRef = useRef<HTMLElement>(null)
 
   const tracks = useMemo(() => tracksForDisplay(allTracks), [allTracks])
   const trackById = useMemo(() => new Map(allTracks.map((t) => [t.id, t])), [allTracks])
   const next = useMemo(() => nextStudyOf(items), [items])
   const studying = useMemo(() => studyList(items, 'estudando'), [items])
   const list = useMemo(() => studyList(items, view, trackId), [items, view, trackId])
+  const hasQueue = useMemo(() => studyItemsOnly(items).some((i) => i.status !== 'estudando' && i.status !== 'pausado'), [items])
+  const saved = useMemo(() => savedContent(items), [items])
   const reading = useMemo(() => booksByStatus(books, 'lendo')[0] ?? booksByStatus(books, 'proximo')[0], [books])
   const filterTrack = trackId ? trackById.get(trackId) : undefined
+  const wantsSaved = params.get('v') === 'salvos'
+
+  // /estudos?v=salvos → straight to "Conteúdos salvos" (Espaços → Aprender, Lumos)
+  useEffect(() => {
+    if (wantsSaved) savedRef.current?.scrollIntoView({ block: 'start' })
+  }, [wantsSaved])
 
   const finish = (item: StudyItem) => {
     actions.update('studyItems', item.id, finishStudyPatch(today))
@@ -121,9 +133,9 @@ export default function StudyPage() {
   return (
     <Page>
       <PageHeader
-        eyebrow="mente"
-        title="📚 Learning OS"
-        subtitle="o que estou aprendendo agora — e o próximo já guardado."
+        eyebrow="aprender"
+        title="Estudos"
+        subtitle="o que estou aprendendo — e o que eu guardo pra quando quiser."
         actions={
           <>
             <IconButton label="Livros" onClick={() => nav(ROUTES.books)}>
@@ -136,43 +148,28 @@ export default function StudyPage() {
         }
       />
 
-      <SectionTitle className="mt-1">Agora estou estudando</SectionTitle>
-      <div className="space-y-2.5">
-        {studying.length ? (
-          studying.map((it, i) => (
-            <motion.div key={it.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
-              <StudyingCard item={it} track={it.trackId ? trackById.get(it.trackId) : undefined} onFinish={() => finish(it)} />
-            </motion.div>
-          ))
-        ) : (
-          <Card>
-            <EmptyState
-              compact
-              emoji="🌿"
-              title="Nada em andamento agora"
-              text="Começa o próximo quando quiser, sem pressa."
-              action={
-                next && (
-                  <Button size="sm" variant="primary" icon={<Play size={14} />} onClick={() => startNow(next, items)}>
-                    começar “{next.title}”
-                  </Button>
-                )
-              }
-            />
-          </Card>
-        )}
-      </div>
+      {studying.length > 0 && (
+        <>
+          <SectionTitle className="mt-1">Agora estou estudando</SectionTitle>
+          <div className="space-y-2.5">
+            {studying.map((it, i) => (
+              <motion.div key={it.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
+                <StudyingCard item={it} track={it.trackId ? trackById.get(it.trackId) : undefined} onFinish={() => finish(it)} />
+              </motion.div>
+            ))}
+          </div>
+        </>
+      )}
 
-      <SectionTitle>Próximo estudo</SectionTitle>
-      <NextHero
-        next={next}
-        track={next?.trackId ? trackById.get(next.trackId) : undefined}
-        hasBacklog={items.some((i) => i.status === 'backlog')}
-        onStart={() => next && startNow(next, items)}
-        onPick={() => setPanel({ kind: 'pickNext' })}
-      />
+      {next && (
+        <>
+          <SectionTitle>Próximo estudo</SectionTitle>
+          <NextHero next={next} track={next.trackId ? trackById.get(next.trackId) : undefined} onStart={() => startNow(next, items)} />
+        </>
+      )}
 
       <SectionTitle
+        className={studying.length || next ? undefined : 'mt-1'}
         action={
           <button type="button" onClick={() => setPanel({ kind: 'tracks' })} className="text-[13px] text-muted h-8 -mb-1.5 px-1 inline-flex items-center gap-1">
             <Settings2 size={14} /> editar
@@ -195,117 +192,117 @@ export default function StudyPage() {
             />
           </motion.div>
         ))}
-        <button
-          type="button"
-          onClick={() => setPanel({ kind: 'tracks' })}
-          className="w-full h-12 rounded-2xl border border-dashed border-line text-muted inline-flex items-center justify-center gap-1.5 text-[13.5px] active:scale-[0.99] transition"
-        >
-          <Plus size={16} /> nova trilha
-        </button>
+        {tracks.length === 0 && (
+          <button
+            type="button"
+            onClick={() => setPanel({ kind: 'tracks' })}
+            className="w-full h-12 rounded-2xl border border-dashed border-line text-muted inline-flex items-center justify-center gap-1.5 text-[13.5px] active:scale-[0.99] transition"
+          >
+            <Plus size={16} /> nova trilha
+          </button>
+        )}
       </div>
 
-      <SectionTitle
-        action={
-          filterTrack && (
-            <button type="button" onClick={() => setTrackId(undefined)} className="text-[13px] text-muted h-8 -mb-1.5 px-1 inline-flex items-center gap-1">
-              {filterTrack.emoji} só {filterTrack.name} <X size={14} />
-            </button>
-          )
-        }
-      >
-        Learning backlog
-      </SectionTitle>
-      <Segmented value={view} onChange={setView} options={VIEWS} />
+      {hasQueue && (
+        <>
+          <SectionTitle
+            action={
+              filterTrack && (
+                <button type="button" onClick={() => setTrackId(undefined)} className="text-[13px] text-muted h-8 -mb-1.5 px-1 inline-flex items-center gap-1">
+                  {filterTrack.emoji} só {filterTrack.name} <X size={14} />
+                </button>
+              )
+            }
+          >
+            Pra estudar depois
+          </SectionTitle>
+          <Segmented value={view} onChange={setView} options={VIEWS} />
 
-      <div className="mt-3 space-y-2.5">
-        {view === 'backlog' && <BacklogCapture trackId={trackId} items={items} />}
+          <div className="mt-3 space-y-2.5">
+            {view === 'backlog' && <BacklogCapture trackId={trackId} items={items} />}
 
-        {view === 'proximo' &&
-          (list.length ? (
-            <SortableList
-              items={list}
-              className="space-y-2"
-              onReorder={(ids) => {
-                const all = studyList(items, 'proximo').map((i) => i.id)
-                actions.reorder('studyItems', mergeSubsetOrder(all, ids))
-              }}
-              renderItem={(it, handle) => (
+            {view === 'proximo' &&
+              (list.length ? (
+                <SortableList
+                  items={list}
+                  className="space-y-2"
+                  onReorder={(ids) => {
+                    const all = studyList(items, 'proximo').map((i) => i.id)
+                    actions.reorder('studyItems', mergeSubsetOrder(all, ids))
+                  }}
+                  renderItem={(it, handle) => (
+                    <StudyRow
+                      item={it}
+                      track={it.trackId ? trackById.get(it.trackId) : undefined}
+                      handle={handle}
+                      badge={it.id === next?.id ? 'o próximo' : undefined}
+                      completeLabel="Começar"
+                      onComplete={() => startNow(it, items)}
+                      trailing={
+                        <IconButton label={`Começar ${it.title}`} variant="soft" size="sm" onClick={() => startNow(it, items)}>
+                          <Play size={14} />
+                        </IconButton>
+                      }
+                    />
+                  )}
+                />
+              ) : (
+                <p className="text-[14px] text-muted px-1">Fila vazia — escolhe algo do backlog quando der.</p>
+              ))}
+
+            {view === 'backlog' &&
+              list.map((it) => (
                 <StudyRow
+                  key={it.id}
                   item={it}
                   track={it.trackId ? trackById.get(it.trackId) : undefined}
-                  handle={handle}
-                  badge={it.id === next?.id ? 'o próximo' : undefined}
-                  completeLabel="Começar"
-                  onComplete={() => startNow(it, items)}
+                  completeLabel="Próximo"
+                  onComplete={() => promote(it, items)}
                   trailing={
-                    <IconButton label={`Começar ${it.title}`} variant="soft" size="sm" onClick={() => startNow(it, items)}>
-                      <Play size={14} />
+                    <IconButton label={`Tornar ${it.title} o próximo estudo`} variant="soft" size="sm" onClick={() => promote(it, items)}>
+                      <ArrowUp size={15} />
                     </IconButton>
                   }
                 />
-              )}
-            />
-          ) : (
-            <Card>
-              <EmptyState compact emoji="🧭" title="Fila vazia" text="Escolhe algo do backlog pra ser o próximo — assim nada se perde." action={<Button size="sm" variant="soft" onClick={() => setView('backlog')}>ver backlog</Button>} />
-            </Card>
-          ))}
+              ))}
 
-        {view === 'backlog' &&
-          (list.length ? (
-            list.map((it) => (
-              <StudyRow
-                key={it.id}
-                item={it}
-                track={it.trackId ? trackById.get(it.trackId) : undefined}
-                completeLabel="Próximo"
-                onComplete={() => promote(it, items)}
-                trailing={
-                  <IconButton label={`Tornar ${it.title} o próximo estudo`} variant="soft" size="sm" onClick={() => promote(it, items)}>
-                    <ArrowUp size={15} />
-                  </IconButton>
-                }
-              />
-            ))
-          ) : (
-            <EmptyState compact emoji="📥" title="Backlog livre" text="Viu um curso, artigo ou tema legal? Joga aqui em cima." />
-          ))}
+            {view === 'finalizado' &&
+              (list.length ? (
+                list.map((it) => (
+                  <StudyRow
+                    key={it.id}
+                    item={it}
+                    track={it.trackId ? trackById.get(it.trackId) : undefined}
+                    subtitle={it.finishedAt ? `terminou ${formatShortDate(it.finishedAt)} 🎉` : 'finalizado 🎉'}
+                  />
+                ))
+              ) : (
+                <p className="text-[14px] text-muted px-1">Quando terminar algo, ele vem pra cá — com festa. 🎓</p>
+              ))}
+          </div>
+        </>
+      )}
 
-        {view === 'finalizado' &&
-          (list.length ? (
-            list.map((it) => (
-              <StudyRow
-                key={it.id}
-                item={it}
-                track={it.trackId ? trackById.get(it.trackId) : undefined}
-                subtitle={it.finishedAt ? `terminou ${formatShortDate(it.finishedAt)} 🎉` : 'finalizado 🎉'}
-              />
-            ))
-          ) : (
-            <EmptyState compact emoji="🎓" title="Ainda nada por aqui" text="Quando terminar algo, ele vem pra cá — com festa." />
-          ))}
-      </div>
+      <section ref={savedRef} id="salvos" className="scroll-mt-4">
+        <SectionTitle>Conteúdos salvos</SectionTitle>
+        <SavedContent groups={saved} items={items} trackById={trackById} />
+      </section>
 
-      <Card onPress={() => nav(ROUTES.books)} className="mt-8 flex items-center gap-4">
-        {reading ? (
+      {reading && (
+        <Card onPress={() => nav(ROUTES.books)} className="mt-8 flex items-center gap-4">
           <BookCover book={reading} width={48} />
-        ) : (
-          <span className="h-[72px] w-12 rounded-[3px_8px_8px_3px] border border-dashed border-line flex items-center justify-center text-[20px]" aria-hidden>
-            📖
-          </span>
-        )}
-        <div className="flex-1 min-w-0">
-          <div className="eyebrow">{reading ? (reading.status === 'lendo' ? 'lendo agora' : 'próximo livro') : 'livros'}</div>
-          <div className="font-display text-[18px] leading-tight truncate mt-0.5">{reading ? reading.title : 'Sua estante'}</div>
-          <div className="text-[13px] text-muted">{reading ? 'sua estante de livros' : 'começa vazia — do jeito que tem que ser.'}</div>
-        </div>
-        <ArrowRight size={18} className="text-muted" />
-      </Card>
+          <div className="flex-1 min-w-0">
+            <div className="eyebrow">{reading.status === 'lendo' ? 'lendo agora' : 'próximo livro'}</div>
+            <div className="font-display text-[18px] leading-tight truncate mt-0.5">{reading.title}</div>
+            <div className="text-[13px] text-muted truncate">{(reading.status === 'lendo' && readingWhere(reading)) || reading.author || 'sua estante'}</div>
+          </div>
+          <ArrowRight size={18} className="text-muted" />
+        </Card>
+      )}
 
       <LocalSheet open={!!panel} onClose={() => setPanel(null)}>
         {panel?.kind === 'finished' && <WhatsNext finished={panel.item} onDone={() => setPanel(null)} />}
         {panel?.kind === 'tracks' && <TrackEditor onClose={() => setPanel(null)} />}
-        {panel?.kind === 'pickNext' && <PickNext items={items} trackById={trackById} onClose={() => setPanel(null)} />}
       </LocalSheet>
     </Page>
   )
@@ -319,25 +316,7 @@ function promote(it: StudyItem, items: StudyItem[]) {
 
 // ─── Hero ───────────────────────────────────────────────────────────────────
 
-function NextHero({ next, track, hasBacklog, onStart, onPick }: { next?: StudyItem; track?: StudyTrack; hasBacklog: boolean; onStart: () => void; onPick: () => void }) {
-  if (!next) {
-    return (
-      <div className="card p-5 relative overflow-hidden">
-        <div className="font-display text-[22px] leading-tight">Qual é o próximo?</div>
-        <p className="text-[14px] text-muted mt-1">Deixa ele guardado aqui — quando terminar o atual, já sabe por onde seguir.</p>
-        <div className="flex gap-2 mt-4">
-          {hasBacklog && (
-            <Button size="sm" variant="primary" onClick={onPick}>
-              escolher do backlog
-            </Button>
-          )}
-          <Button size="sm" variant={hasBacklog ? 'soft' : 'primary'} icon={<Plus size={14} />} onClick={() => openSheet('study', { defaults: { status: 'proximo' } })}>
-            anotar
-          </Button>
-        </div>
-      </div>
-    )
-  }
+function NextHero({ next, track, onStart }: { next: StudyItem; track?: StudyTrack; onStart: () => void }) {
   const t = TONE[track?.tone ?? 'accent']
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={cn('relative overflow-hidden rounded-[var(--radius-card)] p-5', t.soft)}>
@@ -400,9 +379,11 @@ function TrackCard({
           </span>
           <span className="min-w-0">
             <span className="block text-[16px] font-medium leading-tight truncate">{track.name}</span>
-            <span className="block text-[12.5px] text-muted truncate mt-0.5">
-              {current.length ? `agora: ${current.map((c) => c.title).join(' · ')}` : status === 'pausado' ? 'pausada, sem pressa' : 'nada em andamento agora'}
-            </span>
+            {current.length > 0 ? (
+              <span className="block text-[12.5px] text-muted truncate mt-0.5">agora: {current.map((c) => c.title).join(' · ')}</span>
+            ) : status === 'pausado' ? (
+              <span className="block text-[12.5px] text-muted mt-0.5">pausada, sem pressa</span>
+            ) : null}
           </span>
         </button>
         <button
@@ -414,6 +395,7 @@ function TrackCard({
           <span className={cn('inline-flex items-center h-7 px-3 rounded-full text-[12.5px] font-medium', STATUS_STYLE[status])}>{TRACK_STATUS_LABEL[status]}</span>
         </button>
       </div>
+      {track.notes && <p className="text-[13.5px] text-ink-2 leading-snug mt-2 px-0.5">{track.notes}</p>}
       {formats.length > 0 ? (
         <div className="flex flex-wrap gap-1.5 mt-3">
           {formats.map((f) => (
@@ -620,42 +602,5 @@ function BacklogCapture({ trackId, items }: { trackId?: string; items: StudyItem
       />
       <SubmitIcon label="Guardar no backlog" disabled={!text.trim()} />
     </form>
-  )
-}
-
-// ─── Pick next from backlog ─────────────────────────────────────────────────
-
-function PickNext({ items, trackById, onClose }: { items: StudyItem[]; trackById: Map<string, StudyTrack>; onClose: () => void }) {
-  const backlog = useMemo(() => studyList(items, 'backlog'), [items])
-  return (
-    <SheetLayout title="Escolher o próximo" eyebrow="do seu backlog" onClose={onClose}>
-      {backlog.length ? (
-        <div className="card overflow-hidden divide-y divide-line/70">
-          {backlog.map((it) => {
-            const tr = it.trackId ? trackById.get(it.trackId) : undefined
-            return (
-              <button
-                key={it.id}
-                type="button"
-                onClick={() => {
-                  promote(it, items)
-                  onClose()
-                }}
-                className="w-full flex items-center gap-3 min-h-[56px] px-4 py-2.5 text-left active:bg-surface-2"
-              >
-                <span className="text-[19px] w-7 text-center">{tr?.emoji ?? '📚'}</span>
-                <span className="flex-1 min-w-0">
-                  <span className="block text-[15px] truncate">{it.title}</span>
-                  {tr && <span className="block text-[12.5px] text-muted">{tr.name}</span>}
-                </span>
-                <ArrowUp size={16} className="text-muted" />
-              </button>
-            )
-          })}
-        </div>
-      ) : (
-        <EmptyState compact emoji="📥" title="Backlog vazio" />
-      )}
-    </SheetLayout>
   )
 }

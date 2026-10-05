@@ -5,8 +5,8 @@ import { SEED_IDS } from '@/data/seed/ids'
 /**
  * Creator seed (brief §22, 23, 28). Only what Marina gave:
  * - Breevo as a partnership in 'contato' + a "revisar hoje" task (never late, no values invented);
- * - the possible South Africa series as a creator project with an idea bank;
- * - a couple of everyday ideas inside her own categories.
+ * - the possible South Africa series as a creator project with an idea bank (§28).
+ * No generic everyday ideas: her own ideas arrive through Lumos ("ideia de reels na bike").
  */
 export const AFRICA_SERIES_CATEGORIES = [
   'viagem solo',
@@ -57,18 +57,10 @@ export const seedCreator: FeatureSeed = (ctx) => {
     ['O que comi na semana', 'comida'],
     ['Vida real: dias sem roteiro', 'vida real'],
   ]
-  const everyday: [string, string][] = [
-    ['Bastidores de um treino de natação', 'natação'],
-    ['Minha rotina: treino + trabalho', 'rotina'],
-  ]
-
   let order = 0
   const contentItems = [
     ...africaIdeas.map(([title, category]) =>
       ctx.make('contentItems', { id: seedId('creator', `africa-${title}`), title, category, stage: 'ideia', projectId: seriesId, links: [], order: order++ }),
-    ),
-    ...everyday.map(([title, category]) =>
-      ctx.make('contentItems', { id: seedId('creator', `ugc-${title}`), title, category, stage: 'ideia', projectId: SEED_IDS.projUGC, links: [], order: order++ }),
     ),
   ]
 
