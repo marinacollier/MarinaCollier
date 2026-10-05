@@ -195,6 +195,8 @@ export function emptyDB(): DB {
     foods: [],
     mealAdjustments: [],
     mealPrepPlans: [],
+    pantry: [],
+    memory: [],
   }
 }
 

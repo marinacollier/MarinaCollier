@@ -683,6 +683,48 @@ export interface MealPrepPlan extends Entity {
   by: 'lumos' | 'marina'
 }
 
+/** What's at home: ingredients ("já tenho arroz, whey e café") and prepared food ("fiz 6 porções de frango"). */
+export interface PantryItem extends Entity {
+  name: string
+  kind: 'ingrediente' | 'preparado'
+  /** Prepared food: portions made and still left. */
+  portions?: number
+  remaining?: number
+  gramsPerPortion?: number
+  madeAt?: DateKey
+  storage?: 'despensa' | 'geladeira' | 'freezer'
+  /** Bought every week (café, whey…) — shopping lists consider it without asking. */
+  recurring?: boolean
+  /** Plan item it covers, when known ('<planId>#<meal>#<item>' or a food name). */
+  covers?: string[]
+}
+
+// ─── Lumos memory (what Lumos knows about Marina; editable) ─────────────────
+
+export type MemoryKind = 'fact' | 'preference' | 'state' | 'history'
+export type MemoryArea = 'rotina' | 'trabalho' | 'esportes' | 'alimentacao' | 'estudos' | 'leitura' | 'viagens' | 'habitos' | 'luna' | 'casa' | 'financas' | 'uso_app'
+
+/**
+ * One thing Lumos knows. FACTS ("mora em São Paulo"), PREFERENCES ("treino pesado de manhã"),
+ * CURRENT STATE ("lendo Continuous Discovery Habits"), HISTORY ("terminou X em 05/10").
+ * An observed pattern is NEVER a rule: status 'observed' + evidence count until Marina confirms.
+ */
+export interface MemoryItem extends Entity {
+  kind: MemoryKind
+  area: MemoryArea
+  text: string
+  /** Stable key so Lumos updates instead of duplicating ('yoga.weekday', 'book.current'). */
+  key?: string
+  status: 'confirmed' | 'observed' | 'archived'
+  source: 'seed' | 'marina' | 'lumos' | 'observed'
+  /** Times the pattern was seen (observed items). */
+  evidence?: number
+  lastSeenAt?: ISODateTime
+  /** When Lumos asked "quer que eu considere isso como preferência?" (asks once). */
+  askedAt?: ISODateTime
+  ref?: { type: EntityType; id: ID }
+}
+
 // ─── Nutrition ledger (execution layer over the nutritionist's plan) ────────
 
 export interface Nutrients {
@@ -1057,7 +1099,9 @@ export type StudyStatus = 'estudando' | 'proximo' | 'backlog' | 'pausado' | 'fin
 export interface StudyItem extends Entity {
   trackId?: ID
   title: string
-  kind: 'curso' | 'aula' | 'artigo' | 'video' | 'livro' | 'tema' | 'certificacao' | 'podcast' | 'outro'
+  kind: 'curso' | 'aula' | 'artigo' | 'video' | 'livro' | 'tema' | 'certificacao' | 'podcast' | 'newsletter' | 'outro'
+  /** Reference content she follows (Product Talk, Lenny's…): shown only on demand, NEVER a task or "atrasado". */
+  reference?: boolean
   source?: string
   link?: string
   status: StudyStatus
@@ -1084,6 +1128,10 @@ export interface Book extends Entity {
   notes?: string
   quotes: { id: ID; text: string; page?: string }[]
   order: number
+  /** Where she is now ("Chapter 10 — Testing Assumptions"). */
+  currentChapter?: string
+  currentPage?: number
+  totalPages?: number
 }
 
 // ─── Travel ─────────────────────────────────────────────────────────────────
@@ -1421,6 +1469,8 @@ export interface DB {
   foods: FoodItem[]
   mealAdjustments: MealAdjustment[]
   mealPrepPlans: MealPrepPlan[]
+  pantry: PantryItem[]
+  memory: MemoryItem[]
 }
 
 /** Keys of DB that hold arrays of entities. */

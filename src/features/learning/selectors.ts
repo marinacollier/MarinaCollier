@@ -190,6 +190,7 @@ export const STUDY_KIND_LABEL: Record<StudyItem['kind'], string> = {
   tema: 'tema',
   certificacao: 'certificação',
   podcast: 'podcast',
+  newsletter: 'newsletter',
   outro: 'outro',
 }
 
