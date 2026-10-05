@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Book, StudyItem, StudyTrack } from '@/data/types'
 import { createSeedContext, seedId } from '@/data/seed/context'
 import { SEED_IDS } from '@/data/seed/ids'
-import { seedLearning } from './seed'
+import { LEARNING_SEED_IDS, seedLearning } from './seed'
 import {
   TRACK_STATUS_LABEL,
   addFormat,
@@ -27,6 +27,11 @@ import {
   startStudyPatch,
   studyList,
   trackCounts,
+  bookProgressPatch,
+  isReference,
+  libraryShelves,
+  readingWhere,
+  savedContent,
 } from './selectors'
 
 const T = '2026-10-02'
@@ -170,47 +175,114 @@ describe('seed — real life (Learning OS)', () => {
   const data = seedLearning(createSeedContext(T))
   const tracks = data.studyTracks!
   const items = data.studyItems!
+  const books = data.books!
   const byName = (name: string) => tracks.find((t) => t.name === name)!
 
-  it('has exactly her 4 trilhas, with stable ids and statuses', () => {
-    expect(tracks.map((t) => t.name)).toEqual(['Inglês', 'Pós-graduação', 'Tera', 'AI / Produto / Liderança'])
-    expect(tracks.map((t) => t.status)).toEqual(['ativo', 'ativo', 'ativo', 'continuo'])
+  it('has her trilhas with real objectives, stable ids and statuses', () => {
+    expect(tracks.map((t) => t.name)).toEqual(['Inglês', 'Pós-graduação', 'Produto', 'Tera'])
+    expect(tracks.every((t) => t.status === 'ativo' && !t.archived)).toBe(true)
     expect(byName('Inglês').id).toBe(SEED_IDS.trackIngles)
     expect(byName('Pós-graduação').id).toBe(SEED_IDS.trackPos)
+    expect(byName('Produto').id).toBe(SEED_IDS.trackProduto)
     expect(byName('Tera').id).toBe(seedId('learning', 'tera'))
-    expect(tracks.every((t) => !t.archived)).toBe(true)
     // ids are stable across builds (migration safety)
     const again = seedLearning(createSeedContext(T))
     expect(again.studyTracks!.map((t) => t.id)).toEqual(tracks.map((t) => t.id))
     expect(again.studyItems!.map((t) => t.id)).toEqual(items.map((t) => t.id))
+    expect(again.books!.map((b) => b.id)).toEqual(books.map((b) => b.id))
   })
 
-  it('Inglês has her formats and a note that the calendar wins — no invented time', () => {
+  it('Inglês: her formats and her objective — no invented time', () => {
     const en = byName('Inglês')
     expect(en.formats).toEqual(['Cambly', 'Estudo individual', 'Conversação', 'Vocabulário', 'Leitura', 'Listening'])
-    expect(en.notes).toMatch(/calendário conectado prevalece/)
+    expect(en.notes).toMatch(/conversação, pronúncia, vocabulário prático, fluência e confiança/)
     expect(en.notes).not.toMatch(/\d{1,2}[:h]\d{0,2}/)
   })
 
-  it('study items: only placeholders the brief implies, all pointing to existing trilhas', () => {
-    const ids = new Set(tracks.map((t) => t.id))
-    expect(items.every((i) => i.trackId && ids.has(i.trackId))).toBe(true)
+  it('no generic study items — only Cambly in progress, the rest is reference', () => {
     expect(items.every((i) => i.id.startsWith('seed:learning:'))).toBe(true)
-    expect(studyList(items, 'estudando').map((i) => i.title)).toEqual(['Cambly / conversação', 'Pós-graduação — disciplina atual', 'Tera — trilha atual'])
-    expect(items.find((i) => i.title.startsWith('Cambly'))!.nextContent).toBeUndefined()
-    expect(items.find((i) => i.title.startsWith('Pós'))!.nextContent).toBe('definir próximo conteúdo')
-    const backlog = studyList(items, 'backlog')
-    expect(backlog.every((i) => i.kind === 'tema' && i.trackId === byName('AI / Produto / Liderança').id)).toBe(true)
-    // no invented progress, no "próximo" pretending she already chose
-    expect(items.every((i) => i.progress === 0 && !i.finishedAt && !i.link && !i.source)).toBe(true)
-    expect(nextStudyOf(items)).toBeUndefined()
-    // none of the old generic examples
     const titles = items.map((i) => i.title).join(' | ')
-    expect(titles).not.toMatch(/Fundamentos de agentes|Discovery contínuo|Feedback e 1:1s|Conversação semanal/)
+    expect(titles).not.toMatch(/Curso \d|exemplo|Temas de IA para aprofundar|Liderança — o que quero|disciplina atual|trilha atual/i)
+    expect(studyList(items, 'estudando').map((i) => i.title)).toEqual(['Cambly / conversação'])
+    expect(items.every((i) => i.progress === 0 && !i.finishedAt)).toBe(true)
+    expect(nextStudyOf(items)).toBeUndefined()
+    const trackIds = new Set(tracks.map((t) => t.id))
+    expect(items.every((i) => !i.trackId || trackIds.has(i.trackId))).toBe(true)
   })
 
-  it('library starts empty — no invented books', () => {
-    expect(data.books).toEqual([])
+  it('newsletters and interests are references: never in a queue, never a task, no dates', () => {
+    const refs = items.filter(isReference)
+    expect(refs.map((r) => r.title)).toEqual([
+      'Product Talk',
+      "Lenny's Newsletter",
+      'The Pragmatic Engineer',
+      'AI-assisted software engineering',
+      'Claude',
+      'IA aplicada a Produto',
+    ])
+    expect(refs.every((r) => r.reference === true && !r.finishedAt && !r.nextContent)).toBe(true)
+    expect(refs.filter((r) => r.kind === 'newsletter').every((r) => r.link?.startsWith('https://'))).toBe(true)
+    // none leaks into the study lists
+    for (const v of ['estudando', 'proximo', 'backlog', 'finalizado'] as const) expect(studyList(items, v).some(isReference)).toBe(false)
+    expect(trackCounts(items).get(SEED_IDS.trackProduto)).toBeUndefined()
+    const groups = savedContent(items)
+    expect(groups.map((g) => g.key)).toEqual(['fontes', 'temas'])
+    expect(groups[0].items.map((i) => i.title)).toEqual(['Product Talk', "Lenny's Newsletter", 'The Pragmatic Engineer'])
+  })
+
+  it('library: Continuous Discovery Habits being read, at chapter 10 — nothing else invented', () => {
+    expect(books).toHaveLength(1)
+    const cdh = books[0]
+    expect(cdh).toMatchObject({
+      id: LEARNING_SEED_IDS.bookCDH,
+      title: 'Continuous Discovery Habits',
+      author: 'Teresa Torres',
+      status: 'lendo',
+      currentChapter: 'Chapter 10 — Testing Assumptions',
+      progress: 0,
+    })
+    expect(cdh.startDate).toBeUndefined()
+    expect(books.some((b) => /inspired/i.test(b.title))).toBe(false)
+    expect(libraryShelves(books).map((s) => s.label)).toEqual(['Lendo'])
+    expect(readingWhere(cdh)).toBe('Chapter 10 — Testing Assumptions')
+  })
+})
+
+describe('library shelves', () => {
+  const mk = (id: string, status: Book['status'], extra: Partial<Book> = {}): Book => ({
+    id,
+    title: id,
+    status,
+    progress: 0,
+    quotes: [],
+    order: 0,
+    createdAt: '',
+    updatedAt: '',
+    ...extra,
+  })
+
+  it('empty shelves are not rendered; order Lendo · Próximo · Quero ler · Lidos', () => {
+    expect(libraryShelves([])).toEqual([])
+    const shelves = libraryShelves([mk('a', 'quero'), mk('b', 'finalizado', { endDate: '2026-01-02' }), mk('c', 'finalizado', { endDate: '2026-09-01' })])
+    expect(shelves.map((s) => s.label)).toEqual(['Quero ler', 'Lidos'])
+    expect(shelves[1].books.map((b) => b.id)).toEqual(['c', 'b'])
+    expect(libraryShelves([mk('x', 'proximo'), mk('y', 'lendo')]).map((s) => s.status)).toEqual(['lendo', 'proximo'])
+  })
+
+  it('readingWhere: chapter, page, then percent only when there is one', () => {
+    expect(readingWhere(mk('a', 'lendo'))).toBeUndefined()
+    expect(readingWhere(mk('a', 'lendo', { progress: 40 }))).toBe('40%')
+    expect(readingWhere(mk('a', 'lendo', { currentPage: 190 }))).toBe('p. 190')
+    expect(readingWhere(mk('a', 'lendo', { currentChapter: 'Cap. 3', currentPage: 190, totalPages: 320, progress: 59 }))).toBe('Cap. 3 · p. 190 de 320')
+  })
+
+  it('bookProgressPatch: page of total → percent (never 100 by itself); blanks clear', () => {
+    expect(bookProgressPatch({ chapter: ' Cap. 4 ', page: 190, totalPages: 320 })).toEqual({ currentChapter: 'Cap. 4', currentPage: 190, totalPages: 320, progress: 59 })
+    expect(bookProgressPatch({ page: 400, totalPages: 320 })).toMatchObject({ currentPage: 320, progress: 99 })
+    const onlyPage = bookProgressPatch({ page: 12 })
+    expect(onlyPage).toEqual({ currentChapter: undefined, currentPage: 12, totalPages: undefined })
+    expect('progress' in onlyPage).toBe(false)
+    expect(bookProgressPatch({ chapter: '', page: 0 })).toEqual({ currentChapter: undefined, currentPage: undefined, totalPages: undefined })
   })
 })
 
