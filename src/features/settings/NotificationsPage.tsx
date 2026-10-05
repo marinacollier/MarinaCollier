@@ -63,7 +63,7 @@ export default function NotificationsPage() {
 
   return (
     <Page>
-      <PageHeader title="Notificações" back backTo={ROUTES.more} search={false} subtitle="Poucos lembretes, só do que importa." />
+      <PageHeader title="Notificações" back backTo={ROUTES.settings} search={false} subtitle="Poucos lembretes, só do que importa." />
 
       <Card className="mt-1">
         <div className="flex items-start gap-3">

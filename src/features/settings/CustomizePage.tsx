@@ -1,34 +1,24 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Star } from 'lucide-react'
-import { ListCard, ListRow, Page, PageHeader, SectionTitle, SortableList, TONE } from '@/components/ui'
+import { Card, ListCard, ListRow, Page, PageHeader, SectionTitle, Segmented, TONE } from '@/components/ui'
 import { actions, useDB } from '@/data/store'
-import type { HomeWidgetId, Modality, ModuleId } from '@/data/types'
+import type { Modality, ModuleId } from '@/data/types'
 import { ROUTES } from '@/app/routes'
 import { openSheet } from '@/app/ui-store'
 import { SEED_IDS } from '@/data/seed/ids'
 import { cn } from '@/lib/cn'
 import { haptic } from '@/lib/haptics'
 import { EmojiBubble, Hint, Toggle } from './components'
-import { HIDEABLE_MODULES, WIDGET_META } from './labels'
-import { mergeWidgets } from './profileEdit'
+import { HIDEABLE_MODULES, THEME_OPTIONS } from './labels'
 
+/** DESIGN (Ajustes): tema, o que aparece em Espaços, modalidades. */
 export default function CustomizePage() {
   const nav = useNavigate()
   const profile = useDB((db) => db.profile)
   const hasMorningRoutine = useDB((db) => db.routines.some((r) => r.id === SEED_IDS.routineMorning))
 
-  const widgets = useMemo(() => mergeWidgets(profile.homeWidgets, Object.keys(WIDGET_META) as HomeWidgetId[]), [profile.homeWidgets])
   const moduleVisible = useMemo(() => new Map(profile.modules.map((m) => [m.id, m.visible])), [profile.modules])
-
-  const setWidget = (id: HomeWidgetId, visible: boolean) => actions.setProfile({ homeWidgets: widgets.map((w) => (w.id === id ? { ...w, visible } : w)) })
-
-  const reorderWidgets = (ids: string[]) => {
-    const byId = new Map(widgets.map((w) => [w.id, w]))
-    const ordered = ids.map((id) => byId.get(id as HomeWidgetId)!).filter(Boolean)
-    const rest = widgets.filter((w) => !ids.includes(w.id))
-    actions.setProfile({ homeWidgets: [...ordered, ...rest] })
-  }
 
   const setModule = (id: ModuleId, visible: boolean) => {
     const exists = profile.modules.some((m) => m.id === id)
@@ -42,31 +32,14 @@ export default function CustomizePage() {
 
   return (
     <Page>
-      <PageHeader title="Personalizar meu MARINA OS" back backTo={ROUTES.more} search={false} subtitle="Já vem arrumado. Mude o que quiser, quando quiser." />
+      <PageHeader title="Design" back backTo={ROUTES.settings} search={false} subtitle="Já vem arrumado. Mude o que quiser, quando quiser." />
 
-      <SectionTitle className="mt-2">Widgets da home</SectionTitle>
-      <SortableList
-        items={widgets}
-        onReorder={reorderWidgets}
-        className="card overflow-hidden divide-y divide-line/70"
-        renderItem={(w, handle) => {
-          const meta = WIDGET_META[w.id]
-          return (
-            <div className="flex items-center gap-2 min-h-[60px] pl-1.5 pr-4 py-2 bg-surface">
-              {handle}
-              <EmojiBubble emoji={meta.emoji} className={cn(!w.visible && 'opacity-50')} />
-              <div className={cn('flex-1 min-w-0 ml-1', !w.visible && 'opacity-60')}>
-                <div className="text-[15px] leading-snug">{meta.label}</div>
-                <div className="text-[12.5px] text-muted truncate">{meta.text}</div>
-              </div>
-              <Toggle checked={w.visible} onChange={(v) => setWidget(w.id, v)} label={`Mostrar ${meta.label}`} />
-            </div>
-          )
-        }}
-      />
-      <Hint>Segure o ícone ⋮⋮ e arraste para mudar a ordem na tela Hoje.</Hint>
+      <SectionTitle className="mt-2">Tema</SectionTitle>
+      <Card>
+        <Segmented value={profile.theme} onChange={(theme) => actions.setProfile({ theme })} options={THEME_OPTIONS} />
+      </Card>
 
-      <SectionTitle>Módulos</SectionTitle>
+      <SectionTitle>Em Espaços</SectionTitle>
       <ListCard>
         {HIDEABLE_MODULES.map((m) => {
           const visible = moduleVisible.get(m.module) ?? true
@@ -79,7 +52,7 @@ export default function CustomizePage() {
           )
         })}
       </ListCard>
-      <Hint>Módulos escondidos saem do Mais, mas nada é apagado. Dá pra voltar quando quiser.</Hint>
+      <Hint>Escondido sai de Espaços, mas nada é apagado. E o que está vazio já não aparece sozinho.</Hint>
 
       <SectionTitle>Modalidades</SectionTitle>
       <ListCard>
@@ -117,8 +90,6 @@ export default function CustomizePage() {
           />
         )}
         <ListRow leading={<EmojiBubble emoji="💸" />} title="Categorias de gastos" subtitle="em Dinheiro" chevron onPress={() => nav(ROUTES.money)} />
-        <ListRow leading={<EmojiBubble emoji="🔌" />} title="Integrações" subtitle="agenda, e-mail, finanças" chevron onPress={() => nav(ROUTES.integrations)} />
-        <ListRow leading={<EmojiBubble emoji="🔔" />} title="Notificações" chevron onPress={() => nav(ROUTES.notifications)} />
       </ListCard>
     </Page>
   )
