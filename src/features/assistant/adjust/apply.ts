@@ -6,10 +6,15 @@
  * Order: workouts → per-day schedule ops (data/schedule.ts, all by 'lumos') → checklist tasks.
  * Undo runs in reverse, so one "Desfazer" puts the whole plan back as a single unit.
  */
+import type { Now } from '@/data/intel'
 import { saveAdjustment } from '@/data/nutrition'
+import { findModality } from '@/data/planning'
 import { applyOps, type Undo } from '@/data/schedule'
 import { actions, getDB } from '@/data/store'
-import type { ID, Workout } from '@/data/types'
+import type { ID, LifeEvent, Workout } from '@/data/types'
+import { minutesOfDay, todayKey } from '@/lib/date'
+import { eventDraft, logEvents } from '../act/log'
+import { observe } from '../act/memory'
 import type { ChangePlan } from './types'
 
 export interface ApplySnapshot {
@@ -23,9 +28,39 @@ export interface ApplySnapshot {
   createdTasks?: ID[]
   /** Undo of the meal overlays (nutrition engine). */
   undoMeals?: Undo[]
+  /** The LifeEvent(s) + observed patterns this plan wrote. */
+  undoLog?: Undo
 }
 
-export function applyPlan(plan: ChangePlan): ApplySnapshot {
+function nowOf(): Now {
+  const d = new Date()
+  return { date: todayKey(d), minutes: minutesOfDay(d), iso: d.toISOString() }
+}
+
+function eventKind(plan: ChangePlan): LifeEvent['kind'] {
+  if (plan.scheduleOps?.some((o) => o.op === 'override' && o.patch.cancelled) || plan.changes.some((c) => c.kind === 'remove' || c.after.status === 'pulado')) return 'cancelled'
+  if (plan.changes.some((c) => c.before && (c.before.time !== c.after.time || c.before.date !== c.after.date))) return 'moved'
+  if (plan.taskCreates?.length && !plan.scheduleOps?.length && !plan.changes.length) return 'created'
+  return 'changed'
+}
+
+/** One LifeEvent for the whole plan + "observed" (never confirmed) training-time patterns. */
+function logPlan(plan: ChangePlan, now: Now): Undo {
+  const title = (plan.doneTitle?.split('✓')[0].trim() || plan.summary).replace(/\s+/g, ' ').slice(0, 140)
+  const date = plan.dayDate ?? plan.changes[0]?.after.date ?? now.date
+  const undos: Undo[] = [logEvents([eventDraft(now, { kind: eventKind(plan), date, title, area: plan.changes.length ? 'esportes' : 'rotina' })])]
+  for (const c of plan.changes) {
+    if (c.implicit || !c.after.time || c.after.status === 'pulado' || (c.before && c.before.time === c.after.time)) continue
+    if (!c.before) continue
+    const label = findModality(getDB().profile, c.after.modality)?.label ?? c.after.modality
+    undos.push(observe(now, `training.time.${c.after.modality}.${c.after.time}`, `Você costuma preferir ${label.toLowerCase()} às ${c.after.time}`, 'esportes').undo)
+  }
+  return () => {
+    for (const u of undos.reverse()) u()
+  }
+}
+
+export function applyPlan(plan: ChangePlan, now: Now = nowOf()): ApplySnapshot {
   const snap: ApplySnapshot = { updated: [], created: [] }
   for (const c of plan.changes) {
     const current = c.kind === 'create' ? undefined : getDB().workouts.find((w) => w.id === (c.id ?? c.after.id))
@@ -56,10 +91,12 @@ export function applyPlan(plan: ChangePlan): ApplySnapshot {
     }
   }
   if (plan.mealAdjustments?.length) snap.undoMeals = plan.mealAdjustments.map((d) => saveAdjustment(d).undo)
+  if (hasWork(plan)) snap.undoLog = logPlan(plan, now)
   return snap
 }
 
 export function undoPlan(snap: ApplySnapshot): void {
+  snap.undoLog?.()
   for (const u of [...(snap.undoMeals ?? [])].reverse()) u()
   for (const id of snap.createdTasks ?? []) actions.remove('tasks', id)
   snap.undoOps?.()

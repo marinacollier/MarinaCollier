@@ -106,4 +106,4 @@ export const CHANGE_PLAN_SCHEMA = {
   },
 } as const
 
-export const ADJUST_PILL = 'Lumos entende frases comuns e sempre mostra antes de mudar.'
+export const ADJUST_PILL = 'Lumos entende frases comuns: o simples ela já faz (com Desfazer), o sensível ela pergunta antes.'
