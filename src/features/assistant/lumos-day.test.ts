@@ -226,24 +226,28 @@ describe('routing', () => {
   })
 
   it('meal prep triggers', () => {
-    for (const q of ['faz minhas marmitas', 'organiza minha alimentação da semana', 'faz lista de supermercado', 'quero deixar tudo pronto', 'o que preparo domingo?', 'não quero cozinhar durante a semana'])
+    // "lista de supermercado / feira" is the shopping reply now (pantry, prepared food, trip days) — see lumos-act.test.ts.
+    expect(understand(getDB(), 'faz lista de supermercado', TODAY, 600).kind).toBe('reply')
+    for (const q of ['faz minhas marmitas', 'organiza minha alimentação da semana', 'quero deixar tudo pronto', 'o que preparo domingo?', 'não quero cozinhar durante a semana'])
       expect(understand(getDB(), q, TODAY, 600), q).toMatchObject({ kind: 'mealprep', intent: { kind: 'week' } })
     expect(understand(getDB(), 'O que faço com essa porção?', TODAY, 600)).toMatchObject({ kind: 'mealprep', intent: { kind: 'recipe', portions: 1 } })
     expect(understand(getDB(), 'receita do almoço em 4 porções', TODAY, 600)).toMatchObject({ kind: 'mealprep', intent: { kind: 'recipe', meal: 'almoco', portions: 4 } })
   })
 
-  it('"Amanhã vou presencial o dia inteiro." on a presencial day → the engine kit', () => {
-    const p = adjust('Amanhã vou presencial o dia inteiro.', MONDAY)
-    expect(p.summary).toBe('KIT TERÇA — PRESENCIAL')
-    expect(p.previewTitle).toMatch(/esquema pegou e saiu/)
-    expect(p.checklist?.some((l) => l.kind === 'prep')).toBe(true)
-    expect(p.link?.to).toBe('/meal-prep')
+  it('"Amanhã vou presencial o dia inteiro." on a presencial day → the engine kit, nothing to change', () => {
+    const t = understand(getDB(), 'Amanhã vou presencial o dia inteiro.', MONDAY, 600)
+    expect(t.kind).toBe('reply')
+    const r = (t as Extract<typeof t, { kind: 'reply' }>).reply
+    expect(r.action).toBeUndefined()
+    expect(r.sections?.[0].title).toBe('KIT TERÇA — PRESENCIAL')
+    expect(r.sub).toMatch(/esquema pegou e saiu/)
+    expect(r.link?.to).toBe('/meal-prep')
   })
 
-  it('…and on a day her profile says remote: honest portable list + "levar" items to add', () => {
-    const p = adjust('Amanhã vou presencial o dia inteiro.', '2026-10-07')
-    expect(p.checklist?.map((l) => l.time)).toEqual(['08:00', '12:00', '16:00'])
-    expect(p.taskCreates?.map((t) => t.time)).toEqual(['07:45', '07:45', '07:45'])
-    expect(p.confirmLabel).toBe('Adicionar ao checklist')
+  it('…and on a remote day: the day really becomes presencial (per-day override) + the kit', () => {
+    const t = understand(getDB(), 'Amanhã vou presencial o dia inteiro.', '2026-10-07', 600)
+    const r = (t as Extract<typeof t, { kind: 'reply' }>).reply
+    expect(r.action?.mode).toBe('direct')
+    expect(r.sections?.[0].title).toMatch(/KIT QUINTA — PRESENCIAL/)
   })
 })

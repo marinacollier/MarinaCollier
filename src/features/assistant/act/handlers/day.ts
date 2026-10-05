@@ -165,7 +165,7 @@ export function pickPriorities(db: DB, date: DateKey): Pick[] {
 function organize(input: HandlerInput): LumosReply | undefined {
   const { db, n, now } = input
   if (!ORGANIZE.test(n)) return undefined
-  if (/\bsemana\b/.test(n)) return undefined
+  if (/\b(semana|checklist)\b/.test(n)) return undefined
   const date = /\bamanha\b/.test(n) ? addDays(now.date, 1) : now.date
   const existing = prioritiesFor(db, date)
   const free = freeWindows(db, date, date === now.date ? now.minutes : 0)

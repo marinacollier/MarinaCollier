@@ -20,6 +20,7 @@ import { useDB, useStore } from '@/data/store'
 import { nextTrip } from '@/data/selectors'
 import type { DB } from '@/data/types'
 import { useNow } from '@/hooks/useToday'
+import { useKeyboardInset } from '@/hooks/useKeyboardInset'
 import { diffDays, weekday } from '@/lib/date'
 import { cn } from '@/lib/cn'
 import { openSheet } from '@/app/ui-store'
@@ -262,13 +263,16 @@ export interface LumosInlineProps {
   variant?: 'home' | 'page'
   /** Home: how many recent exchanges to show (default 2). */
   limit?: number
+  /** Shows a small "fechar" so the host can go back to its calm state. */
+  onClose?: () => void
 }
 
-export default function LumosInline({ initial, composer = true, placeholder, suggestions, variant = 'home', limit = 2 }: LumosInlineProps) {
+export default function LumosInline({ initial, composer = true, placeholder, suggestions, variant = 'home', limit = 2, onClose }: LumosInlineProps) {
   const db = useDB()
   const { today, minutes } = useNow()
   const navigate = useNavigate()
   const hydrated = useStore((s) => s.hydrated)
+  const kb = useKeyboardInset()
   const exchanges = useConversation((s) => s.exchanges)
   const asked = useRef<string | undefined>(undefined)
   const lastRef = useRef<HTMLDivElement>(null)
@@ -326,7 +330,7 @@ export default function LumosInline({ initial, composer = true, placeholder, sug
         {composer && (
           <>
             <div className="h-24" />
-            <div className="fixed left-0 right-0 z-30 bg-bg/90 backdrop-blur-xl border-t border-line/60" style={{ bottom: 'calc(env(safe-area-inset-bottom) + 60px)' }}>
+            <div className="fixed left-0 right-0 z-30 bg-bg/90 backdrop-blur-xl border-t border-line/60" style={{ bottom: kb > 0 ? kb : 'calc(env(safe-area-inset-bottom) + 60px)' }}>
               <div className="mx-auto max-w-[640px] px-4 py-2.5">
                 <Composer variant="page" placeholder={hint} />
               </div>
@@ -337,11 +341,20 @@ export default function LumosInline({ initial, composer = true, placeholder, sug
     )
   }
 
+  // Empty: the composer leads. With a conversation: answers first, the follow-up box right under them.
   return (
     <div className="space-y-3">
-      {composer && <Composer variant="home" placeholder={hint} />}
+      {composer && !exchanges.length && <Composer variant="home" placeholder={hint} />}
       {!exchanges.length && chipRow}
       {conversation}
+      {composer && exchanges.length > 0 && <Composer variant="page" placeholder="responder ou pedir outra coisa…" />}
+      {onClose && (
+        <div className="flex justify-end">
+          <button type="button" onClick={onClose} className="h-10 px-2 -mr-2 text-[13px] text-muted">
+            fechar
+          </button>
+        </div>
+      )}
     </div>
   )
 }

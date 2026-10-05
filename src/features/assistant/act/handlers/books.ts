@@ -172,7 +172,7 @@ const DROP = /\b(tira|tirar|remove|remover|desisti|larguei|abandonei)\b|\bta cha
 function drop(input: HandlerInput): LumosReply | undefined {
   const { db, n, now } = input
   if (!DROP.test(n)) return undefined
-  const talksBook = /\b(livro|fila|lista de leitura|leitura)\b/.test(n) || !!matchTitle(db.books, n)
+  const talksBook = /\b(livros?|fila|lista de leitura)\b/.test(n) || !!matchTitle(db.books, n)
   if (!talksBook) return undefined
   if (/\b(compras|mercado|feira)\b/.test(n)) return undefined
   const b = target(input, db.books.filter((x) => x.status !== 'finalizado'))
