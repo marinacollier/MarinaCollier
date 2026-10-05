@@ -15,6 +15,7 @@ import type {
   ID,
   Modality,
   NewItem,
+  ScheduleOverride,
   SchedulingConstraint,
   Task,
   TimeHM,
@@ -63,12 +64,36 @@ export function modalityGroup(profile: UserProfile, id: string): TrainingGroup {
   return findModality(profile, id)?.group ?? DEFAULT_MODALITIES.find((m) => m.id === id)?.group ?? 'fun'
 }
 
-export function workMode(profile: UserProfile, date: DateKey): WorkDayMode {
-  return profile.work?.days?.[weekday(date)] ?? 'remoto'
+/** Profile or the whole DB. Passing the DB makes per-day changes ("amanhã fiquei presencial") count. */
+export type WorkSource = UserProfile | DB
+
+const isDB = (src: WorkSource): src is DB => 'profile' in src && 'scheduleOverrides' in src
+const profileOf = (src: WorkSource): UserProfile => (isDB(src) ? src.profile : src)
+
+/** The per-day work override (ScheduleOverride refType 'work', refId = the DateKey). Latest write wins. */
+export function workOverride(db: DB, date: DateKey): ScheduleOverride | undefined {
+  let found: ScheduleOverride | undefined
+  for (const o of db.scheduleOverrides ?? []) {
+    if (o.refType === 'work' && o.refId === date && (!found || o.updatedAt >= found.updatedAt)) found = o
+  }
+  return found
 }
 
-export function isPresencial(profile: UserProfile, date: DateKey): boolean {
-  return workMode(profile, date) === 'presencial'
+/**
+ * Work mode of a day: the per-day override (when `src` is the DB) wins over the weekly BASE.
+ * A cancelled 'work' override means no work that day ('off').
+ */
+export function workMode(src: WorkSource, date: DateKey): WorkDayMode {
+  if (isDB(src)) {
+    const o = workOverride(src, date)
+    if (o?.workMode) return o.workMode
+    if (o?.cancelled) return 'off'
+  }
+  return profileOf(src).work?.days?.[weekday(date)] ?? 'remoto'
+}
+
+export function isPresencial(src: WorkSource, date: DateKey): boolean {
+  return workMode(src, date) === 'presencial'
 }
 
 export interface TimeRange {
@@ -107,11 +132,15 @@ export interface WorkBlock {
   mode: WorkDayMode
 }
 
-/** BASE work hours for a day, plus commute buffers on presencial days. Empty on 'off'. */
-export function workBlocks(profile: UserProfile, date: DateKey): WorkBlock[] {
-  const mode = workMode(profile, date)
+/** BASE work hours for a day, plus commute buffers on presencial days. Empty on 'off'. With the DB, a 'work' override's time/endTime change that day's hours. */
+export function workBlocks(src: WorkSource, date: DateKey): WorkBlock[] {
+  const profile = profileOf(src)
+  const mode = workMode(src, date)
   if (mode === 'off' || !profile.work) return []
-  const { start, end, location, commuteBeforeMin, commuteAfterMin } = profile.work
+  const o = isDB(src) ? workOverride(src, date) : undefined
+  const { location, commuteBeforeMin, commuteAfterMin } = profile.work
+  const start = o?.time ?? profile.work.start
+  const end = o?.endTime ?? profile.work.end
   const blocks: WorkBlock[] = []
   if (mode === 'presencial' && commuteBeforeMin > 0) {
     blocks.push({ kind: 'commute', title: 'Deslocamento', start: minutesToHM(Math.max(0, hmToMinutes(start) - commuteBeforeMin)), end: start, mode })
@@ -295,7 +324,7 @@ export function conflictsOn(db: DB, date: DateKey, opts: ConflictOptions = {}): 
   }
 
   // 3. Workouts inside work hours / commute (BASE, so it's information)
-  const blocks = workBlocks(db.profile, date)
+  const blocks = workBlocks(db, date)
   for (const w of dayWorkouts) {
     const r = rangeOf(w, w.durationMin ?? w.plannedDurationMin ?? 60)
     if (!r || r.approx) continue
@@ -317,7 +346,7 @@ export function conflictsOn(db: DB, date: DateKey, opts: ConflictOptions = {}): 
   }
 
   // 4. Heavy logistics on presencial days
-  if (isPresencial(db.profile, date)) {
+  if (isPresencial(db, date)) {
     for (const w of dayWorkouts) {
       const m = findModality(db.profile, w.modality)
       const dur = w.durationMin ?? w.plannedDurationMin ?? 0
@@ -424,13 +453,13 @@ export function suggestWindows(db: DB, opts: SuggestOptions): WindowSuggestion[]
 
   for (const date of weekDays(opts.from)) {
     if (date < opts.from) continue
-    if (m?.heavyLogistics && dur >= 90 && isPresencial(db.profile, date)) continue
+    if (m?.heavyLogistics && dur >= 90 && isPresencial(db, date)) continue
     const dayWorkouts = activeWorkouts(db, date)
     if (dayWorkouts.some((w) => w.modality === opts.modality)) continue
     if (limiting.some((c) => dayWorkouts.filter((w) => c.modalities?.includes(w.modality)).length >= c.limit)) continue
 
     const busy = busyOn(db, date, db.workouts).map((b) => b.range)
-    for (const b of workBlocks(db.profile, date)) busy.push({ start: hmToMinutes(b.start), end: hmToMinutes(b.end), approx: false })
+    for (const b of workBlocks(db, date)) busy.push({ start: hmToMinutes(b.start), end: hmToMinutes(b.end), approx: false })
     busy.sort((a, b) => a.start - b.start)
 
     let cursor = dayStart
@@ -441,7 +470,7 @@ export function suggestWindows(db: DB, opts: SuggestOptions): WindowSuggestion[]
           date,
           start: minutesToHM(cursor),
           end: minutesToHM(cursor + dur),
-          reason: preferred ? 'dia que você costuma preferir' : workMode(db.profile, date) === 'presencial' ? 'janela livre num dia presencial' : 'janela livre',
+          reason: preferred ? 'dia que você costuma preferir' : workMode(db, date) === 'presencial' ? 'janela livre num dia presencial' : 'janela livre',
           score: (preferred ? 0 : 100) + weekDays(opts.from).indexOf(date),
         })
         break // one suggestion per day keeps the list calm

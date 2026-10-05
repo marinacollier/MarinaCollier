@@ -360,7 +360,7 @@ export function dayTimeline(db: DB, date: DateKey, opts: DayTimelineOptions = {}
   }
 
   // 3. BASE work hours (+ commute on presencial days). Information, not editable here.
-  for (const b of workBlocks(db.profile, date)) {
+  for (const b of workBlocks(db, date)) {
     const ref = { type: 'event' as const, id: `work:${b.kind}:${b.start}` }
     out.push(
       entry({

@@ -166,7 +166,7 @@ export function agendaFor(db: DB, date: DateKey, opts: { includeBlocks?: boolean
     })
   }
   if (opts.includeBlocks) {
-    for (const b of workBlocks(db.profile, date)) {
+    for (const b of workBlocks(db, date)) {
       out.push({
         kind: 'block',
         id: `block:${b.kind}:${date}:${b.start}`,

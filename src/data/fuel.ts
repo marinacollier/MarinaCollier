@@ -14,6 +14,8 @@ import type {
   NutritionDayType,
   NutritionStrategy,
   PlannedMeal,
+  ScheduleOverride,
+  ScheduleRefType,
   Workout,
 } from './types'
 import { addDays, weekday, weekDays } from '@/lib/date'
@@ -33,13 +35,14 @@ export function workoutsOnDay(db: DB, date: DateKey): Workout[] {
  * so "QUA 🔥 Pernas" still reads right. Real records always win, including rest days.
  */
 export function contextWorkouts(db: DB, date: DateKey): Workout[] {
-  if (db.workouts.some((w) => w.date === date)) return workoutsOnDay(db, date)
+  if (db.workouts.some((w) => w.date === date)) return workoutsOnDay(db, date).map((w) => withDayOverride(db, date, 'workout', w.id, w))
   // A template line already materialized somewhere this week (e.g. the long run moved to Saturday)
   // belongs to that workout now — it must not reappear on its original weekday.
   const week = new Set(weekDays(date))
   const used = new Set(db.workouts.filter((w) => w.templateId && week.has(w.date)).map((w) => w.templateId))
   return db.weekTemplate
     .filter((t) => t.active && t.choice === 'fixed' && t.weekday === weekday(date) && t.modalities[0] && !used.has(t.id))
+    .filter((t) => !dayOverride(db, date, 'weekTemplate', t.id)?.cancelled)
     .sort((a, b) => (a.time ?? '99').localeCompare(b.time ?? '99') || a.order - b.order)
     .map((t) => ({
       id: `template:${t.id}:${date}`,
@@ -66,6 +69,27 @@ export function contextWorkouts(db: DB, date: DateKey): Workout[] {
       templateId: t.id,
       order: t.order,
     }))
+    .map((w) => withDayOverride(db, date, 'weekTemplate', w.templateId!, w))
+}
+
+/** Latest per-day override for a ref (kept local: timeline.ts imports this module). */
+function dayOverride(db: DB, date: DateKey, type: ScheduleRefType, id: string): ScheduleOverride | undefined {
+  let found: ScheduleOverride | undefined
+  for (const o of db.scheduleOverrides ?? []) {
+    if (o.date === date && o.refType === type && o.refId === id && (!found || o.updatedAt >= found.updatedAt)) found = o
+  }
+  return found
+}
+
+/** One day's time / duration change ("domingo o pedal passou pra 4h") shapes that day's fuel context too. */
+function withDayOverride(db: DB, date: DateKey, type: ScheduleRefType, id: string, w: Workout): Workout {
+  const o = dayOverride(db, date, type, id)
+  if (!o || (!o.time && !o.durationMin)) return w
+  return {
+    ...w,
+    ...(o.time ? { time: o.time, period: undefined } : {}),
+    ...(o.durationMin ? { plannedDurationMin: o.durationMin, plannedDurationMaxMin: undefined } : {}),
+  }
 }
 
 function isLong(w: Workout): boolean {

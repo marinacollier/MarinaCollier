@@ -7,7 +7,8 @@
 import type { DateKey, DB, MealPrepPlan, TimeHM } from '@/data/types'
 import { agendaFor } from '@/data/selectors'
 import { addDays, diffDays, hmToMinutes, startOfWeek, weekday, WEEKDAY_LONG, WEEKDAY_SHORT } from '@/lib/date'
-import type { CookRole, Ingredient } from './catalog'
+import { buyKeyOf, type CookRole, type Ingredient } from './catalog'
+import { preparedStock } from './pantry'
 import { formatWeight } from './parse'
 import { planFor, shortItem, slotLabel, weekMenu, type MealPlace, type MenuItem, type MenuMeal, type WeekMenu } from './menu'
 
@@ -153,6 +154,8 @@ export interface BatchPlan {
   second?: { date: DateKey; label: string; bases: BatchBase[]; minutes: number; key: string }
   /** Breakfast eggs are baked only for the days she eats out; other days, mexido na hora. */
   eggsNote?: string
+  /** Prepared food already at home that covers (part of) the cooking ("6 porções de frango grelhado"). */
+  alreadyMade?: string[]
 }
 
 function rawText(ready: number, ing: Ingredient): { raw?: [number, number]; text: string } {
@@ -241,6 +244,18 @@ export function batchFromMenu(db: DB, menu: WeekMenu): BatchPlan {
     }
   }
 
+  // Prepared food at home covers part of the cooking (ready grams, or the week's average portion).
+  const alreadyMade: string[] = []
+  for (const p of preparedStock(db)) {
+    const need = main.get(p.ingredientKey) ?? [...main.values()].find((n) => buyKeyOf(n.ing) === p.buyKey)
+    if (!need || need.ready <= 0) continue
+    const covered = p.grams ? p.portions * p.grams : p.portions * (need.servings ? need.ready / need.servings : 0)
+    need.ready = Math.max(0, need.ready - covered)
+    need.servings = Math.max(0, need.servings - p.portions)
+    alreadyMade.push(`${p.portions} ${p.portions === 1 ? 'porção' : 'porções'} de ${p.name}`)
+    if (need.ready < 1) main.delete(need.ing.key)
+  }
+
   const bases = basesOf(main)
   const steps: BatchStep[] = []
   const soak = bases.filter((b) => b.role === 'feijao' && /molho/.test(b.how))
@@ -302,6 +317,7 @@ export function batchFromMenu(db: DB, menu: WeekMenu): BatchPlan {
           ? 'Omelete assada só pros cafés que vão na bolsa; nos outros dias, ovo mexido na hora leva 3 min.'
           : 'Ovo mexido é melhor na hora (3 min) — se preferir, asse omeletes individuais pra semana toda.'
         : undefined,
+    ...(alreadyMade.length ? { alreadyMade } : {}),
   }
 }
 

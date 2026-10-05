@@ -128,8 +128,8 @@ function mealOverride(db: DB, date: DateKey, ref: string) {
  * training/event that starts right after it. Driven only by profile.work + the day's agenda.
  */
 export function dayOut(db: DB, date: DateKey): DayOut | undefined {
-  if (workMode(db.profile, date) !== 'presencial') return undefined
-  const blocks = workBlocks(db.profile, date)
+  if (workMode(db, date) !== 'presencial') return undefined
+  const blocks = workBlocks(db, date)
   if (!blocks.length) return undefined
   const first = hmToMinutes(blocks[0].start)
   const last = hmToMinutes(blocks[blocks.length - 1].end)
@@ -195,7 +195,7 @@ export function menuDay(db: DB, date: DateKey, plan?: MealPrepPlan): MenuDay {
     })
   })
   meals.sort((a, b) => (a.time ?? '99').localeCompare(b.time ?? '99') || a.index - b.index)
-  const mode = workMode(db.profile, date)
+  const mode = workMode(db, date)
   return {
     date,
     short: WEEKDAY_SHORT[weekday(date)],

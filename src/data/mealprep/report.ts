@@ -12,6 +12,7 @@ import { grabFromMenu, groupGrab, type GrabGroup } from './grab'
 import { presencialKits, type PresencialKit } from './kit'
 import { planFor, weekMenu, type WeekMenu } from './menu'
 import { shoppingFromMenu, type ShoppingList } from './shopping'
+import { pantryNames, preparedStock } from './pantry'
 import { storageFromMenu, type StoragePlan } from './storage'
 
 export interface WeekReport {
@@ -69,7 +70,7 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 /** Section-15 report for a week. */
 export function weekReport(db: DB, weekStart: DateKey, plan: MealPrepPlan | undefined = planFor(db, weekStart)): WeekReport {
   const menu = weekMenu(db, weekStart, plan)
-  const shopping = shoppingFromMenu(menu, plan?.pantry ?? [])
+  const shopping = shoppingFromMenu(menu, pantryNames(db, plan), preparedStock(db))
   const batch = batchFromMenu(db, menu)
   const pots = potsFromMenu(menu, plan)
   const grab = groupGrab(grabFromMenu(menu))
