@@ -7,24 +7,27 @@ import type { Now } from '@/data/intel'
 import type { DB } from '@/data/types'
 import { backupHandler } from './handlers/backup'
 import { booksHandler } from './handlers/books'
+import { calendarHandler } from './handlers/calendar'
 import { careerHandler } from './handlers/career'
 import { captureHandler } from './handlers/capture'
 import { dayHandler } from './handlers/day'
 import { kitchenHandler } from './handlers/kitchen'
 import { memoryHandler } from './handlers/memory'
 import { studyHandler } from './handlers/study'
+import { tasksHandler } from './handlers/tasks'
 import { travelHandler } from './handlers/travel'
 import { workHandler } from './handlers/work'
 import { norm } from './text'
+import type { AttachmentReading } from '../attach/types'
 import type { Handler, LumosReply, TurnContext } from './types'
 
-export const HANDLERS: Handler[] = [backupHandler, careerHandler, memoryHandler, booksHandler, kitchenHandler, workHandler, dayHandler, travelHandler, studyHandler, captureHandler]
+export const HANDLERS: Handler[] = [backupHandler, careerHandler, calendarHandler, memoryHandler, booksHandler, kitchenHandler, workHandler, tasksHandler, dayHandler, travelHandler, studyHandler, captureHandler]
 
-export function respond(db: DB, text: string, now: Now, ctx: TurnContext = {}): LumosReply | undefined {
+export function respond(db: DB, text: string, now: Now, ctx: TurnContext = {}, attachment?: AttachmentReading): LumosReply | undefined {
   const n = norm(text)
-  if (!n) return undefined
+  if (!n && !attachment) return undefined
   for (const h of HANDLERS) {
-    const r = h.run({ db, text: text.trim(), n, now, ctx })
+    const r = h.run({ db, text: text.trim(), n, now, ctx, attachment })
     if (r) return r
   }
   return undefined

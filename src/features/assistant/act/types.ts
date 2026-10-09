@@ -8,6 +8,7 @@
  */
 import type { Now } from '@/data/intel'
 import type { DB, Provenance } from '@/data/types'
+import type { AttachmentReading } from '../attach/types'
 
 export type Undo = () => void
 
@@ -86,4 +87,6 @@ export interface HandlerInput {
   n: string
   now: Now
   ctx: TurnContext
+  /** A print / photo / PDF sent with the sentence, already read (the sentence carries the intent). */
+  attachment?: AttachmentReading
 }

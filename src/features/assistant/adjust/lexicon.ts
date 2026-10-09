@@ -130,7 +130,9 @@ function hm(h: number, m: number): TimeHM {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
-const TIME_PREV = new Set(['as', 'a', 'das', 'pelas', 'umas'])
+const TIME_PREV = new Set(['as', 'a', 'das', 'pelas', 'umas', 'pras', 'para as', 'ate as'])
+/** Hours said in words, after "às / pras / pelas": "pras sete", "às oito e meia". */
+const HOUR_WORD: Record<string, number> = { uma: 1, duas: 2, tres: 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9, dez: 10, onze: 11, doze: 12 }
 const DURATION_PREV = new Set(['de', 'por', 'durar', 'dura', 'durante', 'com', 'em'])
 
 /** Times ("às 7h", "19:30") and durations ("de 4h", "90 min", "1h30") from the tokens. */
@@ -156,6 +158,14 @@ function numbers(tokens: string[]): { time?: Lexed['time']; duration?: Lexed['du
     const minTok = /^(\d+)(min|mins|minutos)?$/.exec(t)
     if (minTok && (minTok[2] || ['min', 'mins', 'minuto', 'minutos'].includes(next))) {
       duration ??= { min: +minTok[1], pos: i }
+      continue
+    }
+    const worded = TIME_PREV.has(prev) && t in HOUR_WORD ? HOUR_WORD[t] : undefined
+    if (worded !== undefined) {
+      const half = next === 'e' && tokens[i + 2] === 'meia' ? 30 : next === 'e' && tokens[i + 2] === 'quinze' ? 15 : 0
+      const after = tokens.slice(i + 1, i + 5)
+      const pm = after.includes('da') && (after.includes('tarde') || after.includes('noite')) && worded < 12
+      time ??= { hm: hm(pm ? worded + 12 : worded, half), pos: i }
       continue
     }
     const plainNum = /^\d{1,2}$/.test(t) ? +t : undefined

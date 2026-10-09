@@ -333,12 +333,36 @@ function week(input: HandlerInput): LumosReply | undefined {
 
 // ─── "terminei o treino" / "terminei <tarefa>" ──────────────────────────────
 
-function markWorkoutDone(id: string, title: string, now: Now): Undo {
-  const w = getDB().workouts.find((x) => x.id === id)!
-  return runLogged(() => updateUndoable('workouts', id, { status: 'feito', durationMin: w.durationMin ?? w.plannedDurationMin }), [eventDraft(now, { kind: 'done', title: `Treinou: ${title}`, area: 'esportes', ref: { type: 'workout', id } })])
+const NUM_WORDS: Record<string, number> = { um: 1, uma: 1, dois: 2, duas: 2, tres: 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9, dez: 10, onze: 11, doze: 12, treze: 13, quatorze: 14, catorze: 14, quinze: 15, dezesseis: 16, dezessete: 17, dezoito: 18, dezenove: 19, vinte: 20, trinta: 30, quarenta: 40, cinquenta: 50 }
+
+/** What she said about the session: "foram sete quilômetros em Z2", "10,5 km", "50 minutos". Only what was said. */
+export function sessionFacts(n: string): { distanceKm?: number; durationMin?: number; zone?: string } {
+  const num = (s: string) => (s in NUM_WORDS ? NUM_WORDS[s] : Number(s.replace(',', '.')))
+  const km = /\b(\d+(?:[.,]\d+)?|um|uma|dois|duas|tres|quatro|cinco|seis|sete|oito|nove|dez|onze|doze|treze|quatorze|catorze|quinze|dezesseis|dezessete|dezoito|dezenove|vinte|trinta|quarenta|cinquenta)\s*(?:km|quilometros?|k)\b/.exec(n)
+  const min = /\b(\d+|vinte|trinta|quarenta|cinquenta)\s*(?:min|minutos)\b/.exec(n)
+  const h = /\b(\d+|uma|duas|tres)\s*(?:h|horas?)\b(?:\s*e\s*(\d+|meia))?/.exec(n)
+  const zone = /\bz\s?([1-5])\b|\bzona\s+([1-5])\b/.exec(n)
+  const durationMin = min ? num(min[1]) : h ? num(h[1]) * 60 + (h[2] === 'meia' ? 30 : h[2] ? Number(h[2]) : 0) : undefined
+  return {
+    distanceKm: km && Number.isFinite(num(km[1])) ? num(km[1]) : undefined,
+    durationMin: durationMin && Number.isFinite(durationMin) ? durationMin : undefined,
+    zone: zone ? `Z${zone[1] ?? zone[2]}` : undefined,
+  }
 }
 
-const DONE = /^(?:ja\s+)?(?:terminei|fiz|conclui|finalizei|acabei|mandei|enviei|resolvi|entreguei|treinei|registra)\b\s*(?:de\s+)?(?:o |a |os |as |meu |minha )?(.*)$/
+function markWorkoutDone(id: string, title: string, now: Now, facts: ReturnType<typeof sessionFacts> = {}): Undo {
+  const w = getDB().workouts.find((x) => x.id === id)!
+  const patch = {
+    status: 'feito' as const,
+    durationMin: facts.durationMin ?? w.durationMin ?? w.plannedDurationMin,
+    ...(facts.distanceKm ? { distanceKm: facts.distanceKm } : {}),
+    ...(facts.zone ? { notes: [w.notes, `Feito em ${facts.zone}`].filter(Boolean).join(' · ') } : {}),
+  }
+  const extra = [facts.distanceKm ? `${String(facts.distanceKm).replace('.', ',')} km` : undefined, facts.zone].filter(Boolean).join(' · ')
+  return runLogged(() => updateUndoable('workouts', id, patch), [eventDraft(now, { kind: 'done', title: `Treinou: ${title}${extra ? ` (${extra})` : ''}`, area: 'esportes', ref: { type: 'workout', id } })])
+}
+
+const DONE = /^(?:ja\s+)?(?:acabei de fazer|acabei de|terminei agora|fiz agora|terminei|fiz|conclui|finalizei|acabei|mandei|enviei|resolvi|entreguei|treinei|registra)\b\s*(?:de\s+)?(?:o |a |os |as |meu |minha )?(.*)$/
 
 function done(input: HandlerInput): LumosReply | undefined {
   const { db, n, now } = input
@@ -350,6 +374,8 @@ function done(input: HandlerInput): LumosReply | undefined {
   const mods = /^(?:mandei|enviei|resolvi|entreguei)\b/.test(n) ? [] : lex(db, input.text, now.date).mods.filter((x) => head.includes(x.word))
   const isTraining = /^treinei/.test(n) || /^(?:meu\s+)?treino\b/.test(rest) || mods.length > 0
   if (isTraining) {
+    const facts = sessionFacts(n)
+    const said = [facts.distanceKm ? `${String(facts.distanceKm).replace('.', ',')} km` : undefined, facts.durationMin ? `${facts.durationMin} min` : undefined, facts.zone].filter(Boolean).join(' · ')
     // Identity by MODALITY, never by position or a loose title match: "fiz yoga" never touches the corrida.
     const date = dayIn(n, now.date) ?? now.date
     const pending = dayTimeline(db, date)
@@ -366,7 +392,7 @@ function done(input: HandlerInput): LumosReply | undefined {
         text: `Qual ${named ? 'deles' : 'treino'} você fez?`,
         options: candidates.map((x) => ({
           label: `${x.e.title}${x.e.start ? ` · ${x.e.start}` : ''}`,
-          act: { done: `${x.e.title} registrado ✓`, run: () => markWorkoutDone(x.w.id, x.e.title, now) },
+          act: { done: `${x.e.title} registrado ✓${said ? ` ${said}` : ''}`, run: () => markWorkoutDone(x.w.id, x.e.title, now, facts) },
         })),
       }
     if (!pick) {
@@ -383,7 +409,7 @@ function done(input: HandlerInput): LumosReply | undefined {
         action: {
           mode: policyFor('complete_task'),
           run: () =>
-            runLogged(() => createUndoable('workouts', { id, date, time, modality: mod.id, status: 'feito', order: db.workouts.filter((w) => w.date === date).length }).undo, [
+            runLogged(() => createUndoable('workouts', { id, date, time, modality: mod.id, status: 'feito', distanceKm: facts.distanceKm, durationMin: facts.durationMin, notes: facts.zone ? `Feito em ${facts.zone}` : undefined, order: db.workouts.filter((w) => w.date === date).length }).undo, [
               eventDraft(now, { kind: 'done', title: `Treinou: ${mod.label}`, area: 'esportes', ref: { type: 'workout', id } }),
             ]),
         },
@@ -392,11 +418,11 @@ function done(input: HandlerInput): LumosReply | undefined {
     const w = pick.w
     return {
       area: 'treino',
-      text: `${pick.e.title} registrado ✓ Bom demais.`,
+      text: `${pick.e.title} registrado ✓${said ? ` ${said}.` : ''} Bom demais.`,
       sub: w.isKeySession ? 'Foi sessão-chave — quer ver como fica sua alimentação no resto do dia?' : undefined,
       ref: { type: 'workout', id: w.id },
       options: [{ label: 'Como fica minha alimentação?', ask: 'Como estão meus macros hoje?' }],
-      action: { mode: policyFor('complete_task'), run: () => markWorkoutDone(w.id, pick.e.title, now) },
+      action: { mode: policyFor('complete_task'), run: () => markWorkoutDone(w.id, pick.e.title, now, facts) },
     }
   }
   if (!rest || rest.split(' ').length > 8) return undefined

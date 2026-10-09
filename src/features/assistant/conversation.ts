@@ -21,7 +21,7 @@ import type { LumosReply, ReplyOption, TurnContext, Undo } from './act/types'
 import { answerFood, type FoodReply } from './food/answer'
 import type { FoodLogState } from './food/FoodCards'
 import { logFromChat, needsAnswer, parseLog, type Savable } from './food/log'
-import { understand, type LumosTurn } from './router'
+import { clausesOf, understand, type LumosTurn } from './router'
 import { settle } from './act/commit'
 
 /** 'saving': written in memory, waiting for the device. Only 'done' means it is saved. */
@@ -40,6 +40,8 @@ export interface Exchange {
   /** The "pulei essa refeição" write: saving on the device, or failed (rolled back). */
   skipSave?: 'saving' | 'failed'
   lumos?: { reply: LumosReply; status: ReplyStatus }
+  /** Part of a sentence with two actions: the id of the first part (her words are shown once). */
+  partOf?: number
   /** A save that failed after the change was already confirmed (e.g. Desfazer): shown under the card. */
   saveNote?: string
 }
@@ -230,6 +232,25 @@ export function ask(question: string, now: Now = nowOf()): number | undefined {
   const q = question.trim()
   if (!q) return undefined
   haptic('light')
+  // Two actions in one sentence → each runs through the same pipeline, in order.
+  if (useStore.getState().hydrated) {
+    const parts = clausesOf(getDB(), q, now.date, now.minutes, useConversation.getState().ctx)
+    if (parts.length > 1) {
+      const first = nextId
+      useConversation.setState({ draft: '' })
+      const say = (text: string, i: number) => {
+        const pid = nextId++
+        const ex: Exchange = { id: pid, question: i === 0 ? q : text, waiting: true, partOf: i === 0 ? undefined : first }
+        useConversation.setState((s) => ({ exchanges: [...s.exchanges, ex] }))
+        patch(pid, begin({ ...ex, question: text }, now))
+        patch(pid, { question: ex.question })
+        drain()
+      }
+      parts.forEach(say)
+      markSeen()
+      return first
+    }
+  }
   const id = nextId++
   const ex: Exchange = { id, question: q, waiting: true }
   useConversation.setState((s) => ({ exchanges: [...s.exchanges, ex], draft: '' }))

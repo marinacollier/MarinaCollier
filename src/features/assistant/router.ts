@@ -78,3 +78,44 @@ export function understand(db: DB, text: string, today: DateKey, nowMinutes: num
   }
   return { kind: 'answer' }
 }
+
+// ─── Two things in one sentence ─────────────────────────────────────────────
+
+const JOIN = /\s*(?:,|;|\s)\s*(?:e\s+(?:tambem\s+)?|mas\s+|tambem\s+)(?=\S)|\s*[;,]\s+(?=(?:ja|passa|passar|joga|empurra|move|muda|adia|hoje|amanha|nao|coloca|adiciona|registra|recebi|comi|cancela|marca|fiz|terminei|acabei)\b)/
+
+/** Lumos understood this clause on its own (an action, a choice, or a precise answer like "não estava no seu dia"). */
+function actionable(t: LumosTurn): boolean {
+  if (t.kind === 'reply') return true
+  if (t.kind === 'adjust') return t.plan.changes.length > 0 || !!t.plan.scheduleOps?.length || !!t.plan.taskCreates?.length || !!t.plan.needsChoice
+  // Food sentences are lists ("arroz e feijão"): never split them.
+  return false
+}
+
+/**
+ * "já fiz yoga e passa LinkedIn pra amanhã" → two clauses, each its own turn through the same pipeline.
+ * Split only when EVERY part is something Lumos can act on alone; otherwise it stays one sentence
+ * ("arroz e feijão", "Ana e Bia") — never a guess.
+ */
+export function clausesOf(db: DB, text: string, today: DateKey, nowMinutes: number, ctx: TurnContext = {}): string[] {
+  const n = normalize(text)
+  const cuts: number[] = []
+  const re = new RegExp(JOIN.source, 'g')
+  for (let m = re.exec(n); m; m = re.exec(n)) cuts.push(m.index, m.index + m[0].length)
+  if (!cuts.length) return [text]
+  const parts: string[] = []
+  let from = 0
+  for (let i = 0; i < cuts.length; i += 2) {
+    parts.push(text.slice(from, cuts[i]).trim())
+    from = cuts[i + 1]
+  }
+  parts.push(text.slice(from).trim())
+  const clean = parts.map((p) => p.replace(/^(?:lumos[,\s]+)/i, '').trim()).filter(Boolean)
+  if (clean.length < 2) return [text]
+  // A day said once at the start applies to the next clause too ("amanhã não tenho inglês e passa a corrida pras 7").
+  const day = /^(hoje|amanh[aã]|depois de amanh[aã])\b/i.exec(clean[0])?.[1]
+  const withDay = clean.map((c, i) => (i > 0 && day && !/\b(hoje|amanh[aã]|segunda|ter[cç]a|quarta|quinta|sexta|s[aá]bado|domingo)\b/i.test(c) ? `${day} ${c}` : c))
+  const turns = withDay.map((c) => understand(db, c, today, nowMinutes, ctx))
+  // At least one real action, and every part understood on its own.
+  const acts = turns.filter((t) => (t.kind === 'reply' ? !!t.reply.action || !!t.reply.options?.some((o) => o.act) : actionable(t)))
+  return acts.length && turns.every(actionable) ? withDay : [text]
+}

@@ -202,9 +202,12 @@ function ExchangeView({ e, db, today, minutes }: { e: Exchange; db: DB; today: s
   }
   return (
     <div className="space-y-2.5 scroll-mt-4">
-      <motion.div initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} className="flex justify-end">
-        <div className="max-w-[85%] rounded-2xl rounded-br-md bg-ink text-bg px-3.5 py-2.5 text-[15px] leading-snug">{e.question}</div>
-      </motion.div>
+      {/* The second action of a two-action sentence: her words were already shown once. */}
+      {!e.partOf && (
+        <motion.div initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} className="flex justify-end">
+          <div className="max-w-[85%] rounded-2xl rounded-br-md bg-ink text-bg px-3.5 py-2.5 text-[15px] leading-snug">{e.question}</div>
+        </motion.div>
+      )}
       {e.waiting ? (
         <div className="card p-4 text-[14px] text-muted">Só um instante…</div>
       ) : e.lumos ? (

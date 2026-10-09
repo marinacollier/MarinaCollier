@@ -84,7 +84,7 @@ export function foodIntentOf(text: string, today: DateKey): FoodIntent | undefin
     const craving = /(?:comer|cabe)\s+(?:um |uma |algum |alguma )?([a-z ]+?)(?:,|\s+o que|$)/.exec(q)?.[1]?.trim()
     return { kind: 'fits', date, craving: craving || q }
   }
-  const skip = new RegExp(`(?:nao vou (?:fazer|comer|tomar|ter)|vou pular|pular|sem)\\s+(?:o |a |meu |minha )?${MEAL_RE}`).exec(q)
+  const skip = new RegExp(`(?:nao vou (?:fazer|comer|tomar|ter)|vou pular|pulei|pular|nao comi|nao fiz|sem)\\s+(?:o |a |meu |minha )?${MEAL_RE}`).exec(q)
   if (skip && !question) return { kind: 'skip', date, meal: mealWordOf(skip[1])! }
   const keep = new RegExp(`(?:posso|da pra|consigo|vou) manter (?:o |a |meu |minha )?${MEAL_RE}|muda (?:o |a |meu |minha )?${MEAL_RE}|${MEAL_RE}.*posso manter|precisa mudar`).exec(q)
   if (keep) return { kind: 'keep', date, meal: mealWordOf(keep[0]) }
