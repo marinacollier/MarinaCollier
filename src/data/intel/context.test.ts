@@ -79,3 +79,19 @@ describe('Proactive · monthly backup reminder', () => {
     expect(tip.key).toBe('backup:2026-10')
   })
 })
+
+describe('Proactive · career & money (only when it really matters)', () => {
+  it('receivable due soon, without values; with the lock on, without names either', async () => {
+    const { proactiveInsights } = await import('./proactive')
+    const db = buildSeed('2026-10-13')
+    const tip = proactiveInsights(db, now('2026-10-13', 10), 10).find((i) => i.key.startsWith('rcv:'))!
+    expect(tip.text).toBe('Seu recebimento do Santander é esperado dia 15.')
+    const locked = { ...db, profile: { ...db.profile, privacyLock: { enabled: true, areas: ['dinheiro' as const], pinHash: 'x', pinSalt: 'y', relockMinutes: 5 } } }
+    expect(proactiveInsights(locked, now('2026-10-13', 10), 10).find((i) => i.key.startsWith('rcv:'))?.text).toBe('Tem um recebimento previsto pros próximos dias.')
+  })
+  it('nothing about career when nothing needs her', async () => {
+    const { proactiveInsights } = await import('./proactive')
+    const tips = proactiveInsights(buildSeed('2026-10-05'), now('2026-10-05', 10), 10)
+    expect(tips.some((i) => /^(opp-stale|win-case|career-review)/.test(i.key))).toBe(false)
+  })
+})

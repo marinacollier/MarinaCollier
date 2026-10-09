@@ -32,6 +32,10 @@ export type ActionKind =
   | 'change_corporate_event'
   | 'send_message'
   | 'external_transaction'
+  /** Her own receivable / income record (not a bank transaction): direct + Desfazer. */
+  | 'finance_record'
+  /** Career data: activity logged, opportunity/contact/case updated. */
+  | 'career_update'
 
 const SENSITIVE: ReadonlySet<ActionKind> = new Set<ActionKind>([
   'plan_week',

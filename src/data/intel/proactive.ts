@@ -2,12 +2,14 @@
  * Proactive Lumos (Home): ONE line under the greeting, up to 3 contextual suggestions under the
  * composer, and 0–3 insights. Never a feed, never generic, never guilt. All from data + now.
  */
+import { monthIncome } from '../finance/receivables'
+import { staleOpportunities } from '../career/pipeline'
 import type { DB } from '../types'
 import { contextWorkouts } from '../fuel'
 import { workMode } from '../planning'
 import { isTaskOpen, prioritiesFor, upcomingTrips, waitingFor } from '../selectors'
 import { prepChecklistFor, planFor } from '../mealprep'
-import { startOfWeek, addDays, diffDays, hmToMinutes, weekday } from '@/lib/date'
+import { startOfWeek, addDays, diffDays, endOfMonth, hmToMinutes, weekday } from '@/lib/date'
 import { capitalize, dayContext, dayLabel, lifeContext, trainingNoun, tripOpenItems } from './context'
 import { isAcked, needsAttention } from './attention'
 import { changeFeed } from './changes'
@@ -143,6 +145,22 @@ export function proactiveInsights(db: DB, now: Now, max = 3): Insight[] {
 
   const pattern = (db.memory ?? []).find((m) => m.status === 'observed' && (m.evidence ?? 0) >= PATTERN_EVIDENCE && !m.askedAt)
   if (pattern) out.push({ key: `pattern:${pattern.id}`, text: `${pattern.text}. Quer que eu considere isso como preferência?`, ask: `sim, considera "${pattern.text}" como preferência`, provenance: 'inference', priority: 50 })
+
+  // Career & money — only when something really needs her. With the privacy lock on, no names or values.
+  const lockOn = (area: 'dinheiro' | 'carreira') => !!db.profile.privacyLock?.enabled && db.profile.privacyLock.areas.includes(area)
+  for (const e of monthIncome(db, now.date.slice(0, 7), now.date).items) {
+    if (e.effective === 'expected' && e.expectedDate && e.expectedDate >= now.date && e.expectedDate <= addDays(now.date, 2))
+      out.push({ key: `rcv:${e.id}`, text: lockOn('dinheiro') ? 'Tem um recebimento previsto pros próximos dias.' : `Seu recebimento do ${e.title} é esperado dia ${Number(e.expectedDate.slice(8, 10))}.`, ask: lockOn('dinheiro') ? undefined : 'quanto tenho previsto para receber este mês?', provenance: 'fact', priority: 55 })
+    if (e.effective === 'overdue')
+      out.push({ key: `rcv-late:${e.id}`, text: lockOn('dinheiro') ? 'Um recebimento passou da data.' : `${e.title} era pra dia ${Number(e.expectedDate!.slice(8, 10))} — já caiu?`, ask: lockOn('dinheiro') ? undefined : `recebi o ${e.title} hoje`, provenance: 'inference', priority: 58 })
+  }
+  const stale = staleOpportunities(db, now.date)[0]
+  if (stale) out.push({ key: `opp-stale:${stale.id}:${stale.days >= 10 ? 10 : 5}`, text: lockOn('carreira') ? 'Uma oportunidade está sem follow-up.' : `${stale.role} · ${stale.company} está sem follow-up há ${stale.days} dias.`, ask: lockOn('carreira') ? undefined : 'qual é meu próximo follow-up de networking?', provenance: 'inference', priority: 52 })
+  const freshWin = db.wins.find((w) => !w.evidence && w.date >= addDays(now.date, -2))
+  if (freshWin) out.push({ key: `win-case:${freshWin.id}`, text: 'Você registrou um win importante. Quer transformar em evidência executiva?', ask: 'transforma meu último win em case', provenance: 'suggestion', priority: 45 })
+  const review = db.tasks.find((t) => t.careerKind === 'review' && t.recurrence)
+  if (review && now.date === endOfMonth(now.date) && !db.monthlyReviews.some((r) => r.kind === 'carreira' && r.month === now.date.slice(0, 7) && r.completedAt))
+    out.push({ key: `career-review:${now.date.slice(0, 7)}`, text: 'Sua Executive Career Review é hoje.', ask: 'faz minha revisão executiva do mês', provenance: 'fact', priority: 62 })
 
   // Monthly, discreet: everything lives on this device, so a file copy every ~30 days.
   const backupRef = db.profile.lastBackupAt ?? db.profile.onboardedAt
