@@ -6,3 +6,7 @@ dev-dist
 *.tsbuildinfo
 .claude/worktrees
 dist-preview
+e2e/.profiles/
+e2e/.shots/
+e2e/sheet-*.png
+e2e/*.png
