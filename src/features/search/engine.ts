@@ -996,7 +996,7 @@ export function parseMoneyQuery(db: DB, tokens: string[], today: DateKey): Money
 
 export function moneyMatches(db: DB, q: MoneyQuery): Expense[] {
   return db.expenses
-    .filter((e) => e.status === 'paid' && !!e.date)
+    .filter((e) => e.type !== 'income' && e.status === 'paid' && !!e.date)
     .filter((e) => (!q.from || e.date! >= q.from) && (!q.to || e.date! <= q.to))
     .filter((e) => {
       const anyFilter = q.travel || q.categoryIds.size > 0 || q.tripIds.size > 0

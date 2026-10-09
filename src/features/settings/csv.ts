@@ -42,7 +42,9 @@ export function buildDataset(db: DB, id: CsvDatasetId): { headers: string[]; row
       const cat = new Map(db.financialCategories.map((c) => [c.id, c.name]))
       return {
         headers: ['Data', 'Descrição', 'Valor (R$)', 'Categoria', 'Pagamento', 'Status', 'Planejado', 'Observações'],
-        rows: [...db.expenses]
+        // Spending only: income (recebimentos) is never a "gasto".
+        rows: db.expenses
+          .filter((e) => e.type !== 'income')
           .sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))
           .map((e) => [
             date(e.date),

@@ -390,7 +390,7 @@ export interface BudgetSummary {
 
 export function budgetSummary(trip: Trip, expenses: Expense[]): BudgetSummary {
   const mine = expenses.filter((e) => e.tripId === trip.id)
-  const spentCents = mine.filter((e) => e.status === 'paid').reduce((s, e) => s + e.amountCents, 0)
+  const spentCents = mine.filter((e) => e.type !== 'income' && e.status === 'paid').reduce((s, e) => s + e.amountCents, 0)
   const plannedCents = mine.filter((e) => e.status === 'planned_purchase').reduce((s, e) => s + e.amountCents, 0)
   return {
     budgetCents: trip.budgetCents,

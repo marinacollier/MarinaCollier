@@ -80,7 +80,7 @@ export function periodLabel(kind: PeriodKind, anchor: DateKey, today: DateKey): 
 // ─── Totals ─────────────────────────────────────────────────────────────────
 
 export function isPaid(e: Expense): e is Expense & { date: DateKey } {
-  return e.status === 'paid' && !!e.date
+  return e.type !== 'income' && e.status === 'paid' && !!e.date
 }
 
 export function paidBetween(expenses: Expense[], from: DateKey, to: DateKey): Expense[] {

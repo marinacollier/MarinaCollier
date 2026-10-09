@@ -247,7 +247,8 @@ export function mealsOn(db: DB, date: DateKey) {
 // ─── Money ──────────────────────────────────────────────────────────────────
 
 export function paidExpenses(db: DB): Expense[] {
-  return db.expenses.filter((e) => e.status === 'paid' && !!e.date)
+  // Spending only — income never enters a sum of expenses, whatever its status.
+  return db.expenses.filter((e) => e.type !== 'income' && e.status === 'paid' && !!e.date)
 }
 
 export function expensesBetween(db: DB, from: DateKey, to: DateKey): Expense[] {
