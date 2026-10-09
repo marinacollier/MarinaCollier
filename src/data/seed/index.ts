@@ -20,6 +20,7 @@ import { seedIntegrations } from '@/integrations/seed'
 import { seedProfile } from './profile'
 import { seedNutrition } from '@/features/nutrition/seed'
 import { seedMemory } from './memory'
+import { seedCareer } from '@/features/career/seed'
 
 const FEATURE_SEEDS: FeatureSeed[] = [
   seedProfile,
@@ -27,6 +28,7 @@ const FEATURE_SEEDS: FeatureSeed[] = [
   seedInbox,
   seedBody,
   seedFinance,
+  seedCareer,
   seedWork,
   seedLearning,
   seedTravel,
@@ -55,4 +57,4 @@ export function buildSeed(today: DateKey): DB {
 }
 
 /** Bump when the life seed gains records that existing installs should receive (see migrate.ts). */
-export const LIFE_SEED_VERSION = 7
+export const LIFE_SEED_VERSION = 8

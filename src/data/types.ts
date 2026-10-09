@@ -159,6 +159,8 @@ export interface Occurrence extends Entity {
   stepsDone?: number[]
   /** Real moment it was checked (the time she actually did it). */
   completedAt?: ISODateTime
+  /** Minutes actually spent ("30 min de inglês executivo"). */
+  durationMin?: number
 }
 
 // ─── Time-aware day (one life, one timeline) ────────────────────────────────
@@ -428,7 +430,7 @@ export interface Task extends Entity {
   /** Free-form grouping label (e.g. 'Cape Town', 'Johannesburg / Safari'). */
   group?: string
   /** 'trabalho' tasks show in Work OS, 'vida_real' in Vida real, 'luna' in Luna, etc. */
-  context?: 'geral' | 'trabalho' | 'vida_real' | 'luna' | 'viagem' | 'conteudo' | 'estudo'
+  context?: 'geral' | 'trabalho' | 'vida_real' | 'luna' | 'viagem' | 'conteudo' | 'estudo' | 'carreira'
   lifeAdminCategory?: LifeAdminCategory
   /** Life admin flavour: manutenção / comprar / resolver (waiting uses status 'waiting'). */
   adminKind?: 'manutencao' | 'comprar' | 'resolver'
@@ -446,7 +448,20 @@ export interface Task extends Entity {
   origin?: { type: EntityType; id: ID }
   completedAt?: ISODateTime
   order: number
+  // ── Career & Growth (reuses tasks; no parallel "career app") ──
+  /** A weekly career quota ("Inglês executivo 3×/semana") or a session placed for one. */
+  careerKind?: CareerKind
+  /** Quota: sessions per week. */
+  targetPerWeek?: number
+  /** Quota: minutes per week (Desenvolvimento de liderança 1h). */
+  targetMinutesPerWeek?: number
+  /** Goal it serves (North Star / quarter objective). */
+  goalId?: ID
+  /** A dated session created for this quota by the planner or Lumos. */
+  careerParentId?: ID
 }
+
+export type CareerKind = 'ingles_exec' | 'networking' | 'post' | 'lideranca' | 'review'
 
 /** "Minhas 3 prioridades de hoje". Max 3 per date. Can point at any entity. */
 export interface DayPriority extends Entity {

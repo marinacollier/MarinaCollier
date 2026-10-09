@@ -17,10 +17,14 @@ import { nextOrder } from '../store'
 import { addDays, hmToMinutes, minutesToHM, startOfWeek, weekday, weekDays, WEEKDAY_LONG } from '@/lib/date'
 import { nowISO } from '@/lib/id'
 import { normalize } from '@/lib/text'
+import { CAREER_META, sessionDraft, sessionsToPlace, weekProgress } from '../career/activities'
 import { busyIntervals, dayBounds, freeWindows } from './context'
 import { eventOp } from './log'
 import { commitOps, createOp, previewOps, type IntelOp } from './ops'
 import type { Now, PlanLayer, WeekProposal, WeekProposalItem } from './types'
+
+/** Never more than this many new career sessions in one week. */
+export const MAX_CAREER = 6
 
 const LAYER_ORDER: PlanLayer[] = ['fixo', 'treino_chave', 'preparo', 'prazo', 'estudo', 'vida', 'descanso']
 const STUDY_MIN = 45
@@ -156,6 +160,26 @@ export function planWeek(db: DB, now: Now, weekStart?: DateKey): WeekProposal {
     preview = previewOps(db, ops)
   }
 
+  // ── Career quotas (Inglês executivo 3×, networking, posts, liderança): only free windows, never on rest or
+  //    presencial days, one session per quota per day, keeping free space; nothing written until "Aplicar". ──
+  let careerPlaced = 0
+  for (const p of weekProgress(preview, ws)) {
+    let need = sessionsToPlace(p)
+    const usedByQuota = new Set(p.planned.map((t) => t.date))
+    while (need > 0 && careerPlaced < MAX_CAREER) {
+      const pool = days.filter((d) => open(d) && !rest.has(d) && !usedByQuota.has(d) && workMode(preview, d) !== 'presencial')
+      const slot = studySlot(preview, [...pool.filter((d) => weekday(d) >= 1 && weekday(d) <= 5), ...pool.filter((d) => weekday(d) === 0 || weekday(d) === 6)], CAREER_META[p.kind].sessionMin)
+      if (!slot) break
+      const draft = sessionDraft(p.quota, slot.date, slot.time)
+      ops.push(createOp('tasks', { ...draft, order: nextOrder(db.tasks) + studies + careerPlaced + 1 }))
+      add(slot.date, draft.title, 'estudo', 'suggestion', true, slot.time)
+      usedByQuota.add(slot.date)
+      careerPlaced++
+      need--
+      preview = previewOps(db, ops)
+    }
+  }
+
   // ── Life: flexible weekly intentions, Luna, life admin ──
   for (const g of db.workoutGoals) {
     if (g.status !== 'ativa' || g.planType !== 'flexivel' || !g.perWeek || !g.modality || g.obligation === false) continue
@@ -194,7 +218,7 @@ export function planWeek(db: DB, now: Now, weekStart?: DateKey): WeekProposal {
     keyTitles.length ? `${keyTitles.length} ${keyTitles.length === 1 ? 'treino-chave' : 'treinos-chave'} (${keyTitles.join(', ')})` : undefined,
     count('preparo') ? `${count('preparo')} ${count('preparo') === 1 ? 'preparo' : 'preparos'}` : undefined,
     count('prazo') ? `${count('prazo')} ${count('prazo') === 1 ? 'prazo' : 'prazos'}` : undefined,
-    count('estudo') ? `${count('estudo')} ${count('estudo') === 1 ? 'bloco de estudo' : 'blocos de estudo'}` : undefined,
+    count('estudo') ? `${count('estudo')} ${count('estudo') === 1 ? 'bloco' : 'blocos'} de estudo${careerPlaced ? ' e carreira' : ''}` : undefined,
   ].filter(Boolean) as string[]
   const restLine = [...rest].filter(open).map((d) => WEEKDAY_LONG[weekday(d)])
   const summary = [
@@ -219,15 +243,15 @@ export function planWeek(db: DB, now: Now, weekStart?: DateKey): WeekProposal {
 }
 
 /** A study slot: a free window after work (or in the afternoon on days off), keeping free space left. */
-function studySlot(db: DB, candidates: DateKey[]): { date: DateKey; time: TimeHM } | undefined {
+function studySlot(db: DB, candidates: DateKey[], minutes = STUDY_MIN): { date: DateKey; time: TimeHM } | undefined {
   const { sleep } = dayBounds(db)
   for (const d of candidates) {
     const work = workBlocks(db, d)
     const from = work.length ? hmToMinutes(work[work.length - 1].end) + 30 : 14 * 60
-    const windows = freeWindows(busyIntervals(db, d), from, sleep - 30, STUDY_MIN)
+    const windows = freeWindows(busyIntervals(db, d), from, sleep - 30, minutes)
     const total = freeWindows(busyIntervals(db, d), dayBounds(db).wake, sleep, 30).reduce((s, f) => s + hmToMinutes(f.end) - hmToMinutes(f.start), 0)
     const w = windows[0]
-    if (!w || total - STUDY_MIN < KEEP_FREE) continue
+    if (!w || total - minutes < KEEP_FREE) continue
     return { date: d, time: minutesToHM(Math.ceil(hmToMinutes(w.start) / 15) * 15) }
   }
   return undefined

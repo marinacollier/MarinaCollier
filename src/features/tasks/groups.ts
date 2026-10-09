@@ -3,7 +3,7 @@
  * Every open task lands in exactly one section; nothing is ever called "atrasado".
  */
 import type { DateKey, DB, Task } from '@/data/types'
-import { carriedOverTasks, isTaskDoneOn, isTaskOpen, tasksForDay } from '@/data/selectors'
+import { carriedOverTasks, isCareerQuota, isTaskDoneOn, isTaskOpen, tasksForDay } from '@/data/selectors'
 import { addDays, endOfWeek, toDateKey } from '@/lib/date'
 
 export type TaskContext = NonNullable<Task['context']>
@@ -16,6 +16,7 @@ export const CONTEXT_LABEL: Record<TaskContext, string> = {
   viagem: 'Viagem',
   conteudo: 'Conteúdo',
   estudo: 'Estudo',
+  carreira: 'Carreira',
 }
 
 export const CONTEXT_EMOJI: Record<TaskContext, string> = {
@@ -26,6 +27,7 @@ export const CONTEXT_EMOJI: Record<TaskContext, string> = {
   viagem: '✈️',
   conteudo: '🎬',
   estudo: '📚',
+  carreira: '🧭',
 }
 
 export type TaskSectionId = 'hoje' | 'semana' | 'depois' | 'algum_dia' | 'recorrentes' | 'esperando' | 'revisar' | 'feitas'
@@ -74,7 +76,7 @@ export function groupTasks(db: DB, today: DateKey, context?: TaskContext): TaskS
   const t = todayTasks(db, today)
   const hoje = take([...t.carried, ...t.open])
 
-  const open = db.tasks.filter((x) => isTaskOpen(x) && !x.recurrence && !seen.has(x.id))
+  const open = db.tasks.filter((x) => isTaskOpen(x) && !x.recurrence && !isCareerQuota(x) && !seen.has(x.id))
   const semana = take(
     open
       .filter((x) => {

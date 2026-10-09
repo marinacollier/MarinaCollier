@@ -31,6 +31,11 @@ const byOrder = <T extends { order: number }>(a: T, b: T) => a.order - b.order
 
 // ─── Tasks ──────────────────────────────────────────────────────────────────
 
+/** A weekly career quota ("Inglês executivo 3×/semana"): a target, not a to-do — never listed as an open task. */
+export function isCareerQuota(t: Task): boolean {
+  return !!t.careerKind && !t.date && !t.recurrence && !!(t.targetPerWeek || t.targetMinutesPerWeek)
+}
+
 export function isTaskOpen(t: Task): boolean {
   return t.status !== 'done' && t.status !== 'archived'
 }
