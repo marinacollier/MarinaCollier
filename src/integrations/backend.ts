@@ -43,16 +43,18 @@ export class BackendError extends Error {
 type TokenProvider = () => Promise<string | undefined> | string | undefined
 let sessionToken: TokenProvider = () => undefined
 let sessionWired = false
+let signedInNow: () => boolean = () => true
 
 /** Register how to get the current Supabase Auth access token (kept in memory by the auth client). */
-export function setSessionTokenProvider(fn: TokenProvider): void {
+export function setSessionTokenProvider(fn: TokenProvider, isSignedIn?: () => boolean): void {
   sessionToken = fn
   sessionWired = true
+  if (isSignedIn) signedInNow = isSignedIn
 }
 
-/** True once an auth client registered itself. Without it, functions can't know who Marina is. */
+/** True when an auth client is wired AND signed in. Without it, functions can't know who Marina is. */
 export function hasSessionProvider(): boolean {
-  return sessionWired
+  return sessionWired && signedInNow()
 }
 
 export interface CallOptions {

@@ -17,12 +17,19 @@ export function db(): SupabaseClient {
 }
 
 /** The signed-in Supabase user (from the Authorization bearer JWT). */
-export async function requireUser(req: Request): Promise<{ id: string }> {
+export async function requireUser(req: Request): Promise<{ id: string; email?: string }> {
   const jwt = req.headers.get('Authorization')?.replace(/^Bearer\s+/i, '')
   if (!jwt) throw new HttpError('unauthorized', 'Faça login no MARINA OS', 401)
   const { data, error } = await db().auth.getUser(jwt)
   if (error || !data.user) throw new HttpError('unauthorized', 'Sessão inválida', 401)
-  return { id: data.user.id }
+  return { id: data.user.id, email: data.user.email ?? undefined }
+}
+
+/** Least privilege for paid calls: only the e-mails in ALLOWED_EMAILS (comma-separated) may use them. */
+export function requireAllowed(user: { email?: string }): void {
+  const allowed = (Deno.env.get('ALLOWED_EMAILS') ?? '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
+  if (!allowed.length) throw new HttpError('not_configured', 'Defina ALLOWED_EMAILS nos segredos', 500)
+  if (!user.email || !allowed.includes(user.email.toLowerCase())) throw new HttpError('policy_blocked', 'Conta sem permissão para este recurso', 403)
 }
 
 export interface AccountRow {

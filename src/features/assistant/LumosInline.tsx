@@ -31,6 +31,7 @@ import { visibleChanges } from './adjust/planner'
 import type { ChangePlan } from './adjust/types'
 import { attentionFor, intelReady } from './act/intel'
 import { LOW_CONFIDENCE, useSpeech } from '@/features/today/home/useSpeech'
+import { canReadAttachments } from './attach/read'
 import { VoiceBar } from './VoiceBar'
 import { askLumos } from './chief'
 import {
@@ -43,7 +44,7 @@ import {
   logFood,
   resolveWaiting,
   runOption,
-  say,
+  sendAttachment,
   setAdjust,
   setDraft,
   undoAdjust,
@@ -120,11 +121,10 @@ function Composer({ variant, placeholder }: { variant: 'home' | 'page'; placehol
     inputRef.current?.blur()
   }
 
+  // A print/PDF goes with whatever she typed ("coloca isso na agenda") as ONE turn.
   const onFile = (file: File | undefined) => {
     if (!file) return
-    const kind = file.type.startsWith('image/') ? 'image' : 'file'
-    const c = normalizeCapture({ kind, file, name: file.name })
-    say(`📎 ${file.name}`, { area: 'arquivo', text: c.note ?? 'Recebi o arquivo.', sub: c.supported ? undefined : 'Por enquanto: texto (e voz, quando o navegador deixa).' })
+    void sendAttachment(file, draft)
     if (fileRef.current) fileRef.current.value = ''
   }
 
@@ -155,9 +155,11 @@ function Composer({ variant, placeholder }: { variant: 'home' | 'page'; placehol
       />
       <div className={cn('flex items-center gap-1', variant === 'home' ? 'justify-end mt-1' : 'absolute right-2 bottom-2')}>
         <input ref={fileRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
-        <button type="button" onClick={() => fileRef.current?.click()} aria-label="Anexar arquivo ou print" className="h-10 w-10 rounded-full text-muted flex items-center justify-center active:bg-surface-2">
-          <Paperclip size={18} />
-        </button>
+        {canReadAttachments() && (
+          <button type="button" onClick={() => fileRef.current?.click()} aria-label="Anexar print, foto ou PDF" className="h-10 w-10 rounded-full text-muted flex items-center justify-center active:bg-surface-2">
+            <Paperclip size={18} />
+          </button>
+        )}
         {speech.available && (
           <button type="button" onClick={() => speech.start()} aria-label="Falar com a Lumos" className="h-10 w-10 rounded-full flex items-center justify-center active:bg-surface-2 text-muted">
             <Mic size={18} />
@@ -193,10 +195,17 @@ function ExchangeView({ e, db, today, minutes }: { e: Exchange; db: DB; today: s
       {/* The second action of a two-action sentence: her words were already shown once. */}
       {!e.partOf && (
         <motion.div initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} className="flex justify-end">
-          <div className="max-w-[85%] rounded-2xl rounded-br-md bg-ink text-bg px-3.5 py-2.5 text-[15px] leading-snug">{e.question}</div>
+          <div className="max-w-[85%] rounded-2xl rounded-br-md bg-ink text-bg px-3.5 py-2.5 text-[15px] leading-snug">
+            {e.attachment && <span className="block text-[13px] opacity-80">📎 {e.attachment.name}</span>}
+            {e.question}
+          </div>
         </motion.div>
       )}
-      {e.waiting ? (
+      {e.attachment?.status === 'reading' ? (
+        <div className="card p-4 text-[14px] text-muted" role="status">
+          Lendo {/\.pdf$/i.test(e.attachment.name) ? 'o PDF' : 'o print'}…
+        </div>
+      ) : e.waiting ? (
         <div className="card p-4 text-[14px] text-muted">Só um instante…</div>
       ) : e.lumos ? (
         <ReplyCard

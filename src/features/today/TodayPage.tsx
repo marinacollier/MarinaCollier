@@ -79,6 +79,11 @@ export default function TodayPage() {
     },
     [navigate],
   )
+  // A print/PDF opens the conversation right here and is read there (same Lumos, same pipeline).
+  const attach = useCallback((file: File, caption: string) => {
+    setConversation((c) => ({ text: '', n: (c?.n ?? 0) + 1 }))
+    void import('@/features/assistant/conversation').then((m) => m.sendAttachment(file, caption))
+  }, [])
   const placeholder = composerPlaceholder(home.part, { workNow: home.part === 'dia' })
   const hasLines = attention.length > 0 || insights.length > 0 || changes.items.length > 0 || !!trip
 
@@ -119,7 +124,7 @@ export default function TodayPage() {
             </Suspense>
           </section>
         ) : (
-          <LumosBox placeholder={placeholder} suggestions={suggestions} onAsk={ask} />
+          <LumosBox placeholder={placeholder} suggestions={suggestions} onAsk={ask} onAttach={attach} />
         )}
       </motion.div>
 

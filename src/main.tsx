@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { registerSW } from 'virtual:pwa-register'
 import App from './App'
 import { hydrate } from '@/data/store'
+import { initAuth } from '@/integrations/auth'
 import './index.css'
 
 registerSW({ immediate: true })
@@ -17,3 +18,4 @@ createRoot(document.getElementById('root')!).render(
 )
 
 void hydrate()
+void initAuth()

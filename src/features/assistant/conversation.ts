@@ -22,6 +22,9 @@ import { answerFood, type FoodReply } from './food/answer'
 import type { FoodLogState } from './food/FoodCards'
 import { logFromChat, needsAnswer, parseLog, type Savable } from './food/log'
 import { clausesOf, understand, type LumosTurn } from './router'
+import type { AttachmentReading } from './attach/types'
+import { ReadError, readAttachment } from './attach/read'
+import { ROUTES } from '@/app/routes'
 import { settle } from './act/commit'
 
 /** 'saving': written in memory, waiting for the device. Only 'done' means it is saved. */
@@ -40,6 +43,8 @@ export interface Exchange {
   /** The "pulei essa refeição" write: saving on the device, or failed (rolled back). */
   skipSave?: 'saving' | 'failed'
   lumos?: { reply: LumosReply; status: ReplyStatus }
+  /** A print/PDF sent with this turn (the file itself is not kept — only its name and what was read). */
+  attachment?: { name: string; status: 'reading' | 'read' | 'failed'; reading?: AttachmentReading }
   /** Part of a sentence with two actions: the id of the first part (her words are shown once). */
   partOf?: number
   /** A save that failed after the change was already confirmed (e.g. Desfazer): shown under the card. */
@@ -163,7 +168,7 @@ function logNow(id: number, foods: LoggedFood[], savable: Savable[], now: Now, a
 function begin(ex: Exchange, now: Now): Exchange {
   const db = getDB()
   const ctx = useConversation.getState().ctx
-  const turn = understand(db, ex.question, now.date, now.minutes, ctx)
+  const turn = understand(db, ex.question, now.date, now.minutes, ctx, ex.attachment?.reading)
   const out: Exchange = { ...ex, waiting: false, turn }
 
   if (turn.kind === 'reply') {
@@ -270,6 +275,32 @@ export function resolveWaiting(now: Now = nowOf()) {
     drain()
   }
   if (pending.length) markSeen()
+}
+
+/**
+ * A print / photo / PDF, with or without a sentence ("coloca isso na agenda"). It is read once, then
+ * the reading + the sentence run as ONE turn through the same handlers as text and voice.
+ */
+export async function sendAttachment(file: File, caption = '', now: Now = nowOf()): Promise<number> {
+  const id = nextId++
+  const name = file.name || 'print'
+  const ex: Exchange = { id, question: caption.trim(), attachment: { name, status: 'reading' } }
+  useConversation.setState((s) => ({ exchanges: [...s.exchanges, ex], draft: '' }))
+  haptic('light')
+  try {
+    const reading = await readAttachment(file, now.date, caption.trim())
+    const read: Exchange = { ...ex, attachment: { name, status: 'read', reading } }
+    patch(id, { attachment: read.attachment })
+    patch(id, begin(read, now))
+    drain()
+  } catch (err) {
+    const message = err instanceof ReadError || err instanceof Error ? err.message : 'Não consegui ler esse arquivo agora.'
+    const signin = err instanceof ReadError && err.code === 'signin'
+    const reply: LumosReply = { area: 'arquivo', text: message, link: signin ? { label: 'Entrar na conta', to: ROUTES.integrations } : undefined }
+    patch(id, { waiting: false, attachment: { name, status: 'failed' }, turn: { kind: 'reply', reply }, lumos: { reply, status: 'done' } })
+  }
+  markSeen()
+  return id
 }
 
 export function setDraft(draft: string) {

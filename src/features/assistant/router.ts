@@ -22,6 +22,7 @@ import { cleanFoodText, foodIntentOf, looksLikeFood, type FoodIntent } from './f
 import { mealPrepIntentOf, type MealPrepIntent } from './food/mealprep'
 import { respond } from './act/respond'
 import type { LumosReply, TurnContext } from './act/types'
+import type { AttachmentReading } from './attach/types'
 import { firstRoutineStart } from './day/wake'
 
 export type LumosTurn =
@@ -46,9 +47,14 @@ export function wakeMinutes(db: DB, n: string, today: DateKey, nowMinutes: numbe
   return start === undefined ? nowMinutes : Math.max(nowMinutes, start + offset)
 }
 
-export function understand(db: DB, text: string, today: DateKey, nowMinutes: number, ctx: TurnContext = {}): LumosTurn {
+export function understand(db: DB, text: string, today: DateKey, nowMinutes: number, ctx: TurnContext = {}, attachment?: AttachmentReading): LumosTurn {
   const t = text.trim()
   const n = normalize(t).replace(/[?!.]+$/g, '').trim()
+  // A print/PDF + (maybe) a sentence: the reading gives the data, the sentence the intent — one turn.
+  if (attachment) {
+    const reply = respond(db, t, { date: today, minutes: nowMinutes }, ctx, attachment)
+    return reply ? { kind: 'reply', reply } : { kind: 'answer' }
+  }
   if (!n) return { kind: 'answer' }
 
   if (WOKE_UP.test(n) && !t.endsWith('?')) return { kind: 'adjust', plan: planWake(db, today, wakeMinutes(db, n, today, nowMinutes)) }

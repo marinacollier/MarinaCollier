@@ -11,8 +11,10 @@ import { cn } from '@/lib/cn'
 import { haptic } from '@/lib/haptics'
 import { LOW_CONFIDENCE, useSpeech } from './useSpeech'
 import { VoiceBar } from '@/features/assistant/VoiceBar'
+import { canReadAttachments } from '@/features/assistant/attach/read'
 
-export function LumosBox({ placeholder, suggestions, onAsk }: { placeholder: string; suggestions: string[]; onAsk: (text: string) => void }) {
+export function LumosBox({ placeholder, suggestions, onAsk, onAttach }: { placeholder: string; suggestions: string[]; onAsk: (text: string) => void; onAttach?: (file: File, caption: string) => void }) {
+  const canAttach = !!onAttach && canReadAttachments()
   const [text, setText] = useState('')
   const [note, setNote] = useState<string>()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -43,12 +45,12 @@ export function LumosBox({ placeholder, suggestions, onAsk }: { placeholder: str
     onAsk(q)
   }
 
+  // A print/PDF goes with whatever she typed ("coloca isso na agenda").
   const onFile = (file?: File) => {
-    if (!file) return
-    const kind = file.type.startsWith('image/') ? 'image' : 'file'
-    const n = normalizeCapture({ kind, file, name: file.name, caption: text.trim() || undefined })
-    if (n.supported && n.text) onAsk(n.text)
-    else setNote(`${file.name} — ${n.note ?? 'Ainda não leio esse tipo de arquivo.'}`)
+    if (!file || !onAttach) return
+    onAttach(file, text.trim())
+    setText('')
+    setNote(undefined)
     if (fileRef.current) fileRef.current.value = ''
   }
 
@@ -80,9 +82,11 @@ export function LumosBox({ placeholder, suggestions, onAsk }: { placeholder: str
         ) : (
           <div className="flex items-center justify-between -mx-2 mt-1">
             <div className="flex items-center">
-              <button type="button" aria-label="Anexar foto ou arquivo" onClick={() => fileRef.current?.click()} className="h-11 w-11 rounded-full inline-flex items-center justify-center text-muted active:bg-surface-2 transition">
-                <Paperclip size={19} />
-              </button>
+              {canAttach && (
+                <button type="button" aria-label="Anexar print, foto ou PDF" onClick={() => fileRef.current?.click()} className="h-11 w-11 rounded-full inline-flex items-center justify-center text-muted active:bg-surface-2 transition">
+                  <Paperclip size={19} />
+                </button>
+              )}
               {speech.available && (
                 <button type="button" aria-label="Falar com a Lumos" onClick={() => speech.start()} className="h-11 w-11 rounded-full inline-flex items-center justify-center transition text-muted active:bg-surface-2">
                   <Mic size={19} />

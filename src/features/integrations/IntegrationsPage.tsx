@@ -17,6 +17,8 @@ import { teamsMentions } from '@/integrations/teams'
 import type { ProviderInfo, ProviderStatus } from '@/integrations/types'
 import { IcsTools, reportMessage } from './IcsTools'
 import { InfoBox, ProviderCard } from './ProviderCard'
+import { AccountSection } from './AccountSection'
+import { useAuth } from '@/integrations/auth'
 
 type Pid = (typeof PROVIDER_ORDER)[number]
 
@@ -83,7 +85,8 @@ export default function IntegrationsPage() {
   const flags = useDB((db) => db.profile.featureFlags)
   const connections = useDB((db) => db.integrations)
   const env = useMemo(() => readBackendEnv(), [])
-  const signedIn = hasSessionProvider()
+  const authed = useAuth((a) => a.signedIn)
+  const signedIn = authed && hasSessionProvider()
   const backendReady = !!env.apiUrl && signedIn
   const location = useLocation()
   const navigate = useNavigate()
@@ -246,9 +249,11 @@ export default function IntegrationsPage() {
         </div>
         <div className="text-[14px] text-ink-2 leading-relaxed">
           <div className="font-medium text-ink">Seus dados, do seu jeito</div>
-          Senhas e tokens nunca ficam no aparelho. Trabalho entra só como resumo e link — nunca o e-mail inteiro. E nada é enviado, apagado ou movido.
+          Senhas e tokens de Google, Microsoft e Organizze ficam só no servidor, nunca no aparelho (aqui fica apenas a sua sessão do MARINA OS, que você encerra em “Sair”). Trabalho entra só como resumo e link — nunca o e-mail inteiro. E nada é enviado, apagado ou movido.
         </div>
       </div>
+
+      <AccountSection />
 
       {GROUPS.map((g) => (
         <div key={g.id}>

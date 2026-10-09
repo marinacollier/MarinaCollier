@@ -7,6 +7,7 @@ import type { Now } from '@/data/intel'
 import type { DB } from '@/data/types'
 import { backupHandler } from './handlers/backup'
 import { booksHandler } from './handlers/books'
+import { attachmentHandler } from './handlers/attachment'
 import { calendarHandler } from './handlers/calendar'
 import { careerHandler } from './handlers/career'
 import { captureHandler } from './handlers/capture'
@@ -21,12 +22,14 @@ import { norm } from './text'
 import type { AttachmentReading } from '../attach/types'
 import type { Handler, LumosReply, TurnContext } from './types'
 
-export const HANDLERS: Handler[] = [backupHandler, careerHandler, calendarHandler, memoryHandler, booksHandler, kitchenHandler, workHandler, tasksHandler, dayHandler, travelHandler, studyHandler, captureHandler]
+export const HANDLERS: Handler[] = [backupHandler, careerHandler, calendarHandler, attachmentHandler, memoryHandler, booksHandler, kitchenHandler, workHandler, tasksHandler, dayHandler, travelHandler, studyHandler, captureHandler]
 
 export function respond(db: DB, text: string, now: Now, ctx: TurnContext = {}, attachment?: AttachmentReading): LumosReply | undefined {
   const n = norm(text)
   if (!n && !attachment) return undefined
-  for (const h of HANDLERS) {
+  // With a file, what was read decides first (the sentence is the intent); then the usual handlers.
+  const order = attachment ? [calendarHandler, attachmentHandler, ...HANDLERS.filter((h) => h !== calendarHandler && h !== attachmentHandler)] : HANDLERS
+  for (const h of order) {
     const r = h.run({ db, text: text.trim(), n, now, ctx, attachment })
     if (r) return r
   }
