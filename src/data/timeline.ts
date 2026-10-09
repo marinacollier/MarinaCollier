@@ -75,7 +75,7 @@ const hm = (min: number): TimeHM => {
   return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
 }
 
-const isoToHM = (iso?: string): TimeHM | undefined => {
+export const isoToHM = (iso?: string): TimeHM | undefined => {
   if (!iso) return undefined
   const d = new Date(iso)
   return Number.isNaN(d.getTime()) ? undefined : toTimeHM(d)
@@ -331,6 +331,9 @@ export function dayTimeline(db: DB, date: DateKey, opts: DayTimelineOptions = {}
   for (const e of eventsFor(db, date)) {
     const ref = { type: 'event' as const, id: e.id }
     const o = overrideFor(db, date, 'event', e.id)
+    // "Fui / feito" on that day's occurrence of the event (recurring events too).
+    const occ = occurrenceFor(db.occurrences, 'event', e.id, date)
+    const done = occ?.status === 'done'
     const base = {
       kind: 'event' as const,
       ref,
@@ -339,8 +342,9 @@ export function dayTimeline(db: DB, date: DateKey, opts: DayTimelineOptions = {}
       title: e.title,
       emoji: e.kind === 'criatividade' ? '🏺' : e.kind === 'estudo' ? '📚' : e.kind === 'trabalho' ? '💼' : e.kind === 'saude' ? '🩺' : '📅',
       planType: e.planType,
-      status: o?.cancelled ? ('cancelled' as const) : ('pending' as const),
-      editable: { time: !e.allDay, reorder: false, check: false },
+      status: o?.cancelled ? ('cancelled' as const) : done ? ('done' as const) : ('pending' as const),
+      doneAt: done ? isoToHM(occ?.completedAt) : undefined,
+      editable: { time: !e.allDay, reorder: false, check: true },
     }
     const time = o?.time ?? e.startTime
     if (e.allDay || o?.anytime) {

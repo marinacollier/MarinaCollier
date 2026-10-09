@@ -12,6 +12,7 @@
  *   6 a food said plainly ("banana com duas fatias de queijo") → log
  *   7 everything else                       → the Chief of Staff answers (agents)
  */
+import { looksLikeBriefing } from '@/data/briefing/import'
 import type { DateKey, DB } from '@/data/types'
 import { normalize } from '@/lib/text'
 import { lex } from './adjust/lexicon'
@@ -103,6 +104,8 @@ function actionable(t: LumosTurn): boolean {
  * ("arroz e feijão", "Ana e Bia") — never a guess.
  */
 export function clausesOf(db: DB, text: string, today: DateKey, nowMinutes: number, ctx: TurnContext = {}): string[] {
+  // A pasted briefing / JSON block is one thing, never split into sentences.
+  if (looksLikeBriefing(text)) return [text]
   const n = normalize(text)
   const cuts: number[] = []
   const re = new RegExp(JOIN.source, 'g')

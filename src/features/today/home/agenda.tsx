@@ -35,7 +35,7 @@ function CheckButton({ item, onDone }: { item: ActionItem; onDone?: () => void }
       </span>
     )
   }
-  const verb = item.check === 'meal' ? 'Comi' : item.check === 'workout' ? 'Treino feito' : 'Concluir'
+  const verb = item.check === 'meal' ? 'Comi' : item.check === 'workout' ? 'Treino feito' : item.check === 'bill' ? 'Paguei' : 'Concluir'
   return (
     <button
       type="button"

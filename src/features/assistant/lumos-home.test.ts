@@ -118,6 +118,6 @@ describe('Lumos changes the Home (text = transcript)', () => {
     const ev = db.events.filter((e) => e.title === 'Aniversário da Ana')
     expect(ev).toHaveLength(1)
     expect(ev[0]).toMatchObject({ date: addDays(THU, 2), startTime: '20:00', allDay: false })
-    expect(dayItems(db, addDays(THU, 2), THU).some((i) => i.title === 'Aniversário da Ana' && i.check === 'none')).toBe(true)
+    expect(dayItems(db, addDays(THU, 2), THU).some((i) => i.title === 'Aniversário da Ana' && i.check === 'toggle')).toBe(true)
   })
 })

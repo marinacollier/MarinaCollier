@@ -28,3 +28,10 @@ export const SEED_IDS = {
   trackLideranca: 'track-lideranca',
   trackCursos: 'track-cursos',
 } as const
+
+const STABLE_SEED_IDS = new Set<string>([...Object.values(SEED_IDS), 'goal-africa-pronta'])
+
+/** Ids only the seed produces: 'seed:<area>:<slug>' and the named SEED_IDS (+ default categories). */
+export function isSeedRecordId(id: string): boolean {
+  return id.startsWith('seed:') || STABLE_SEED_IDS.has(id)
+}

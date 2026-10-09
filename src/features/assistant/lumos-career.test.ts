@@ -151,7 +151,8 @@ describe('Lumos · Executive Career Review', () => {
     addOpportunity({ role: 'Head of Product', company: 'Empresa X' }, FRI)
     const r = reply(talk('faz minha revisão executiva do mês'))
     expect(r.text).toMatch(/você não precisa recadastrar nada/)
-    expect(r.sections?.map((s) => s.title)).toEqual(['O que avancei?', 'Quais oportunidades surgiram?'])
+    // Her real waiting-fors (Vitor, Thales) show up as "bloqueado" too.
+    expect(r.sections?.map((s) => s.title)).toEqual(['O que avancei?', 'Quais oportunidades surgiram?', 'O que está bloqueado?'])
     expect(r.sections?.[0].lines[0].text).toBe('Inglês executivo: 1×')
     runOption(r.options![0])
     runOption(reply(talk('faz minha revisão executiva do mês')).options![0])

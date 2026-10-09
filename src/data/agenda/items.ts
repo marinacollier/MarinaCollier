@@ -7,10 +7,11 @@
  * Each item points at its own record (`refType` + `refId`); nothing here writes, nothing is turned into a Task.
  * Pure: the UI decides how to check/open each kind (see `check`).
  */
-import { dayTimeline } from '../timeline'
+import { dayTimeline, isoToHM } from '../timeline'
 import { carriedOverTasks, isCareerQuota, prioritiesFor, tasksForDay } from '../selectors'
 import type { DateKey, DB, DayPriority, Project, Task, TimeHM, TimelineEntry } from '../types'
 import { addDays, hmToMinutes } from '@/lib/date'
+import { billPeriod, billsDueOn } from '../finance/bills'
 
 /** Filter chips: Tudo · Trabalho · Corpo · Vida. Career, study and content count as Trabalho. */
 export type FrontGroup = 'trabalho' | 'corpo' | 'vida'
@@ -27,11 +28,15 @@ export interface Front {
  *  routine → every step of that routine at once
  *  workout → mark the training as done (sheet to add duration/distance)
  *  meal    → "comi" with the real time
- *  none    → not something you tick (events, deadlines, follow-ups): tap opens it
+ *  mark    → a line with no done-state of its own (follow-up, career next action, deadline): the tick is an
+ *            Occurrence of that line on that day — the record itself is not changed
+ *  bill    → a recurring payment paid this month/week
+ *  none    → not something you tick (work hours): tap opens it
+ * Events tick too ("fui / feito"), through their own occurrence (toggle on the timeline row).
  */
-export type CheckKind = 'toggle' | 'routine' | 'workout' | 'meal' | 'none'
+export type CheckKind = 'toggle' | 'routine' | 'workout' | 'meal' | 'mark' | 'bill' | 'none'
 
-export type ActionSource = 'timeline' | 'task' | 'waiting' | 'opportunity' | 'contact' | 'tripItem' | 'deadline'
+export type ActionSource = 'timeline' | 'task' | 'waiting' | 'opportunity' | 'contact' | 'tripItem' | 'deadline' | 'bill'
 
 export interface ActionItem {
   /** Unique in a day: `${refType}:${refId}`. */
@@ -133,10 +138,26 @@ function entryFront(db: DB, e: TimelineEntry): Front {
 }
 
 function checkFor(e: TimelineEntry): CheckKind {
-  if (e.kind === 'workout') return e.ref.type === 'workout' ? 'workout' : 'none'
+  if (e.kind === 'workout') return e.ref.type === 'workout' || e.ref.type === 'weekTemplate' ? 'workout' : 'none'
   if (e.kind === 'meal') return e.ref.type === 'planMeal' && !e.ref.id.startsWith('meal:') ? 'meal' : 'none'
-  if (e.kind === 'event' || e.kind === 'work') return 'none'
+  if (e.kind === 'work') return 'none'
   return e.editable.check ? 'toggle' : 'none'
+}
+
+/** The tick of a 'mark' line on `date` (or undefined). */
+function markOn(db: DB, key: string, date: DateKey) {
+  return db.occurrences.find((o) => o.parentType === 'item' && o.parentId === key && o.date === date && o.status === 'done')
+}
+
+/** An overdue line (due before today) already ticked on or after its due day doesn't come back. */
+function markedSince(db: DB, key: string, since: DateKey, today: DateKey): boolean {
+  return db.occurrences.some((o) => o.parentType === 'item' && o.parentId === key && o.status === 'done' && o.date >= since && o.date < today)
+}
+
+/** A 'mark' line, done when ticked that day. */
+function marked(db: DB, it: Omit<ActionItem, 'status' | 'check' | 'doneAt'>): ActionItem {
+  const occ = markOn(db, it.key, it.date)
+  return { ...it, status: occ ? 'done' : 'pending', doneAt: occ ? isoToHM(occ.completedAt) : undefined, check: 'mark' }
 }
 
 function fromEntry(db: DB, e: TimelineEntry): ActionItem {
@@ -248,7 +269,9 @@ export function dayItems(db: DB, date: DateKey, today: DateKey, opts: ItemOption
   for (const t of db.tasks) {
     const f = t.status === 'waiting' ? t.waiting?.followUpOn : undefined
     if (!f || !(f === date || (date === today && f < today))) continue
-    push({ key: `waiting:${t.id}`, source: 'waiting', refType: 'task', refId: t.id, date, title: `Cobrar ${t.waiting!.who}: ${t.title}`, sub: f < date ? 'era pra antes' : undefined, front: taskFront(db, t), status: 'pending', check: 'none', important: true })
+    const key = `waiting:${t.id}`
+    if (f < date && markedSince(db, key, f, today)) continue
+    push(marked(db, { key, source: 'waiting', refType: 'task', refId: t.id, date, title: `Cobrar ${t.waiting!.who}: ${t.title}`, sub: f < date ? 'era pra antes' : undefined, front: taskFront(db, t), important: true }))
   }
 
   // Career next actions (opportunities, people).
@@ -256,12 +279,14 @@ export function dayItems(db: DB, date: DateKey, today: DateKey, opts: ItemOption
   for (const o of db.opportunities ?? []) {
     const d = o.nextActionDate
     if (!d || o.status === 'fechada' || o.status === 'descartada' || !(d === date || (date === today && d < today))) continue
-    push({ key: `opportunity:${o.id}`, source: 'opportunity', refType: 'opportunity', refId: o.id, date, title: careerHidden ? 'Próxima ação de carreira' : `${o.nextAction ?? 'Próxima ação'} · ${o.role} (${o.company})`, front: { label: 'CARREIRA', group: 'trabalho' }, status: 'pending', check: 'none', important: true })
+    if (d < date && markedSince(db, `opportunity:${o.id}`, d, today)) continue
+    push(marked(db, { key: `opportunity:${o.id}`, source: 'opportunity', refType: 'opportunity', refId: o.id, date, title: careerHidden ? 'Próxima ação de carreira' : `${o.nextAction ?? 'Próxima ação'} · ${o.role} (${o.company})`, front: { label: 'CARREIRA', group: 'trabalho' }, important: true }))
   }
   for (const c of db.contacts ?? []) {
     const d = c.nextFollowUp
     if (!d || !(d === date || (date === today && d < today))) continue
-    push({ key: `contact:${c.id}`, source: 'contact', refType: 'contact', refId: c.id, date, title: careerHidden ? 'Follow-up de networking' : `Follow-up com ${c.name}${c.company ? ` (${c.company})` : ''}`, front: { label: 'CARREIRA', group: 'trabalho' }, status: 'pending', check: 'none', important: true })
+    if (d < date && markedSince(db, `contact:${c.id}`, d, today)) continue
+    push(marked(db, { key: `contact:${c.id}`, source: 'contact', refType: 'contact', refId: c.id, date, title: careerHidden ? 'Follow-up de networking' : `Follow-up com ${c.name}${c.company ? ` (${c.company})` : ''}`, front: { label: 'CARREIRA', group: 'trabalho' }, important: true }))
   }
 
   // Trip to-dos on that day.
@@ -274,20 +299,30 @@ export function dayItems(db: DB, date: DateKey, today: DateKey, opts: ItemOption
   // Deadlines that land on that day (information: open the record to act).
   for (const c of db.contentItems) {
     if (c.deadline !== date || c.stage === 'publicado') continue
-    push({ key: `content:${c.id}`, source: 'deadline', refType: 'content', refId: c.id, date, title: c.title, sub: 'prazo', front: { label: 'CONTEÚDO', group: 'trabalho' }, status: 'pending', check: 'none', important: true })
+    push(marked(db, { key: `content:${c.id}`, source: 'deadline', refType: 'content', refId: c.id, date, title: c.title, sub: 'prazo', front: { label: 'CONTEÚDO', group: 'trabalho' }, important: true }))
   }
   for (const p of db.partnerships) {
     if (p.deadline !== date || p.stage === 'finalizado') continue
-    push({ key: `partnership:${p.id}`, source: 'deadline', refType: 'partnership', refId: p.id, date, title: `${p.brand}: entrega`, sub: 'prazo', front: { label: 'CONTEÚDO', group: 'trabalho' }, status: 'pending', check: 'none', important: true })
+    push(marked(db, { key: `partnership:${p.id}`, source: 'deadline', refType: 'partnership', refId: p.id, date, title: `${p.brand}: entrega`, sub: 'prazo', front: { label: 'CONTEÚDO', group: 'trabalho' }, important: true }))
   }
   for (const m of db.milestones) {
-    if (m.date !== date || m.done || m.status === 'feito') continue
+    if (m.date !== date) continue
     const p = db.projects.find((x) => x.id === m.projectId)
-    push({ key: `milestone:${m.id}`, source: 'deadline', refType: 'milestone', refId: m.id, date, title: m.title, sub: 'marco', front: projectFront(p) ?? { label: 'TRABALHO', group: 'trabalho' }, status: 'pending', check: 'none', important: true })
+    const done = m.done || m.status === 'feito'
+    push({ key: `milestone:${m.id}`, source: 'deadline', refType: 'milestone', refId: m.id, date, title: m.title, sub: 'marco', front: projectFront(p) ?? { label: 'TRABALHO', group: 'trabalho' }, status: done ? 'done' : 'pending', check: 'toggle', important: true })
   }
   for (const p of db.projects) {
     if (p.status === 'concluido' || p.nextDelivery?.date !== date) continue
-    push({ key: `delivery:${p.id}`, source: 'deadline', refType: 'project', refId: p.id, date, title: p.nextDelivery.title, sub: 'entrega', front: projectFront(p)!, status: 'pending', check: 'none', important: true })
+    push(marked(db, { key: `delivery:${p.id}`, source: 'deadline', refType: 'project', refId: p.id, date, title: p.nextDelivery.title, sub: 'entrega', front: projectFront(p)!, important: true }))
+  }
+
+  // Recurring payments with a due day she gave (unpaid ones from earlier this month show today).
+  const moneyHidden = !!opts.hidden?.dinheiro
+  for (const { category: c, dueDate } of billsDueOn(db, date, today)) {
+    const period = billPeriod(c, date)
+    const paid = db.occurrences.find((o) => o.parentType === 'bill' && o.parentId === c.id && o.date === period && o.status === 'done')
+    if (paid && date === today && dueDate < today) continue
+    push({ key: `bill:${c.id}`, source: 'bill', refType: 'financialCategory', refId: c.id, date, title: moneyHidden ? 'Pagamento' : `Pagar ${c.name}`, sub: dueDate < date ? 'venceu antes' : 'vence hoje', emoji: c.emoji, front: { label: 'DINHEIRO', group: 'vida' }, status: paid ? 'done' : 'pending', doneAt: paid ? isoToHM(paid.completedAt) : undefined, check: 'bill', important: true })
   }
 
   markPriorities(items, prioritiesFor(db, date))

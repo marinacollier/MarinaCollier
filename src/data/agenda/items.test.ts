@@ -79,9 +79,9 @@ describe('Home projection (ActionItem)', () => {
     expect(todaySections(dayItems(getDB(), MON, MON), 600).done.length).toBeGreaterThanOrEqual(5)
   })
 
-  it('events are not checkable', () => {
+  it('everything that can be ticked has a check — events too ("fui / feito"); only work hours do not', () => {
     for (const d of [MON, addDays(MON, 1), addDays(MON, 2), addDays(MON, 3), addDays(MON, 4)])
-      for (const i of dayItems(getDB(), d, MON).filter((x) => x.refType === 'event')) expect(i.check).toBe('none')
+      for (const i of dayItems(getDB(), d, MON)) expect(i.check, i.title).not.toBe('none')
   })
 
   it('próximos: the next days with counts and highlights; undated to-dos are still findable', () => {

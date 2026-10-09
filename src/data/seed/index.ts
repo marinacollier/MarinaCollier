@@ -21,6 +21,7 @@ import { seedProfile } from './profile'
 import { seedNutrition } from '@/features/nutrition/seed'
 import { seedMemory } from './memory'
 import { seedCareer } from '@/features/career/seed'
+import { seedBacklog } from './backlog'
 
 const FEATURE_SEEDS: FeatureSeed[] = [
   seedProfile,
@@ -39,6 +40,7 @@ const FEATURE_SEEDS: FeatureSeed[] = [
   seedIntegrations,
   seedNutrition,
   seedMemory,
+  seedBacklog,
 ]
 
 export function buildSeed(today: DateKey): DB {
@@ -49,6 +51,13 @@ export function buildSeed(today: DateKey): DB {
     const { profile, ...part } = seed(ctx)
     if (profile) db.profile = { ...db.profile, ...profile }
     for (const [key, items] of Object.entries(part) as [CollectionKey, unknown[]][]) {
+      if (key === 'financialCategories') {
+        // Same id as a default category ("Assinaturas") → one category, the seed's fields win.
+        const byId = new Map(db.financialCategories.map((c) => [c.id, c]))
+        for (const c of items as DB['financialCategories']) byId.set(c.id, { ...byId.get(c.id), ...c, order: byId.get(c.id)?.order ?? c.order })
+        db.financialCategories = [...byId.values()]
+        continue
+      }
       ;(db[key] as unknown[]) = [...(db[key] as unknown[]), ...items]
     }
   }
@@ -57,4 +66,4 @@ export function buildSeed(today: DateKey): DB {
 }
 
 /** Bump when the life seed gains records that existing installs should receive (see migrate.ts). */
-export const LIFE_SEED_VERSION = 8
+export const LIFE_SEED_VERSION = 9

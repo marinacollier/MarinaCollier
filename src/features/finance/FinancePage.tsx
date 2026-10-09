@@ -14,6 +14,7 @@ import { DuplicatesSection } from './DuplicatesSection'
 import { CategoriesEditor } from './CategoriesEditor'
 import { ConnectionsSection } from './ConnectionsSection'
 import { IncomeSection } from './IncomeSection'
+import { BillsSection } from './BillsSection'
 import { LockGate } from '@/components/layout/LockGate'
 
 function Stat({ label, cents, big }: { label: string; cents: number; big?: boolean }) {
@@ -83,6 +84,10 @@ function FinancePage() {
 
       <Reveal delay={0.02}>
         <IncomeSection today={today} />
+      </Reveal>
+
+      <Reveal delay={0.03}>
+        <BillsSection today={today} />
       </Reveal>
 
       <Reveal delay={0.04}>

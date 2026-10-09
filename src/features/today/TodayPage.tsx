@@ -57,7 +57,7 @@ export default function TodayPage() {
   const attention = useMemo(() => needsAttention(db, now), [db, now])
   const insights = useMemo(() => proactiveInsights(db, now, 3), [db, now])
   const lock = useLockState()
-  const hidden = useMemo(() => ({ carreira: areaLocked(db.profile.privacyLock, 'carreira', lock) }), [db.profile.privacyLock, lock])
+  const hidden = useMemo(() => ({ carreira: areaLocked(db.profile.privacyLock, 'carreira', lock), dinheiro: areaLocked(db.profile.privacyLock, 'dinheiro', lock) }), [db.profile.privacyLock, lock])
   const items = useMemo(() => dayItems(db, today, today, { hidden }), [db, today, hidden])
   const sections = useMemo(() => todaySections(items, minutes), [items, minutes])
   const next = useMemo(() => upcomingDays(db, today, 6, { hidden }), [db, today, hidden])

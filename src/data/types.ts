@@ -145,7 +145,14 @@ export type Recurrence =
   /** Every N days counted from `anchor` (or from the last completion when `fromLastDone`). */
   | { kind: 'every_n_days'; days: number; anchor: DateKey; fromLastDone?: boolean }
 
-export type OccurrenceParent = 'task' | 'routineItem' | 'petTask'
+/**
+ * task / routineItem / petTask: recurring things done on a date.
+ * event: "fui / feito" on a calendar event that day.
+ * item: a Home line that has no done-state of its own — a follow-up ("Cobrar Fran"), a career next action,
+ *   a deadline — keyed by the Home item key ('waiting:<taskId>', 'opportunity:<id>', 'content:<id>'…).
+ * bill: a recurring payment (FinancialCategory with `bill`) paid in that period; date = period start.
+ */
+export type OccurrenceParent = 'task' | 'routineItem' | 'petTask' | 'event' | 'item' | 'bill'
 
 /** A single dated completion (or skip) of something recurring. Also used as TaskOccurrence / RoutineOccurrence. */
 export interface Occurrence extends Entity {
@@ -376,6 +383,10 @@ export interface UserProfile {
   work: WorkSchedule
   /** Version of the life seed applied to this database (see data/seed/migrate.ts). */
   seedVersion?: number
+  /** Seed record ids this install already received (a seed record she deleted never comes back). */
+  seedIds?: string[]
+  /** Seed record ids she deleted herself. */
+  removedSeedIds?: string[]
   /** Lumos may apply small meal adjustments without asking (off by default; always undoable). */
   lumosAutoApplySmall?: boolean
   /** Last time Marina talked to Lumos / opened Home — ChangeFeed baseline ("o que mudou?"). */
@@ -1063,6 +1074,11 @@ export interface FinancialCategory extends Entity {
   order: number
   archived: boolean
   external?: ExternalRef
+  /**
+   * A recurring payment she controls with a check ("Aluguel", "Cartão C6", "Hortifruti e carnes — semanal").
+   * No amount is ever assumed; `dueDay` only when she tells it (then it shows on Hoje that day).
+   */
+  bill?: { every: 'mes' | 'semana'; dueDay?: number }
 }
 
 // ─── Goals ──────────────────────────────────────────────────────────────────

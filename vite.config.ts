@@ -21,7 +21,8 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       disable: preview,
-      registerType: 'autoUpdate',
+      // 'prompt': the new version waits until main.tsx has saved everything on the device, then reloads.
+      registerType: 'prompt',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'MARINA OS',

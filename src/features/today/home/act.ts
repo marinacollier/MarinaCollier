@@ -6,8 +6,11 @@
 import { openSheet, toast } from '@/app/ui-store'
 import { ROUTES } from '@/app/routes'
 import type { ActionItem } from '@/data/agenda/items'
+import { contextWorkouts } from '@/data/fuel'
 import { actions, getDB, persist } from '@/data/store'
-import type { DateKey } from '@/data/types'
+import type { DateKey, OccurrenceParent } from '@/data/types'
+import { billPeriod } from '@/data/finance/bills'
+import { workoutFromChoice } from '@/features/body/planner'
 import { haptic } from '@/lib/haptics'
 import { nowISO } from '@/lib/id'
 import { toggleEaten } from '@/features/nutrition/feedback'
@@ -42,6 +45,7 @@ export function checkItem(item: ActionItem): boolean | undefined {
       break
     }
     case 'workout': {
+      if (item.refType === 'weekTemplate') return checkTemplateWorkout(item)
       const w = db.workouts.find((x) => x.id === item.refId)
       if (!w) return undefined
       const before = { status: w.status, durationMin: w.durationMin }
@@ -62,6 +66,15 @@ export function checkItem(item: ActionItem): boolean | undefined {
       })
       return done
     }
+    case 'mark':
+      done = tick('item', item.key, item.date)
+      break
+    case 'bill': {
+      const c = db.financialCategories.find((x) => x.id === item.refId)
+      if (!c) return undefined
+      done = tick('bill', c.id, billPeriod(c, item.date))
+      break
+    }
     case 'meal': {
       toggleEaten(item.date, item.refId, item.title)
       save()
@@ -80,6 +93,13 @@ export function checkItem(item: ActionItem): boolean | undefined {
           done = t.status !== 'done'
           actions.update('tasks', t.id, done ? { status: 'done', completedAt: nowISO() } : { status: 'todo', completedAt: undefined })
         }
+        break
+      }
+      if (item.refType === 'milestone') {
+        const m = db.milestones.find((x) => x.id === item.refId)
+        if (!m) return undefined
+        done = !(m.done || m.status === 'feito')
+        actions.update('milestones', m.id, done ? { done: true, status: 'feito' } : { done: false, status: m.status === 'feito' ? 'em_andamento' : m.status })
         break
       }
       if (item.refType === 'tripItem') {
@@ -107,6 +127,40 @@ export function checkItem(item: ActionItem): boolean | undefined {
   return done
 }
 
+/** A dated tick (Occurrence) with the real moment it was checked. */
+function tick(parentType: OccurrenceParent, parentId: string, date: DateKey): boolean {
+  const done = actions.toggleOccurrence(parentType, parentId, date)
+  if (done) {
+    const occ = getDB().occurrences.find((o) => o.parentType === parentType && o.parentId === parentId && o.date === date)
+    if (occ) actions.update('occurrences', occ.id, { completedAt: nowISO() })
+  }
+  return done
+}
+
+/**
+ * A training that is still only the weekly base (not a record yet): ticking it creates the day's sessions
+ * from the base — this one as done, the others of that day as planned (so they don't vanish) — with Desfazer.
+ */
+function checkTemplateWorkout(item: ActionItem): boolean | undefined {
+  const db = getDB()
+  const lines = contextWorkouts(db, item.date).filter((w) => w.id.startsWith('template:'))
+  if (!lines.length) return undefined
+  const created: string[] = []
+  for (const w of lines) {
+    const t = db.weekTemplate.find((x) => x.id === w.templateId)
+    if (!t) continue
+    const data = workoutFromChoice(getDB(), t, item.date, t.modalities[0])
+    const mine = t.id === item.refId
+    created.push(actions.create('workouts', mine ? { ...data, status: 'feito', durationMin: data.plannedDurationMin } : data).id)
+  }
+  haptic('success')
+  save()
+  undoable(`${item.title} feito ✓`, () => {
+    for (const id of created) actions.remove('workouts', id)
+  })
+  return true
+}
+
 /** Tap on the row itself: open its own record. */
 export function openItem(item: ActionItem, today: DateKey, navigate: (to: string) => void): void {
   haptic('light')
@@ -131,5 +185,7 @@ export function openItem(item: ActionItem, today: DateKey, navigate: (to: string
     }
     case 'project':
       return navigate(ROUTES.project(item.refId))
+    case 'financialCategory':
+      return navigate(ROUTES.money)
   }
 }

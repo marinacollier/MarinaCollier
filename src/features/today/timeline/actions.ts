@@ -20,7 +20,7 @@ export function undoToast(message: string, undo: Undo) {
 }
 
 /** Stamp the real completion time on an Occurrence created by toggleOccurrence. */
-function stampOccurrence(parentType: 'task' | 'petTask', id: string, date: DateKey) {
+function stampOccurrence(parentType: 'task' | 'petTask' | 'event', id: string, date: DateKey) {
   const occ = occurrenceFor(getDB().occurrences, parentType, id, date)
   if (occ) actions.update('occurrences', occ.id, { completedAt: nowISO() })
 }
@@ -51,6 +51,9 @@ export function toggleEntry(e: TimelineEntry): boolean | undefined {
   } else if (e.ref.type === 'petTask') {
     done = actions.toggleOccurrence('petTask', e.ref.id, e.date)
     if (done) stampOccurrence('petTask', e.ref.id, e.date)
+  } else if (e.ref.type === 'event' && !e.ref.id.startsWith('work:')) {
+    done = actions.toggleOccurrence('event', e.ref.id, e.date)
+    if (done) stampOccurrence('event', e.ref.id, e.date)
   } else if (e.ref.type === 'mealPrep') {
     // Prep keys carry their own date ('mealprep:<date>:<slug>'); the tick lives in that week's plan.
     const week = startOfWeek(e.ref.id.split(':')[1] ?? e.date)

@@ -61,8 +61,12 @@ function move(input: HandlerInput): LumosReply | undefined {
   const date = dayIn(m[2], now.date)
   if (!date || /\d/.test(m[2].replace(/\bdia\s+\d+/, ''))) return undefined // "pras sete" is a time: the planner's
   if (lex(db, m[1], now.date).mods.length) return undefined
-  const hits = findTasks(openTasks(db), m[1])
-  if (!hits.length) return undefined
+  const found = findTasks(openTasks(db), m[1])
+  if (!found.length) return undefined
+  // Similar names ("Atualizar LinkedIn" / "Página no LinkedIn do Fashion Finder"): the one in her day wins;
+  // still more than one → she picks.
+  const onDay = found.filter((t) => t.date && t.date <= now.date)
+  const hits = found.length > 1 && onDay.length === 1 ? onDay : found
   if (hits.length > 1)
     return { area: AREA, text: 'Qual delas?', options: hits.slice(0, 5).map((t) => ({ label: t.title, act: { done: `“${t.title}” vai pra ${dayLabel(date, now.date)} ✓`, run: () => moveTo(t, date, now) } })) }
   const t = hits[0]

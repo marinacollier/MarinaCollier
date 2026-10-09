@@ -9,6 +9,7 @@
  *   Code that must CONFIRM a write to Marina (Lumos) awaits `persist()` first: it saves, reads the
  *   record back and only then reports ok. A failed save is surfaced (`saveFailed`), never swallowed.
  */
+import { isSeedRecordId } from './seed/ids'
 import { create } from 'zustand'
 import { emptyDB, migrate } from './defaults'
 import { buildSeed } from './seed'
@@ -58,6 +59,14 @@ function stamp<T extends object>(data: T, id?: string) {
   return { ...data, id: id ?? uid(), createdAt: now, updatedAt: now }
 }
 
+/** Deleting a record that came from the life seed is remembered, so a new deploy never brings it back. */
+function tombstone(profile: DB['profile'], id: ID, removed: boolean): DB['profile'] {
+  if (!isSeedRecordId(id)) return profile
+  const list = profile.removedSeedIds ?? []
+  if (removed === list.includes(id)) return profile
+  return { ...profile, removedSeedIds: removed ? [...list, id] : list.filter((x) => x !== id) }
+}
+
 export const actions = {
   create<K extends CollectionKey>(key: K, data: NewItem<K>): ItemOf<K> {
     const item = stamp(data, data.id) as unknown as ItemOf<K>
@@ -84,7 +93,7 @@ export const actions = {
   remove<K extends CollectionKey>(key: K, id: ID): ItemOf<K> | undefined {
     const found = (getDB()[key] as ItemOf<K>[]).find((it) => it.id === id)
     if (!found) return undefined
-    commit((db) => ({ ...db, [key]: (db[key] as ItemOf<K>[]).filter((it) => it.id !== id) }))
+    commit((db) => ({ ...db, [key]: (db[key] as ItemOf<K>[]).filter((it) => it.id !== id), profile: tombstone(db.profile, id, true) }))
     return found
   },
 
@@ -93,7 +102,7 @@ export const actions = {
     commit((db) => {
       const list = db[key] as ItemOf<K>[]
       if (list.some((it) => it.id === item.id)) return db
-      return { ...db, [key]: [...list, item] }
+      return { ...db, [key]: [...list, item], profile: tombstone(db.profile, item.id, false) }
     })
   },
 
