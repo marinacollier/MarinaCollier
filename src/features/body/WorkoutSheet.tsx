@@ -54,6 +54,7 @@ export default function WorkoutSheet({ id, date, defaults }: SheetProps<'workout
       },
   )
   const set = (p: Partial<Workout>) => setDraft((d) => ({ ...d, ...p }))
+  const pass = db.constraints.find((c) => c.active && c.kind === 'max_checkins_per_day')
   const modalities = useMemo(() => orderedModalities(db.profile.modalities, { keep: draft.modality }), [db.profile.modalities, draft.modality])
   const current = modalities.find((m) => m.id === draft.modality)
   const [showAll, setShowAll] = useState(false)
@@ -215,6 +216,20 @@ export default function WorkoutSheet({ id, date, defaults }: SheetProps<'workout
         <Button variant="soft" block icon={<Utensils size={16} />} onClick={() => replaceSheet('fuel', { workoutId: existing.id })}>
           Ver estratégia{existing.isKeySession ? ' · 🔥 key session' : ''}
         </Button>
+      )}
+
+      {!isRest && pass && (
+        <Field label="Check-in" hint={`Sem marcar, segue a regra de ${pass.name}.`}>
+          <ChipSelect
+            value={draft.usesCheckin === undefined ? undefined : draft.usesCheckin ? 'sim' : 'nao'}
+            clearable
+            onChange={(v) => set({ usesCheckin: v === undefined ? undefined : v === 'sim' })}
+            options={[
+              { value: 'sim', label: `usa ${pass.name.split(' — ')[0]}` },
+              { value: 'nao', label: 'sem pass (app, casa, outro lugar)' },
+            ]}
+          />
+        </Field>
       )}
 
       {!isRest && (

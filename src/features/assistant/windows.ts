@@ -4,7 +4,7 @@
  * plus the reasons some days were left out. Pure.
  */
 import type { DateKey, DB, SchedulingConstraint, WorkoutGoal } from '@/data/types'
-import { suggestWindows, type WindowSuggestion } from '@/data/planning'
+import { suggestWindows, usesCheckin, type WindowSuggestion } from '@/data/planning'
 import { addDays, hmToMinutes, minutesToHM, startOfWeek, weekday, weekDays } from '@/lib/date'
 
 export interface FitResult {
@@ -60,7 +60,7 @@ export function fitWindows(db: DB, today: DateKey, nowMinutes: number, modality:
         c.kind === 'max_checkins_per_day' &&
         c.modalities?.includes(modality) &&
         !dayWorkouts.some((w) => w.modality === modality) &&
-        dayWorkouts.filter((w) => c.modalities?.includes(w.modality)).length >= c.limit,
+        dayWorkouts.filter((w) => usesCheckin(c, w)).length >= c.limit,
     )
     if (c) blocked.push({ date, constraint: c })
   }

@@ -626,6 +626,11 @@ export interface Workout extends Entity {
   strategyReviewedAtMin?: number
   /** Quick check-in after a key session. */
   postCheckin?: PostWorkoutCheckin
+  /**
+   * Whether THIS session uses a pass check-in (TotalPass…). undefined = follow the constraint's modality
+   * list; false = not via the pass (e.g. yoga by the app); true = counts even if the modality isn't listed.
+   */
+  usesCheckin?: boolean
 }
 
 export type SessionType = 'endurance' | 'forca' | 'qualidade' | 'tecnica' | 'longo' | 'recuperacao' | 'mobilidade' | 'fun' | 'outro'

@@ -8,6 +8,7 @@ import { applyOps, cancelOn, clearOverride, planSetDefault, setAnytimeOn, setTim
 import { overrideFor, slotForTime, type ScheduleRef } from '@/data/timeline'
 import type { DateKey, TimeHM, TimelineEntry } from '@/data/types'
 import { emptyPlanData } from '@/data/mealprep'
+import { workoutForPhase } from '@/data/fuel'
 import { startOfWeek } from '@/lib/date'
 import { haptic } from '@/lib/haptics'
 import { nowISO } from '@/lib/id'
@@ -78,7 +79,7 @@ export function openEntryFlow(e: TimelineEntry, today: DateKey) {
     case 'planMeal': {
       const eaten = e.ref.id.startsWith('meal:') ? db.meals.find((m) => m.id === e.ref.id.slice(5)) : db.meals.find((m) => m.date === e.date && m.planMealRef === e.ref.id)
       if (eaten) return openSheet('meal', { id: eaten.id })
-      const w = db.workouts.find((x) => x.date === e.date && x.status !== 'pulado' && x.status !== 'descanso')
+      const w = e.phase && e.phase !== 'refeicao' ? workoutForPhase(db, e.date, e.phase, e.start) : undefined
       // A planned meal opens its detail (plan, trocas, comi, Lumos); fuel around a training opens the fuel sheet.
       if (!e.ref.id.startsWith('meal:') && e.ref.id.includes('#')) return openSheet('mealDetail', { date: e.date, ref: e.ref.id })
       if (e.phase && e.phase !== 'refeicao' && w) return openSheet('fuel', { workoutId: w.id })

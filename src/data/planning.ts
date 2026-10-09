@@ -274,6 +274,11 @@ export interface ConflictOptions {
   workouts?: Workout[]
 }
 
+/** Does this session spend a check-in of constraint `c`? The session's own answer wins over the modality list. */
+export function usesCheckin(c: Pick<SchedulingConstraint, 'modalities'>, w: Pick<Workout, 'modality' | 'usesCheckin'>): boolean {
+  return w.usesCheckin ?? !!c.modalities?.includes(w.modality)
+}
+
 /** All conflicts on one day. Pure; never mutates. */
 export function conflictsOn(db: DB, date: DateKey, opts: ConflictOptions = {}): Conflict[] {
   const workouts = opts.workouts ?? db.workouts
@@ -282,7 +287,7 @@ export function conflictsOn(db: DB, date: DateKey, opts: ConflictOptions = {}): 
 
   // 1. Check-in limits (TotalPass-style)
   for (const c of db.constraints.filter((c) => c.active && c.kind === 'max_checkins_per_day')) {
-    const using = dayWorkouts.filter((w) => c.modalities?.includes(w.modality))
+    const using = dayWorkouts.filter((w) => usesCheckin(c, w))
     if (using.length > c.limit) {
       out.push({
         key: conflictKey('checkin_limit', date, using.map((w) => w.id)),
@@ -456,7 +461,7 @@ export function suggestWindows(db: DB, opts: SuggestOptions): WindowSuggestion[]
     if (m?.heavyLogistics && dur >= 90 && isPresencial(db, date)) continue
     const dayWorkouts = activeWorkouts(db, date)
     if (dayWorkouts.some((w) => w.modality === opts.modality)) continue
-    if (limiting.some((c) => dayWorkouts.filter((w) => c.modalities?.includes(w.modality)).length >= c.limit)) continue
+    if (limiting.some((c) => dayWorkouts.filter((w) => usesCheckin(c, w)).length >= c.limit)) continue
 
     const busy = busyOn(db, date, db.workouts).map((b) => b.range)
     for (const b of workBlocks(db, date)) busy.push({ start: hmToMinutes(b.start), end: hmToMinutes(b.end), approx: false })
@@ -501,15 +506,27 @@ export interface TemplateProposal {
 
 /**
  * Expands the weekly template for the week of `anyDayOfWeek`.
- * Skips template lines already materialized that week (same templateId + date).
+ * Skips template lines already materialized that week — on ANY day: a session she moved (seg → ter) or
+ * skipped still came from that line, so the base never brings it back to the original day.
  */
 export function proposeWeekFromTemplate(db: DB, anyDayOfWeek: DateKey): TemplateProposal[] {
   const days = weekDays(anyDayOfWeek)
   const out: TemplateProposal[] = []
   const items = db.weekTemplate.filter((t) => t.active).sort((a, b) => a.weekday - b.weekday || a.order - b.order)
+  const inWeek = new Set(db.workouts.filter((w) => w.templateId && days.includes(w.date)).map((w) => w.templateId))
+  // Sessions of the week that came from no base line (added by hand or by Lumos): each one already covers one
+  // fixed line of its modality ("já fiz yoga" on Thursday means Tuesday's yoga isn't missing).
+  const loose = db.workouts.filter((w) => !w.templateId && days.includes(w.date) && w.status !== 'pulado' && w.status !== 'descanso')
   for (const t of items) {
     const date = days.find((d) => weekday(d) === t.weekday)!
-    if (db.workouts.some((w) => w.templateId === t.id && w.date === date)) continue
+    if (inWeek.has(t.id)) continue
+    if (t.choice === 'fixed' && t.modalities[0]) {
+      const i = loose.findIndex((w) => w.modality === t.modalities[0])
+      if (i >= 0) {
+        loose.splice(i, 1)
+        continue
+      }
+    }
     const base = { date, templateId: t.id, choice: t.choice, planType: t.planType, note: t.notes }
     if (t.choice === 'fixed' && t.modalities[0]) {
       out.push({

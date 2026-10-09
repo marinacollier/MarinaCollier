@@ -10,6 +10,7 @@ import type {
   DateKey,
   DB,
   FuelPhase,
+  TimeHM,
   NutritionDayPlan,
   NutritionDayType,
   NutritionStrategy,
@@ -18,7 +19,7 @@ import type {
   ScheduleRefType,
   Workout,
 } from './types'
-import { addDays, weekday, weekDays } from '@/lib/date'
+import { addDays, hmToMinutes, weekday, weekDays } from '@/lib/date'
 import { modalityGroup } from './planning'
 
 const ACTIVE = (w: Workout) => w.status !== 'pulado' && w.status !== 'descanso'
@@ -104,6 +105,23 @@ export interface DayTrainingContext {
   /** A next-day training that needs preparation the day before (makes today a PREP day). */
   prepFor?: Workout
   dayType: NutritionDayType
+}
+
+/**
+ * The session a fuel moment of the day belongs to — by time, never by position in the list:
+ * pré → the next session after it, pós → the last one that ended before it, intra → the one it falls in.
+ * Without a time, the day's key session (else the longest).
+ */
+export function workoutForPhase(db: DB, date: DateKey, phase: FuelPhase, time?: TimeHM): Workout | undefined {
+  const list = workoutsOnDay(db, date)
+  if (!list.length) return undefined
+  const fallback = list.find((w) => w.isKeySession) ?? [...list].sort((a, b) => (b.plannedDurationMin ?? 0) - (a.plannedDurationMin ?? 0))[0]
+  if (!time) return fallback
+  const t = hmToMinutes(time)
+  const timed = list.filter((w) => w.time).map((w) => ({ w, s: hmToMinutes(w.time!), e: hmToMinutes(w.time!) + (w.durationMin ?? w.plannedDurationMin ?? 60) }))
+  if (phase === 'pre' || phase === 'ontem') return timed.filter((x) => x.s >= t).sort((a, b) => a.s - b.s)[0]?.w ?? fallback
+  if (phase === 'pos') return timed.filter((x) => x.e <= t + 30).sort((a, b) => b.e - a.e)[0]?.w ?? fallback
+  return timed.find((x) => x.s <= t && t <= x.e)?.w ?? fallback
 }
 
 export function dayTrainingContext(db: DB, date: DateKey): DayTrainingContext {
