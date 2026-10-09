@@ -9,7 +9,7 @@ import { weekProgress } from '@/data/career/activities'
 import { FINANCE_SEED_IDS } from '@/features/finance/seed'
 import { lockSession, unlockSession } from '@/app/lock-store'
 import type { LumosReply } from './act/types'
-import { ask, clearConversation, runOption, undoReply, useConversation, type Exchange } from './conversation'
+import { ask, clearConversation, confirmReply, runOption, undoReply, useConversation, type Exchange } from './conversation'
 
 const FRI = '2026-10-09'
 const at = (date: string, hm: string): Now => {
@@ -157,5 +157,43 @@ describe('Lumos · Executive Career Review', () => {
     expect(saved).toHaveLength(1)
     expect(saved[0].month).toBe('2026-10')
     expect(JSON.stringify(saved[0])).not.toMatch(/%|prontid/)
+  })
+})
+
+describe('receiving a different amount, said the way she says it', () => {
+  it.each([
+    ['recebi o Santander hoje, 18 mil', 1_800_000],
+    ['recebi 18.000 do Santander', 1_800_000],
+    ['recebi 18000 do Santander', 1_800_000],
+    ['recebi 18 mil e 500 do Santander', 1_850_000],
+    ['recebi 18.500 do Santander', 1_850_000],
+    ['recebi R$ 18.500 do Santander', 1_850_000],
+    ['recebi dezoito mil do Santander', 1_800_000],
+  ])('"%s" → asks to confirm, then keeps expected 20.000 and actual on the SAME record', (text, cents) => {
+    const e = talk(text)
+    const r = reply(e)
+    expect(e.lumos?.status).toBe('pending')
+    expect(r.text).toMatch(/marco R\$\s?[\d.]+,00 recebido/)
+    expect(getDB().expenses.find((x) => x.id === SAN_OCT)?.status).toBe('expected')
+    confirmReply(e.id)
+    const rec = getDB().expenses.filter((x) => x.contractId === FINANCE_SEED_IDS.contractSantander && x.period === '2026-10')
+    expect(rec).toHaveLength(1)
+    expect(rec[0]).toMatchObject({ id: SAN_OCT, status: 'received', expectedAmountCents: 2_000_000, receivedAmountCents: cents, amountCents: cents })
+    expect(getDB().contracts.find((c) => c.id === FINANCE_SEED_IDS.contractSantander)?.amountCents).toBe(2_000_000)
+  })
+
+  it('"recebi 18 do Santander" is ambiguous → asks, writes nothing', () => {
+    const r = reply(talk('recebi 18 do Santander'))
+    expect(r.text).toMatch(/Quanto caiu/)
+    expect(r.options?.map((o) => o.label.replace(/\s/g, ' '))).toEqual(['R$ 18,00', 'R$ 18.000,00', 'Outro valor'])
+    expect(getDB().expenses.find((x) => x.id === SAN_OCT)?.status).toBe('expected')
+    runOption(r.options![1])
+    expect(getDB().expenses.find((x) => x.id === SAN_OCT)).toMatchObject({ status: 'received', receivedAmountCents: 1_800_000, expectedAmountCents: 2_000_000 })
+  })
+
+  it('same amount as expected → direct, no extra question', () => {
+    const e = talk('recebi 20 mil do Santander')
+    expect(e.lumos?.status).toBe('done')
+    expect(getDB().expenses.find((x) => x.id === SAN_OCT)?.status).toBe('received')
   })
 })

@@ -33,7 +33,7 @@ import { REVIEW_QUESTIONS, reviewDraft, saveCareerReview, savedReview } from '@/
 import { isCareerQuota } from '@/data/selectors'
 import type { CareerKind, DB, LockArea, Opportunity } from '@/data/types'
 import { addDays, monthKey } from '@/lib/date'
-import { formatBRL } from '@/lib/money'
+import { formatBRL, parseSpokenBRL } from '@/lib/money'
 import { policyFor } from '../policy'
 import { cap, dayIn, ddmm, numberOf } from '../text'
 import type { Handler, HandlerInput, LumosReply } from '../types'
@@ -108,15 +108,42 @@ function money(input: HandlerInput): LumosReply | undefined {
 
   if (mine.status === 'received') return { area: MONEY, text: `${contract.client} já está como recebido em ${ddmm(mine.receivedAt!.slice(0, 10))} ✓ Não dupliquei nada.` }
   const day = dayIn(n, now.date) ?? now.date
-  const amount = /\b(\d[\d.]*(?:,\d{2})?)\s*(?:mil|k)?\b/.exec(n.replace(/r\$\s*/, ''))
-  const thousands = amount && /\b(mil|k)\b/.test(n) ? Number(amount[1].replace(/\./g, '').replace(',', '.')) * 1000 : undefined
-  const cents = thousands ? Math.round(thousands * 100) : undefined
-  const value = cents ?? mine.expectedAmountCents ?? mine.amountCents
+  const expected = mine.expectedAmountCents ?? mine.amountCents
+  const at = day === now.date ? undefined : isoAt(day)
+  const receive = (value: number): LumosReply['action'] => ({
+    mode: value === expected ? policyFor('finance_record') : 'confirm',
+    label: `Confirmar ${formatBRL(value)}`,
+    done: `${contract.client} recebido ✓ ${formatBRL(value)} em ${ddmm(day)}${value !== expected ? ` — o previsto (${formatBRL(expected)}) ficou guardado.` : '.'}`,
+    run: () => markReceived(mine.id, { at, amountCents: value, by: 'lumos' }),
+  })
+  // The amount she said, read safely ("18 mil e 500", "R$ 18.500", "dezoito mil"); ask when it has two readings.
+  const spoken = parseSpokenBRL(input.text)
+  if (spoken.kind === 'ambiguous')
+    return {
+      area: MONEY,
+      text: `Quanto caiu do ${contract.client}? Entendi mais de um valor.`,
+      sub: `Previsto: ${formatBRL(expected)} (bruto).`,
+      options: [
+        ...spoken.options.map((c) => ({ label: formatBRL(c), act: { done: receive(c)!.done!, run: receive(c)!.run } })),
+        { label: 'Outro valor', prefill: `recebi o ${contract.client} ${day === now.date ? 'hoje' : `dia ${Number(day.slice(8, 10))}`}, R$ ` },
+      ],
+      ref: { type: 'expense', id: mine.id },
+    }
+  const value = spoken.kind === 'ok' ? spoken.cents : expected
+  if (value === expected)
+    return {
+      area: MONEY,
+      text: `${contract.client} recebido ✓ ${formatBRL(value)} em ${ddmm(day)}.`,
+      sub: 'Valor bruto. Atualizei o mês em Dinheiro.',
+      action: receive(value),
+      ref: { type: 'expense', id: mine.id },
+    }
+  // A different amount is relevant money: she confirms it before it is written.
   return {
     area: MONEY,
-    text: `${contract.client} recebido ✓ ${formatBRL(value)} em ${ddmm(day)}${value !== (mine.expectedAmountCents ?? mine.amountCents) ? ` (previsto era ${formatBRL(mine.expectedAmountCents ?? mine.amountCents)})` : ''}.`,
-    sub: 'Valor bruto. Atualizei o mês em Dinheiro.',
-    action: { mode: policyFor('finance_record'), run: () => markReceived(mine.id, { at: day === now.date ? undefined : isoAt(day), amountCents: value, by: 'lumos' }) },
+    text: `${contract.client}: marco ${formatBRL(value)} recebido em ${ddmm(day)}?`,
+    sub: `O previsto era ${formatBRL(expected)} — ele fica guardado e o contrato não muda. Dá pra pôr uma observação no recebimento depois.`,
+    action: receive(value),
     ref: { type: 'expense', id: mine.id },
   }
 }

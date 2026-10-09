@@ -155,13 +155,13 @@ function materialize(id: ID): Expense | undefined {
 const money = (cents: number) => (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 
 /** expected → received on the SAME record. `amountCents` defaults to the expected amount. */
-export function markReceived(id: ID, opts: { at?: string; amountCents?: number; by?: 'marina' | 'lumos' } = {}): Undo {
+export function markReceived(id: ID, opts: { at?: string; amountCents?: number; notes?: string; by?: 'marina' | 'lumos' } = {}): Undo {
   const before = getDB().expenses.find((e) => e.id === id)
   const rec = materialize(id)
   if (!rec) return () => {}
   const amount = opts.amountCents ?? rec.expectedAmountCents ?? rec.amountCents
   const at = opts.at ?? nowISO()
-  actions.update('expenses', rec.id, { status: 'received', receivedAt: at, receivedAmountCents: amount, amountCents: amount, date: at.slice(0, 10) })
+  actions.update('expenses', rec.id, { status: 'received', receivedAt: at, receivedAmountCents: amount, amountCents: amount, date: at.slice(0, 10), ...(opts.notes !== undefined ? { notes: opts.notes } : {}) })
   const log = logLife({ kind: 'done', date: at.slice(0, 10), title: `Recebeu ${rec.title} (${money(amount)})`, area: 'financas', ref: { type: 'expense', id: rec.id }, by: opts.by ?? 'marina', provenance: 'user' })
   return () => {
     log.undo()

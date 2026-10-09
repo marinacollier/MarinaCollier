@@ -84,7 +84,7 @@ function ReceivableSheet({ id, extra, date }: SheetProps<'receivable'>) {
       primary={
         isReceived
           ? { label: 'Salvar', onClick: () => done('Ajustado ✓', updateReceivable(rec.id, { receivedAmountCents: amount, receivedAt: when ? `${when}T12:00:00.000-03:00` : rec.receivedAt, notes: notes || undefined })) }
-          : { label: `Recebi ${amount ? formatBRL(amount) : ''}`.trim(), disabled: !amount, onClick: () => done(`${rec.title} recebido ✓`, markReceived(rec.id, { amountCents: amount, at: when && when !== today ? `${when}T12:00:00.000-03:00` : undefined })) }
+          : { label: `Recebi ${amount ? formatBRL(amount) : ''}`.trim(), disabled: !amount, onClick: () => done(`${rec.title} recebido ✓`, markReceived(rec.id, { amountCents: amount, at: when && when !== today ? `${when}T12:00:00.000-03:00` : undefined, notes: notes || undefined })) }
       }
     >
       <p className="text-[13px] text-muted -mt-1">Faturamento bruto, antes de impostos. Nada é marcado como recebido sozinho.</p>
