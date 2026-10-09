@@ -1,15 +1,13 @@
 /**
- * INÍCIO — "O que importa agora?"
- *
- * Five blocks, nothing else permanent:
+ * INÍCIO — the command center of the day and the week, calm by progressive disclosure:
  *   1. greeting + date + ONE smart line (or nothing)
- *   2. LUMOS — the main element (composer, voice, attachments, ≤3 suggestions; answers inline when available)
- *   3. AGORA / PRÓXIMO
- *   4. HOJE IMPORTA (max 3)
- *   5. RESTANTE DO DIA (a few relevant rows → the full Linha do dia on tap)
+ *   2. LUMOS — the way in (text, voice, prints, files; answers inline)
+ *   3. HOJE IMPORTA (Top 3 — what matters most; never a replacement for the full list)
+ *   4. HOJE — every real thing of the day, from every front, checkable in place
+ *   5. PRÓXIMOS — tomorrow open, the next days one line each, "sem dia" folded
  * Discreet lines appear only when they carry something real: needs-attention (one row), 0–3 insights,
- * what changed since the last visit, a close trip. Modules (livros, finanças, Luna…) live in Espaços
- * or come up through Lumos.
+ * what changed since the last visit, a close trip. Rows are a projection (data/agenda/items.ts) over
+ * the real records — nothing is copied into a Task.
  */
 import { Suspense, useCallback, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -19,17 +17,18 @@ import { ROUTES } from '@/app/routes'
 import { Page } from '@/components/ui'
 import { changeFeed, dailyBrief, homeSuggestions, lifeContext, needsAttention, proactiveInsights, type Now } from '@/data/intel'
 import { getDB, useDB } from '@/data/store'
-import { dayTimeline } from '@/data/timeline'
+import { dayItems, todaySections, undatedItems, upcomingDays } from '@/data/agenda/items'
+import { areaLocked, useLockState } from '@/app/lock-store'
 import { useNow } from '@/hooks/useToday'
 import { formatLongDate, greeting } from '@/lib/date'
 import { homeContext, tripPriorityItems } from './context'
 import { prioritiesOf } from './priorities'
-import { AttentionRow, ChangesLine, ImportaBlock, InsightLines, NowBlock, RestBlock, TripLine } from './home/blocks'
-import { composerPlaceholder, homeDay } from './home/day'
+import { AttentionRow, ChangesLine, ImportaBlock, InsightLines, TripLine } from './home/blocks'
+import { HojeBlock, ProximosBlock } from './home/agenda'
+import { composerPlaceholder } from './home/day'
 import { LumosBox } from './home/LumosBox'
 import { LumosInline, lumosHref } from './home/lumos'
 import { useMarkSeenOnLeave } from './home/seen'
-import { LinhaDoDiaWidget } from './timeline/LinhaDoDia'
 
 /** A trip shows on Home only when it's really close. */
 const TRIP_LINE_DAYS = 30
@@ -57,8 +56,12 @@ export default function TodayPage() {
   const suggestions = useMemo(() => homeSuggestions(db, now).slice(0, 3), [db, now])
   const attention = useMemo(() => needsAttention(db, now), [db, now])
   const insights = useMemo(() => proactiveInsights(db, now, 3), [db, now])
-  const entries = useMemo(() => dayTimeline(db, today, { nowMinutes: minutes }), [db, today, minutes])
-  const day = useMemo(() => homeDay(db, today, minutes, entries), [db, today, minutes, entries])
+  const lock = useLockState()
+  const hidden = useMemo(() => ({ carreira: areaLocked(db.profile.privacyLock, 'carreira', lock) }), [db.profile.privacyLock, lock])
+  const items = useMemo(() => dayItems(db, today, today, { hidden }), [db, today, hidden])
+  const sections = useMemo(() => todaySections(items, minutes), [items, minutes])
+  const next = useMemo(() => upcomingDays(db, today, 6, { hidden }), [db, today, hidden])
+  const undated = useMemo(() => undatedItems(db, today), [db, today])
   const priorities = useMemo(() => prioritiesOf(db, today), [db, today])
 
   const trip = useMemo(() => {
@@ -76,8 +79,7 @@ export default function TodayPage() {
     },
     [navigate],
   )
-  const [fullDay, setFullDay] = useState(false)
-  const placeholder = composerPlaceholder(home.part, { workNow: day.now.row?.kind === 'work' })
+  const placeholder = composerPlaceholder(home.part, { workNow: home.part === 'dia' })
   const hasLines = attention.length > 0 || insights.length > 0 || changes.items.length > 0 || !!trip
 
   return (
@@ -131,20 +133,15 @@ export default function TodayPage() {
       )}
 
       <motion.div {...rise(3)} className="mt-9">
-        <NowBlock day={day} today={today} onExpand={() => setFullDay(true)} />
-      </motion.div>
-
-      <motion.div {...rise(4)} className="mt-9">
         <ImportaBlock list={priorities} today={today} onAsk={ask} />
       </motion.div>
 
-      <motion.div {...rise(5)} className="mt-8">
-        <RestBlock day={day} today={today} expanded={fullDay} onExpand={() => setFullDay((f) => !f)} />
-        {fullDay && (
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mt-2">
-            <LinhaDoDiaWidget ctx={{ db, today, minutes, part: home.part, home }} />
-          </motion.div>
-        )}
+      <motion.div {...rise(4)} className="mt-8">
+        <HojeBlock sections={sections} today={today} />
+      </motion.div>
+
+      <motion.div {...rise(5)} className="mt-9">
+        <ProximosBlock days={next} undated={undated} today={today} />
       </motion.div>
 
       <p className="text-center font-display italic text-[14px] text-muted mt-14">em constante movimento: corpo, mente e vida.</p>

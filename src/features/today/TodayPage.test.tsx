@@ -38,13 +38,13 @@ beforeEach(async () => {
 afterEach(cleanup)
 
 describe('Início (Lumos-first Home)', () => {
-  it('renders the five blocks and nothing of the old dashboard', () => {
+  it('renders greeting · Lumos · Top 3 · Hoje · Próximos — and nothing of the old dashboard', () => {
     renderHome()
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Bom dia, Marina.')
     expect(screen.getByLabelText('Fala com a Lumos')).toBeTruthy()
-    expect(screen.getByLabelText('Agora')).toBeTruthy()
     expect(screen.getByLabelText('Hoje importa')).toBeTruthy()
-    expect(screen.getByLabelText('Restante do dia')).toBeTruthy()
+    expect(screen.getByLabelText('Hoje')).toBeTruthy()
+    expect(screen.getByLabelText('Próximos')).toBeTruthy()
     const text = document.body.textContent ?? ''
     for (const gone of ['Brain dump', 'Top 3 de hoje', 'Lendo agora', 'Gastos', 'Linha do dia']) expect(text).not.toContain(gone)
   })
