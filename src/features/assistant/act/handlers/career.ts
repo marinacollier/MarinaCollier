@@ -17,6 +17,7 @@ import { CAREER_META, logCareerActivity, quotaFor, weekProgress } from '@/data/c
 import {
   OPP_STATUS_LABEL,
   addContact,
+  canonicalCompany,
   addOpportunity,
   casesWithoutMetrics,
   logInteraction,
@@ -56,7 +57,7 @@ const isoAt = (date: string) => `${date}T12:00:00.000-03:00`
 
 const RECEIVED = /\b(recebi|caiu|entrou|pagou|pagaram|foi recebido|foi pago)\b/
 const NOT_YET = /\b(ainda nao|nao)\s+(pagou|pagaram|caiu|entrou|recebi)\b/
-const FORECAST = /\b(quanto|o que)\b.*\b(previsto|receber|recebo|entra|vou receber)\b|\bprevisao de recebimento/
+const FORECAST = /\b(quanto|o que)\b.*\b(previsto|receber|recebo|entra|vou receber|ganho|faturo)\b|\bprevisao de recebimento|\b(qual|como esta|como ta)\b.*\b(minha renda|meu faturamento|minha receita)\b/
 
 function money(input: HandlerInput): LumosReply | undefined {
   const { db, n, now } = input
@@ -237,7 +238,7 @@ function opportunities(input: HandlerInput): LumosReply | undefined {
     const company = add[4]?.replace(/\b(ao|no) (meu )?pipeline\b/, '').trim()
     const role = cap(text.slice(normalizeIndex(text, roleRaw), normalizeIndex(text, roleRaw) + roleRaw.length) || roleRaw)
     if (!company) return { area: CAREER, text: `Anoto “${role}” — de qual empresa?`, options: [{ label: 'Dizer a empresa', prefill: `adiciona uma vaga de ${role} na ` }] }
-    const companyNice = cap(text.slice(normalizeIndex(text, company), normalizeIndex(text, company) + company.length) || company)
+    const companyNice = canonicalCompany(db, company) ?? cap(text.slice(normalizeIndex(text, company), normalizeIndex(text, company) + company.length) || company)
     return {
       area: CAREER,
       text: `${role} · ${companyNice} entrou no pipeline ✓ Status: no radar.`,
@@ -257,6 +258,20 @@ function opportunities(input: HandlerInput): LumosReply | undefined {
       text: `${one.role} · ${one.company} saiu do pipeline ✓ Fica no histórico como descartada.`,
       action: { mode: policyFor('career_update'), run: () => setOpportunityStatus(one.id, 'descartada', now.date, { note: input.text, by: 'lumos' }) },
       ref: { type: 'opportunity', id: one.id },
+    }
+  }
+  // Who/what is in process: "quem estou entrevistando?", "quais minhas entrevistas?"
+  if (/\bquem (?:eu )?(?:estou|to|tou|ando) entrevistando\b|\b(?:quais|minhas) (?:sao )?(?:as )?(?:minhas )?entrevistas\b|\bem quais processos\b|\bcomo (?:esta|ta) (?:meu|o) pipeline\b|\bquais vagas\b/.test(n)) {
+    const l = locked(db, 'carreira')
+    if (l) return l
+    const open = openOpportunities(db)
+    const inProcess = open.filter((o) => o.status !== 'radar')
+    if (!open.length) return { area: CAREER, text: 'Nenhuma vaga aberta no seu pipeline agora.', link: { label: 'Carreira 2027', to: ROUTES.career } }
+    return {
+      area: CAREER,
+      text: inProcess.length ? `${inProcess.length} em processo${open.length > inProcess.length ? ` · ${open.length - inProcess.length} no radar` : ''}.` : `Nada em processo — ${open.length} no radar.`,
+      lines: open.map((o) => ({ text: `${o.role} · ${o.company}`, sub: [OPP_STATUS_LABEL[o.status], o.nextAction && `${o.nextAction}${o.nextActionDate ? ` ${ddmm(o.nextActionDate)}` : ''}`].filter(Boolean).join(' · ') })),
+      link: { label: 'Carreira 2027', to: ROUTES.career },
     }
   }
   // Interview: "tenho entrevista na próxima terça. me ajuda a preparar"
@@ -312,7 +327,7 @@ function people(input: HandlerInput): LumosReply | undefined {
     const f = nextFollowUp(db, now.date)
     return f ? { area: CAREER, text: `Próximo follow-up: ${f.who} — ${f.date < now.date ? `estava pra ${ddmm(f.date)}` : f.date === now.date ? 'hoje' : ddmm(f.date)}.` } : { area: CAREER, text: 'Nenhum follow-up marcado. Quando falar com alguém, me conta que eu guardo.' }
   }
-  const talked = /\b(falei|conversei|tomei um cafe|almocei|encontrei)\b com (?:a |o )?([a-z]+(?: [a-z]+)?)(?: (?:da|do|de) (?:empresa )?(.+?))?(?: (hoje|ontem|amanha))?$/.exec(n)
+  const talked = /\b(falei|conversei|tomei um cafe|almocei|encontrei)\b com (?:a |o )?([a-z]+(?: [a-z]+)?)(?: (?:da|do|de) (.+?))?(?: (hoje|ontem|amanha))?$/.exec(n)
   if (!talked) return undefined
   const l = locked(db, 'carreira')
   if (l) return l
@@ -321,7 +336,7 @@ function people(input: HandlerInput): LumosReply | undefined {
   const date = /\bontem\b/.test(n) ? addDays(now.date, -1) : now.date
   const found = matchContacts(db, name, company)
   const niceName = cap(text.slice(normalizeIndex(text, name), normalizeIndex(text, name) + name.length) || name)
-  const niceCompany = company ? cap(text.slice(normalizeIndex(text, company), normalizeIndex(text, company) + company.length) || company) : undefined
+  const niceCompany = company ? (canonicalCompany(db, company) ?? cap(text.slice(normalizeIndex(text, company), normalizeIndex(text, company) + company.length) || company)) : undefined
   if (found.length === 1) {
     const c = found[0]
     return { area: CAREER, text: `Anotado: conversa com ${c.name}${c.company ? ` (${c.company})` : ''} em ${ddmm(date)} ✓`, action: { mode: policyFor('career_update'), run: () => logInteraction(c.id, date, undefined, 'lumos') }, ref: { type: 'contact', id: c.id } }

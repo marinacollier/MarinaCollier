@@ -113,6 +113,7 @@ export const FinanceAgent: Agent = {
   id: 'finance',
   name: 'Dinheiro',
   emoji: '💸',
+  lockArea: 'dinheiro',
   match(q) {
     if (has(q, 'gast*', 'despesa*', 'paguei', 'gastei')) return 0.9
     if (has(q, 'dinheiro', 'orcamento', 'financas', 'compras planejadas', 'lista de compras')) return 0.8

@@ -25,6 +25,9 @@ import { attentionFor, briefFor, changesSince, contextOf, MODE_TEXT, startOfDayI
 import { all, createUndoable, eventDraft, runLogged, updateUndoable } from '../log'
 import { policyFor } from '../policy'
 import { dayIn, matchTitle } from '../text'
+import { lex } from '../../adjust/lexicon'
+import { getDB } from '@/data/store'
+import { uid } from '@/lib/id'
 import type { Handler, HandlerInput, LumosReply, ReplyLine, ReplySection, Undo } from '../types'
 
 const RELEVANT = new Set<TimelineEntry['kind']>(['workout', 'event', 'work', 'task'])
@@ -269,7 +272,7 @@ function attention(input: HandlerInput): LumosReply | undefined {
 
 // ─── ChangeFeed ─────────────────────────────────────────────────────────────
 
-const CHANGES = /\bo que mudou\b|\bquais (?:foram )?(?:as )?mudancas\b|\bo que (?:aconteceu|rolou) desde\b/
+const CHANGES = /\bo que mudou\b|\bquais (?:foram )?(?:as )?mudancas\b|\bo que (?:aconteceu|rolou) desde\b|\bo que (?:aconteceu|rolou|eu fiz|fiz)\b.*\b(?:essa|nessa|esta|nesta|na) semana\b|\bcomo foi (?:a |minha )?semana\b/
 const BY: Record<string, string> = { marina: 'você', lumos: 'Lumos', integration: 'integração', system: 'automático' }
 
 function changes(input: HandlerInput): LumosReply | undefined {
@@ -330,6 +333,11 @@ function week(input: HandlerInput): LumosReply | undefined {
 
 // ─── "terminei o treino" / "terminei <tarefa>" ──────────────────────────────
 
+function markWorkoutDone(id: string, title: string, now: Now): Undo {
+  const w = getDB().workouts.find((x) => x.id === id)!
+  return runLogged(() => updateUndoable('workouts', id, { status: 'feito', durationMin: w.durationMin ?? w.plannedDurationMin }), [eventDraft(now, { kind: 'done', title: `Treinou: ${title}`, area: 'esportes', ref: { type: 'workout', id } })])
+}
+
 const DONE = /^(?:ja\s+)?(?:terminei|fiz|conclui|finalizei|acabei|mandei|enviei|resolvi|entreguei|treinei|registra)\b\s*(?:de\s+)?(?:o |a |os |as |meu |minha )?(.*)$/
 
 function done(input: HandlerInput): LumosReply | undefined {
@@ -337,23 +345,58 @@ function done(input: HandlerInput): LumosReply | undefined {
   const m = DONE.exec(n)
   if (!m) return undefined
   const rest = m[1].trim()
-  const isTraining = /^treinei/.test(n) || /^(?:meu\s+)?treino\b/.test(rest) || db.profile.modalities.some((mo) => rest.startsWith(mo.label.toLowerCase()) || rest.startsWith(mo.id))
+  // The modality must be what she did ("fiz yoga", "terminei a natação"), not a word inside a task title.
+  const head = rest.split(' ').slice(0, 3)
+  const mods = /^(?:mandei|enviei|resolvi|entreguei)\b/.test(n) ? [] : lex(db, input.text, now.date).mods.filter((x) => head.includes(x.word))
+  const isTraining = /^treinei/.test(n) || /^(?:meu\s+)?treino\b/.test(rest) || mods.length > 0
   if (isTraining) {
-    const entries = dayTimeline(db, now.date).filter((e) => e.kind === 'workout' && e.status === 'pending' && e.ref.type === 'workout')
-    const byMod = entries.find((e) => rest && e.title.toLowerCase().includes(rest.replace(/^treino\s*(de\s*)?/, '').trim()) && rest.replace(/^treino\s*/, '').trim())
-    const e = byMod ?? entries.find((x) => (startMin(x) ?? 0) <= now.minutes) ?? entries[0]
-    if (!e) return undefined
-    const w = db.workouts.find((x) => x.id === e.ref.id)!
+    // Identity by MODALITY, never by position or a loose title match: "fiz yoga" never touches the corrida.
+    const date = dayIn(n, now.date) ?? now.date
+    const pending = dayTimeline(db, date)
+      .filter((e) => e.kind === 'workout' && e.status === 'pending' && e.ref.type === 'workout')
+      .map((e) => ({ e, w: db.workouts.find((x) => x.id === e.ref.id)! }))
+      .filter((x) => x.w)
+    const named = mods[0]
+    const candidates = named ? pending.filter((x) => named.ids.includes(x.w.modality)) : pending
+    const started = candidates.filter((x) => (startMin(x.e) ?? 0) <= now.minutes || date < now.date)
+    const pick = candidates.length === 1 ? candidates[0] : started.length === 1 ? started[0] : undefined
+    if (!pick && candidates.length > 1)
+      return {
+        area: 'treino',
+        text: `Qual ${named ? 'deles' : 'treino'} você fez?`,
+        options: candidates.map((x) => ({
+          label: `${x.e.title}${x.e.start ? ` · ${x.e.start}` : ''}`,
+          act: { done: `${x.e.title} registrado ✓`, run: () => markWorkoutDone(x.w.id, x.e.title, now) },
+        })),
+      }
+    if (!pick) {
+      if (!named) return undefined
+      // Not on the plan for that day: register what she did — never mark a different session.
+      const mod = db.profile.modalities.find((x) => x.id === named.id)!
+      const id = uid()
+      const time = date === now.date ? minutesToHM(Math.floor(now.minutes / 5) * 5) : undefined
+      return {
+        area: 'treino',
+        text: `${mod.emoji} ${mod.label} registrada ✓ ${date === now.date ? 'hoje' : ofDay(date, now.date)} — não estava no plano, então anotei como treino extra.`,
+        sub: 'Nenhum outro treino foi mexido.',
+        ref: { type: 'workout', id },
+        action: {
+          mode: policyFor('complete_task'),
+          run: () =>
+            runLogged(() => createUndoable('workouts', { id, date, time, modality: mod.id, status: 'feito', order: db.workouts.filter((w) => w.date === date).length }).undo, [
+              eventDraft(now, { kind: 'done', title: `Treinou: ${mod.label}`, area: 'esportes', ref: { type: 'workout', id } }),
+            ]),
+        },
+      }
+    }
+    const w = pick.w
     return {
       area: 'treino',
-      text: `${e.title} registrado ✓ Bom demais.`,
+      text: `${pick.e.title} registrado ✓ Bom demais.`,
       sub: w.isKeySession ? 'Foi sessão-chave — quer ver como fica sua alimentação no resto do dia?' : undefined,
       ref: { type: 'workout', id: w.id },
       options: [{ label: 'Como fica minha alimentação?', ask: 'Como estão meus macros hoje?' }],
-      action: {
-        mode: policyFor('complete_task'),
-        run: () => runLogged(() => updateUndoable('workouts', w.id, { status: 'feito', durationMin: w.durationMin ?? w.plannedDurationMin }), [eventDraft(now, { kind: 'done', title: `Treinou: ${e.title}`, area: 'esportes', ref: { type: 'workout', id: w.id } })]),
-      },
+      action: { mode: policyFor('complete_task'), run: () => markWorkoutDone(w.id, pick.e.title, now) },
     }
   }
   if (!rest || rest.split(' ').length > 8) return undefined

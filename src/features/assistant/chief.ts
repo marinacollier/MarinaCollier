@@ -5,6 +5,7 @@
  */
 import type { DateKey, DB } from '@/data/types'
 import { search, topResults, type SearchResult } from '@/features/search/engine'
+import { areaLocked } from '@/app/lock-store'
 import { AGENTS } from './agents'
 import { parseQuestion } from './parse'
 import type { Agent, AnswerBlock, AnswerItem, LumosAnswer } from './types'
@@ -85,7 +86,10 @@ export function askLumos(db: DB, question: string, today: DateKey, minutes: numb
   let headline = ''
   const blocks: AnswerBlock[] = []
   for (const agent of chosen) {
-    const out = agent.answer({ db, today, minutes, q })
+    const out: AnswerBlock[] =
+      agent.lockArea && areaLocked(db.profile.privacyLock, agent.lockArea)
+        ? [{ kind: 'headline', text: `${agent.name} está protegido — desbloqueia e me pergunta de novo.` }]
+        : agent.answer({ db, today, minutes, q })
     for (const b of out) {
       if (b.kind === 'headline') {
         if (!headline) headline = b.text

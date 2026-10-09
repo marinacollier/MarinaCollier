@@ -46,7 +46,9 @@ function eventKind(plan: ChangePlan): LifeEvent['kind'] {
 
 /** One LifeEvent for the whole plan + "observed" (never confirmed) training-time patterns. */
 function logPlan(plan: ChangePlan, now: Now): Undo {
-  const title = (plan.doneTitle?.split('✓')[0].trim() || plan.summary).replace(/\s+/g, ' ').slice(0, 140)
+  // What changed, not the "Feito ✓" that opens some confirmations.
+  const done = plan.doneTitle?.replace(/^\s*(?:feito|pronto)\s*✓\s*/i, '').split('✓')[0].trim()
+  const title = (done || plan.summary).replace(/\s+/g, ' ').replace(/[.\s]+$/, '').slice(0, 140)
   const date = plan.dayDate ?? plan.changes[0]?.after.date ?? now.date
   const undos: Undo[] = [logEvents([eventDraft(now, { kind: eventKind(plan), date, title, area: plan.changes.length ? 'esportes' : 'rotina' })])]
   for (const c of plan.changes) {

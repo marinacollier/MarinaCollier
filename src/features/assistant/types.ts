@@ -55,6 +55,8 @@ export interface Agent {
   /** 0..1 — how well this agent can answer. */
   match(q: ParsedQuestion): number
   answer(ctx: AgentContext): AnswerBlock[]
+  /** Area protected by the privacy lock: while locked, this agent answers nothing but that. */
+  lockArea?: import('@/data/types').LockArea
 }
 
 export interface LumosAnswer {

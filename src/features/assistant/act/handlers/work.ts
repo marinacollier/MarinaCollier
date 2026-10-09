@@ -7,16 +7,18 @@
  *   "nota no FashionFinder: …"          → logged in the project's changelog
  */
 import { ROUTES } from '@/app/routes'
-import { activeProjects, isTaskOpen, waitingFor } from '@/data/selectors'
+import { activeProjects, isTaskOpen, prioritiesFor, waitingFor } from '@/data/selectors'
+import { nextOrder } from '@/data/store'
 import type { DB, Project, Task } from '@/data/types'
-import { diffDays, formatDayMonth } from '@/lib/date'
+import { diffDays, formatDayMonth, relativeDay } from '@/lib/date'
+import { uid } from '@/lib/id'
 import { nowISO } from '@/lib/id'
 import { normalize } from '@/lib/text'
 import { plural, sinceLabel } from '../../agents/common'
-import { eventDraft, runLogged, updateUndoable } from '../log'
+import { all, createUndoable, eventDraft, removeUndoable, runLogged, updateUndoable } from '../log'
 import { policyFor } from '../policy'
-import { cap, matchTitle, norm, stripLead } from '../text'
-import type { Handler, HandlerInput, LumosReply, ReplyLine } from '../types'
+import { cap, dayIn, matchTitle, norm, stripLead } from '../text'
+import type { Handler, HandlerInput, LumosReply, ReplyLine, Undo } from '../types'
 
 const AREA = 'trabalho'
 
@@ -177,9 +179,134 @@ function nextStep(input: HandlerInput): LumosReply | undefined {
   }
 }
 
+// ─── "Fran ficou de me responder sexta" → Esperando, with the follow-up day ─
+
+const PROMISED = /^(?:a |o )?(.+?)\s+ficou de\s+(?:me\s+)?(.+)$/
+const NOT_A_PERSON = /^(?:eu|voce|ele|ela|eles|elas|a gente|isso|isto)$/
+const DAY_TAIL = /\s+(?:ate\s+|na\s+|no\s+|pra\s+)?(?:hoje|amanha|depois de amanha|segunda|terca|quarta|quinta|sexta|sabado|domingo)(?:-feira)?(?:\s+que vem)?$/
+
+function promised(input: HandlerInput): LumosReply | undefined {
+  const { db, n, now, text } = input
+  const m = PROMISED.exec(n)
+  if (!m) return undefined
+  const who = m[1].trim()
+  if (!who || who.split(' ').length > 3 || NOT_A_PERSON.test(who)) return undefined
+  const day = dayIn(m[2], now.date)
+  const what = m[2].replace(DAY_TAIL, '').trim()
+  if (!what) return undefined
+  // Her spelling of the name, from the original sentence.
+  const original = text.trim().replace(/^(?:a|o)\s+/i, '').split(/\s+/).slice(0, who.split(' ').length).join(' ')
+  const known = people(db).find((p) => normalize(p.name) === who || firstWord(p.name) === firstWord(who))
+  const name = known?.name ?? cap(original)
+  const title = /^(?:responder|retornar|dar (?:um )?retorno|confirmar)\b/.test(what) ? `Retorno de ${name}` : `${name}: ${what}`
+  const when = day ? `${relativeDay(day, now.date)} (${formatDayMonth(day)})` : undefined
+  const existing = db.tasks.filter((t) => t.status === 'waiting' && t.waiting?.who && (normalize(t.waiting.who) === who || firstWord(t.waiting.who) === firstWord(who)))
+  if (existing.length > 1)
+    return {
+      area: AREA,
+      text: `Você já espera ${plural(existing.length, 'coisa', 'coisas')} de ${name}. É sobre qual?`,
+      options: existing.map((t) => ({
+        label: t.title,
+        act: { done: `“${t.title}”: retorno ${when ?? 'anotado'} ✓`, run: () => runLogged(() => updateUndoable('tasks', t.id, { waiting: { ...t.waiting!, followUpOn: day } }), [eventDraft(now, { kind: 'changed', title: `Esperando ${name}: ${t.title}${when ? ` · retorno ${when}` : ''}`, area: 'trabalho', ref: { type: 'task', id: t.id } })]) },
+      })),
+    }
+  if (existing.length === 1) {
+    const t = existing[0]
+    return {
+      area: AREA,
+      text: `Já estava esperando ${name} em “${t.title}” — ${when ? `anotei o retorno pra ${when}` : 'mantive'} ✓ Não criei outro.`,
+      ref: { type: 'task', id: t.id },
+      action: { mode: policyFor('capture'), run: () => runLogged(() => updateUndoable('tasks', t.id, { waiting: { ...t.waiting!, followUpOn: day } }), [eventDraft(now, { kind: 'changed', title: `Esperando ${name}: ${t.title}${when ? ` · retorno ${when}` : ''}`, area: 'trabalho', ref: { type: 'task', id: t.id } })]) },
+    }
+  }
+  const projectId = known?.projectIds.length === 1 ? known.projectIds[0] : undefined
+  const id = uid()
+  return {
+    area: AREA,
+    text: `Anotei em Esperando: ${title}${when ? ` — retorno ${when}` : ''} ✓`,
+    sub: when ? `Se não vier até ${relativeDay(day!, now.date)}, eu te lembro.` : 'Sem dia combinado — quando quiser um, é só dizer.',
+    ref: { type: 'task', id },
+    action: {
+      mode: policyFor('capture'),
+      run: () =>
+        runLogged(() => createUndoable('tasks', { id, title, status: 'waiting', waiting: { who: name, since: now.date, followUpOn: day }, context: 'trabalho', projectId, order: nextOrder(db.tasks) } as Omit<Task, 'createdAt' | 'updatedAt'>).undo, [
+          eventDraft(now, { kind: 'created', title: `Esperando ${name}: ${title}`, area: 'trabalho', ref: { type: 'task', id } }),
+        ]),
+    },
+  }
+}
+
+// ─── "FashionFinder é prioridade hoje" → Hoje importa (max 3) ───────────────
+
+const PRIORITY = /^(?:o |a )?(.+?)\s+(?:e|eh|virou|vai ser|sera|fica)\s+(?:a\s+)?(?:minha\s+)?(?:prioridade|top ?1|foco)(?:\s+(?:numero 1|n[ºo°]? ?1|maxima|principal))?(?:\s+(?:de|pra|para))?(?:\s+(hoje|amanha))?$/
+
+function priority(input: HandlerInput): LumosReply | undefined {
+  const { db, n, now } = input
+  const m = PRIORITY.exec(n)
+  if (!m) return undefined
+  const date = m[2] === 'amanha' ? dayIn('amanha', now.date)! : now.date
+  const project = projectNamed(db, m[1])
+  const task = project ? undefined : matchTitle(db.tasks.filter((t) => isTaskOpen(t)), m[1])
+  if (!project && !task) return undefined
+  const title = project ? project.name : task!.title
+  const ref = project ? { type: 'project' as const, id: project.id } : { type: 'task' as const, id: task!.id }
+  const current = prioritiesFor(db, date)
+  const day = relativeDay(date, now.date)
+  const same = current.find((p) => (p.ref?.type === ref.type && p.ref.id === ref.id) || normalize(p.title) === normalize(title))
+  const toTop = (extra: () => Undo) =>
+    runLogged(
+      () =>
+        all([extra(), ...current.filter((p) => p.id !== same?.id).map((p, i) => updateUndoable('priorities', p.id, { order: i + 1 }))]),
+      [eventDraft(now, { kind: 'changed', title: `Prioridade ${day}: ${title}`, area: 'trabalho', ref })],
+    )
+  if (same) {
+    if (current[0]?.id === same.id) return { area: 'hoje importa', text: `${title} já é sua prioridade nº 1 ${day} ✓` }
+    return { area: 'hoje importa', text: `${title} subiu pro topo ${day} ✓`, action: { mode: policyFor('complete_task'), run: () => toTop(() => updateUndoable('priorities', same.id, { order: 0 })) } }
+  }
+  const create = () => createUndoable('priorities', { date, title, order: 0, done: false, ref }).undo
+  if (current.length >= 3)
+    return {
+      area: 'hoje importa',
+      text: `${cap(day)} já tem 3 prioridades. Qual sai pra entrar ${title}?`,
+      options: current.map((p) => ({
+        label: p.title,
+        act: {
+          done: `${title} entrou no lugar de “${p.title}” ✓`,
+          run: () => runLogged(() => all([removeUndoable('priorities', p.id), create(), ...current.filter((x) => x.id !== p.id).map((x, i) => updateUndoable('priorities', x.id, { order: i + 1 }))]), [eventDraft(now, { kind: 'changed', title: `Prioridade ${day}: ${title}`, area: 'trabalho', ref })]),
+        },
+      })),
+    }
+  return {
+    area: 'hoje importa',
+    text: `${title} é a prioridade nº 1 ${day} ✓`,
+    sub: current.length ? `Depois: ${current.map((p) => p.title).join(' · ')}.` : undefined,
+    ref,
+    action: { mode: policyFor('complete_task'), run: () => toTop(create) },
+  }
+}
+
+// ─── "essa tarefa já fiz" (the task we were just talking about) ─────────────
+
+const THAT_DONE = /^(?:(?:essa|esta|isso|ela)(?:\s+tarefa)?\s+(?:eu\s+)?(?:ja\s+)?(?:fiz|terminei|conclui|acabei|resolvi|(?:ta|esta|foi)\s+feit[ao])|(?:ja\s+)?(?:fiz|terminei|conclui|acabei|resolvi)\s+(?:essa|esta|isso)(?:\s+tarefa)?)(?:\s+ja)?$/
+
+function thatDone(input: HandlerInput): LumosReply | undefined {
+  const { db, n, now, ctx } = input
+  if (!THAT_DONE.test(n)) return undefined
+  const t = ctx.lastRef?.type === 'task' ? db.tasks.find((x) => x.id === ctx.lastRef!.id && isTaskOpen(x)) : undefined
+  const mark = (task: Task) => () => runLogged(() => updateUndoable('tasks', task.id, { status: 'done', completedAt: nowISO() } as Partial<Task>), [eventDraft(now, { kind: 'done', title: `Feito: ${task.title}`, area: task.context === 'trabalho' ? 'trabalho' : 'rotina', ref: { type: 'task', id: task.id } })])
+  if (t) return { area: 'feito', text: `“${t.title}” feito ✓`, ref: { type: 'task', id: t.id }, action: { mode: policyFor('complete_task'), run: mark(t) } }
+  // No task in the conversation: never guess — ask, with today's open ones.
+  const today = db.tasks.filter((x) => isTaskOpen(x) && x.status !== 'waiting' && (x.date === now.date || x.dueDate === now.date)).slice(0, 4)
+  return {
+    area: 'feito',
+    text: 'Qual tarefa você fez?',
+    options: [...today.map((x) => ({ label: x.title, act: { done: `“${x.title}” feito ✓`, run: mark(x) } })), { label: 'Outra', prefill: 'terminei ' }],
+  }
+}
+
 export const workHandler: Handler = {
   id: 'work',
   run(input) {
-    return nextStep(input) ?? update(input) ?? replied(input)
+    return nextStep(input) ?? update(input) ?? replied(input) ?? promised(input) ?? priority(input) ?? thatDone(input)
   },
 }

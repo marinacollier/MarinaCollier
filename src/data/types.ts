@@ -1679,6 +1679,9 @@ export type EntityType =
   | 'petTask'
   | 'weeklyReview'
   | 'monthlyReview'
+  | 'opportunity'
+  | 'contact'
+  | 'contract'
 
 export const ENTITY_COLLECTION: Record<EntityType, CollectionKey> = {
   task: 'tasks',
@@ -1708,6 +1711,9 @@ export const ENTITY_COLLECTION: Record<EntityType, CollectionKey> = {
   petTask: 'petTasks',
   weeklyReview: 'weeklyReviews',
   monthlyReview: 'monthlyReviews',
+  opportunity: 'opportunities',
+  contact: 'contacts',
+  contract: 'contracts',
 }
 
 // ─── Aliases from the product brief (no duplicated structures) ──────────────

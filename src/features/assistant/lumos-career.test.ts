@@ -106,9 +106,11 @@ describe('Lumos · career', () => {
 
   it('"falei com a Ana da empresa X hoje." → updates the right contact; two Anas → asks; unknown → offers to save', () => {
     const r1 = reply(talk('falei com a Ana da empresa X hoje.'))
-    expect(r1.text).toMatch(/^Não tenho Ana \(X\) nos seus contatos/)
+    expect(r1.text).toMatch(/^Não tenho Ana \(Empresa X\) nos seus contatos/)
     runOption(r1.options![0])
-    expect(getDB().contacts.map((c) => [c.name, c.company, c.lastInteraction])).toEqual([['Ana', 'X', FRI]])
+    expect(getDB().contacts.map((c) => [c.name, c.company, c.lastInteraction])).toEqual([['Ana', 'Empresa X', FRI]])
+    // Same company, said either way, is one company: "da X" finds Ana of "Empresa X".
+    expect(reply(talk('falei com a Ana da X hoje.')).text).toMatch(/^Anotado: conversa com Ana \(Empresa X\)/)
     addContact({ name: 'Ana Lima', company: 'Z' })
     expect(reply(talk('falei com a Ana hoje.')).text).toMatch(/mais de uma Ana/)
   })

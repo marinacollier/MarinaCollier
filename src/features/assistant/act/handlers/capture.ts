@@ -19,6 +19,8 @@ import { cap, stripLead } from '../text'
 import type { Handler, HandlerInput, LumosReply } from '../types'
 
 const LEAD = /^(?:(?:eu\s+)?(?:preciso|tenho que|tenho de)\s+(?:lembrar\s+(?:de\s+)?)?|(?:me\s+)?lembra(?:r)?\s+(?:de\s+)?|nao\s+(?:posso\s+)?esquecer\s+(?:de\s+)?|lembrete\s*:?\s*)/
+/** "adiciona comprar ração da Luna" — only when what follows is something to DO (an infinitive), never "adiciona yoga". */
+const ADD = /^(?:adiciona|adicionar|coloca|colocar|bota|botar|inclui|incluir|poe|por)\s+(?:ai\s+|na (?:minha )?lista\s+|nas tarefas\s+)?(?:pra eu\s+|que (?:eu )?preciso\s+)?(?=[a-z]+(?:ar|er|ir)\b)/
 const IDEA = /^(?:(?:tive\s+(?:uma\s+)?)?ideia|idea|pensei\s+(?:em|num|numa))\s*(?:de|pra|para|:)?\s*/
 const NOTE = /^(?:anota(?:\s+ai)?|guarda(?:\s+isso)?|brain ?dump|pensamento)\s*(?:que|:)?\s*/
 const HAS_WHEN = /\b(hoje|amanha|segunda|terca|quarta|quinta|sexta|sabado|domingo)\b|\b\d{1,2}(:\d{2}|h\d{0,2})\b/
@@ -55,10 +57,11 @@ function capture(input: HandlerInput): LumosReply | undefined {
   const { db, n, now, text } = input
   const isIdea = IDEA.test(n)
   const isNote = NOTE.test(n)
-  const isTodo = LEAD.test(n)
+  const isAdd = !isIdea && !isNote && !LEAD.test(n) && ADD.test(n)
+  const isTodo = LEAD.test(n) || isAdd
   if (!isIdea && !isNote && !isTodo) return undefined
   if (isTodo && HAS_WHEN.test(n)) return undefined
-  const lead = isIdea ? IDEA : isNote ? NOTE : LEAD
+  const lead = isIdea ? IDEA : isNote ? NOTE : isAdd ? ADD : LEAD
   const body = stripLead(text, lead).replace(/[.!]+$/, '').trim()
   if (!body) return undefined
   const bn = normalize(body)

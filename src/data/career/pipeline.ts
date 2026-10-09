@@ -61,12 +61,23 @@ const fold = (s: string) =>
     .trim()
 
 /** Contacts whose first name / full name appears in the text (+ company when given). Never guesses between two. */
+/** "empresa X" and "X" are the same company. */
+export function companyKey(company: string): string {
+  return fold(company).replace(/^(?:a |o )?empresa\s+/, '').trim()
+}
+
+/** The spelling already used for this company (opportunities, contacts), so one company never becomes two. */
+export function canonicalCompany(db: DB, said: string): string | undefined {
+  const k = companyKey(said)
+  return [...(db.opportunities ?? []).map((o) => o.company), ...(db.contacts ?? []).map((c) => c.company)].find((c) => !!c && companyKey(c) === k)
+}
+
 export function matchContacts(db: DB, name: string, company?: string): ProfessionalContact[] {
   const n = fold(name)
   return (db.contacts ?? []).filter((c) => {
     const cn = fold(c.name)
     const nameOk = cn === n || cn.split(' ')[0] === n.split(' ')[0]
-    const companyOk = !company || (c.company && fold(c.company).includes(fold(company)))
+    const companyOk = !company || (c.company && companyKey(c.company).includes(companyKey(company)))
     return nameOk && companyOk
   })
 }
@@ -82,7 +93,7 @@ export function matchOpportunities(db: DB, text: string): Opportunity[] {
 export function addOpportunity(input: Omit<Opportunity, 'id' | 'createdAt' | 'updatedAt' | 'history' | 'status'> & { status?: OpportunityStatus }, today: DateKey, by: 'marina' | 'lumos' = 'marina'): { item: Opportunity; undo: Undo } {
   const status = input.status ?? 'radar'
   const item = actions.create('opportunities', { ...input, status, lastActivityAt: today, history: [{ date: today, status }] })
-  const log = logLife({ kind: 'created', date: today, title: `Oportunidade: ${item.role} · ${item.company}`, area: 'trabalho', ref: { type: 'task', id: item.id }, by, provenance: 'user' })
+  const log = logLife({ kind: 'created', date: today, title: `Oportunidade: ${item.role} · ${item.company}`, area: 'trabalho', ref: { type: 'opportunity', id: item.id }, by, provenance: 'user' })
   return {
     item,
     undo: () => {
@@ -97,7 +108,7 @@ export function setOpportunityStatus(id: ID, status: OpportunityStatus, today: D
   if (!o) return () => {}
   const before = { ...o }
   actions.update('opportunities', id, { status, lastActivityAt: today, history: [...(o.history ?? []), { date: today, status, note: opts.note }] })
-  const log = logLife({ kind: status === 'descartada' ? 'cancelled' : 'changed', date: today, title: `${o.role} · ${o.company}: ${OPP_STATUS_LABEL[status]}`, area: 'trabalho', by: opts.by ?? 'marina', provenance: 'user' })
+  const log = logLife({ kind: status === 'descartada' ? 'cancelled' : 'changed', date: today, title: `${o.role} · ${o.company}: ${OPP_STATUS_LABEL[status]}`, area: 'trabalho', ref: { type: 'opportunity', id: o.id }, by: opts.by ?? 'marina', provenance: 'user' })
   return () => {
     log.undo()
     actions.update('opportunities', id, before)
@@ -123,7 +134,7 @@ export function logInteraction(contactId: ID, date: DateKey, note?: string, by: 
     // A follow-up that was due is considered done by talking to her.
     nextFollowUp: c.nextFollowUp && c.nextFollowUp <= date ? undefined : c.nextFollowUp,
   })
-  const log = logLife({ kind: 'logged', date, title: `Conversou com ${c.name}${c.company ? ` (${c.company})` : ''}`, area: 'trabalho', by, provenance: 'user' })
+  const log = logLife({ kind: 'logged', date, title: `Conversou com ${c.name}${c.company ? ` (${c.company})` : ''}`, area: 'trabalho', ref: { type: 'contact', id: c.id }, by, provenance: 'user' })
   return () => {
     log.undo()
     actions.update('contacts', contactId, before)
@@ -132,7 +143,7 @@ export function logInteraction(contactId: ID, date: DateKey, note?: string, by: 
 
 export function addContact(input: Omit<ProfessionalContact, 'id' | 'createdAt' | 'updatedAt'>, by: 'marina' | 'lumos' = 'marina'): { item: ProfessionalContact; undo: Undo } {
   const item = actions.create('contacts', input)
-  const log = logLife({ kind: 'created', date: input.lastInteraction, title: `Contato: ${item.name}${item.company ? ` (${item.company})` : ''}`, area: 'trabalho', by, provenance: 'user' })
+  const log = logLife({ kind: 'created', date: input.lastInteraction, title: `Contato: ${item.name}${item.company ? ` (${item.company})` : ''}`, area: 'trabalho', ref: { type: 'contact', id: item.id }, by, provenance: 'user' })
   return {
     item,
     undo: () => {
@@ -148,7 +159,7 @@ export function promoteToEvidence(winId: ID, patch: Partial<ProfessionalWin> = {
   if (!w) return () => {}
   const before = { ...w }
   actions.update('wins', winId, { evidence: true, confidentiality: w.confidentiality ?? 'interno', verification: w.verification ?? 'rascunho', ...patch })
-  const log = logLife({ kind: 'created', date: w.date, title: `Virou case: ${w.title}`, area: 'trabalho', by, provenance: 'user' })
+  const log = logLife({ kind: 'created', date: w.date, title: `Virou case: ${w.title}`, area: 'trabalho', ref: { type: 'win', id: w.id }, by, provenance: 'user' })
   return () => {
     log.undo()
     actions.update('wins', winId, before)

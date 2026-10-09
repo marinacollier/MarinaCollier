@@ -20,6 +20,7 @@ import {
   type Now,
   type WeekProposal,
 } from '@/data/intel'
+import { areaLocked } from '@/app/lock-store'
 import { conflictsBetween, proposeWeekFromTemplate, workMode } from '@/data/planning'
 import { actions, getDB } from '@/data/store'
 import { dayTimeline, isAnytime } from '@/data/timeline'
@@ -107,16 +108,29 @@ export function fallbackAttention(db: DB, now: Now): AttentionItem[] {
 
 // ─── ChangeFeed ─────────────────────────────────────────────────────────────
 
+/** Money and career records stay hidden in the feed while their area is locked (no title, value or name). */
+export function lockedRedaction(db: DB): (ref: ChangeItem['ref']) => string | undefined {
+  const money = areaLocked(db.profile.privacyLock, 'dinheiro')
+  const career = areaLocked(db.profile.privacyLock, 'carreira')
+  return (ref) => {
+    if (!ref) return undefined
+    if (money && (ref.type === 'expense' || ref.type === 'contract')) return 'Atualização em Dinheiro (protegido)'
+    if (career && (ref.type === 'opportunity' || ref.type === 'contact')) return 'Atualização em Carreira (protegido)'
+    return undefined
+  }
+}
+
 export function changesSince(db: DB, now: Now, since?: ISODateTime): { since?: ISODateTime; items: ChangeItem[]; summary: string } {
-  return intelReady(db, now) ? changeFeed(db, now, since) : fallbackChanges(db, now, since)
+  return intelReady(db, now) ? changeFeed(db, now, since, lockedRedaction(db)) : fallbackChanges(db, now, since)
 }
 
 export function fallbackChanges(db: DB, _now: Now, since?: ISODateTime): { since?: ISODateTime; items: ChangeItem[]; summary: string } {
   const from = since ?? db.profile.lumosLastSeenAt
+  const redact = lockedRedaction(db)
   const items: ChangeItem[] = db.lifeLog
-    .filter((e) => !from || e.at >= from)
+    .filter((e) => !from || Date.parse(e.at) >= Date.parse(from))
     .sort((a, b) => b.at.localeCompare(a.at))
-    .map((e) => ({ at: e.at, title: e.title, by: e.by, provenance: e.provenance, ref: e.ref }))
+    .map((e) => ({ at: e.at, title: redact(e.ref) ?? e.title, by: e.by, provenance: e.provenance, ref: e.ref }))
   if (!items.length) return { since: from, items, summary: 'Nada mudou desde a última vez.' }
   const firsts = items.slice(0, 3).map((i) => i.title.replace(/[.✓\s]+$/g, ''))
   return { since: from, items, summary: `${capitalize(plural(items.length, 'mudança', 'mudanças'))}: ${listJoin(firsts)}${items.length > 3 ? '…' : '.'}` }

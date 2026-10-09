@@ -30,7 +30,9 @@ interface Candidate extends ChangeItem {
 
 function entityChanges(db: DB, since: ISODateTime, now: Now, logged: Set<string>): Candidate[] {
   const out: Candidate[] = []
-  const after = (iso?: string) => !!iso && iso > since
+  const sinceMs = Date.parse(since)
+  // Instants are compared as instants: "…Z" and "…-03:00" strings don't sort the same.
+  const after = (iso?: string) => !!iso && Date.parse(iso) > sinceMs
   const created = (r: { id: string; createdAt: string }) => after(r.createdAt) && !isSeed(r.id)
   const by = (r: object) => ('external' in r && r.external ? ('integration' as const) : ('marina' as const))
   const prov = (r: object) => ('external' in r && r.external ? ('integration' as const) : ('user' as const))
@@ -62,6 +64,8 @@ function entityChanges(db: DB, since: ISODateTime, now: Now, logged: Set<string>
     else if (created(i)) push({ at: i.createdAt, title: `Viagem: ${i.title}`, by: 'marina', provenance: 'user', ref: { type: 'tripItem', id: i.id }, group: 'viagem' })
   }
   for (const x of db.expenses) {
+    // Income is never a "gasto"; its real moments (recebido, receita extra) are already in the life log.
+    if (x.type === 'income') continue
     if (created(x)) push({ at: x.createdAt, title: `Gasto: ${x.title}`, by: by(x), provenance: prov(x), ref: { type: 'expense', id: x.id }, group: 'gasto' })
   }
   for (const n of db.workInbox) {
@@ -93,17 +97,32 @@ function joinPt(parts: string[]): string {
 }
 
 /** Real deltas since `since` (default: profile.lumosLastSeenAt), newest first, + one natural line. */
-export function changeFeed(db: DB, now: Now, since?: ISODateTime): { since?: ISODateTime; items: ChangeItem[]; summary: string } {
+export function changeFeed(
+  db: DB,
+  now: Now,
+  since?: ISODateTime,
+  /** Replacement title for items that must not be shown (privacy lock); undefined = show as is. */
+  redact?: (ref: ChangeItem['ref']) => string | undefined,
+): { since?: ISODateTime; items: ChangeItem[]; summary: string } {
   const base = since ?? db.profile.lumosLastSeenAt
   const until = now.iso ?? nowISO()
   if (!base) return { since: undefined, items: [], summary: 'Ainda não tenho um "desde a última vez" — a partir de agora eu acompanho.' }
 
-  const events = (db.lifeLog ?? []).filter((e) => e.at > base && e.at <= until && !e.causedBy && !(e.kind === 'learned' && e.confidence === 'low'))
-  const logged = new Set((db.lifeLog ?? []).filter((e) => e.at > base && e.ref).map((e) => `${e.ref!.type}:${e.ref!.id}`))
-  const fromLog: Candidate[] = events.map((e: LifeEvent) => ({ at: e.at, title: e.title, by: e.by, provenance: e.provenance, ref: e.ref, group: '' }))
-  const fromEntities = entityChanges(db, base, now, logged).filter((c) => c.at <= until)
+  const baseMs = Date.parse(base)
+  const untilMs = Date.parse(until)
+  const inRange = (at: string) => Date.parse(at) > baseMs && Date.parse(at) <= untilMs
+  const events = (db.lifeLog ?? []).filter((e) => inRange(e.at) && !e.causedBy && !(e.kind === 'learned' && e.confidence === 'low'))
+  const logged = new Set((db.lifeLog ?? []).filter((e) => Date.parse(e.at) > baseMs && e.ref).map((e) => `${e.ref!.type}:${e.ref!.id}`))
+  const hide = (c: Candidate): Candidate => {
+    const t = redact?.(c.ref)
+    return t ? { ...c, title: t } : c
+  }
+  const fromLog: Candidate[] = events.map((e: LifeEvent) => hide({ at: e.at, title: e.title, by: e.by, provenance: e.provenance, ref: e.ref, group: '' }))
+  const fromEntities = entityChanges(db, base, now, logged)
+    .filter((c) => Date.parse(c.at) <= untilMs)
+    .map(hide)
 
-  const items = [...fromLog, ...fromEntities].sort((a, b) => b.at.localeCompare(a.at))
+  const items = [...fromLog, ...fromEntities].sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
   if (!items.length) return { since: base, items: [], summary: 'Nada mudou desde a última vez. Tudo como você deixou.' }
 
   // Summary: the logged changes by name (max 3), the rest counted by group.

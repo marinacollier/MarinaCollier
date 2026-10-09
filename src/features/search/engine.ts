@@ -9,6 +9,7 @@
  */
 import type { Book, BookStatus, DateKey, DB, Expense, ID, PlanType, Recurrence, StudyItem, StudyStatus } from '@/data/types'
 import { ROUTES } from '@/app/routes'
+import { areaLocked } from '@/app/lock-store'
 import { categoryOf, modalityOf, sumCents } from '@/data/selectors'
 import { PERIOD_LABEL } from '@/data/planning'
 import {
@@ -347,6 +348,9 @@ function join(...parts: (string | undefined | false | null)[]): string | undefin
 
 function buildDocs(db: DB, today: DateKey): Doc[] {
   const docs: Doc[] = []
+  // Locked areas are not searchable at all (no title, value or name can leak through results).
+  const moneyLocked = areaLocked(db.profile.privacyLock, 'dinheiro')
+  const careerLocked = areaLocked(db.profile.privacyLock, 'carreira')
   const projectName = new Map(db.projects.map((p) => [p.id, p.name]))
   const trips = new Map(db.trips.map((t) => [t.id, t]))
   const tracks = new Map(db.studyTracks.map((t) => [t.id, t]))
@@ -419,6 +423,7 @@ function buildDocs(db: DB, today: DateKey): Doc[] {
   }
 
   for (const w of db.wins) {
+    if (careerLocked && (w.evidence || w.metrics || w.confidentiality)) continue
     const proj = w.projectId ? projectName.get(w.projectId) : undefined
     docs.push({
       domain: 'win',
@@ -597,6 +602,7 @@ function buildDocs(db: DB, today: DateKey): Doc[] {
   }
 
   for (const e of db.expenses) {
+    if (moneyLocked) break
     if (e.type === 'income') {
       // Receivables: found by client name; open the month's receivable, never the spending sheet.
       const label = e.status === 'received' ? 'recebido' : e.status === 'cancelled' ? 'cancelado' : 'previsto'
@@ -1104,7 +1110,7 @@ export function search(db: DB, query: string, today: DateKey): SearchResponse {
   const trimmed = query.trim()
   const tokens = tokenize(trimmed)
   if (!tokens.length) return { query: trimmed, groups: [], total: 0 }
-  const smart = moneySearch(db, trimmed, tokens, today) ?? booksSearch(db, trimmed, tokens, today) ?? studySearch(db, trimmed, tokens, today)
+  const smart = (areaLocked(db.profile.privacyLock, 'dinheiro') ? undefined : moneySearch(db, trimmed, tokens, today)) ?? booksSearch(db, trimmed, tokens, today) ?? studySearch(db, trimmed, tokens, today)
   if (smart) return smart
   const results = searchAll(db, trimmed, today)
   return { query: trimmed, groups: groupResults(results), total: results.length }
