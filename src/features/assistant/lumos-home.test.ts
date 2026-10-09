@@ -9,6 +9,7 @@ import { SEED_IDS } from '@/data/seed/ids'
 import { actions, detachStorage, flushNow, getDB, hydrate } from '@/data/store'
 import { createMemoryAdapter } from '@/data/storage'
 import { dayItems } from '@/data/agenda/items'
+import { needsAttention } from '@/data/intel/attention'
 import { CAREER_SEED_IDS } from '@/features/career/seed'
 import { addDays } from '@/lib/date'
 import type { DB } from '@/data/types'
@@ -119,5 +120,38 @@ describe('Lumos changes the Home (text = transcript)', () => {
     expect(ev).toHaveLength(1)
     expect(ev[0]).toMatchObject({ date: addDays(THU, 2), startTime: '20:00', allDay: false })
     expect(dayItems(db, addDays(THU, 2), THU).some((i) => i.title === 'Aniversário da Ana' && i.check === 'toggle')).toBe(true)
+  })
+
+  describe('a task still "a confirmar": Segue · Segue amanhã · Tira', () => {
+    const brevo = () => actions.create('tasks', { title: 'Brevo', status: 'review', date: THU, order: 5 })
+    const card = (id: string) => needsAttention(getDB(), at(THU, '09:00')).find((i) => i.ref?.id === id)!
+
+    it('the card offers the three answers', () => {
+      const t = brevo()
+      expect(card(t.id).options?.map((o) => o.label)).toEqual(['Segue', 'Segue amanhã', 'Tira'])
+    })
+
+    it('"Segue amanhã" → confirmed AND on tomorrow, after reopening; the card is gone', async () => {
+      const t = brevo()
+      await say(card(t.id).options![1].ask, at(THU, '09:00'))
+      const db = await reopen()
+      expect(db.tasks.find((x) => x.id === t.id)).toMatchObject({ status: 'todo', date: FRI })
+      expect(needsAttention(db, at(THU, '09:05')).some((i) => i.ref?.id === t.id)).toBe(false)
+      expect(dayItems(db, FRI, THU).some((i) => i.refId === t.id && i.check === 'toggle')).toBe(true)
+    })
+
+    it('"Segue" → confirmed, same day', async () => {
+      const t = brevo()
+      await say(card(t.id).options![0].ask, at(THU, '09:00'))
+      expect((await reopen()).tasks.find((x) => x.id === t.id)).toMatchObject({ status: 'todo', date: THU })
+    })
+
+    it('"Tira" → out of the list (archived, not deleted)', async () => {
+      const t = brevo()
+      await say(card(t.id).options![2].ask, at(THU, '09:00'))
+      const db = await reopen()
+      expect(db.tasks.find((x) => x.id === t.id)?.status).toBe('archived')
+      expect(dayItems(db, THU, THU).some((i) => i.refId === t.id)).toBe(false)
+    })
   })
 })

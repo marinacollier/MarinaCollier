@@ -163,9 +163,51 @@ function notDoing(input: HandlerInput): LumosReply | undefined {
   }
 }
 
+// ─── segue / tira (a task still "a confirmar") ──────────────────────────────
+
+const REVIEW = /^(confirma|confirmo|confirmado|segue|mantem|mantenho|fica|tira|tirar|remove|descarta)\s+(?:a\s+|o\s+|com\s+(?:a\s+|o\s+)?)?(.+)$/
+const WHEN = /^(.+?)\s+(?:(?:pra|para|pro)\s+)?(depois de amanha|amanha|hoje|segunda|terca|quarta|quinta|sexta|sabado|domingo)(?:-feira)?$/
+
+/**
+ * The "Segue · Amanhã · Tira" answers of a task still to be confirmed (status 'review'):
+ *   "segue Brevo"              → confirmed (a normal to-do), same day
+ *   "segue Brevo pra amanhã"   → confirmed and moved to tomorrow
+ *   "tira Brevo"               → out of the list (archived — Desfazer brings it back)
+ * Only tasks that are actually waiting for this answer; anything else is left to the other handlers.
+ */
+function review(input: HandlerInput): LumosReply | undefined {
+  const { db, n, now } = input
+  const m = REVIEW.exec(n)
+  if (!m) return undefined
+  const list = db.tasks.filter((t) => t.status === 'review')
+  if (!list.length) return undefined
+  // The day at the end is read first ("segue Brevo pra amanhã"); a title that itself ends in a day word
+  // ("Revisão de sexta") still matches when the shorter name finds nothing.
+  const w = WHEN.exec(m[2])
+  let hits = w ? findTasks(list, w[1]) : []
+  let when = hits.length && w ? dayIn(w[2], now.date) : undefined
+  if (!hits.length) {
+    hits = findTasks(list, m[2])
+    when = undefined
+  }
+  if (!hits.length) return undefined
+  const drop = /^(tira|tirar|remove|descarta)$/.test(m[1])
+  const act = (t: Task): { done: string; run: () => Undo } =>
+    drop
+      ? { done: `“${t.title}” saiu da lista ✓`, run: () => runLogged(() => updateUndoable('tasks', t.id, { status: 'archived' } as Partial<Task>), [eventDraft(now, { kind: 'cancelled', title: `Tirado: ${t.title}`, area: 'rotina', ref: { type: 'task', id: t.id } })]) }
+      : {
+          done: `“${t.title}” segue ✓${when ? ` · ${dayLabel(when, now.date)}` : ''}`,
+          run: () => runLogged(() => updateUndoable('tasks', t.id, { status: 'todo', ...(when ? { date: when, bucket: undefined } : {}) } as Partial<Task>), [eventDraft(now, { kind: when ? 'moved' : 'changed', title: `Confirmado: ${t.title}${when ? ` → ${formatDayMonth(when)}` : ''}`, area: 'rotina', ref: { type: 'task', id: t.id } })]),
+        }
+  if (hits.length > 1) return { area: AREA, text: 'Qual delas?', options: hits.slice(0, 5).map((t) => ({ label: t.title, act: act(t) })) }
+  const t = hits[0]
+  const a = act(t)
+  return { area: AREA, text: a.done, ref: { type: 'task', id: t.id }, action: { mode: 'direct', run: a.run } }
+}
+
 export const tasksHandler: Handler = {
   id: 'tasks',
   run(input) {
-    return projectDone(input) ?? move(input) ?? notDoing(input)
+    return review(input) ?? projectDone(input) ?? move(input) ?? notDoing(input)
   },
 }

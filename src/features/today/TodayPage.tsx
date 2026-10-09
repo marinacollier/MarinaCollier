@@ -131,10 +131,10 @@ export default function TodayPage() {
       {hasLines && (
         <motion.div {...rise(2)} className="mt-6 space-y-1.5">
           <AttentionRow items={attention} onAsk={ask} />
-          <InsightLines items={insights} onAsk={ask} />
+          {/* The trip shows once, as its own line (with its to-dos and a check each) — not also as an insight. */}
+          <InsightLines items={trip ? insights.filter((i) => !i.key.startsWith(`trip:${trip.id}`)) : insights} onAsk={ask} />
           <ChangesLine summary={changes.summary} items={changes.items} />
-          {/* The trip shows once: as an insight when Lumos already raised it, else as its own line. */}
-          {trip && !insights.some((i) => i.key.startsWith(`trip:${trip.id}`)) && <TripLine trip={trip} />}
+          {trip && <TripLine trip={trip} />}
         </motion.div>
       )}
 

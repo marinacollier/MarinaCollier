@@ -6,10 +6,12 @@
 import { useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ChevronDown, ChevronRight, X } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, X } from 'lucide-react'
 import { toast } from '@/app/ui-store'
 import { ROUTES } from '@/app/routes'
-import { actions } from '@/data/store'
+import { actions, getDB, persist, useDB } from '@/data/store'
+import { nowISO } from '@/lib/id'
+import { tripPriorityItems, type TripPending } from '../context'
 import type { AttentionItem, ChangeItem, Insight, LifeContext } from '@/data/intel'
 import type { DateKey, DayPriority } from '@/data/types'
 import { cn } from '@/lib/cn'
@@ -288,18 +290,107 @@ export function ChangesLine({ summary, items }: { summary: string; items: Change
 }
 
 /** Smart surfacing: a close trip as one tiny line. Disappears after the trip on its own. */
+/**
+ * The close trip, right on Home: one line; tapping it opens the trip's open to-dos with a check each
+ * (no need to go into the trip page to tick). "Abrir a viagem" still goes to the full page.
+ */
 export function TripLine({ trip }: { trip: NonNullable<LifeContext['nextTrip']> }) {
   const nav = useNavigate()
+  const [open, setOpen] = useState(false)
+  const db = useDB((d) => d)
+  const t = db.trips.find((x) => x.id === trip.id)
+  const items = t ? tripPriorityItems(db, t, 99) : []
+  const [ticked, setTicked] = useState<{ key: string; title: string }[]>([])
+  const [all, setAll] = useState(false)
+  const shown = all ? items : items.slice(0, 6)
   const when = trip.daysLeft <= 0 ? 'começa hoje' : trip.daysLeft === 1 ? 'amanhã' : `em ${trip.daysLeft} dias`
+  const tick = (p: TripPending) => {
+    const undo = checkTripPending(p)
+    if (!undo) return
+    setTicked((l) => [...l, { key: p.key, title: p.title }])
+    haptic('success')
+    void persist()
+    toast(`${p.title} ✓`, {
+      action: {
+        label: 'Desfazer',
+        run: () => {
+          undo()
+          setTicked((l) => l.filter((x) => x.key !== p.key))
+          void persist()
+        },
+      },
+    })
+  }
   return (
-    <button type="button" onClick={() => nav(ROUTES.trip(trip.id))} className="w-full flex items-start gap-2.5 min-h-10 py-1.5 text-left text-[14px] text-ink-2 leading-snug active:opacity-70">
-      <span aria-hidden className="mt-[1px]">
-        ✈️
-      </span>
-      <span className="flex-1">
-        {trip.name} {when}
-        {trip.openItems > 0 && <span className="text-muted"> · {trip.openItems === 1 ? '1 coisa aberta' : `${trip.openItems} coisas abertas`}</span>}
-      </span>
-    </button>
+    <div>
+      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="w-full flex items-start gap-2.5 min-h-10 py-1.5 text-left text-[14px] text-ink-2 leading-snug active:opacity-70">
+        <span aria-hidden className="mt-[1px]">
+          ✈️
+        </span>
+        <span className="flex-1">
+          {trip.name} {when}
+          {items.length > 0 && <span className="text-muted"> · {items.length === 1 ? '1 coisa aberta' : `${items.length} coisas abertas`}</span>}
+        </span>
+        <ChevronDown size={15} className={cn('text-muted mt-0.5 transition-transform', open && 'rotate-180')} />
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+            <ul aria-label={`Pendências de ${trip.name}`} className="pl-6">
+              {shown.map((p) => (
+                <li key={p.key} className="flex items-center">
+                  <button type="button" aria-label={`Concluir: ${p.title}`} aria-pressed={false} onClick={() => tick(p)} className="h-11 w-9 shrink-0 -ml-1 inline-flex items-center justify-center active:scale-90 transition">
+                    <span className="h-[20px] w-[20px] rounded-full border-[1.5px] border-ink/30" />
+                  </button>
+                  <span className="flex-1 min-w-0 text-[14px] leading-snug">
+                    {p.title}
+                    {p.status === 'a_confirmar' && <span className="text-muted text-[12.5px]"> · a confirmar</span>}
+                  </span>
+                </li>
+              ))}
+              {ticked.map((p) => (
+                <li key={p.key} className="flex items-center text-muted">
+                  <span className="h-11 w-9 shrink-0 -ml-1 inline-flex items-center justify-center">
+                    <span className="h-[20px] w-[20px] rounded-full bg-sage text-bg inline-flex items-center justify-center">
+                      <Check size={12} strokeWidth={3} />
+                    </span>
+                  </span>
+                  <span className="flex-1 min-w-0 text-[14px] line-through">{p.title}</span>
+                </li>
+              ))}
+              {!items.length && !ticked.length && <li className="text-[13.5px] text-muted py-2">Nada aberto ✨</li>}
+              {items.length > shown.length && (
+                <li>
+                  <button type="button" onClick={() => setAll(true)} className="h-10 text-[13px] text-ink-2">
+                    ver todas ({items.length})
+                  </button>
+                </li>
+              )}
+              <li>
+                <button type="button" onClick={() => nav(ROUTES.trip(trip.id))} className="h-10 text-[13px] text-accent font-medium">
+                  Abrir a viagem →
+                </button>
+              </li>
+            </ul>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   )
+}
+
+/** A trip to-do (trip item or task of the trip) → done, through the same records the trip page uses. */
+function checkTripPending(p: TripPending): (() => void) | undefined {
+  if (p.kind === 'tripItem') {
+    const it = getDB().tripItems.find((x) => x.id === p.id)
+    if (!it) return undefined
+    const before = it.status
+    actions.update('tripItems', it.id, { status: 'feito' })
+    return () => actions.update('tripItems', it.id, { status: before })
+  }
+  const task = getDB().tasks.find((x) => x.id === p.id)
+  if (!task) return undefined
+  const before = { status: task.status, completedAt: task.completedAt }
+  actions.update('tasks', task.id, { status: 'done', completedAt: nowISO() })
+  return () => actions.update('tasks', task.id, before)
 }

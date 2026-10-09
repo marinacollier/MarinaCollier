@@ -76,7 +76,8 @@ export function needsAttention(db: DB, now: Now): AttentionItem[] {
       title: t.title,
       detail: when < today ? 'ficou de antes — ainda faz sentido?' : `${dayLabel(when, today)} — ainda a confirmar`,
       options: [
-        { label: 'Segue', ask: `confirma ${t.title}` },
+        { label: 'Segue', ask: `segue ${t.title}` },
+        { label: 'Segue amanhã', ask: `segue ${t.title} pra amanhã` },
         { label: 'Tira', ask: `tira ${t.title}` },
       ],
       provenance: 'fact',
