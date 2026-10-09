@@ -5,20 +5,30 @@
  */
 import { useRef, useState, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowUp, Mic, Paperclip, Square, X } from 'lucide-react'
+import { ArrowUp, Mic, Paperclip, X } from 'lucide-react'
 import { normalizeCapture } from '@/data/intel'
 import { cn } from '@/lib/cn'
 import { haptic } from '@/lib/haptics'
-import { useSpeech } from './useSpeech'
+import { LOW_CONFIDENCE, useSpeech } from './useSpeech'
+import { VoiceBar } from '@/features/assistant/VoiceBar'
 
 export function LumosBox({ placeholder, suggestions, onAsk }: { placeholder: string; suggestions: string[]; onAsk: (text: string) => void }) {
   const [text, setText] = useState('')
   const [note, setNote] = useState<string>()
   const fileRef = useRef<HTMLInputElement>(null)
   const areaRef = useRef<HTMLTextAreaElement>(null)
-  const speech = useSpeech((t) => {
-    const n = normalizeCapture({ kind: 'voice', transcript: t })
-    if (n.text !== undefined) setText(n.text)
+  // The transcript goes to Lumos like typed text. When the browser says it's unsure, she confirms first.
+  const speech = useSpeech(({ text: said, confidence }) => {
+    const q = normalizeCapture({ kind: 'voice', transcript: said }).text?.trim()
+    if (!q) return
+    if (confidence !== undefined && confidence < LOW_CONFIDENCE) {
+      setText(q)
+      setNote(`Entendi: “${q}” — confere e envia (ou corrige antes).`)
+      areaRef.current?.focus()
+      return
+    }
+    haptic('light')
+    onAsk(q)
   })
 
   const send = (e?: FormEvent) => {
@@ -27,7 +37,7 @@ export function LumosBox({ placeholder, suggestions, onAsk }: { placeholder: str
     const q = n.text?.trim()
     if (!q) return areaRef.current?.focus()
     haptic('light')
-    if (speech.listening) speech.stop()
+    if (speech.listening) speech.cancel()
     setText('')
     setNote(undefined)
     onAsk(q)
@@ -48,7 +58,7 @@ export function LumosBox({ placeholder, suggestions, onAsk }: { placeholder: str
         <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] font-semibold text-plum">
           <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-plum" />
           Lumos
-          {speech.listening && <span className="normal-case tracking-normal font-medium text-muted">· ouvindo…</span>}
+
         </div>
         <textarea
           ref={areaRef}
@@ -63,32 +73,32 @@ export function LumosBox({ placeholder, suggestions, onAsk }: { placeholder: str
           placeholder={`fala comigo… ${placeholder}`}
           className="mt-2 w-full resize-none bg-transparent font-display text-[21px] leading-[1.3] tracking-tight text-ink placeholder:text-muted/70 outline-none min-h-[56px] max-h-40"
         />
-        <div className="flex items-center justify-between -mx-2 mt-1">
-          <div className="flex items-center">
-            <button type="button" aria-label="Anexar foto ou arquivo" onClick={() => fileRef.current?.click()} className="h-11 w-11 rounded-full inline-flex items-center justify-center text-muted active:bg-surface-2 transition">
-              <Paperclip size={19} />
-            </button>
-            {speech.supported && (
-              <button
-                type="button"
-                aria-label={speech.listening ? 'Parar de ouvir' : 'Falar com a Lumos'}
-                aria-pressed={speech.listening}
-                onClick={() => (speech.listening ? speech.stop() : speech.start())}
-                className={cn('h-11 w-11 rounded-full inline-flex items-center justify-center transition', speech.listening ? 'bg-plum-soft text-plum' : 'text-muted active:bg-surface-2')}
-              >
-                {speech.listening ? <Square size={15} fill="currentColor" /> : <Mic size={19} />}
-              </button>
-            )}
-            <input ref={fileRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
+        {speech.listening ? (
+          <div className="-mx-1 mt-1">
+            <VoiceBar seconds={speech.seconds} interim={speech.interim} onCancel={speech.cancel} onSend={speech.send} />
           </div>
-          <button
-            type="submit"
-            aria-label="Enviar para a Lumos"
-            className={cn('h-11 w-11 rounded-full inline-flex items-center justify-center transition active:scale-95', text.trim() ? 'bg-ink text-bg' : 'bg-surface-2 text-muted')}
-          >
-            <ArrowUp size={19} />
-          </button>
-        </div>
+        ) : (
+          <div className="flex items-center justify-between -mx-2 mt-1">
+            <div className="flex items-center">
+              <button type="button" aria-label="Anexar foto ou arquivo" onClick={() => fileRef.current?.click()} className="h-11 w-11 rounded-full inline-flex items-center justify-center text-muted active:bg-surface-2 transition">
+                <Paperclip size={19} />
+              </button>
+              {speech.available && (
+                <button type="button" aria-label="Falar com a Lumos" onClick={() => speech.start()} className="h-11 w-11 rounded-full inline-flex items-center justify-center transition text-muted active:bg-surface-2">
+                  <Mic size={19} />
+                </button>
+              )}
+              <input ref={fileRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
+            </div>
+            <button
+              type="submit"
+              aria-label="Enviar para a Lumos"
+              className={cn('h-11 w-11 rounded-full inline-flex items-center justify-center transition active:scale-95', text.trim() ? 'bg-ink text-bg' : 'bg-surface-2 text-muted')}
+            >
+              <ArrowUp size={19} />
+            </button>
+          </div>
+        )}
       </form>
 
       <AnimatePresence initial={false}>

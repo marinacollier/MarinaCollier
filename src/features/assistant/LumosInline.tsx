@@ -30,6 +30,8 @@ import { AdjustCard } from './adjust/AdjustCard'
 import { visibleChanges } from './adjust/planner'
 import type { ChangePlan } from './adjust/types'
 import { attentionFor, intelReady } from './act/intel'
+import { LOW_CONFIDENCE, useSpeech } from '@/features/today/home/useSpeech'
+import { VoiceBar } from './VoiceBar'
 import { askLumos } from './chief'
 import {
   ask,
@@ -88,32 +90,25 @@ export function contextSuggestions(db: DB, now: Now): string[] {
   return [...new Set(out)].slice(0, 3)
 }
 
-// ─── Voice (only when the browser has it) ───────────────────────────────────
-
-interface Recognition {
-  lang: string
-  interimResults: boolean
-  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null
-  onend: (() => void) | null
-  start(): void
-  stop(): void
-}
-
-function speechCtor(): (new () => Recognition) | undefined {
-  if (typeof window === 'undefined') return undefined
-  const w = window as unknown as { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition }
-  return w.SpeechRecognition ?? w.webkitSpeechRecognition
-}
-
 // ─── Composer ───────────────────────────────────────────────────────────────
 
 function Composer({ variant, placeholder }: { variant: 'home' | 'page'; placeholder: string }) {
   const draft = useConversation((s) => s.draft)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
-  const [listening, setListening] = useState(false)
-  const Speech = useMemo(speechCtor, [])
-  const recRef = useRef<Recognition | null>(null)
+  const [voiceNote, setVoiceNote] = useState<string>()
+  // The iPhone's own dictation: the transcript is sent like typed text (unsure → shown to confirm).
+  const speech = useSpeech(({ text, confidence }) => {
+    const q = normalizeCapture({ kind: 'voice', transcript: text }).text?.trim()
+    if (!q) return
+    if (confidence !== undefined && confidence < LOW_CONFIDENCE) {
+      setDraft(q)
+      setVoiceNote(`Entendi: “${q}” — confere e envia (ou corrige antes).`)
+      return
+    }
+    setVoiceNote(undefined)
+    ask(q)
+  })
 
   useEffect(() => {
     if (draft) inputRef.current?.focus()
@@ -123,19 +118,6 @@ function Composer({ variant, placeholder }: { variant: 'home' | 'page'; placehol
     if (!draft.trim()) return
     ask(draft)
     inputRef.current?.blur()
-  }
-
-  const listen = () => {
-    if (!Speech) return
-    if (listening) return recRef.current?.stop()
-    const rec = new Speech()
-    rec.lang = 'pt-BR'
-    rec.interimResults = false
-    rec.onresult = (e) => setDraft(Array.from(e.results).map((r) => r[0]?.transcript ?? '').join(' ').trim())
-    rec.onend = () => setListening(false)
-    recRef.current = rec
-    setListening(true)
-    rec.start()
   }
 
   const onFile = (file: File | undefined) => {
@@ -176,8 +158,8 @@ function Composer({ variant, placeholder }: { variant: 'home' | 'page'; placehol
         <button type="button" onClick={() => fileRef.current?.click()} aria-label="Anexar arquivo ou print" className="h-10 w-10 rounded-full text-muted flex items-center justify-center active:bg-surface-2">
           <Paperclip size={18} />
         </button>
-        {Speech && (
-          <button type="button" onClick={listen} aria-label={listening ? 'Parar de ouvir' : 'Falar'} aria-pressed={listening} className={cn('h-10 w-10 rounded-full flex items-center justify-center active:bg-surface-2', listening ? 'text-accent bg-accent-soft' : 'text-muted')}>
+        {speech.available && (
+          <button type="button" onClick={() => speech.start()} aria-label="Falar com a Lumos" className="h-10 w-10 rounded-full flex items-center justify-center active:bg-surface-2 text-muted">
             <Mic size={18} />
           </button>
         )}
@@ -185,6 +167,12 @@ function Composer({ variant, placeholder }: { variant: 'home' | 'page'; placehol
           <ArrowUp size={18} />
         </button>
       </div>
+      {speech.listening && (
+        <div className="absolute inset-x-2 bottom-1.5 bg-surface rounded-full">
+          <VoiceBar seconds={speech.seconds} interim={speech.interim} onCancel={speech.cancel} onSend={speech.send} />
+        </div>
+      )}
+      {(voiceNote || speech.error) && <p className="text-[12.5px] text-ink-2 leading-snug px-1 pt-2">{voiceNote ?? speech.error}</p>}
     </form>
   )
 }
