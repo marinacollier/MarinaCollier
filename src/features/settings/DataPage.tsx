@@ -8,7 +8,7 @@ import { toast } from '@/app/ui-store'
 import { nowISO } from '@/lib/id'
 import { haptic } from '@/lib/haptics'
 import { formatFullDate, todayKey } from '@/lib/date'
-import { validateBackup, type BackupPreview } from './backup'
+import { parseBackupText, type BackupPreview } from './backup'
 import { exportBackup, restoreBackup } from './backup-io'
 import { CSV_DATASETS, datasetCSV, type CsvDatasetId } from './csv'
 import { formatBytes, saveFile } from './platform'
@@ -71,7 +71,7 @@ export default function DataPage() {
     if (!file) return
     try {
       const text = await file.text()
-      const result = validateBackup(JSON.parse(text))
+      const result = parseBackupText(text)
       if (result.ok) setPreview(result)
       else setImportError(result.error)
     } catch {

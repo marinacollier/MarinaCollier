@@ -139,6 +139,21 @@ const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 
  * Checks a parsed JSON value. Accepts the backup wrapper or a bare DB object (older exports).
  * Never throws.
  */
+/** From the file's text: a truncated or non-JSON file gets a clear message instead of a parser error. */
+export function parseBackupText(text: string): BackupValidation {
+  if (!text.trim()) return { ok: false, error: 'O arquivo está vazio.' }
+  let raw: unknown
+  try {
+    raw = JSON.parse(text)
+  } catch {
+    return {
+      ok: false,
+      error: text.trimStart().startsWith('{') ? 'Esse backup está incompleto (o arquivo foi cortado). Usa o arquivo original, sem editar.' : 'Esse arquivo não é um backup do MARINA OS (precisa ser o .json exportado aqui).',
+    }
+  }
+  return validateBackup(raw)
+}
+
 export function validateBackup(raw: unknown): BackupValidation {
   if (!isObj(raw)) return { ok: false, error: 'Esse arquivo não parece um backup do MARINA OS.' }
 
@@ -220,5 +235,10 @@ export function relationWarnings(db: DB): string[] {
   checks.push(['marcos sem projeto', (db.milestones ?? []).filter((m) => !projects.has(m.projectId)).length])
   const parents: Record<string, Set<string>> = { task: ids(db.tasks), routineItem: ids(db.routineItems), petTask: ids(db.petTasks) }
   checks.push(['registros de “feito” sem o item', (db.occurrences ?? []).filter((o) => !parents[o.parentType]?.has(o.parentId)).length])
+  const contracts = ids(db.contracts)
+  checks.push(['recebimentos sem contrato', (db.expenses ?? []).filter((e) => e.contractId && !contracts.has(e.contractId)).length])
+  const contacts = ids(db.contacts)
+  checks.push(['vagas apontando pra contato que não existe', (db.opportunities ?? []).filter((o) => (o.contactIds ?? []).some((c) => !contacts.has(c))).length])
+  checks.push(['sessões de carreira sem a meta', (db.tasks ?? []).filter((t) => t.careerParentId && !parents.task.has(t.careerParentId)).length])
   return checks.filter(([, n]) => n > 0).map(([what, n]) => `${n} ${what}`)
 }

@@ -8,7 +8,7 @@ import { actions, flushNow, getDB, hydrate } from '@/data/store'
 import { createMemoryAdapter } from '@/data/storage'
 import { buildSeed } from '@/data/seed'
 import type { DB } from '@/data/types'
-import { checksumOf, makeBackup, validateBackup, type BackupPreview } from './backup'
+import { checksumOf, makeBackup, parseBackupText, validateBackup, type BackupPreview } from './backup'
 import { daysSinceBackup, restoreBackup } from './backup-io'
 import { ensureReceivables, markReceived, receivableId } from '@/data/finance/receivables'
 import { FINANCE_SEED_IDS } from '@/features/finance/seed'
@@ -51,6 +51,13 @@ function liveALittle() {
   ensureReceivables(TODAY)
   markReceived(receivableId(FINANCE_SEED_IDS.contractSantander, TODAY.slice(0, 7)), { at: `${TODAY}T10:00:00.000-03:00` })
   actions.create('lifeLog', { at: `${TODAY}T15:00:00.000-03:00`, date: TODAY, kind: 'done', title: 'Correu 50 min', by: 'marina', provenance: 'user' })
+  // Evidence (a win turned into a case), a placed career session, settings & preferences, Lumos state.
+  const win = getDB().wins.at(-1)!
+  actions.update('wins', win.id, { evidence: 'Busca semântica em produção', metrics: '+18% conversão', confidentiality: 'interno', verification: 'verificado' })
+  const quota = getDB().tasks.find((t) => t.careerKind === 'ingles_exec' && !t.careerParentId)
+  if (quota) actions.create('tasks', { title: '🗣️ Inglês executivo', date: TODAY, time: '19:00', durationMin: 30, status: 'done', context: 'carreira', careerKind: 'ingles_exec', careerParentId: quota.id, order: 990 })
+  actions.setProfile({ theme: 'dark', rhythm: { wakeTime: '04:40', sleepTime: '22:00' }, lumosLastSeenAt: `${TODAY}T09:00:00.000Z`, privacyLock: { enabled: true, areas: ['dinheiro'], pinHash: 'h', pinSalt: 's', relockMinutes: 5 } })
+  actions.create('attentionAcks', { key: 'stale-opp', at: `${TODAY}T09:00:00.000Z` } as never)
   return { task, recurring, item, routine, workout, goal }
 }
 
@@ -85,8 +92,15 @@ describe('backup → restore round trip', () => {
     await hydrate(device)
     const after = getDB()
     expect(counts(after)).toEqual(counts(before))
-    for (const key of ['tasks', 'occurrences', 'routines', 'routineItems', 'workouts', 'meals', 'books', 'goals', 'wins', 'expenses', 'pantry', 'memory', 'scheduleOverrides', 'lifeLog', 'contracts', 'opportunities', 'contacts', 'monthlyReviews'] as const)
+    for (const key of ['tasks', 'occurrences', 'routines', 'routineItems', 'workouts', 'meals', 'books', 'goals', 'wins', 'expenses', 'pantry', 'memory', 'scheduleOverrides', 'lifeLog', 'contracts', 'opportunities', 'contacts', 'monthlyReviews', 'attentionAcks'] as const)
       expect(after[key], key).toEqual(before[key])
+    // Whole-DB structural equality (the device's own onboarding stamp is the only thing kept from the device).
+    const { onboardedAt: _a, ...pAfter } = after.profile
+    const { onboardedAt: _b, ...pBefore } = before.profile
+    expect(pAfter).toEqual(pBefore)
+    expect({ ...after, profile: undefined }).toEqual({ ...before, profile: undefined })
+    expect(after.wins.some((w) => w.metrics === '+18% conversão' && w.confidentiality === 'interno')).toBe(true)
+    expect(after.tasks.some((t) => t.careerParentId && t.status === 'done')).toBe(true)
 
     // Relations still point at real records.
     const occ = after.occurrences.find((o) => o.parentType === 'task' && o.parentId === made.recurring.id)
@@ -127,7 +141,10 @@ describe('backup → restore round trip', () => {
     const r = validateBackup(JSON.parse(JSON.stringify(edited)))
     expect(r.ok).toBe(false)
     expect(!r.ok && r.error).toMatch(/alterado ou está incompleto/)
-    expect(() => JSON.parse(JSON.stringify(file).slice(0, 500))).toThrow()
+    const cut = parseBackupText(JSON.stringify(file).slice(0, 500))
+    expect(!cut.ok && cut.error).toMatch(/incompleto \(o arquivo foi cortado\)/)
+    expect(parseBackupText('olá').ok).toBe(false)
+    expect(parseBackupText('')).toEqual({ ok: false, error: 'O arquivo está vazio.' })
     expect(validateBackup({ app: 'outro' }).ok).toBe(false)
     expect(validateBackup({ app: 'marina-os', schemaVersion: 999, db: file.db }).ok).toBe(false)
   })
@@ -137,6 +154,27 @@ describe('backup → restore round trip', () => {
     expect(file).toMatchObject({ app: 'marina-os', format: 2, schemaVersion: getDB().schemaVersion, seedVersion: getDB().profile.seedVersion })
     expect(file.counts?.tasks).toBe(getDB().tasks.length)
     expect(file.checksum).toBe(checksumOf(JSON.stringify(file.db)))
+  })
+
+  it('an older backup (format 1, no checksum) is accepted and upgraded; an incompatible future one is refused', () => {
+    const db = getDB()
+    const old = validateBackup({ app: 'marina-os', schemaVersion: 0, exportedAt: '2026-01-01T00:00:00Z', db: { ...db, schemaVersion: 0, contracts: undefined, opportunities: undefined } })
+    expect(old.ok).toBe(true)
+    expect(old.ok && old.upgraded).toBe(true)
+    const future = validateBackup({ app: 'marina-os', schemaVersion: 99, db })
+    expect(!future.ok && future.error).toMatch(/versão mais nova do app/)
+  })
+
+  it('new relations are checked too: receivable without contract, opportunity pointing to a missing person', () => {
+    liveALittle()
+    const db = getDB()
+    const raw = {
+      ...db,
+      expenses: [...db.expenses, { ...db.expenses.find((e) => e.contractId)!, id: 'rcv-x', contractId: 'gone' }],
+      opportunities: [...db.opportunities, { ...db.opportunities[0], id: 'opp-x', contactIds: ['nobody'] }],
+    }
+    const preview = validateBackup(raw) as BackupPreview
+    expect(preview.warnings).toEqual(['1 recebimentos sem contrato', '1 vagas apontando pra contato que não existe'])
   })
 
   it('relations that point nowhere are reported, not silently dropped', () => {
