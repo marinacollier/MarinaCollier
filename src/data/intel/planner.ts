@@ -23,13 +23,19 @@ import { eventOp } from './log'
 import { commitOps, createOp, previewOps, type IntelOp } from './ops'
 import type { Now, PlanLayer, WeekProposal, WeekProposalItem } from './types'
 
-/** Never more than this many new career sessions in one week. */
-export const MAX_CAREER = 6
+/**
+ * Career quotas are flexible targets, not a schedule to fill: at most this many sessions get a slot in a
+ * week (the rest stay as targets she can do whenever). An empty window is not an available window.
+ */
+export const MAX_CAREER = 3
 
 const LAYER_ORDER: PlanLayer[] = ['fixo', 'treino_chave', 'preparo', 'prazo', 'estudo', 'vida', 'descanso']
 const STUDY_MIN = 45
 const MAX_STUDY = 2
 const KEEP_FREE = 60
+/** Minutes kept clear around a key/long session, and the latest end the evening before an early one. */
+const KEY_GAP = 120
+const EARLY_EVE = 20 * 60 + 30
 
 /** Default week: this one; from Saturday on, the next one ("monta minha semana" on the weekend). */
 export function defaultPlanWeek(now: Now): DateKey {
@@ -141,7 +147,26 @@ export function planWeek(db: DB, now: Now, weekStart?: DateKey): WeekProposal {
   // ── Study (modest): one block per active track not already in the calendar, max 2 a week ──
   const weekEvents = normalize(days.flatMap((d) => eventsFor(preview, d).map((e) => e.title)).join(' | '))
   const tracks = db.studyTracks.filter((t) => !t.archived && t.status === 'ativo' && !weekEvents.includes(normalize(t.name))).sort((a, b) => a.order - b.order)
-  const usedDays = new Set<DateKey>()
+  // Focus blocks never compete with key/long sessions: not within 2h of one, and not late the evening
+  // before an early one (sleep comes first). The first candidate day that respects this wins.
+  const isKey = (w: (typeof preview.workouts)[number]) => (w.isKeySession || w.isLongSession) && w.status !== 'pulado' && w.status !== 'descanso' && !!w.time
+  const competes = (d: DateKey, start: number, minutes: number) =>
+    preview.workouts.some((w) => {
+      if (!isKey(w)) return false
+      const ws0 = hmToMinutes(w.time!)
+      const we0 = ws0 + (w.plannedDurationMaxMin ?? w.plannedDurationMin ?? 60)
+      if (w.date === d) return start < we0 + KEY_GAP && start + minutes > ws0 - KEY_GAP
+      return w.date === addDays(d, 1) && ws0 <= 7 * 60 && start + minutes > EARLY_EVE
+    })
+  const focusSlot = (pool: DateKey[], minutes = STUDY_MIN) => {
+    for (const d of [...pool.filter((x) => weekday(x) >= 1 && weekday(x) <= 5), ...pool.filter((x) => weekday(x) === 0 || weekday(x) === 6)]) {
+      const slot = studySlot(preview, [d], minutes)
+      if (slot && !competes(d, hmToMinutes(slot.time), minutes)) return slot
+    }
+    return undefined
+  }
+  // One focus block (study OR career) per evening, counting what is already on the calendar.
+  const usedDays = new Set<DateKey>(db.tasks.filter((t) => t.date && t.date >= ws && t.date <= we && (t.context === 'estudo' || t.context === 'carreira') && t.status !== 'archived').map((t) => t.date!))
   let studies = 0
   for (const track of tracks) {
     if (studies >= MAX_STUDY) break
@@ -150,7 +175,7 @@ export function planWeek(db: DB, now: Now, weekStart?: DateKey): WeekProposal {
     const current = db.studyItems.find((s) => s.trackId === track.id && s.status === 'estudando' && !s.reference)
     // Weekdays first (weekends stay lighter); never on presencial or rest days.
     const pool = days.filter((d) => open(d) && !rest.has(d) && !usedDays.has(d) && workMode(preview, d) !== 'presencial')
-    const slot = studySlot(preview, [...pool.filter((d) => weekday(d) >= 1 && weekday(d) <= 5), ...pool.filter((d) => weekday(d) === 0 || weekday(d) === 6)])
+    const slot = focusSlot(pool)
     if (!slot) continue
     const title = current ? (normalize(current.title).startsWith(normalize(track.name)) ? `${track.emoji} ${current.title}` : `${track.emoji} ${track.name} — ${current.title}`) : `${track.emoji} ${track.name}`
     ops.push(createOp('tasks', { title, date: slot.date, time: slot.time, durationMin: STUDY_MIN, status: 'todo', context: 'estudo', area: 'estudo', planType: 'flexivel', bucket: 'semana', order: nextOrder(db.tasks) + studies + 1 }))
@@ -162,23 +187,26 @@ export function planWeek(db: DB, now: Now, weekStart?: DateKey): WeekProposal {
 
   // ── Career quotas (Inglês executivo 3×, networking, posts, liderança): only free windows, never on rest or
   //    presencial days, one session per quota per day, keeping free space; nothing written until "Aplicar". ──
+  // At least two open evenings stay with nothing planned.
+  const focusRoom = Math.max(0, days.filter((d) => open(d) && !rest.has(d)).length - 2 - usedDays.size)
   let careerPlaced = 0
   for (const p of weekProgress(preview, ws)) {
     let need = sessionsToPlace(p)
-    const usedByQuota = new Set(p.planned.map((t) => t.date))
-    while (need > 0 && careerPlaced < MAX_CAREER) {
-      const pool = days.filter((d) => open(d) && !rest.has(d) && !usedByQuota.has(d) && workMode(preview, d) !== 'presencial')
-      const slot = studySlot(preview, [...pool.filter((d) => weekday(d) >= 1 && weekday(d) <= 5), ...pool.filter((d) => weekday(d) === 0 || weekday(d) === 6)], CAREER_META[p.kind].sessionMin)
+    while (need > 0 && careerPlaced < Math.min(MAX_CAREER, focusRoom)) {
+      const pool = days.filter((d) => open(d) && !rest.has(d) && !usedDays.has(d) && workMode(preview, d) !== 'presencial')
+      const slot = focusSlot(pool, CAREER_META[p.kind].sessionMin)
       if (!slot) break
       const draft = sessionDraft(p.quota, slot.date, slot.time)
       ops.push(createOp('tasks', { ...draft, order: nextOrder(db.tasks) + studies + careerPlaced + 1 }))
       add(slot.date, draft.title, 'estudo', 'suggestion', true, slot.time)
-      usedByQuota.add(slot.date)
+      usedDays.add(slot.date)
       careerPlaced++
       need--
       preview = previewOps(db, ops)
     }
   }
+
+  const careerOpen = weekProgress(previewOps(db, ops), ws).some((p) => sessionsToPlace(p) > 0)
 
   // ── Life: flexible weekly intentions, Luna, life admin ──
   for (const g of db.workoutGoals) {
@@ -225,6 +253,7 @@ export function planWeek(db: DB, now: Now, weekStart?: DateKey): WeekProposal {
     `Semana de ${fmtDM(ws)}: ${parts.length ? joinPt(parts) : 'só o que já é fixo'}.`,
     restLine.length ? `${cap(joinPt(restLine))} ${restLine.length === 1 ? 'fica leve' : 'ficam leves'}.` : undefined,
     conflicts.length ? `${conflicts.length === 1 ? 'Um conflito' : `${conflicts.length} conflitos`} pra você olhar.` : undefined,
+    careerOpen ? 'Metas de carreira seguem flexíveis — não encaixei mais pra não lotar a semana.' : undefined,
   ]
     .filter(Boolean)
     .join(' ')

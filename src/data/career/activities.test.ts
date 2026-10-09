@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { actions, getDB, hydrate } from '../store'
+import { actions, getDB, hydrate, useStore } from '../store'
 import { createMemoryAdapter } from '../storage'
 import { buildSeed } from '../seed'
 import { busyIntervals } from '../intel/context'
@@ -9,7 +9,7 @@ import { isCareerQuota } from '../selectors'
 import { groupTasks } from '@/features/tasks/groups'
 import { CAREER_SEED_IDS } from '@/features/career/seed'
 import { logCareerActivity, weekLine, weekProgress } from './activities'
-import { hmToMinutes } from '@/lib/date'
+import { addDays, hmToMinutes } from '@/lib/date'
 
 const MON = '2026-10-12'
 
@@ -50,26 +50,43 @@ describe('career activities (reusing tasks)', () => {
     expect(weekProgress(getDB(), MON).find((x) => x.kind === 'ingles_exec')?.done).toBe(0)
   })
 
-  it('"monta minha semana" places sessions only in free windows: never on presencial/rest days, never over trainings or fixed events', () => {
+  it('her real week (Cerâmica Mon/Thu evenings, presencial Tue/Wed, key sessions) is NOT filled up', () => {
+    const w = planWeek(getDB(), { date: MON, minutes: 8 * 60 }, MON)
+    w.apply()
+    const focus = getDB().tasks.filter((t) => t.date && t.date >= MON && t.date <= addDays(MON, 6) && (t.context === 'estudo' || t.context === 'carreira'))
+    const perDay = new Map<string, number>()
+    for (const t of focus) perDay.set(t.date!, (perDay.get(t.date!) ?? 0) + 1)
+    expect(Math.max(0, ...perDay.values()), 'one focus block per day at most').toBeLessThanOrEqual(1)
+    expect(w.summary).toMatch(/Metas de carreira seguem flexíveis/)
+  })
+
+  it('with room in the week, sessions go only into free windows: never presencial/rest, never near key sessions, max 3, two evenings stay free', () => {
+    // A week without Cerâmica (e.g. on vacation from it): evenings open up.
+    useStore.setState({ db: { ...getDB(), events: getDB().events.filter((e) => !/cer[aâ]mica/i.test(e.title)) } })
     const before = structuredClone(getDB())
     const w = planWeek(before, { date: MON, minutes: 8 * 60 }, MON)
     const careerItems = w.days.flatMap((d) => d.items.filter((i) => i.isNew && /Inglês executivo|Networking|Conteúdo profissional|liderança/.test(i.title)).map((i) => ({ ...i, date: d.date })))
     expect(careerItems.length).toBeGreaterThan(0)
+    expect(careerItems.length).toBeLessThanOrEqual(3)
     // Nothing written yet.
     expect(getDB().tasks.filter((t) => t.careerParentId)).toHaveLength(0)
     const undo = w.apply()
     const sessions = getDB().tasks.filter((t) => t.careerParentId)
     expect(sessions.length).toBe(careerItems.length)
+    const focusDays = new Set(getDB().tasks.filter((t) => t.date && t.date >= MON && t.date <= addDays(MON, 6) && (t.context === 'estudo' || t.context === 'carreira')).map((t) => t.date))
+    expect(7 - focusDays.size, 'evenings left alone').toBeGreaterThanOrEqual(2)
     for (const s of sessions) {
       const wd = new Date(`${s.date}T12:00:00Z`).getUTCDay()
       expect([2, 3]).not.toContain(wd) // Tue/Wed presencial
-      // Free at that time in the plan without this session.
       const others = { ...getDB(), tasks: getDB().tasks.filter((t) => t.id !== s.id) }
       const start = hmToMinutes(s.time!)
       const overlaps = busyIntervals(others, s.date!).some((b) => start < b.end && start + (s.durationMin ?? 30) > b.start)
       expect(overlaps, `${s.title} ${s.date} ${s.time}`).toBe(false)
+      for (const k of getDB().workouts.filter((x) => x.date === s.date && (x.isKeySession || x.isLongSession) && x.time)) {
+        const ks = hmToMinutes(k.time!)
+        expect(Math.abs(start - ks), `${s.title} near ${k.modality}`).toBeGreaterThanOrEqual(120)
+      }
     }
-    // Existing trainings/events untouched.
     expect(getDB().workouts.filter((x) => before.workouts.some((b) => b.id === x.id))).toEqual(before.workouts)
     expect(getDB().events).toEqual(before.events)
     undo()
@@ -84,6 +101,7 @@ describe('career activities (reusing tasks)', () => {
   })
 
   it('a placed session done counts once (same record), not twice', () => {
+    useStore.setState({ db: { ...getDB(), events: getDB().events.filter((e) => !/cer[aâ]mica/i.test(e.title)) } })
     planWeek(getDB(), { date: MON, minutes: 480 }, MON).apply()
     const s = getDB().tasks.find((t) => t.careerKind === 'ingles_exec' && t.careerParentId)!
     logCareerActivity('ingles_exec', s.date!, { minutes: 30 })

@@ -119,6 +119,8 @@ describe('Rotina', () => {
   })
 
   it('amanhã cancelei meu inglês — the session placed by "monta minha semana" is cancelled, nothing else', async () => {
+    // A week with free evenings (no Cerâmica): in her usual week the planner rightly places none.
+    for (const ev of getDB().events.filter((x) => /cer[aâ]mica/i.test(x.title))) actions.remove('events', ev.id)
     const plan = await say('monta minha semana', at(MON, '07:00'))
     if (plan.lumos?.status === 'pending') confirmReply(plan.id)
     await whenSaved()
