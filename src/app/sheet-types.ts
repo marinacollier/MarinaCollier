@@ -45,6 +45,11 @@ export interface SheetPropsMap {
   receivable: { id?: ID; extra?: boolean; date?: DateKey }
   /** Recurring contract (owner: features/finance). */
   contract: { id?: ID }
+  /** Career pipeline (owner: features/career). */
+  opportunity: { id?: ID }
+  contact: { id?: ID }
+  /** A win as an executive case (owner: features/career). */
+  evidence: { id: ID }
   /** Planned meal detail: plan, quantities, macros, trocas, Lumos (owner: features/nutrition). ref = '<planId>#<meal index>'. */
   mealDetail: { date: DateKey; ref: string }
   /** Meus alimentos: add from label / edit (owner: features/nutrition). */

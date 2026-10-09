@@ -200,6 +200,8 @@ export function emptyDB(): DB {
     lifeLog: [],
     attentionAcks: [],
     contracts: [],
+    opportunities: [],
+    contacts: [],
   }
 }
 

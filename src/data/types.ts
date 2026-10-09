@@ -1145,6 +1145,50 @@ export interface ProfessionalWin extends Entity {
   description?: string
   impact?: string
   link?: string
+  // ── Executive evidence (case) — same record, promoted when it's worth telling in an interview ──
+  /** Turned into an executive case ("evidência"). */
+  evidence?: boolean
+  context?: string
+  responsibility?: string
+  decision?: string
+  /** Numbers that prove the impact. Missing = the case shows "sem métricas". */
+  metrics?: string
+  confidentiality?: 'publico' | 'interno' | 'confidencial'
+  verification?: 'rascunho' | 'verificado'
+}
+
+// ─── Career pipeline (only the two entities that didn't exist) ──────────────
+
+export type OpportunityStatus = 'radar' | 'conversa' | 'processo' | 'entrevista' | 'proposta' | 'fechada' | 'descartada'
+
+/** A role in her pipeline. Never invented: created only from what Marina says or types. */
+export interface Opportunity extends Entity {
+  company: string
+  role: string
+  country?: string
+  workModel?: 'remoto' | 'hibrido' | 'presencial'
+  /** Free text as she said it ("R$ 40–45k CLT", "USD 180k"). */
+  compensation?: string
+  employmentType?: 'clt' | 'pj' | 'internacional' | 'outro'
+  status: OpportunityStatus
+  nextAction?: string
+  nextActionDate?: DateKey
+  contactIds?: ID[]
+  notes?: string
+  /** Last time something happened (for "sem follow-up há N dias"). */
+  lastActivityAt?: DateKey
+  history?: { date: DateKey; status: OpportunityStatus; note?: string }[]
+}
+
+export interface ProfessionalContact extends Entity {
+  name: string
+  company?: string
+  role?: string
+  relationship?: 'mentor' | 'recrutador' | 'par' | 'lideranca' | 'cliente' | 'amizade' | 'outro'
+  lastInteraction?: DateKey
+  nextFollowUp?: DateKey
+  notes?: string
+  interactions?: { date: DateKey; note?: string }[]
 }
 
 export type WorkInboxKind =
@@ -1446,6 +1490,10 @@ export interface WeeklyReview extends Entity {
 export interface MonthlyReview extends Entity {
   /** 'YYYY-MM' */
   month: string
+  /** Missing = the life review. 'carreira' = Executive Career Review. */
+  kind?: 'vida' | 'carreira'
+  /** Executive Career Review answers (her six questions). */
+  career?: { advanced?: string; opportunities?: string; skills?: string; results?: string; blocked?: string; priorities?: string[] }
   highlights: string[]
   notes?: string
   takeForward?: string
@@ -1586,6 +1634,8 @@ export interface DB {
   lifeLog: LifeEvent[]
   attentionAcks: AttentionAck[]
   contracts: FinancialContract[]
+  opportunities: Opportunity[]
+  contacts: ProfessionalContact[]
 }
 
 /** Keys of DB that hold arrays of entities. */

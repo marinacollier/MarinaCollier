@@ -112,6 +112,8 @@ export const COLLECTION_LABELS: Partial<Record<CollectionKey, string>> = {
   lifeLog: 'Linha da vida (acontecimentos)',
   attentionAcks: 'Decisões resolvidas',
   contracts: 'Contratos',
+  opportunities: 'Oportunidades',
+  contacts: 'Contatos profissionais',
 }
 
 export interface BackupPreview {

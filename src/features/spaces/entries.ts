@@ -75,6 +75,11 @@ function trabalho(db: DB, today: DateKey): SpaceEntry[] {
     const ideas = db.contentItems.filter((c) => c.stage === 'ideia').length
     out.push({ key: 'creator', label: creator.find((p) => p.status === 'ativo')?.name ?? 'Creator / UGC', emoji: '🎬', to: ROUTES.creator, tone: 'plum', module: 'creator', hint: ideas ? plural(ideas, 'ideia', 'ideias') : undefined })
   }
+  const north = db.goals.find((g) => g.level === 'maior' && g.category === 'profissional' && g.status === 'ativa')
+  if (north || db.opportunities?.length) {
+    const open = (db.opportunities ?? []).filter((o) => !['fechada', 'descartada'].includes(o.status)).length
+    out.unshift({ key: 'career', label: 'Carreira 2027', emoji: '🧭', to: ROUTES.career, tone: 'accent', hint: open ? plural(open, 'oportunidade aberta', 'oportunidades abertas') : north ? 'North Star · semana' : undefined })
+  }
   const waiting = waitingFor(db).length
   if (waiting) out.push({ key: 'waiting', label: 'Esperando retorno', emoji: '⏳', to: ROUTES.work, tone: 'ink', hint: plural(waiting, 'item', 'itens') })
   return out
