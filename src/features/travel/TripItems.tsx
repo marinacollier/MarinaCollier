@@ -111,7 +111,8 @@ export function ItemRow({ item, showDate, review }: { item: TripItem; showDate?:
     item.confirmationCode ? `cód. ${item.confirmationCode}` : undefined,
     item.notes,
   ].filter(Boolean)
-  const showStatusPill = review || !checkable || item.status === 'a_confirmar' || cancelled
+  // The check says done/confirmed; the pill only for the other states (a confirmar, cancelado…).
+  const showStatusPill = item.status !== 'feito' && item.status !== 'confirmado' && item.status !== 'a_fazer'
   const statusMeta = useMemo(
     () => (review ? { ...STATUS_META, a_confirmar: { ...STATUS_META.a_confirmar, label: statusLabel('a_confirmar', true) } } : STATUS_META),
     [review],
@@ -129,17 +130,18 @@ export function ItemRow({ item, showDate, review }: { item: TripItem; showDate?:
     >
       <div className="px-4 py-2.5">
         <div className="flex items-center gap-3 min-h-11">
-          {checkable && !review && (
-            <Checkbox
-              checked={done}
-              label={item.title}
-              className="ml-0.5"
-              onChange={(v) => {
-                setStatus(item, v ? 'feito' : 'a_fazer')
-                if (v) haptic('success')
-              }}
-            />
-          )}
+          {/* Every line has a check (no sheet, no confirm): to-dos → feito; bookings/flights/stays → confirmado. */}
+          <Checkbox
+            checked={done || item.status === 'confirmado'}
+            label={item.title}
+            className="ml-0.5"
+            onChange={(v) => {
+              const before = item.status
+              setStatus(item, v ? (checkable ? 'feito' : 'confirmado') : checkable ? 'a_fazer' : 'a_confirmar')
+              if (v) haptic('success')
+              toast(v ? (checkable ? `${item.title} ✓` : `${item.title}: confirmado ✓`) : `${item.title}: desmarcado`, { action: { label: 'Desfazer', run: () => actions.update('tripItems', item.id, { status: before }) } })
+            }}
+          />
           <button type="button" className="flex-1 min-w-0 text-left py-1" onClick={() => openSheet('tripItem', { id: item.id })}>
             <div className={cn('text-[15px] leading-snug', (done || cancelled) && 'text-muted line-through decoration-muted/50')}>{item.title}</div>
             {meta.length > 0 && <div className="text-[12.5px] text-muted mt-0.5 line-clamp-2">{meta.join(' · ')}</div>}

@@ -12,6 +12,7 @@ import { ROUTES } from '@/app/routes'
 import { actions, getDB, persist, useDB } from '@/data/store'
 import { nowISO } from '@/lib/id'
 import { tripPriorityItems, type TripPending } from '../context'
+import { isCheckable } from '@/features/travel/selectors'
 import type { AttentionItem, ChangeItem, Insight, LifeContext } from '@/data/intel'
 import type { DateKey, DayPriority } from '@/data/types'
 import { cn } from '@/lib/cn'
@@ -385,7 +386,8 @@ function checkTripPending(p: TripPending): (() => void) | undefined {
     const it = getDB().tripItems.find((x) => x.id === p.id)
     if (!it) return undefined
     const before = it.status
-    actions.update('tripItems', it.id, { status: 'feito' })
+    // Same meaning as the trip page's check: to-dos → feito; bookings, flights, stays → confirmado.
+    actions.update('tripItems', it.id, { status: isCheckable(it.section) ? 'feito' : 'confirmado' })
     return () => actions.update('tripItems', it.id, { status: before })
   }
   const task = getDB().tasks.find((x) => x.id === p.id)
