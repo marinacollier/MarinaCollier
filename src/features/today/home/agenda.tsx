@@ -72,9 +72,9 @@ export function ActionRow({ item, today, showTime = true }: { item: ActionItem; 
               {item.front.label}
             </span>
           )}
-          <span className={cn('block text-[15.5px] leading-snug', done ? 'text-muted line-through decoration-muted/40' : 'text-ink')}>
+          <span className="block text-[15.5px] leading-snug">
             {item.emoji && <span className="mr-1.5">{item.emoji}</span>}
-            {item.title}
+            <span className={done ? 'text-muted line-through decoration-muted/40' : 'text-ink'}>{item.title}</span>
             {(item.sub || (done && item.doneAt)) && <span className="text-muted text-[13px]"> · {done && item.doneAt ? `✓ ${item.doneAt}` : item.sub}</span>}
           </span>
         </button>

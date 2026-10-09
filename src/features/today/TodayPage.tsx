@@ -133,7 +133,8 @@ export default function TodayPage() {
           <AttentionRow items={attention} onAsk={ask} />
           <InsightLines items={insights} onAsk={ask} />
           <ChangesLine summary={changes.summary} items={changes.items} />
-          {trip && <TripLine trip={trip} />}
+          {/* The trip shows once: as an insight when Lumos already raised it, else as its own line. */}
+          {trip && !insights.some((i) => i.key.startsWith(`trip:${trip.id}`)) && <TripLine trip={trip} />}
         </motion.div>
       )}
 
