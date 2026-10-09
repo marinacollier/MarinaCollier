@@ -6,12 +6,21 @@ import { useDB } from '@/data/store'
 import { addExtraIncome, cancelReceivable, markExpected, markReceived, receivableStatus, receivablesFor, updateReceivable } from '@/data/finance/receivables'
 import { Button, DateInput, Field, MoneyInput, SheetLayout, TextArea, TitleInput } from '@/components/ui'
 import { useToday } from '@/hooks/useToday'
+import { LockGate } from '@/components/layout/LockGate'
 import { monthKey } from '@/lib/date'
 import { formatBRL } from '@/lib/money'
 import { haptic } from '@/lib/haptics'
 import { STATUS_LABEL, monthLabel } from './IncomeSection'
 
-export default function ReceivableSheet({ id, extra, date }: SheetProps<'receivable'>) {
+export default function ReceivableSheetGuarded(props: Parameters<typeof ReceivableSheet>[0]) {
+  return (
+    <LockGate area="dinheiro" compact>
+      <ReceivableSheet {...props} />
+    </LockGate>
+  )
+}
+
+function ReceivableSheet({ id, extra, date }: SheetProps<'receivable'>) {
   const db = useDB()
   const today = useToday()
   const rec = useMemo(() => {

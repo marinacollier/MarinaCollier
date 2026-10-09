@@ -14,6 +14,7 @@ import { DuplicatesSection } from './DuplicatesSection'
 import { CategoriesEditor } from './CategoriesEditor'
 import { ConnectionsSection } from './ConnectionsSection'
 import { IncomeSection } from './IncomeSection'
+import { LockGate } from '@/components/layout/LockGate'
 
 function Stat({ label, cents, big }: { label: string; cents: number; big?: boolean }) {
   return (
@@ -26,8 +27,16 @@ function Stat({ label, cents, big }: { label: string; cents: number; big?: boole
   )
 }
 
-/** Dinheiro: consciência diária, nunca julgamento. */
-export default function FinancePage() {
+/** Dinheiro: consciência diária, nunca julgamento. Protected by the optional privacy lock. */
+export default function FinancePageGuarded() {
+  return (
+    <LockGate area="dinheiro">
+      <FinancePage />
+    </LockGate>
+  )
+}
+
+function FinancePage() {
   const expenses = useDB((db) => db.expenses)
   const categories = useDB((db) => db.financialCategories)
   const trips = useDB((db) => db.trips)

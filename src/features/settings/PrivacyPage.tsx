@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { ROUTES } from '@/app/routes'
 import { ListCard, ListRow, Page, PageHeader } from '@/components/ui'
 import { useDB } from '@/data/store'
+import { PrivacyLockSection } from './PrivacyLockSection'
 
 function Item({ emoji, title, children }: { emoji: string; title: string; children: React.ReactNode }) {
   return (
@@ -42,6 +43,8 @@ export default function PrivacyPage() {
           Agenda, e-mail e finanças só sincronizam depois que você conecta — e dá pra desligar a qualquer momento.
         </Item>
       </motion.div>
+
+      <PrivacyLockSection />
 
       <ListCard className="mt-5">
         <ListRow title="Conexões" subtitle="o que está ligado" chevron onPress={() => nav(ROUTES.integrations)} />

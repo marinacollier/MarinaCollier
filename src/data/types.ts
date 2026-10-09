@@ -336,6 +336,20 @@ export interface FeatureFlags {
 
 export type ThemePref = 'light' | 'dark' | 'system'
 
+export type LockArea = 'dinheiro' | 'carreira'
+
+export interface PrivacyLock {
+  enabled: boolean
+  areas: LockArea[]
+  /** Local code (always present, so she can never be locked out): PBKDF2-SHA256 hash + salt, base64. */
+  pinHash: string
+  pinSalt: string
+  /** Face ID / Touch ID through WebAuthn (platform authenticator). Device-bound; absent after restoring elsewhere. */
+  credentialId?: string
+  /** Re-lock after the app stays in the background this long. */
+  relockMinutes: number
+}
+
 export interface UserProfile {
   name: string
   timezone: 'America/Sao_Paulo'
@@ -366,6 +380,8 @@ export interface UserProfile {
   lumosLastSeenAt?: ISODateTime
   /** Last successful full backup export (for Lumos' monthly reminder). */
   lastBackupAt?: ISODateTime
+  /** Optional privacy lock for sensitive areas (not the whole app). A UI lock, not encryption at rest. */
+  privacyLock?: PrivacyLock
   /** Food likes / aversions Lumos respects when choosing among the nutritionist's substitutions. */
   foodPrefs?: { likes: string[]; dislikes: string[] }
 }

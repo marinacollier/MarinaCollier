@@ -8,9 +8,18 @@ import { ensureReceivables, updateContract } from '@/data/finance/receivables'
 import type { FinancialContract } from '@/data/types'
 import { DateInput, Field, MoneyInput, MoreOptions, NumberInput, Segmented, SheetLayout, TextArea, TitleInput } from '@/components/ui'
 import { useToday } from '@/hooks/useToday'
+import { LockGate } from '@/components/layout/LockGate'
 import { haptic } from '@/lib/haptics'
 
-export default function ContractSheet({ id }: SheetProps<'contract'>) {
+export default function ContractSheetGuarded(props: Parameters<typeof ContractSheet>[0]) {
+  return (
+    <LockGate area="dinheiro" compact>
+      <ContractSheet {...props} />
+    </LockGate>
+  )
+}
+
+function ContractSheet({ id }: SheetProps<'contract'>) {
   const today = useToday()
   const existing = useDB((db) => db.contracts.find((c) => c.id === id))
   const [client, setClient] = useState(existing?.client ?? '')
