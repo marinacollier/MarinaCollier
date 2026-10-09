@@ -1,0 +1,65 @@
+// Pagamentos do mês (check + due day) and a pasted Daily Briefing, in a real browser (iPhone 13), with reopen.
+import { createRequire } from 'module'
+import fs from 'fs'
+const require = createRequire(new URL('../package.json', import.meta.url))
+const { chromium, devices } = require('playwright')
+const base = 'http://localhost:4310'
+const dir = new URL('./.profiles/profile-money', import.meta.url).pathname
+const shots = new URL('./.shots/', import.meta.url).pathname
+fs.rmSync(dir, { recursive: true, force: true })
+fs.mkdirSync(shots, { recursive: true })
+const log = (...a) => console.log(...a)
+const open = async (path = '/') => {
+  const ctx = await chromium.launchPersistentContext(dir, { ...devices['iPhone 13'] })
+  const page = ctx.pages()[0] ?? (await ctx.newPage())
+  page.on('pageerror', (e) => log('PAGEERROR', e.message))
+  await page.goto(base + path)
+  await page.waitForTimeout(2500)
+  const enter = page.getByRole('button', { name: /Entrar no meu dia/i })
+  if (await enter.count()) { await enter.click(); await page.waitForTimeout(800); if (path !== '/') { await page.goto(base + path); await page.waitForTimeout(1500) } }
+  return { ctx, page }
+}
+let { ctx, page } = await open('/dinheiro')
+const title = page.getByText('Pagamentos do mês')
+await title.scrollIntoViewIfNeeded()
+await page.screenshot({ path: shots + 'money-bills.png' })
+await page.getByRole('button', { name: 'Paguei: Aluguel' }).click()
+await page.waitForTimeout(400)
+await page.getByLabel('Dia de vencimento de Cartão de Crédito C6').selectOption('5')
+await page.waitForTimeout(800)
+await ctx.close()
+;({ ctx, page } = await open('/dinheiro'))
+await page.getByText('Pagamentos do mês').scrollIntoViewIfNeeded()
+log('pagos line:', await page.getByText(/de \d+ pagos/).textContent())
+log('C6 due day kept:', await page.getByLabel('Dia de vencimento de Cartão de Crédito C6').inputValue())
+await page.getByRole('button', { name: /^Pagos · / }).click()
+log('Aluguel still paid:', await page.getByRole('button', { name: 'Desmarcar Aluguel' }).count() === 1)
+const m = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }))
+log('horizontal overflow:', m.sw > m.cw + 1)
+await ctx.close()
+
+;({ ctx, page } = await open('/'))
+const briefing = `# DAILY EXECUTIVE BRIEFING\n\nResumo do dia: Pix Automático ganha escala e muda a disputa por recorrência; agentes de IA saem do piloto em crédito, e governança vira diferencial. Career capital: narrativa de quem formula tese e influencia decisão. The One Thing: publicar a tese.\n\n\`\`\`json\n{"date":"${new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })}","source":"Daily Executive Briefing","tasks":[{"title":"Escrever post sobre Pix Automático","category":"Carreira","project":"Carreira","priority":"P1","done_criteria":"Rascunho salvo","estimated_minutes":30,"status":"todo","due_date":null},{"title":"Solucionar conta Apple","category":"Produto/IA","project":"Fashion Finder","priority":"P1","done_criteria":"Conta ok","estimated_minutes":45,"status":"todo","due_date":null}]}\n\`\`\``
+const box = page.getByLabel(/^Fal[ae] com a Lumos$/).last()
+await box.fill(briefing)
+await box.press('Enter')
+await page.waitForTimeout(1500)
+await page.getByRole('button', { name: 'Colocar no app' }).scrollIntoViewIfNeeded()
+await page.screenshot({ path: shots + 'briefing-confirm.png' })
+await page.getByRole('button', { name: 'Colocar no app' }).click()
+await page.waitForTimeout(1500)
+await page.getByRole('button', { name: /fechar conversa/ }).click().catch(() => {})
+await page.waitForTimeout(800)
+await ctx.close()
+;({ ctx, page } = await open('/'))
+await page.locator('section[aria-label="Hoje"]').scrollIntoViewIfNeeded()
+await page.screenshot({ path: shots + 'briefing-home.png' })
+for (const t of ['Escrever post sobre Pix Automático', 'Solucionar conta Apple'])
+  log(`on Hoje with check: ${t}:`, await page.locator(`section[aria-label="Hoje"] button[aria-label="Concluir: ${t}"]`).count())
+await page.locator(`section[aria-label="Hoje"] button[aria-label="Concluir: Escrever post sobre Pix Automático"]`).click()
+await page.waitForTimeout(800)
+await ctx.close()
+;({ ctx, page } = await open('/'))
+await page.getByRole('button', { name: /^Feitos hoje · / }).first().click()
+log('post still done after reopen:', await page.locator(`section[aria-label="Hoje"] button[aria-label="Desmarcar Escrever post sobre Pix Automático"]`).count())
+await ctx.close()
