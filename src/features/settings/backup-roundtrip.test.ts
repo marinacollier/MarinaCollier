@@ -53,7 +53,7 @@ function liveALittle() {
   actions.create('lifeLog', { at: `${TODAY}T15:00:00.000-03:00`, date: TODAY, kind: 'done', title: 'Correu 50 min', by: 'marina', provenance: 'user' })
   // Evidence (a win turned into a case), a placed career session, settings & preferences, Lumos state.
   const win = getDB().wins.at(-1)!
-  actions.update('wins', win.id, { evidence: 'Busca semântica em produção', metrics: '+18% conversão', confidentiality: 'interno', verification: 'verificado' })
+  actions.update('wins', win.id, { evidence: true, context: 'Busca semântica em produção', metrics: '+18% conversão', confidentiality: 'interno', verification: 'verificado' })
   const quota = getDB().tasks.find((t) => t.careerKind === 'ingles_exec' && !t.careerParentId)
   if (quota) actions.create('tasks', { title: '🗣️ Inglês executivo', date: TODAY, time: '19:00', durationMin: 30, status: 'done', context: 'carreira', careerKind: 'ingles_exec', careerParentId: quota.id, order: 990 })
   actions.setProfile({ theme: 'dark', rhythm: { wakeTime: '04:40', sleepTime: '22:00' }, lumosLastSeenAt: `${TODAY}T09:00:00.000Z`, privacyLock: { enabled: true, areas: ['dinheiro'], pinHash: 'h', pinSalt: 's', relockMinutes: 5 } })

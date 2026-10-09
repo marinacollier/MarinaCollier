@@ -198,7 +198,8 @@ function promised(input: HandlerInput): LumosReply | undefined {
   const original = text.trim().replace(/^(?:a|o)\s+/i, '').split(/\s+/).slice(0, who.split(' ').length).join(' ')
   const known = people(db).find((p) => normalize(p.name) === who || firstWord(p.name) === firstWord(who))
   const name = known?.name ?? cap(original)
-  const title = /^(?:responder|retornar|dar (?:um )?retorno|confirmar)\b/.test(what) ? `Retorno de ${name}` : `${name}: ${what}`
+  // The title is WHAT is awaited; who is in waiting.who (screens show "Esperando Fran: Retorno").
+  const title = /^(?:responder|retornar|dar (?:um )?retorno)\b/.test(what) ? 'Retorno' : cap(what)
   const when = day ? `${relativeDay(day, now.date)} (${formatDayMonth(day)})` : undefined
   const existing = db.tasks.filter((t) => t.status === 'waiting' && t.waiting?.who && (normalize(t.waiting.who) === who || firstWord(t.waiting.who) === firstWord(who)))
   if (existing.length > 1)
@@ -223,7 +224,7 @@ function promised(input: HandlerInput): LumosReply | undefined {
   const id = uid()
   return {
     area: AREA,
-    text: `Anotei em Esperando: ${title}${when ? ` — retorno ${when}` : ''} ✓`,
+    text: `Anotei em Esperando: ${name} · ${title}${when ? ` — ${relativeDay(day!, now.date) === 'hoje' ? 'hoje' : `até ${when}`}` : ''} ✓`,
     sub: when ? `Se não vier até ${relativeDay(day!, now.date)}, eu te lembro.` : 'Sem dia combinado — quando quiser um, é só dizer.',
     ref: { type: 'task', id },
     action: {

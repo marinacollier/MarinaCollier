@@ -169,7 +169,7 @@ function Composer({ variant, placeholder }: { variant: 'home' | 'page'; placehol
         autoComplete="off"
         aria-label="Fale com a Lumos"
         placeholder={placeholder}
-        className={cn('w-full resize-none bg-transparent outline-none text-[16px] leading-snug placeholder:text-muted', variant === 'home' ? 'min-h-[48px] font-display text-[18px] placeholder:font-display' : 'min-h-[36px] py-1.5 pr-24')}
+        className={cn('w-full resize-none bg-transparent outline-none text-[16px] leading-snug placeholder:text-muted', variant === 'home' ? 'min-h-[48px] font-display text-[18px] placeholder:font-display' : 'min-h-[36px] py-1.5 pr-36')}
       />
       <div className={cn('flex items-center gap-1', variant === 'home' ? 'justify-end mt-1' : 'absolute right-2 bottom-2')}>
         <input ref={fileRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
