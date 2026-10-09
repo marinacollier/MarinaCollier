@@ -44,6 +44,10 @@ function liveALittle() {
   actions.create('pantry', { name: 'frango grelhado', kind: 'preparado', portions: 6, remaining: 6, madeAt: TODAY })
   actions.create('memory', { kind: 'fact', area: 'luna', text: 'Luna é Border Collie', key: 'luna.raca', status: 'confirmed', source: 'marina' })
   actions.create('scheduleOverrides', { date: TODAY, refType: 'routineItem', refId: item.id, time: '05:10', by: 'marina' })
+  const opp = actions.create('opportunities', { company: 'Empresa X', role: 'Head of Product', status: 'entrevista', history: [{ date: TODAY, status: 'entrevista' }] })
+  actions.create('contacts', { name: 'Ana', company: 'Empresa X', lastInteraction: TODAY, interactions: [{ date: TODAY }] })
+  actions.update('opportunities', opp.id, { contactIds: [getDB().contacts[0].id] })
+  actions.create('monthlyReviews', { id: 'career-review-2026-10', month: '2026-10', kind: 'carreira', highlights: ['Fechar 2 cases'], career: { advanced: 'Inglês executivo: 3×', priorities: ['Fechar 2 cases'] } })
   ensureReceivables(TODAY)
   markReceived(receivableId(FINANCE_SEED_IDS.contractSantander, TODAY.slice(0, 7)), { at: `${TODAY}T10:00:00.000-03:00` })
   actions.create('lifeLog', { at: `${TODAY}T15:00:00.000-03:00`, date: TODAY, kind: 'done', title: 'Correu 50 min', by: 'marina', provenance: 'user' })
@@ -81,7 +85,7 @@ describe('backup → restore round trip', () => {
     await hydrate(device)
     const after = getDB()
     expect(counts(after)).toEqual(counts(before))
-    for (const key of ['tasks', 'occurrences', 'routines', 'routineItems', 'workouts', 'meals', 'books', 'goals', 'wins', 'expenses', 'pantry', 'memory', 'scheduleOverrides', 'lifeLog', 'contracts'] as const)
+    for (const key of ['tasks', 'occurrences', 'routines', 'routineItems', 'workouts', 'meals', 'books', 'goals', 'wins', 'expenses', 'pantry', 'memory', 'scheduleOverrides', 'lifeLog', 'contracts', 'opportunities', 'contacts', 'monthlyReviews'] as const)
       expect(after[key], key).toEqual(before[key])
 
     // Relations still point at real records.
@@ -91,6 +95,7 @@ describe('backup → restore round trip', () => {
     expect(after.meals.find((m) => m.description === 'YoPRO')?.workoutId).toBe(made.workout.id)
     expect(after.goals.find((g) => g.parentId === made.goal.id)?.title).toMatch(/networking/)
     expect(after.scheduleOverrides[0].refId).toBe(made.item.id)
+    expect(after.opportunities[0].contactIds).toEqual([after.contacts[0].id])
     const santanderOct = after.expenses.find((e) => e.id === receivableId(FINANCE_SEED_IDS.contractSantander, TODAY.slice(0, 7)))
     expect(santanderOct).toMatchObject({ type: 'income', status: 'received', contractId: FINANCE_SEED_IDS.contractSantander })
   })

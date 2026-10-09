@@ -29,6 +29,7 @@ import {
 } from '@/data/career/pipeline'
 import { findContract, markExpected, markReceived, monthIncome, receivableStatus, receivablesFor } from '@/data/finance/receivables'
 import { actions } from '@/data/store'
+import { REVIEW_QUESTIONS, reviewDraft, saveCareerReview, savedReview } from '@/data/career/review'
 import { isCareerQuota } from '@/data/selectors'
 import type { CareerKind, DB, LockArea, Opportunity } from '@/data/types'
 import { addDays, monthKey } from '@/lib/date'
@@ -337,8 +338,29 @@ function evidence(input: HandlerInput): LumosReply | undefined {
   }
 }
 
+// ─── Executive Career Review ────────────────────────────────────────────────
+
+function review(input: HandlerInput): LumosReply | undefined {
+  const { db, n, now } = input
+  if (!/\b(revisao|review)\b.*\b(executiva|carreira|career)\b|\bexecutive career review\b/.test(n)) return undefined
+  const l = locked(db, 'carreira')
+  if (l) return l
+  const month = monthKey(now.date)
+  const draft = reviewDraft(db, month, now.date)
+  const sections = REVIEW_QUESTIONS.map((q) => ({ title: q.label, lines: (draft[q.key] ?? '').split('\n').filter(Boolean).map((text) => ({ text })) })).filter((s) => s.lines.length)
+  const done = savedReview(db, month)?.completedAt
+  return {
+    area: CAREER,
+    text: sections.length ? 'Montei o rascunho com o que já está registrado — você não precisa recadastrar nada.' : 'Ainda não tem registro de carreira neste mês, então o rascunho está em branco — me conta o que avançou?',
+    sections,
+    sub: 'Faltam as três prioridades do próximo mês — essas são suas.',
+    options: [{ label: done ? 'Atualizar com este rascunho' : 'Salvar este rascunho', act: { done: 'Revisão salva ✓ Dá pra ajustar em Carreira 2027.', run: () => saveCareerReview(month, { ...draft, ...(savedReview(db, month)?.career ?? {}) }, 'lumos') } }],
+    link: { label: 'Abrir e ajustar', to: ROUTES.careerReview },
+  }
+}
+
 function careerAll(input: HandlerInput): LumosReply | undefined {
-  return money(input) ?? logActivity(input) ?? progress(input) ?? opportunities(input) ?? people(input) ?? evidence(input)
+  return money(input) ?? logActivity(input) ?? progress(input) ?? review(input) ?? opportunities(input) ?? people(input) ?? evidence(input)
 }
 
 export const careerHandler: Handler = { id: 'career', run: careerAll }

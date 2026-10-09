@@ -34,7 +34,8 @@ export function boardEventOfMonth(db: DB, month: string): { event: CalendarEvent
 }
 
 export function findMonthlyReview(reviews: MonthlyReview[], month: string): MonthlyReview | undefined {
-  return reviews.find((r) => r.month === month)
+  // The life review only; the Executive Career Review (kind 'carreira') lives next to it, separately.
+  return reviews.find((r) => r.month === month && r.kind !== 'carreira')
 }
 
 export interface AutoHighlight {

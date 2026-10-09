@@ -3,6 +3,8 @@
  * monthly reviews) + opportunities/contacts. Lumos operates all of it; this page is for looking.
  */
 import { useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { savedReview } from '@/data/career/review'
 import { Plus } from 'lucide-react'
 import { ROUTES } from '@/app/routes'
 import { openSheet, toast } from '@/app/ui-store'
@@ -45,6 +47,8 @@ function CareerPage() {
   const follow = useMemo(() => dueFollowUps(db, today), [db, today])
   const recentPeople = useMemo(() => [...db.contacts].filter((c) => !follow.includes(c)).sort((a, b) => (b.lastInteraction ?? '').localeCompare(a.lastInteraction ?? '')).slice(0, 4), [db.contacts, follow])
   const caseList = useMemo(() => cases(db), [db])
+  const nav = useNavigate()
+  const reviewDone = !!savedReview(db, today.slice(0, 7))?.completedAt
   const promotable = useMemo(() => db.wins.filter((w) => !w.evidence).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3), [db.wins])
 
   return (
@@ -151,6 +155,17 @@ function CareerPage() {
         ) : (
           <p className="text-[13px] text-muted">“Falei com a Ana da empresa X hoje” e a Lumos guarda aqui.</p>
         )}
+      </Card>
+
+      <SectionTitle>Revisão mensal</SectionTitle>
+      <Card className="p-4">
+        <button type="button" onClick={() => nav(ROUTES.careerReview)} className="w-full text-left flex items-center justify-between gap-3">
+          <span>
+            <span className="block text-[14.5px]">Executive Career Review</span>
+            <span className="block text-[12.5px] text-muted">{reviewDone ? 'feita este mês ✓' : 'rascunho pronto com o que você já registrou'}</span>
+          </span>
+          <span className="text-muted">›</span>
+        </button>
       </Card>
 
       <SectionTitle>Cases e evidências</SectionTitle>

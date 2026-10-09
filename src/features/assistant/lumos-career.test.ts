@@ -142,3 +142,20 @@ describe('Lumos · career', () => {
     expect(getDB().tasks.length).toBeGreaterThan(tasksBefore)
   })
 })
+
+describe('Lumos · Executive Career Review', () => {
+  it('"faz minha revisão executiva do mês" → drafts from existing data (no re-entry), saves one review per month', () => {
+    talk('Registra 30 minutos de inglês executivo hoje.')
+    addOpportunity({ role: 'Head of Product', company: 'Empresa X' }, FRI)
+    const r = reply(talk('faz minha revisão executiva do mês'))
+    expect(r.text).toMatch(/você não precisa recadastrar nada/)
+    expect(r.sections?.map((s) => s.title)).toEqual(['O que avancei?', 'Quais oportunidades surgiram?'])
+    expect(r.sections?.[0].lines[0].text).toBe('Inglês executivo: 1×')
+    runOption(r.options![0])
+    runOption(reply(talk('faz minha revisão executiva do mês')).options![0])
+    const saved = getDB().monthlyReviews.filter((x) => x.kind === 'carreira')
+    expect(saved).toHaveLength(1)
+    expect(saved[0].month).toBe('2026-10')
+    expect(JSON.stringify(saved[0])).not.toMatch(/%|prontid/)
+  })
+})
