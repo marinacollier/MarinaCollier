@@ -1,6 +1,8 @@
 /**
  * Backup format + validation. Pure: no DOM, no store.
- * File shape: { app: 'marina-os', schemaVersion, exportedAt, db }.
+ * File shape (format 2): { app: 'marina-os', format, schemaVersion, seedVersion, exportedAt, counts, checksum, db }.
+ * Restore REPLACES the database (never merges), so nothing gets duplicated; duplicate ids inside the
+ * file itself are collapsed (latest updatedAt wins). The checksum catches files edited or truncated by hand.
  */
 import { SCHEMA_VERSION, emptyDB } from '@/data/defaults'
 import type { CollectionKey, DB } from '@/data/types'
@@ -8,15 +10,45 @@ import { todayKey } from '@/lib/date'
 
 export const BACKUP_APP = 'marina-os'
 
+/** Version of the file wrapper itself (independent of the DB schema). */
+export const BACKUP_FORMAT = 2
+
 export interface BackupFile {
   app: typeof BACKUP_APP
+  format?: number
   schemaVersion: number
+  seedVersion?: number
   exportedAt: string
+  /** Items per collection at export time (shown before restoring; also a sanity check). */
+  counts?: Partial<Record<CollectionKey, number>>
+  /** FNV-1a of JSON.stringify(db). Optional so older backups still restore. */
+  checksum?: string
   db: DB
 }
 
+/** Small, dependency-free FNV-1a (32-bit) — integrity, not security. */
+export function checksumOf(text: string): string {
+  let h = 0x811c9dc5
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i)
+    h = Math.imul(h, 0x01000193)
+  }
+  return (h >>> 0).toString(16).padStart(8, '0')
+}
+
 export function makeBackup(db: DB, now: Date = new Date()): BackupFile {
-  return { app: BACKUP_APP, schemaVersion: db.schemaVersion ?? SCHEMA_VERSION, exportedAt: now.toISOString(), db }
+  const counts: BackupFile['counts'] = {}
+  for (const key of COLLECTION_KEYS) counts[key] = (db[key] as unknown[] | undefined)?.length ?? 0
+  return {
+    app: BACKUP_APP,
+    format: BACKUP_FORMAT,
+    schemaVersion: db.schemaVersion ?? SCHEMA_VERSION,
+    seedVersion: db.profile?.seedVersion,
+    exportedAt: now.toISOString(),
+    counts,
+    checksum: checksumOf(JSON.stringify(db)),
+    db,
+  }
 }
 
 export function backupFilename(now: Date = new Date()): string {
@@ -90,6 +122,10 @@ export interface BackupPreview {
   upgraded: boolean
   counts: { key: CollectionKey; label: string; count: number }[]
   total: number
+  /** Same id twice inside the file (collapsed, latest wins). */
+  duplicatesRemoved: number
+  /** Links pointing at something that isn't in the file (restored anyway; shown so nothing is silent). */
+  warnings: string[]
 }
 
 export type BackupValidation = BackupPreview | { ok: false; error: string }
@@ -115,6 +151,8 @@ export function validateBackup(raw: unknown): BackupValidation {
     dbRaw = raw
   }
   if (!isObj(dbRaw)) return { ok: false, error: 'O backup está sem os dados. Confere se é o arquivo certo?' }
+  if (isObj(raw) && typeof raw.checksum === 'string' && checksumOf(JSON.stringify(dbRaw)) !== raw.checksum)
+    return { ok: false, error: 'Esse backup foi alterado ou está incompleto (a verificação não bate). Usa o arquivo original.' }
   if (!isObj(dbRaw.profile)) return { ok: false, error: 'O backup está sem o perfil. Confere se é o arquivo certo?' }
 
   const version = Number(declaredVersion ?? dbRaw.schemaVersion ?? 0)
@@ -135,13 +173,49 @@ export function validateBackup(raw: unknown): BackupValidation {
   }
   if (found === 0) return { ok: false, error: 'Não achei nenhuma lista de dados nesse arquivo.' }
 
+  const { db, removed } = dedupeById(dbRaw as unknown as DB)
   return {
     ok: true,
-    db: dbRaw as unknown as DB,
+    db,
     schemaVersion: version,
     exportedAt,
     upgraded: version < SCHEMA_VERSION,
     counts: counts.filter((c) => c.count > 0),
     total: counts.reduce((s, c) => s + c.count, 0),
+    duplicatesRemoved: removed,
+    warnings: relationWarnings(db),
   }
+}
+
+/** Collapses repeated ids inside each collection (keeps the most recently updated copy). */
+export function dedupeById(db: DB): { db: DB; removed: number } {
+  let removed = 0
+  const out = { ...db } as unknown as Record<string, unknown>
+  for (const key of COLLECTION_KEYS) {
+    const list = (db as unknown as Record<string, unknown>)[key]
+    if (!Array.isArray(list)) continue
+    const byId = new Map<string, { id: string; updatedAt?: string }>()
+    for (const it of list as { id: string; updatedAt?: string }[]) {
+      const prev = byId.get(it.id)
+      if (prev) removed++
+      if (!prev || (it.updatedAt ?? '') >= (prev.updatedAt ?? '')) byId.set(it.id, it)
+    }
+    if (byId.size !== list.length) out[key] = list.filter((it: { id: string }, i: number, arr: { id: string }[]) => byId.get(it.id) === it && arr.indexOf(it) === i)
+  }
+  return { db: out as unknown as DB, removed }
+}
+
+/** The relations that matter most: children whose parent isn't in the file. */
+export function relationWarnings(db: DB): string[] {
+  const ids = (list: { id: string }[] | undefined) => new Set((list ?? []).map((x) => x.id))
+  const checks: [string, number][] = []
+  const routines = ids(db.routines)
+  checks.push(['itens de rotina sem rotina', (db.routineItems ?? []).filter((i) => !routines.has(i.routineId)).length])
+  const trips = ids(db.trips)
+  checks.push(['itens de viagem sem viagem', (db.tripItems ?? []).filter((i) => !trips.has(i.tripId)).length])
+  const projects = ids(db.projects)
+  checks.push(['marcos sem projeto', (db.milestones ?? []).filter((m) => !projects.has(m.projectId)).length])
+  const parents: Record<string, Set<string>> = { task: ids(db.tasks), routineItem: ids(db.routineItems), petTask: ids(db.petTasks) }
+  checks.push(['registros de “feito” sem o item', (db.occurrences ?? []).filter((o) => !parents[o.parentType]?.has(o.parentId)).length])
+  return checks.filter(([, n]) => n > 0).map(([what, n]) => `${n} ${what}`)
 }

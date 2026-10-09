@@ -8,7 +8,8 @@ import { toast } from '@/app/ui-store'
 import { nowISO } from '@/lib/id'
 import { haptic } from '@/lib/haptics'
 import { formatFullDate, todayKey } from '@/lib/date'
-import { backupFilename, makeBackup, validateBackup, type BackupPreview } from './backup'
+import { validateBackup, type BackupPreview } from './backup'
+import { exportBackup, restoreBackup } from './backup-io'
 import { CSV_DATASETS, datasetCSV, type CsvDatasetId } from './csv'
 import { formatBytes, saveFile } from './platform'
 import { Hint } from './components'
@@ -48,10 +49,8 @@ export default function DataPage() {
   const exportJSON = async () => {
     setBusy(true)
     try {
-      await flushNow()
-      const backup = makeBackup(getDB())
-      const ok = await saveFile(backupFilename(), JSON.stringify(backup, null, 2), 'application/json')
-      if (ok) toast('Backup pronto 💾')
+      const ok = await exportBackup()
+      if (ok) toast('Backup pronto 💾 Guarda o arquivo num lugar seguro (iCloud, Drive).')
     } catch (err) {
       console.error(err)
       toast('Não consegui gerar o backup agora. Tenta de novo?')
@@ -84,13 +83,16 @@ export default function DataPage() {
 
   const confirmImport = async () => {
     if (!preview) return
-    const imported = preview.db
-    const onboardedAt = getDB().profile.onboardedAt ?? nowISO()
-    actions.replaceDB({ ...imported, profile: { ...imported.profile, onboardedAt: imported.profile?.onboardedAt ?? onboardedAt } })
-    await flushNow().catch(() => undefined)
-    setPreview(null)
-    haptic('success')
-    toast('Dados restaurados ✨', { tone: 'win' })
+    try {
+      await restoreBackup(preview)
+      setPreview(null)
+      haptic('success')
+      toast(`Dados restaurados ✨ ${preview.total.toLocaleString('pt-BR')} registros de volta.`, { tone: 'win' })
+    } catch (err) {
+      console.error('restore failed', err instanceof Error ? err.message : 'unknown')
+      setImportError('Não consegui gravar os dados restaurados no aparelho. Nada foi perdido do arquivo — tenta de novo?')
+      setPreview(null)
+    }
   }
 
   const confirmReset = async () => {
@@ -150,7 +152,12 @@ export default function DataPage() {
 
       <SectionTitle>Backup</SectionTitle>
       <Card>
-        <p className="text-[14px] text-ink-2 leading-snug">Um arquivo com tudo: tarefas, treinos, gastos, viagens, ajustes.</p>
+        <p className="text-[14px] text-ink-2 leading-snug">Um arquivo com tudo: tarefas, treinos, comida, livros, carreira, dinheiro, viagens, ajustes.</p>
+        <p className="text-[12.5px] text-muted mt-1">
+          {db.profile.lastBackupAt
+            ? `Último backup: ${formatFullDate(todayKey(new Date(db.profile.lastBackupAt)))}.`
+            : 'Você ainda não gerou um backup. Seus dados vivem só neste aparelho.'}
+        </p>
         <div className="grid grid-cols-2 gap-2.5 mt-3.5">
           <Button variant="primary" icon={<Download size={17} />} onClick={() => void exportJSON()} disabled={busy}>
             Exportar
@@ -190,7 +197,13 @@ export default function DataPage() {
                     </li>
                   ))}
                 </ul>
-                <p className="text-[13px] text-ink-2 mt-3">Isso troca tudo o que está no app agora pelo conteúdo do arquivo.</p>
+                {(preview.duplicatesRemoved > 0 || preview.warnings.length > 0) && (
+                  <p className="text-[12.5px] text-muted mt-3">
+                    {preview.duplicatesRemoved > 0 && `${preview.duplicatesRemoved} repetido(s) no arquivo — fica só uma cópia. `}
+                    {preview.warnings.length > 0 && `Atenção: ${preview.warnings.join(', ')} (restauro mesmo assim).`}
+                  </p>
+                )}
+                <p className="text-[13px] text-ink-2 mt-3">Isso troca tudo o que está no app agora pelo conteúdo do arquivo — nada fica duplicado.</p>
                 <div className="flex gap-2 mt-3">
                   <Button variant="ghost" onClick={() => setPreview(null)}>
                     Cancelar

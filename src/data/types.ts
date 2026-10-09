@@ -364,6 +364,8 @@ export interface UserProfile {
   lumosAutoApplySmall?: boolean
   /** Last time Marina talked to Lumos / opened Home — ChangeFeed baseline ("o que mudou?"). */
   lumosLastSeenAt?: ISODateTime
+  /** Last successful full backup export (for Lumos' monthly reminder). */
+  lastBackupAt?: ISODateTime
   /** Food likes / aversions Lumos respects when choosing among the nutritionist's substitutions. */
   foodPrefs?: { likes: string[]; dislikes: string[] }
 }

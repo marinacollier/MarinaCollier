@@ -111,6 +111,9 @@ export function homeSuggestions(db: DB, now: Now): string[] {
 }
 
 /** 0–3 really relevant insights, deduped, respecting attentionAcks. Never a notification feed. */
+/** Lumos suggests a backup when the last one is this old. */
+export const BACKUP_REMINDER_DAYS = 30
+
 export function proactiveInsights(db: DB, now: Now, max = 3): Insight[] {
   const { evening } = parts(db)
   const out: Insight[] = []
@@ -140,6 +143,20 @@ export function proactiveInsights(db: DB, now: Now, max = 3): Insight[] {
 
   const pattern = (db.memory ?? []).find((m) => m.status === 'observed' && (m.evidence ?? 0) >= PATTERN_EVIDENCE && !m.askedAt)
   if (pattern) out.push({ key: `pattern:${pattern.id}`, text: `${pattern.text}. Quer que eu considere isso como preferência?`, ask: `sim, considera "${pattern.text}" como preferência`, provenance: 'inference', priority: 50 })
+
+  // Monthly, discreet: everything lives on this device, so a file copy every ~30 days.
+  const backupRef = db.profile.lastBackupAt ?? db.profile.onboardedAt
+  if (backupRef) {
+    const days = Math.floor((Date.parse(`${now.date}T12:00:00-03:00`) - Date.parse(backupRef)) / 86_400_000)
+    if (days >= BACKUP_REMINDER_DAYS)
+      out.push({
+        key: `backup:${now.date.slice(0, 7)}`,
+        text: db.profile.lastBackupAt ? `Seu último backup foi há ${days} dias. Quer gerar um agora?` : 'Você ainda não tem um backup dos seus dados. Quer gerar um agora?',
+        ask: 'gera meu backup',
+        provenance: 'fact',
+        priority: 30,
+      })
+  }
 
   if (ctx.today.energy === 'baixa') out.push({ key: `energy:${now.date}`, text: `Energia baixa ${dayLabel(now.date, now.date)} — dá pra ir de versão curta.`, ask: 'organiza meu dia na versão curta', provenance: 'inference', priority: 40 })
 

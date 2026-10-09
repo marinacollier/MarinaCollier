@@ -65,3 +65,17 @@ describe('LifeContextEngine — Marina’s seed', () => {
     ])
   })
 })
+
+describe('Proactive · monthly backup reminder', () => {
+  it('suggests a backup after 30 days, once per month, never before', async () => {
+    const { proactiveInsights } = await import('./proactive')
+    const db = buildSeed(FRIDAY)
+    const fresh = { ...db, profile: { ...db.profile, lastBackupAt: '2026-09-25T12:00:00.000Z' } }
+    expect(proactiveInsights(fresh, now(FRIDAY, 10), 10).some((i) => i.key.startsWith('backup:'))).toBe(false)
+    const old = { ...db, profile: { ...db.profile, lastBackupAt: '2026-08-31T12:00:00.000Z' } }
+    const tip = proactiveInsights(old, now(FRIDAY, 10), 10).find((i) => i.key.startsWith('backup:'))!
+    expect(tip.text).toBe('Seu último backup foi há 32 dias. Quer gerar um agora?')
+    expect(tip.ask).toBe('gera meu backup')
+    expect(tip.key).toBe('backup:2026-10')
+  })
+})

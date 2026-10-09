@@ -5,6 +5,7 @@
  */
 import type { Now } from '@/data/intel'
 import type { DB } from '@/data/types'
+import { backupHandler } from './handlers/backup'
 import { booksHandler } from './handlers/books'
 import { captureHandler } from './handlers/capture'
 import { dayHandler } from './handlers/day'
@@ -16,7 +17,7 @@ import { workHandler } from './handlers/work'
 import { norm } from './text'
 import type { Handler, LumosReply, TurnContext } from './types'
 
-export const HANDLERS: Handler[] = [memoryHandler, booksHandler, kitchenHandler, workHandler, dayHandler, travelHandler, studyHandler, captureHandler]
+export const HANDLERS: Handler[] = [backupHandler, memoryHandler, booksHandler, kitchenHandler, workHandler, dayHandler, travelHandler, studyHandler, captureHandler]
 
 export function respond(db: DB, text: string, now: Now, ctx: TurnContext = {}): LumosReply | undefined {
   const n = norm(text)
