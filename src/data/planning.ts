@@ -157,7 +157,7 @@ export function workBlocks(src: WorkSource, date: DateKey): WorkBlock[] {
 
 export function eventOccursOn(e: CalendarEvent, date: DateKey): boolean {
   if (e.exdates?.includes(date)) return false
-  if (e.recurrence) return e.date <= date && occursOn(e.recurrence, date)
+  if (e.recurrence) return e.date <= date && (!e.until || date <= e.until) && occursOn(e.recurrence, date)
   if (e.endDate) return e.date <= date && date <= e.endDate
   return e.date === date
 }

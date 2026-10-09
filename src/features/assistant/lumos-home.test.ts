@@ -14,7 +14,7 @@ import { CAREER_SEED_IDS } from '@/features/career/seed'
 import { addDays } from '@/lib/date'
 import type { DB } from '@/data/types'
 import { whenSaved } from './act/commit'
-import { ask, clearConversation, useConversation, type Exchange } from './conversation'
+import { ask, clearConversation, confirmReply, undoReply, useConversation, type Exchange } from './conversation'
 
 const THU = '2026-10-15'
 const FRI = addDays(THU, 1)
@@ -152,6 +152,46 @@ describe('Lumos changes the Home (text = transcript)', () => {
       const db = await reopen()
       expect(db.tasks.find((x) => x.id === t.id)?.status).toBe('archived')
       expect(dayItems(db, THU, THU).some((i) => i.refId === t.id)).toBe(false)
+    })
+  })
+
+  describe('ending something that repeats — "exclui pfv a recorrência de cerâmica! não faço mais"', () => {
+    const ceramica = () => getDB().events.find((e) => e.title === 'Cerâmica')!
+    const nextMon = '2026-10-19'
+
+    for (const q of ['exclui pfv a recorrência de cerâmica! não faço mais', 'não faço mais cerâmica', 'tira cerâmica de vez', 'cancela todas as cerâmicas']) {
+      it(`"${q}" → asks once, then Cerâmica is gone from every future week; the past stays`, async () => {
+        const past = '2026-10-12' // a Monday before today (THU 15/10)
+        ask(q, at(THU, '20:30'))
+        const e = useConversation.getState().exchanges.at(-1)!
+        expect(e.lumos?.reply.text, q).toBe('Encerrar “Cerâmica” de vez?')
+        expect(e.lumos?.reply.lines?.[0].sub).toMatch(/segunda e quinta/)
+        confirmReply(e.id)
+        const db = await reopen()
+        expect(dayItems(db, nextMon, THU).some((i) => i.refId === ceramica().id)).toBe(false)
+        expect(dayItems(db, addDays(THU, 7), THU).some((i) => i.refId === ceramica().id)).toBe(false)
+        expect(dayItems(db, THU, THU).some((i) => i.refId === ceramica().id)).toBe(false)
+        expect(dayItems(db, past, THU).some((i) => i.refId === ceramica().id)).toBe(true)
+        expect(db.memory.find((m) => m.key === 'ceramica.days')?.status).toBe('archived')
+      })
+    }
+
+    it('Desfazer brings the series (and the memory) back', async () => {
+      ask('não faço mais cerâmica', at(THU, '20:30'))
+      const id = useConversation.getState().exchanges.at(-1)!.id
+      confirmReply(id)
+      await whenSaved()
+      undoReply(id)
+      const db = await reopen()
+      expect(dayItems(db, nextMon, THU).some((i) => i.refId === ceramica().id)).toBe(true)
+      expect(db.memory.find((m) => m.key === 'ceramica.days')?.status).not.toBe('archived')
+    })
+
+    it('"cancela cerâmica hoje" is still only today (not the series)', async () => {
+      await say('cancela cerâmica hoje', at(THU, '10:00'))
+      const db = await reopen()
+      expect(ceramica().until).toBeUndefined()
+      expect(dayItems(db, nextMon, THU).some((i) => i.refId === ceramica().id)).toBe(true)
     })
   })
 })

@@ -579,6 +579,8 @@ export interface CalendarEvent extends Entity {
   period?: DayPeriod
   /** Dates of a recurring event cancelled for that week only. */
   exdates?: DateKey[]
+  /** Last day of a recurring series ("não faço mais cerâmica"): nothing after it; the past stays. */
+  until?: DateKey
   /** Checklist template opened with the event (Weekly CEO Review topics). */
   template?: string[]
   projectId?: ID
