@@ -21,9 +21,9 @@ function texts(db: DB): string[] {
 describe('life seed v6 — real life only', () => {
   const db = buildSeed(T)
 
-  it('is version 6', () => {
-    expect(LIFE_SEED_VERSION).toBe(6)
-    expect(db.profile.seedVersion).toBe(6)
+  it('is version 7 (adds her two contracts)', () => {
+    expect(LIFE_SEED_VERSION).toBe(7)
+    expect(db.profile.seedVersion).toBe(7)
   })
 
   it('no generic / example records anywhere', () => {

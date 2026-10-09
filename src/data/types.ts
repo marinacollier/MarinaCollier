@@ -958,8 +958,12 @@ export interface Expense extends Entity {
   payment?: PaymentMethod
   /** planejada / não planejada (awareness, never judgement). */
   planned?: boolean
-  /** 'planned_purchase' = Compras planejadas / lista de compras (not spent yet). */
-  status: 'paid' | 'planned_purchase'
+  /**
+   * Spending: 'paid' | 'planned_purchase' (Compras planejadas, not spent yet).
+   * Income (type 'income'): 'expected' | 'received' | 'cancelled'. "Atrasado" is DERIVED (expected and the
+   * date has passed) — never stored, and nothing ever becomes 'received' just because the date arrived.
+   */
+  status: 'paid' | 'planned_purchase' | 'expected' | 'received' | 'cancelled'
   notes?: string
   tripId?: ID
   accountId?: ID
@@ -967,6 +971,20 @@ export interface Expense extends Entity {
   external?: ExternalRef
   /** Set by duplicate detection when an imported transaction looks like a manual one. Marina decides. */
   possibleDuplicateOf?: ID
+  // ── Income / receivables (same record evolves: expected → received; never a second entry) ──
+  /** Missing = 'expense' (every record before this field existed). */
+  type?: 'expense' | 'income'
+  /** Contract it comes from (receivable of a recurring contract). One record per contract per `period`. */
+  contractId?: ID
+  /** 'YYYY-MM' the receivable belongs to. */
+  period?: string
+  expectedDate?: DateKey
+  expectedAmountCents?: number
+  receivedAt?: ISODateTime
+  receivedAmountCents?: number
+  currency?: 'BRL' | 'USD' | 'EUR'
+  /** Who created it: a contract's monthly expectation, Marina by hand, Lumos, an integration. */
+  source?: 'contrato' | 'manual' | 'lumos' | 'organizze'
 }
 
 export interface FinancialAccount extends Entity {
@@ -977,6 +995,27 @@ export interface FinancialAccount extends Entity {
   dueDay?: number
   external?: ExternalRef
   archived: boolean
+}
+
+/**
+ * A recurring PJ contract (Santander, Fashion Finder…). Values are GROSS billing as informed by Marina —
+ * never net, never assumed taxes. Its monthly receivables are Expense records with type 'income'.
+ */
+export interface FinancialContract extends Entity {
+  client: string
+  /** Lowercase, accent-free names Lumos matches ("fashion finder", "ff"). */
+  aliases?: string[]
+  projectId?: ID
+  amountCents: number
+  currency: 'BRL' | 'USD' | 'EUR'
+  /** Day of month the payment is expected (1–31; clamped to the month's last day). */
+  paymentDay: number
+  recurrence: 'mensal'
+  status: 'ativo' | 'pausado' | 'encerrado'
+  kind?: 'pj' | 'clt' | 'outro'
+  startDate?: DateKey
+  endDate?: DateKey
+  notes?: string
 }
 
 export interface FinancialCategory extends Entity {
@@ -1515,6 +1554,7 @@ export interface DB {
   memory: MemoryItem[]
   lifeLog: LifeEvent[]
   attentionAcks: AttentionAck[]
+  contracts: FinancialContract[]
 }
 
 /** Keys of DB that hold arrays of entities. */

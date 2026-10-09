@@ -10,6 +10,8 @@ import { buildSeed } from '@/data/seed'
 import type { DB } from '@/data/types'
 import { checksumOf, makeBackup, validateBackup, type BackupPreview } from './backup'
 import { daysSinceBackup, restoreBackup } from './backup-io'
+import { ensureReceivables, markReceived, receivableId } from '@/data/finance/receivables'
+import { FINANCE_SEED_IDS } from '@/features/finance/seed'
 
 const TODAY = '2026-10-09'
 
@@ -42,6 +44,8 @@ function liveALittle() {
   actions.create('pantry', { name: 'frango grelhado', kind: 'preparado', portions: 6, remaining: 6, madeAt: TODAY })
   actions.create('memory', { kind: 'fact', area: 'luna', text: 'Luna é Border Collie', key: 'luna.raca', status: 'confirmed', source: 'marina' })
   actions.create('scheduleOverrides', { date: TODAY, refType: 'routineItem', refId: item.id, time: '05:10', by: 'marina' })
+  ensureReceivables(TODAY)
+  markReceived(receivableId(FINANCE_SEED_IDS.contractSantander, TODAY.slice(0, 7)), { at: `${TODAY}T10:00:00.000-03:00` })
   actions.create('lifeLog', { at: `${TODAY}T15:00:00.000-03:00`, date: TODAY, kind: 'done', title: 'Correu 50 min', by: 'marina', provenance: 'user' })
   return { task, recurring, item, routine, workout, goal }
 }
@@ -77,7 +81,7 @@ describe('backup → restore round trip', () => {
     await hydrate(device)
     const after = getDB()
     expect(counts(after)).toEqual(counts(before))
-    for (const key of ['tasks', 'occurrences', 'routines', 'routineItems', 'workouts', 'meals', 'books', 'goals', 'wins', 'expenses', 'pantry', 'memory', 'scheduleOverrides', 'lifeLog'] as const)
+    for (const key of ['tasks', 'occurrences', 'routines', 'routineItems', 'workouts', 'meals', 'books', 'goals', 'wins', 'expenses', 'pantry', 'memory', 'scheduleOverrides', 'lifeLog', 'contracts'] as const)
       expect(after[key], key).toEqual(before[key])
 
     // Relations still point at real records.
@@ -87,6 +91,8 @@ describe('backup → restore round trip', () => {
     expect(after.meals.find((m) => m.description === 'YoPRO')?.workoutId).toBe(made.workout.id)
     expect(after.goals.find((g) => g.parentId === made.goal.id)?.title).toMatch(/networking/)
     expect(after.scheduleOverrides[0].refId).toBe(made.item.id)
+    const santanderOct = after.expenses.find((e) => e.id === receivableId(FINANCE_SEED_IDS.contractSantander, TODAY.slice(0, 7)))
+    expect(santanderOct).toMatchObject({ type: 'income', status: 'received', contractId: FINANCE_SEED_IDS.contractSantander })
   })
 
   it('restoring the same file twice never duplicates anything', async () => {

@@ -13,6 +13,7 @@ import { QuickQuestions } from './QuickQuestions'
 import { DuplicatesSection } from './DuplicatesSection'
 import { CategoriesEditor } from './CategoriesEditor'
 import { ConnectionsSection } from './ConnectionsSection'
+import { IncomeSection } from './IncomeSection'
 
 function Stat({ label, cents, big }: { label: string; cents: number; big?: boolean }) {
   return (
@@ -69,6 +70,10 @@ export default function FinancePage() {
             Anotar gasto
           </Button>
         </Card>
+      </Reveal>
+
+      <Reveal delay={0.02}>
+        <IncomeSection today={today} />
       </Reveal>
 
       <Reveal delay={0.04}>

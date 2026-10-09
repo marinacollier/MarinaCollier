@@ -1,6 +1,8 @@
 import { Suspense, lazy, useEffect } from 'react'
 import { BrowserRouter, MemoryRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useStore } from '@/data/store'
+import { ensureReceivables } from '@/data/finance/receivables'
+import { todayKey } from '@/lib/date'
 import { ROUTES, routeTable } from '@/app/routes'
 import { openSheet } from '@/app/ui-store'
 import { useTheme } from '@/app/useTheme'
@@ -48,6 +50,10 @@ export default function App() {
   useTheme()
   useCommandShortcut()
   useLocalReminders()
+  // Contracts' monthly receivables exist as "previsto" (this month + next) — idempotent, never "recebido".
+  useEffect(() => {
+    if (hydrated) ensureReceivables(todayKey())
+  }, [hydrated])
 
   if (!hydrated) return <Splash />
 

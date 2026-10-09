@@ -597,6 +597,22 @@ function buildDocs(db: DB, today: DateKey): Doc[] {
   }
 
   for (const e of db.expenses) {
+    if (e.type === 'income') {
+      // Receivables: found by client name; open the month's receivable, never the spending sheet.
+      const label = e.status === 'received' ? 'recebido' : e.status === 'cancelled' ? 'cancelado' : 'previsto'
+      docs.push({
+        domain: 'expense',
+        id: e.id,
+        title: e.title,
+        emoji: '💰',
+        subtitle: join(formatBRL(e.receivedAmountCents ?? e.amountCents), label, when(e.expectedDate ?? e.date, today)),
+        primary: field(e.title),
+        secondary: field('recebimento receita', label, e.notes),
+        date: e.expectedDate ?? e.date,
+        action: sheetAction('receivable', { id: e.id }),
+      })
+      continue
+    }
     const cat = categoryOf(db, e.categoryId)
     const trip = e.tripId ? trips.get(e.tripId)?.name : undefined
     docs.push({

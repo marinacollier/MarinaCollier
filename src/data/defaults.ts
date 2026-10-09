@@ -199,6 +199,7 @@ export function emptyDB(): DB {
     memory: [],
     lifeLog: [],
     attentionAcks: [],
+    contracts: [],
   }
 }
 

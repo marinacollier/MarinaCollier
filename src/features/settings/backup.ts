@@ -111,6 +111,7 @@ export const COLLECTION_LABELS: Partial<Record<CollectionKey, string>> = {
   memory: 'O que a Lumos sabe sobre mim',
   lifeLog: 'Linha da vida (acontecimentos)',
   attentionAcks: 'Decisões resolvidas',
+  contracts: 'Contratos',
 }
 
 export interface BackupPreview {
