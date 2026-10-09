@@ -7,6 +7,7 @@ import { ROUTES, routeTable } from '@/app/routes'
 import { openSheet } from '@/app/ui-store'
 import { useTheme } from '@/app/useTheme'
 import { BottomNav } from '@/components/layout/BottomNav'
+import { SaveFailedBanner } from '@/components/layout/SaveFailedBanner'
 import { SheetHost } from '@/components/layout/SheetHost'
 import { Toaster } from '@/components/ui/Toaster'
 import { useLocalReminders } from '@/features/settings/useLocalReminders'
@@ -75,6 +76,7 @@ export default function App() {
       <BottomNav />
       <SheetHost />
       <Toaster />
+      <SaveFailedBanner />
       {!onboarded && (
         <Suspense fallback={null}>
           <Welcome />

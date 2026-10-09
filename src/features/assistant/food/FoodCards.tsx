@@ -28,6 +28,7 @@ import { haptic } from '@/lib/haptics'
 import { cn } from '@/lib/cn'
 import { normalize } from '@/lib/text'
 import { MacroLine, SourceBadge } from '../lumos-ui'
+import { SAVE_FAILED, SAVE_FAILED_SUB, saveConfirmed } from '../act/commit'
 import type { FoodReply } from './answer'
 import type { FoodIntent } from './intent'
 import { needsAnswer, parseLog, resolveAll, type Resolution, type Savable } from './log'
@@ -67,14 +68,16 @@ function ItemsList({ items }: { items: BadgedFood[] }) {
 function ProposalCard({ db, adj, nowMinutes }: { db: DB; adj: MealAdjustment; nowMinutes: number }) {
   const view = useMemo(() => dayMeals(db, adj.date, nowMinutes).meals.find((m) => m.ref === adj.planMealRef), [db, adj, nowMinutes])
   const others = useMemo(() => otherOptions(db, adj, nowMinutes), [db, adj, nowMinutes])
-  const apply = () => {
-    const undo = applyAdjustment(adj.id)
+  const apply = async () => {
+    const r = await saveConfirmed(() => applyAdjustment(adj.id), (undo) => undo())
+    if (!r.ok) return toast(SAVE_FAILED)
     haptic('success')
-    toast('Aplicado só pra hoje ✓', { action: { label: 'Desfazer', run: undo } })
+    toast('Aplicado só pra hoje ✓', { action: { label: 'Desfazer', run: r.value } })
   }
-  const keep = () => {
-    const undo = dismissAdjustment(adj.id)
-    toast('Mantive o plano do nutri ✓', { action: { label: 'Desfazer', run: undo } })
+  const keep = async () => {
+    const r = await saveConfirmed(() => dismissAdjustment(adj.id), (undo) => undo())
+    if (!r.ok) return toast(SAVE_FAILED)
+    toast('Mantive o plano do nutri ✓', { action: { label: 'Desfazer', run: r.value } })
   }
   const next = () => {
     const i = others.findIndex((o) => sameItems(o, adj))
@@ -116,9 +119,12 @@ function ProposalCard({ db, adj, nowMinutes }: { db: DB; adj: MealAdjustment; no
 // ─── Draft (from a question; not stored until "aplicar") ────────────────────
 
 function DraftCard({ draft, mealName, time }: { draft: AdjustmentDraft; mealName: string; time?: string }) {
-  const [state, setState] = useState<{ status: 'open' | 'applied' | 'kept'; undo?: () => void }>({ status: 'open' })
-  const apply = () => {
-    const { undo } = saveAdjustment({ ...draft, status: 'applied' })
+  const [state, setState] = useState<{ status: 'open' | 'saving' | 'applied' | 'kept' | 'failed'; undo?: () => void }>({ status: 'open' })
+  const apply = async () => {
+    setState({ status: 'saving' })
+    const r = await saveConfirmed(() => saveAdjustment({ ...draft, status: 'applied' }).undo, (undo) => undo())
+    if (!r.ok) return setState({ status: 'failed' })
+    const undo = r.value
     haptic('success')
     setState({ status: 'applied', undo })
     toast('Aplicado só nesse dia ✓', { action: { label: 'Desfazer', run: () => (undo(), setState({ status: 'open' })) } })
@@ -134,10 +140,12 @@ function DraftCard({ draft, mealName, time }: { draft: AdjustmentDraft; mealName
       </div>
       <p className="text-[13px] text-ink-2 leading-snug">{draft.reason}</p>
       <ItemsList items={draft.items} />
-      {state.status === 'open' && (
+      {state.status === 'saving' && <p className="text-[12.5px] text-muted">Salvando no aparelho…</p>}
+      {state.status === 'failed' && <p role="alert" className="text-[12.5px] text-accent">{SAVE_FAILED}</p>}
+      {(state.status === 'open' || state.status === 'failed') && (
         <div className="flex flex-wrap gap-2 pt-0.5">
           <Button size="sm" onClick={apply}>
-            Aplicar
+            {state.status === 'failed' ? 'Tentar de novo' : 'Aplicar'}
           </Button>
           <Button size="sm" variant="soft" onClick={() => setState({ status: 'kept' })}>
             Manter plano
@@ -161,7 +169,8 @@ function DraftCard({ draft, mealName, time }: { draft: AdjustmentDraft; mealName
 // ─── Logging ────────────────────────────────────────────────────────────────
 
 export interface FoodLogState {
-  status: 'resolving' | 'logged' | 'undone'
+  /** 'saving': in memory, waiting for the device · 'failed': rolled back, nothing was logged. */
+  status: 'resolving' | 'saving' | 'logged' | 'undone' | 'failed'
   mealId?: string
   adjustmentIds?: string[]
   summary?: string
@@ -201,6 +210,7 @@ export function FoodLogCard({
   state,
   onLog,
   onUndo,
+  saveNote,
 }: {
   db: DB
   date: DateKey
@@ -209,6 +219,7 @@ export function FoodLogCard({
   state: FoodLogState
   onLog: (foods: LoggedFood[], savable: Savable[]) => void
   onUndo: () => void
+  saveNote?: string
 }) {
   const parsed = useMemo(() => parseLog(db, intent.text), [db, intent.text])
   const [res, setRes] = useState<Record<string, Resolution>>({})
@@ -260,12 +271,25 @@ export function FoodLogCard({
   }
 
   if (state.status === 'undone') return <Shell eyebrow="✨ Lumos · comida" title="Desfeito — tirei esse registro." />
+  if (state.status === 'saving') return <Shell eyebrow="✨ Lumos · comida" title="Salvando no aparelho…" />
+  if (state.status === 'failed')
+    return (
+      <Shell eyebrow="✨ Lumos · comida" title={SAVE_FAILED}>
+        <p className="text-[13.5px] text-ink-2 leading-snug -mt-1.5">{SAVE_FAILED_SUB}</p>
+        {!!state.foods?.length && (
+          <Button size="sm" onClick={() => onLog(state.foods!, state.savable ?? [])}>
+            Tentar de novo
+          </Button>
+        )}
+      </Shell>
+    )
   if (state.status !== 'logged') return null
 
   const proposals = adjustments.filter((a) => a.status !== 'dismissed' || state.adjustmentIds?.length)
   const open = adjustments.length > 0
   return (
     <Shell eyebrow="✨ Lumos · comida" title={state.summary ?? 'Registrado ✓'}>
+      {saveNote && <p role="alert" className="text-[13px] text-accent leading-snug -mt-1.5">{saveNote}</p>}
       {!!state.foods?.length && (
         <ul className="space-y-1">
           {state.foods.map((f, i) => (
@@ -319,10 +343,30 @@ export function FoodLogCard({
 
 // ─── Answers ────────────────────────────────────────────────────────────────
 
-export function FoodAnswerCard({ reply, onUndoSkip, skipUndone }: { reply: FoodReply; onUndoSkip?: () => void; skipUndone?: boolean }) {
+export function FoodAnswerCard({
+  reply,
+  onUndoSkip,
+  skipUndone,
+  skipSave,
+  saveNote,
+}: {
+  reply: FoodReply
+  onUndoSkip?: () => void
+  skipUndone?: boolean
+  skipSave?: 'saving' | 'failed'
+  saveNote?: string
+}) {
   const [swapped, setSwapped] = useState<{ key: string; undo: () => void } | undefined>()
+  if (reply.skip && skipSave === 'saving') return <Shell eyebrow="✨ Lumos · comida" title="Salvando no aparelho…" />
+  if (reply.skip && skipSave === 'failed')
+    return (
+      <Shell eyebrow="✨ Lumos · comida" title={SAVE_FAILED}>
+        <p className="text-[13.5px] text-ink-2 leading-snug -mt-1.5">{SAVE_FAILED_SUB}</p>
+      </Shell>
+    )
   return (
     <Shell eyebrow="✨ Lumos · comida" title={skipUndone ? 'Desfeito — a refeição voltou pro dia.' : reply.headline}>
+      {saveNote && <p role="alert" className="text-[13px] text-accent leading-snug -mt-1.5">{saveNote}</p>}
       {reply.lines.map((l) => (
         <p key={l} className="text-[13.5px] text-ink-2 leading-snug -mt-1.5">
           {l}
@@ -358,10 +402,18 @@ export function FoodAnswerCard({ reply, onUndoSkip, skipUndone }: { reply: FoodR
 }
 
 function SwapList({ reply, swapped, setSwapped }: { reply: FoodReply; swapped?: { key: string; undo: () => void }; setSwapped: (s: { key: string; undo: () => void } | undefined) => void }) {
-  const choose = (ref: string, itemIndex: number, sub: string, items: BadgedFood[]) => {
+  const choose = async (ref: string, itemIndex: number, sub: string, items: BadgedFood[]) => {
     swapped?.undo()
     const next = items.map((it, i) => (i === itemIndex ? { ...parseSubstitution(sub), badge: 'troca' as const } : it))
-    const { undo } = saveAdjustment({ date: reply.date, planMealRef: ref, kind: 'trocar', items: next, reason: `Troca do plano: ${shortFood(items[itemIndex].food)} → ${shortFood(subItem(sub).food)}.`, status: 'applied', by: 'marina' })
+    const r = await saveConfirmed(
+      () => saveAdjustment({ date: reply.date, planMealRef: ref, kind: 'trocar', items: next, reason: `Troca do plano: ${shortFood(items[itemIndex].food)} → ${shortFood(subItem(sub).food)}.`, status: 'applied', by: 'marina' }).undo,
+      (undo) => undo(),
+    )
+    if (!r.ok) {
+      setSwapped(undefined)
+      return toast(SAVE_FAILED)
+    }
+    const undo = r.value
     haptic('success')
     setSwapped({ key: `${ref}#${itemIndex}#${sub}`, undo })
     toast('Troca do plano aplicada só nesse dia ✓', { action: { label: 'Desfazer', run: () => (undo(), setSwapped(undefined)) } })

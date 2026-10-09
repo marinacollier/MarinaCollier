@@ -10,6 +10,7 @@ import type { Provenance } from '@/data/types'
 import { cn } from '@/lib/cn'
 import type { LumosReply, ReplyLine, ReplyOption, ReplySection } from './act/types'
 import type { ReplyStatus } from './conversation'
+import { SAVE_FAILED, SAVE_FAILED_SUB } from './act/commit'
 
 const PROVENANCE: Partial<Record<Provenance, string>> = { inference: 'inferência', integration: 'integração', suggestion: 'sugestão' }
 
@@ -88,13 +89,27 @@ export interface ReplyCardProps {
   onUndo: () => void
   onOption: (o: ReplyOption) => void
   onLink: (to: string) => void
+  /** A later save problem (e.g. Desfazer didn't reach the device). */
+  saveNote?: string
 }
 
-export function ReplyCard({ reply, status, canUndo, onConfirm, onCancel, onUndo, onOption, onLink }: ReplyCardProps) {
+export function ReplyCard({ reply, status, canUndo, onConfirm, onCancel, onUndo, onOption, onLink, saveNote }: ReplyCardProps) {
   const pending = status === 'pending'
+  const failed = status === 'failed'
   const confirmed = status === 'done' && reply.action?.mode === 'confirm'
-  const title = status === 'undone' ? 'Desfeito — voltou como era.' : status === 'cancelled' ? 'Ok, deixei tudo como estava.' : confirmed && reply.action?.done ? reply.action.done : reply.text
-  const quiet = status === 'undone' || status === 'cancelled'
+  const title =
+    status === 'saving'
+      ? 'Salvando no aparelho…'
+      : failed
+        ? SAVE_FAILED
+        : status === 'undone'
+          ? 'Desfeito — voltou como era.'
+          : status === 'cancelled'
+            ? 'Ok, deixei tudo como estava.'
+            : confirmed && reply.action?.done
+              ? reply.action.done
+              : reply.text
+  const quiet = status === 'undone' || status === 'cancelled' || status === 'saving' || failed
   const sections = reply.sections ?? []
   const openFirst = sections.length <= 3 ? sections.length : 2
   return (
@@ -106,6 +121,8 @@ export function ReplyCard({ reply, status, canUndo, onConfirm, onCancel, onUndo,
         </div>
         <p className="font-display text-[19px] leading-snug mt-1">{title}</p>
         {!quiet && reply.sub && <p className="text-[13.5px] text-ink-2 leading-snug mt-1.5">{reply.sub}</p>}
+        {failed && <p className="text-[13.5px] text-ink-2 leading-snug mt-1.5">{SAVE_FAILED_SUB}</p>}
+        {saveNote && <p role="alert" className="text-[13px] text-accent leading-snug mt-1.5">{saveNote}</p>}
       </div>
 
       {!quiet && !!reply.lines?.length && <Lines lines={reply.lines} onOption={onOption} />}
@@ -117,10 +134,10 @@ export function ReplyCard({ reply, status, canUndo, onConfirm, onCancel, onUndo,
         </div>
       )}
 
-      {pending && (
+      {(pending || (failed && reply.action)) && (
         <div className="flex flex-wrap gap-2 pt-0.5">
           <Button size="sm" onClick={onConfirm}>
-            {reply.action?.label ?? 'Confirmar'}
+            {failed ? 'Tentar de novo' : (reply.action?.label ?? 'Confirmar')}
           </Button>
           <Button size="sm" variant="ghost" onClick={onCancel}>
             Agora não

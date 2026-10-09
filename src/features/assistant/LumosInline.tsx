@@ -217,6 +217,7 @@ function ExchangeView({ e, db, today, minutes }: { e: Exchange; db: DB; today: s
           onUndo={() => undoReply(e.id)}
           onOption={runOption}
           onLink={(to) => navigate(to)}
+          saveNote={e.saveNote}
         />
       ) : e.adjust ? (
         <AdjustCard
@@ -235,11 +236,12 @@ function ExchangeView({ e, db, today, minutes }: { e: Exchange; db: DB; today: s
           onFollowUp={(kind) => followUp(e.adjust!.plan, kind)}
           onUndo={() => undoAdjust(e.id)}
           onLink={(to) => navigate(to)}
+          saveNote={e.saveNote}
         />
       ) : e.turn?.kind === 'foodLog' && e.food ? (
-        <FoodLogCard db={db} date={today} nowMinutes={minutes} intent={e.turn.intent} state={e.food} onLog={(foods, savable) => logFood(e.id, foods, savable)} onUndo={() => undoFood(e.id)} />
+        <FoodLogCard db={db} date={today} nowMinutes={minutes} intent={e.turn.intent} state={e.food} onLog={(foods, savable) => logFood(e.id, foods, savable)} onUndo={() => undoFood(e.id)} saveNote={e.saveNote} />
       ) : e.turn?.kind === 'food' && e.foodReply ? (
-        <FoodAnswerCard reply={e.foodReply} skipUndone={e.skipUndone} onUndoSkip={canUndo(e.id) ? () => undoSkip(e.id) : undefined} />
+        <FoodAnswerCard reply={e.foodReply} skipUndone={e.skipUndone} skipSave={e.skipSave} saveNote={e.saveNote} onUndoSkip={canUndo(e.id) ? () => undoSkip(e.id) : undefined} />
       ) : e.turn?.kind === 'mealprep' ? (
         <MealPrepCard db={db} today={today} nowMinutes={minutes} intent={e.turn.intent} onOpen={(to) => navigate(to)} />
       ) : (

@@ -7,11 +7,13 @@ import type { DateKey, DB, Workout } from '@/data/types'
 import { cn } from '@/lib/cn'
 import { capitalize, dayLabel } from '../agents/common'
 import { ChecklistRows, DayRows } from '../lumos-ui'
+import { SAVE_FAILED, SAVE_FAILED_SUB } from '../act/commit'
 import { hasWork } from './apply'
 import { durationText, visibleChanges } from './planner'
 import type { ChangePlan, PlanChange, WorkoutDraft } from './types'
 
-export type AdjustStatus = 'preview' | 'applied' | 'cancelled' | 'undone'
+/** 'saving': applied in memory, waiting for the device; 'failed': rolled back, nothing changed. */
+export type AdjustStatus = 'preview' | 'applied' | 'cancelled' | 'undone' | 'saving' | 'failed'
 
 function SessionRow({ db, w, today, muted, skipped }: { db: DB; w: Workout | WorkoutDraft; today: DateKey; muted?: boolean; skipped?: boolean }) {
   const m = findModality(db.profile, w.modality)
@@ -65,23 +67,26 @@ export interface AdjustCardProps {
   onUndo?: () => void
   /** Opens a route (Meal prep). */
   onLink?: (to: string) => void
+  saveNote?: string
 }
 
 function title(plan: ChangePlan, status: AdjustStatus, work: boolean): string {
   if (!work) return plan.previewTitle ?? plan.summary
+  if (status === 'saving') return 'Salvando no aparelho…'
+  if (status === 'failed') return SAVE_FAILED
   if (status === 'applied') return plan.doneTitle ?? 'Feito ✓ Ficou assim:'
   if (status === 'cancelled') return 'Ok, deixei tudo como estava.'
   if (status === 'undone') return 'Desfeito — voltou como era.'
   return plan.previewTitle ?? 'Vou ajustar assim:'
 }
 
-export function AdjustCard({ db, today, plan, status, onConfirm, onFineTune, onCancel, onChoose, onFollowUp, onUndo, onLink }: AdjustCardProps) {
+export function AdjustCard({ db, today, plan, status, onConfirm, onFineTune, onCancel, onChoose, onFollowUp, onUndo, onLink, saveNote }: AdjustCardProps) {
   const changes = visibleChanges(plan)
   const primary = changes[0]
   const fuelable = primary && primary.after.status !== 'pulado' && primary.kind !== 'remove'
   const work = hasWork(plan)
   const dayOnly = !changes.length
-  const showBody = !plan.needsChoice && status !== 'cancelled'
+  const showBody = !plan.needsChoice && status !== 'cancelled' && status !== 'failed'
   const eyebrow = plan.checklist ? '✨ Lumos · checklist' : changes.length ? '✨ Lumos · ajustar por conversa' : '✨ Lumos · seu dia'
 
   return (
@@ -92,7 +97,9 @@ export function AdjustCard({ db, today, plan, status, onConfirm, onFineTune, onC
         {!plan.needsChoice && work && status === 'preview' && plan.previewTitle && plan.summary && dayOnly && !plan.checklist && !plan.dayRows?.length && (
           <p className="text-[13.5px] text-ink-2 mt-1 leading-snug">{plan.summary}</p>
         )}
-        {!plan.needsChoice && plan.subtitle && <p className="text-[12.5px] text-muted mt-1 leading-snug">{plan.subtitle}</p>}
+        {!plan.needsChoice && plan.subtitle && status !== 'failed' && <p className="text-[12.5px] text-muted mt-1 leading-snug">{plan.subtitle}</p>}
+        {status === 'failed' && <p className="text-[13.5px] text-ink-2 mt-1.5 leading-snug">{SAVE_FAILED_SUB}</p>}
+        {saveNote && <p role="alert" className="text-[13px] text-accent mt-1.5 leading-snug">{saveNote}</p>}
       </div>
 
       {plan.needsChoice && (
@@ -153,6 +160,14 @@ export function AdjustCard({ db, today, plan, status, onConfirm, onFineTune, onC
               </div>
             )
           })}
+        </div>
+      )}
+
+      {status === 'failed' && (
+        <div className="flex flex-wrap gap-2 pt-0.5">
+          <Button size="sm" onClick={onConfirm}>
+            Tentar de novo
+          </Button>
         </div>
       )}
 
