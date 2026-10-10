@@ -140,6 +140,40 @@ function replied(input: HandlerInput): LumosReply | undefined {
   }
 }
 
+// ─── "Thales ainda não respondeu" ───────────────────────────────────────────
+
+const NOT_YET = /^(?:a |o )?(.+?)\s+(?:ainda\s+)?nao\s+(?:me\s+)?(?:respondeu|retornou|deu retorno|mandou|voltou)\b/
+
+/** Still waiting: stays in Esperando, and the quiet-days count restarts from today (no nagging tomorrow). */
+function notYet(input: HandlerInput): LumosReply | undefined {
+  const { db, n, now } = input
+  const m = NOT_YET.exec(n)
+  if (!m) return undefined
+  const who = m[1].replace(/^(a|o)\s+/, '').trim()
+  if (!who || who.split(' ').length > 3) return undefined
+  const waits = db.tasks.filter((t) => t.status === 'waiting' && t.waiting?.who && (normalize(t.waiting.who) === who || firstWord(t.waiting.who) === firstWord(who)))
+  if (!waits.length) return undefined
+  const name = waits[0].waiting!.who
+  return {
+    area: AREA,
+    text: `Ok — ${name} segue em Esperando ✓`,
+    sub: waits.length === 1 ? waits[0].title : `${waits.length} coisas esperando ${name}`,
+    ref: { type: 'task', id: waits[0].id },
+    options: [{ label: `Cobrar ${name} segunda`, ask: `lembra de cobrar ${name} segunda` }],
+    action: {
+      mode: 'direct',
+      run: () =>
+        all(
+          waits.map((t) =>
+            runLogged(() => updateUndoable('tasks', t.id, { waiting: { ...t.waiting!, lastCheckedAt: now.date } } as Partial<Task>), [
+              eventDraft(now, { kind: 'changed', title: `${name} ainda não respondeu: ${t.title}`, area: 'trabalho', ref: { type: 'task', id: t.id } }),
+            ]),
+          ),
+        ),
+    },
+  }
+}
+
 // ─── próximo passo / nota no projeto ────────────────────────────────────────
 
 const NEXT = /^(?:o\s+)?proximo passo\s+(?:do|da|no|na|de|pro|pra)\s+(.+?)\s*[:\-—]\s*/
@@ -308,6 +342,6 @@ function thatDone(input: HandlerInput): LumosReply | undefined {
 export const workHandler: Handler = {
   id: 'work',
   run(input) {
-    return nextStep(input) ?? update(input) ?? replied(input) ?? promised(input) ?? priority(input) ?? thatDone(input)
+    return nextStep(input) ?? update(input) ?? notYet(input) ?? replied(input) ?? promised(input) ?? priority(input) ?? thatDone(input)
   },
 }

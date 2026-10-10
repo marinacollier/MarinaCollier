@@ -77,9 +77,10 @@ describe('Daily Executive Briefing pasted into Lumos', () => {
     ask(DAILY, at(FRI, '07:10'))
     const e = last()
     expect(e.lumos?.status).toBe('pending')
-    expect(e.lumos?.reply.text).toBe('Briefing de 09/10 — coloco no app?')
-    expect(e.lumos?.reply.sub).toMatch(/3 tarefas novas · 1 puxada pro dia · 1 pagamento com check · 1 frente nova/)
-    expect(e.lumos?.reply.sub).toMatch(/1 item já estava no app — não dupliquei/)
+    expect(e.lumos?.reply.text).toBe('Daily Briefing · 9 out')
+    expect(e.lumos?.reply.sub).toMatch(/4 tarefas do dia · 1 aguardando retorno/)
+    // "Pagar IPVA" (recurring) doesn't exist yet: flagged for review, never created with invented values.
+    expect(e.lumos?.reply.sub).toMatch(/1 item precisa de revisão/)
     confirmReply(e.id)
     const db = await reopen()
 
@@ -91,7 +92,8 @@ describe('Daily Executive Briefing pasted into Lumos', () => {
     expect(db.tasks.find((t) => t.title === 'Solucionar conta Apple')?.date).toBe(FRI)
     expect(db.tasks.find((t) => t.title === 'Mandar mensagem para a Duda')?.projectId).toBe(db.projects.find((p) => p.name === 'Yoga App')?.id)
     expect(db.projects.filter((p) => p.name === 'Marina OS')).toHaveLength(1)
-    expect(db.financialCategories.find((c) => c.name === 'Pagar IPVA')?.bill).toEqual({ every: 'mes' })
+    expect(db.financialCategories.some((c) => c.name === 'Pagar IPVA')).toBe(false)
+    expect(db.backlogItems.find((b) => b.title === 'Pagar IPVA')).toMatchObject({ kind: 'recurring', status: 'open' })
     // Vitor was already waiting (backlog) — not duplicated.
     expect(db.tasks.filter((t) => t.status === 'waiting' && t.waiting?.who === 'Vitor')).toHaveLength(1)
     // Everything is on today's Home with a check.

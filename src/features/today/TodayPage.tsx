@@ -18,6 +18,7 @@ import { Page } from '@/components/ui'
 import { changeFeed, dailyBrief, homeSuggestions, lifeContext, needsAttention, proactiveInsights, type Now } from '@/data/intel'
 import { getDB, useDB } from '@/data/store'
 import { dayItems, todaySections, undatedItems, upcomingDays } from '@/data/agenda/items'
+import { radarItems } from '@/data/briefing/backlog'
 import { areaLocked, useLockState } from '@/app/lock-store'
 import { useNow } from '@/hooks/useToday'
 import { formatLongDate, greeting } from '@/lib/date'
@@ -62,6 +63,7 @@ export default function TodayPage() {
   const sections = useMemo(() => todaySections(items, minutes), [items, minutes])
   const next = useMemo(() => upcomingDays(db, today, 6, { hidden }), [db, today, hidden])
   const undated = useMemo(() => undatedItems(db, today), [db, today])
+  const radar = useMemo(() => radarItems(db, today), [db, today])
   const priorities = useMemo(() => prioritiesOf(db, today), [db, today])
 
   const trip = useMemo(() => {
@@ -147,7 +149,7 @@ export default function TodayPage() {
       </motion.div>
 
       <motion.div {...rise(5)} className="mt-9">
-        <ProximosBlock days={next} undated={undated} today={today} />
+        <ProximosBlock days={next} undated={undated} radar={radar} today={today} />
       </motion.div>
 
       <p className="text-center font-display italic text-[14px] text-muted mt-14">em constante movimento: corpo, mente e vida.</p>

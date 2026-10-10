@@ -62,6 +62,8 @@ export const COLLECTION_KEYS: CollectionKey[] = (Object.keys(emptyDB()) as (keyo
 
 export const COLLECTION_LABELS: Partial<Record<CollectionKey, string>> = {
   tasks: 'Tarefas',
+  backlogItems: 'Backlog (do briefing)',
+  importBatches: 'Importações do briefing',
   occurrences: 'Check-ins de rotinas',
   priorities: 'Prioridades do dia',
   routines: 'Rotinas',

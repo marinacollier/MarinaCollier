@@ -1,46 +1,28 @@
 /**
- * "Cola o Daily Executive Briefing aqui" — the briefing text with its JSON block ("BLOCO PARA MARINA OS
- * APP") becomes the day's checklist, pulled backlog, waiting-fors and payments with a check.
- * Always a confirm (it is a batch write); one Desfazer undoes the whole import.
+ * "Cola o Daily Executive Briefing aqui" — preview first, in her words (no technical fields):
+ *   Daily Briefing · 10 out — 4 tarefas do dia · 3 itens futuros · 2 aguardando retorno · 1 recorrência
+ *   Hoje □ … · Próximos … · Waiting For … · Precisa de revisão …
+ * Then IMPORTAR (a confirm; one batch) → "Daily Briefing importado ✓" only after the device has it.
+ * Desfazer reverts only what is still as this import left it.
+ * Also: "o que veio do briefing hoje?" — today's to-dos, what's next and Waiting For, kept apart.
  */
-import { getDB } from '@/data/store'
-import { planBriefing, readBriefing, summarize, type BriefingOp, type BriefingPlan } from '@/data/briefing/import'
-import type { Note } from '@/data/types'
+import { applyPlan, undoBatch } from '@/data/briefing/apply'
+import { planBriefing, readBriefing, summarize, type PlanEntry, type PlanKind } from '@/data/briefing/import'
+import type { DB, ImportBatch } from '@/data/types'
 import { formatDayMonth } from '@/lib/date'
-import { all, createUndoable, eventDraft, runLogged, updateUndoable } from '../log'
-import type { Handler, HandlerInput, LumosReply, ReplyLine, Undo } from '../types'
+import { eventDraft, runLogged } from '../log'
+import type { Handler, HandlerInput, LumosReply, ReplyLine, ReplySection } from '../types'
 
-const PRIO: Record<string, string> = { alta: 'P1', media: 'P2', baixa: 'P3' }
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+const MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
+const dayLabel = (d: string) => `${Number(d.slice(8))} ${MONTHS[Number(d.slice(5, 7)) - 1]}`
+const EMOJI: Record<PlanKind, string> = { today: '☐', future: '→', waiting: '⏳', recurring: '🔁' }
+const TITLES: Record<PlanKind, string> = { today: 'Hoje', future: 'Próximos', waiting: 'Waiting For', recurring: 'Recorrências' }
 
-function lineOf(op: BriefingOp, projectName: (id?: string) => string | undefined): ReplyLine | undefined {
-  if (op.kind === 'task') {
-    const t = op.data
-    const bits = [t.priority ? PRIO[t.priority] : undefined, t.durationMin ? `${t.durationMin} min` : undefined, projectName(t.projectId), t.date ? formatDayMonth(t.date) : t.dueDate ? `prazo ${formatDayMonth(t.dueDate)}` : undefined]
-    return { text: t.status === 'waiting' ? `Esperando ${t.waiting?.who}: ${t.title}` : t.title, emoji: t.status === 'waiting' ? '⏳' : '☐', sub: bits.filter(Boolean).join(' · ') || undefined, isNew: true }
-  }
-  if (op.kind === 'pull') return { text: op.title, emoji: '↪︎', sub: `já estava no app · vem pra ${formatDayMonth(op.patch.date!)}` }
-  return undefined
-}
-
-/** Writes the plan; one undo for everything. */
-export function applyBriefing(plan: BriefingPlan, narrative: string): Undo {
-  const undos: Undo[] = []
-  for (const op of plan.ops) {
-    if (op.kind === 'project') undos.push(createUndoable('projects', op.data).undo)
-    else if (op.kind === 'task') undos.push(createUndoable('tasks', op.data).undo)
-    else if (op.kind === 'pull') undos.push(updateUndoable('tasks', op.id, op.patch))
-    else if (op.kind === 'category') undos.push(createUndoable('financialCategories', op.data).undo)
-    else if (op.kind === 'bill') undos.push(updateUndoable('financialCategories', op.id, { bill: op.bill }))
-  }
-  // The reading itself (not the JSON) is kept as a note of that day, replaced if pasted again.
-  if (narrative.length > 280) {
-    const title = `Daily Executive Briefing · ${formatDayMonth(plan.date)}`
-    const same = getDB().notes.find((x) => x.title === title)
-    const data: Omit<Note, 'id' | 'createdAt' | 'updatedAt'> = { title, body: narrative, kind: 'nota', tags: ['briefing'], pinned: false }
-    undos.push(same ? updateUndoable('notes', same.id, { body: narrative }) : createUndoable('notes', data).undo)
-  }
-  return all(undos)
+function sectionsOf(entries: PlanEntry[]): ReplySection[] {
+  return (['today', 'future', 'waiting', 'recurring'] as PlanKind[])
+    .map((k) => ({ title: TITLES[k], lines: entries.filter((e) => e.kind === k).map((e): ReplyLine => ({ text: e.title, emoji: EMOJI[k], sub: e.sub, isNew: e.how === 'created' })) }))
+    .filter((s) => s.lines.length)
 }
 
 function briefing(input: HandlerInput): LumosReply | undefined {
@@ -49,38 +31,96 @@ function briefing(input: HandlerInput): LumosReply | undefined {
   if (!blocks.length) return undefined
   const plan = planBriefing(db, blocks)!
   const s = summarize(plan)
-  const projectName = (id?: string) => (id ? (db.projects.find((p) => p.id === id)?.name ?? plan.ops.find((o): o is Extract<BriefingOp, { kind: 'project' }> => o.kind === 'project' && o.data.id === id)?.data.name) : undefined)
-  const lines = plan.ops.map((o) => lineOf(o, projectName)).filter((l): l is ReplyLine => !!l)
-  const counts = [
-    s.tasks ? plural(s.tasks, 'tarefa nova', 'tarefas novas') : undefined,
-    s.pulled ? plural(s.pulled, 'puxada pro dia', 'puxadas pro dia') : undefined,
-    s.waiting ? plural(s.waiting, 'em Esperando', 'em Esperando') : undefined,
+  const head = [
+    s.today ? plural(s.today, 'tarefa do dia', 'tarefas do dia') : undefined,
+    s.future ? plural(s.future, 'item futuro', 'itens futuros') : undefined,
+    s.waiting ? plural(s.waiting, 'aguardando retorno', 'aguardando retorno') : undefined,
+    s.recurring ? plural(s.recurring, 'recorrência reconhecida', 'recorrências reconhecidas') : undefined,
     s.bills ? plural(s.bills, 'pagamento com check', 'pagamentos com check') : undefined,
-    s.projects ? plural(s.projects, 'frente nova', 'frentes novas') : undefined,
   ].filter(Boolean)
-  const keptNote = s.kept ? `${plural(s.kept, 'item já estava', 'itens já estavam')} no app — não dupliquei.` : undefined
+  const review = plan.review.length ? `${plural(plan.review.length, 'item precisa', 'itens precisam')} de revisão` : undefined
+  const sections = [...sectionsOf(plan.entries), ...(plan.review.length ? [{ title: 'Precisa de revisão', lines: plan.review.map((r) => ({ text: r.title, emoji: '⚠️', sub: r.reason })) }] : [])]
   if (!plan.ops.length) {
-    return { area: 'briefing', text: `Briefing de ${formatDayMonth(plan.date)}: tudo isso já está no app ✓`, sub: keptNote, provenance: 'user' }
+    return { area: 'briefing', text: `Daily Briefing · ${dayLabel(plan.date)}: tudo isso já está no app ✓`, sub: [s.kept ? 'Nada duplicado — o que você marcou ou mudou ficou como estava.' : undefined, review].filter(Boolean).join('\n') || undefined, sections, provenance: 'user' }
   }
-  const newProjects = plan.ops.filter((o): o is Extract<BriefingOp, { kind: 'project' }> => o.kind === 'project').map((o) => o.data.name)
-  const bills = plan.ops.filter((o): o is Extract<BriefingOp, { kind: 'category' | 'bill' }> => o.kind === 'category' || o.kind === 'bill').map((o) => (o.kind === 'category' ? o.data.name : o.name))
+  const result = [
+    s.created ? plural(s.created, 'tarefa adicionada', 'tarefas adicionadas') : undefined,
+    s.pulled ? plural(s.pulled, 'tarefa do backlog veio pra hoje', 'tarefas do backlog vieram pra hoje') : undefined,
+    s.backlog ? plural(s.backlog, 'item atualizado no backlog', 'itens atualizados no backlog') : undefined,
+    s.waitingLinked ? plural(s.waitingLinked, 'Waiting For vinculado', 'Waiting For vinculados') : undefined,
+    s.recurring ? plural(s.recurring, 'recorrência reconhecida', 'recorrências reconhecidas') : undefined,
+    s.projects ? plural(s.projects, 'frente nova', 'frentes novas') : undefined,
+    review,
+  ].filter(Boolean)
   return {
     area: 'briefing',
-    text: `Briefing de ${formatDayMonth(plan.date)} — coloco no app?`,
-    sub: [counts.join(' · '), keptNote].filter(Boolean).join('\n'),
-    sections: [
-      ...(lines.length ? [{ title: 'Checklist', lines: lines.slice(0, 30) }] : []),
-      ...(bills.length ? [{ title: 'Pagamentos (com check, sem valor)', lines: [{ text: bills.join(' · '), emoji: '💳' }] }] : []),
-      ...(newProjects.length ? [{ title: 'Frentes novas', lines: newProjects.map((n) => ({ text: n, emoji: '📁', isNew: true })) }] : []),
-    ],
+    text: `Daily Briefing · ${dayLabel(plan.date)}`,
+    sub: [head.join(' · '), review].filter(Boolean).join('\n'),
+    sections,
     provenance: 'user',
     action: {
       mode: 'confirm',
-      label: 'Colocar no app',
-      done: `Briefing no app ✓ ${counts.join(' · ')}`,
-      run: () => runLogged(() => applyBriefing(plan, narrative), [eventDraft(now, { kind: 'created', title: `Briefing de ${formatDayMonth(plan.date)} importado`, area: 'rotina' })]),
+      label: 'Importar',
+      done: `Daily Briefing importado ✓ ${result.join(' · ')}`,
+      run: () =>
+        runLogged(
+          () => {
+            const id = applyPlan(plan, narrative)
+            return () => void undoBatch(id)
+          },
+          [eventDraft(now, { kind: 'created', title: `Daily Briefing de ${formatDayMonth(plan.date)} importado`, area: 'rotina' })],
+        ),
     },
   }
 }
 
-export const briefingHandler: Handler = { id: 'briefing', run: briefing }
+// ─── "o que veio do briefing hoje?" ─────────────────────────────────────────
+
+const WHAT_CAME = /\b(?:o que|oque|que|quais?)\b.*\b(?:veio|vieram|chegou|trouxe|tem|entrou)\b.*\bbriefing\b|\bbriefing\b.*\b(?:de hoje|hoje|trouxe)\b.*\?|^briefing de hoje$/
+
+function stateOf(db: DB, item: ImportBatch['items'][number], today: string): string | undefined {
+  if (item.collection === 'tasks') {
+    const t = db.tasks.find((x) => x.id === item.id)
+    if (!t) return 'saiu do app'
+    if (t.status === 'done') return t.waiting ? 'respondeu ✓' : 'feita ✓'
+    if (t.status === 'waiting') return `esperando ${t.waiting?.who ?? ''}`.trim()
+    return t.date ? (t.date === today ? 'hoje' : `foi pra ${formatDayMonth(t.date)}`) : undefined
+  }
+  if (item.collection === 'backlogItems') {
+    const b = db.backlogItems.find((x) => x.id === item.id)
+    if (!b) return undefined
+    if (b.status === 'done') return 'resolvido ✓'
+    if (b.status === 'promoted') {
+      const t = db.tasks.find((x) => x.id === b.promotedTaskId)
+      return t ? `virou tarefa${t.date ? ` · ${formatDayMonth(t.date)}` : ''}${t.status === 'done' ? ' ✓' : ''}` : 'virou tarefa'
+    }
+    return b.kind === 'recurring' ? b.recognizedAs : (b.window?.label ?? 'sem data')
+  }
+  return undefined
+}
+
+function whatCame(input: HandlerInput): LumosReply | undefined {
+  const { db, n, now } = input
+  if (!WHAT_CAME.test(n)) return undefined
+  const batches = db.importBatches.filter((b) => !b.undoneAt).sort((a, b) => b.briefingDate.localeCompare(a.briefingDate) || b.importedAt.localeCompare(a.importedAt))
+  const batch = batches.find((b) => b.briefingDate === now.date) ?? batches[0]
+  if (!batch) return { area: 'briefing', text: 'Ainda não chegou nenhum briefing aqui.', sub: 'Cola o Daily Executive Briefing (com o bloco JSON) e eu organizo.' }
+  const sections = (['today', 'future', 'waiting', 'recurring'] as PlanKind[])
+    .map((k) => ({ title: TITLES[k], lines: batch.items.filter((i) => i.kind === k && i.how !== 'ignored').map((i): ReplyLine => ({ text: i.title, emoji: EMOJI[k], sub: stateOf(db, i, now.date) })) }))
+    .filter((s) => s.lines.length)
+  const count = (k: PlanKind) => batch.items.filter((i) => i.kind === k && i.how !== 'ignored').length
+  return {
+    area: 'briefing',
+    text: `Do briefing de ${dayLabel(batch.briefingDate)}:`,
+    sub: [count('today') && plural(count('today'), 'tarefa do dia', 'tarefas do dia'), count('future') && plural(count('future'), 'item futuro', 'itens futuros'), count('waiting') && plural(count('waiting'), 'aguardando retorno', 'aguardando retorno')].filter(Boolean).join(' · '),
+    sections,
+    provenance: 'fact',
+  }
+}
+
+export const briefingHandler: Handler = {
+  id: 'briefing',
+  run(input) {
+    return briefing(input) ?? whatCame(input)
+  },
+}

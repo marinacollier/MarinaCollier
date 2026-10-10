@@ -450,7 +450,7 @@ export interface Task extends Entity {
   tripId?: ID
   partnershipId?: ID
   /** Waiting For details when status === 'waiting'. */
-  waiting?: { who: string; since: DateKey; followUpOn?: DateKey }
+  waiting?: { who: string; since: DateKey; followUpOn?: DateKey; /** Last time she said "ainda não respondeu". */ lastCheckedAt?: DateKey }
   /** Work: blocked until Marina acts ("Precisa de mim"). */
   needsMe?: boolean
   /** If set, the task is a recurring template; completions are Occurrences. */
@@ -470,6 +470,65 @@ export interface Task extends Entity {
   goalId?: ID
   /** A dated session created for this quota by the planner or Lumos. */
   careerParentId?: ID
+  // ── From the Daily Executive Briefing ──
+  /** "Feito quando: …" — what done means for this to-do. */
+  doneCriteria?: string
+  /** Small free labels ('optional' for a briefing's Optional priority). */
+  tags?: string[]
+  /** Where it came from (imported records keep it; the record itself is hers once imported). */
+  source?: ImportOrigin
+}
+
+/** Provenance of anything the Daily Briefing brought in ("o que veio do briefing de hoje?"). */
+export interface ImportOrigin {
+  type: 'daily_briefing'
+  label: string
+  briefingDate: DateKey
+  /** Deterministic key: the same item imported again is recognised, never duplicated. */
+  sourceKey: string
+  importBatchId: ID
+}
+
+/**
+ * Something to remember / follow — NOT a to-do. A briefing's backlog watchlist lands here:
+ *   scheduled → a future intention, with a time window when the briefing gave one (never a fake time)
+ *   recurring → part of her life already (payments…), recognised, never re-created
+ * It becomes a Task only when she gives it a day ("isso do Santander coloca terça") — `promotedTaskId`.
+ */
+export interface BacklogItem extends Entity {
+  title: string
+  kind: 'scheduled' | 'recurring'
+  status: 'open' | 'promoted' | 'done' | 'dismissed'
+  /** Front as the briefing named it ("Santander", "Vida/Admin"). */
+  front?: string
+  projectId?: ID
+  tripId?: ID
+  context?: Task['context']
+  notes?: string
+  /** "Semana de 12 a 16/10" → from/until; "a partir de 13/10" → from. Only what could be read safely. */
+  window?: { from?: DateKey; until?: DateKey; label: string }
+  /** The to-do that now carries it (promoted by her, or an equivalent task that already existed). */
+  promotedTaskId?: ID
+  /** What it was recognised as (recurring): e.g. "Pagamentos do mês". */
+  recognizedAs?: string
+  source: ImportOrigin
+  /** Last briefing that mentioned it. */
+  lastSeenBriefing?: DateKey
+}
+
+/** One import of a Daily Briefing — for "Desfazer importação" and a light history in Dados. */
+export interface ImportBatch extends Entity {
+  source: string
+  briefingDate: DateKey
+  importedAt: ISODateTime
+  counts: { created: number; updated: number; ignored: number; reviewRequired: number }
+  /** What this import wrote, with what was there before — undo touches only what is still as it left it. */
+  changes: { collection: CollectionKey; id: ID; op: 'created' | 'updated'; previous?: Record<string, unknown>; stamp: ISODateTime }[]
+  /** How each briefing item was understood (for "o que veio do briefing?"). */
+  items: { kind: 'today' | 'future' | 'waiting' | 'recurring'; title: string; collection?: CollectionKey; id?: ID; how: 'created' | 'linked' | 'kept' | 'ignored' }[]
+  review: { title: string; reason: string }[]
+  sourceKeys: string[]
+  undoneAt?: ISODateTime
 }
 
 export type CareerKind = 'ingles_exec' | 'networking' | 'post' | 'lideranca' | 'review'
@@ -1659,6 +1718,8 @@ export interface DB {
   contracts: FinancialContract[]
   opportunities: Opportunity[]
   contacts: ProfessionalContact[]
+  backlogItems: BacklogItem[]
+  importBatches: ImportBatch[]
 }
 
 /** Keys of DB that hold arrays of entities. */

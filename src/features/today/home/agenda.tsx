@@ -10,7 +10,11 @@ import { useNavigate } from 'react-router-dom'
 import { Check, ChevronDown, ChevronRight } from 'lucide-react'
 import type { ActionItem, FrontGroup, TodaySections, UpcomingDay } from '@/data/agenda/items'
 import type { DateKey } from '@/data/types'
-import { WEEKDAY_SHORT, formatDayMonth, weekday } from '@/lib/date'
+import { WEEKDAY_SHORT, addDays, formatDayMonth, weekday } from '@/lib/date'
+import { toast } from '@/app/ui-store'
+import { promoteBacklog } from '@/data/briefing/backlog'
+import { persist } from '@/data/store'
+import { haptic } from '@/lib/haptics'
 import { cn } from '@/lib/cn'
 import { checkItem, openItem } from './act'
 import { Eyebrow } from './blocks'
@@ -54,17 +58,55 @@ function CheckButton({ item, onDone }: { item: ActionItem; onDone?: () => void }
   )
 }
 
+/** A backlog item gets a day right here (it becomes a real to-do on that day). */
+function GiveADay({ item, today }: { item: ActionItem; today: DateKey }) {
+  const monday = addDays(today, ((8 - weekday(today)) % 7) || 7)
+  const options: { label: string; date: DateKey }[] = [
+    { label: 'Hoje', date: today },
+    { label: 'Amanhã', date: addDays(today, 1) },
+    ...(monday !== addDays(today, 1) ? [{ label: `Segunda ${formatDayMonth(monday)}`, date: monday }] : []),
+  ]
+  const give = (date: DateKey, label: string) => {
+    const undo = promoteBacklog(item.refId, date)
+    void persist()
+    haptic('success')
+    toast(`${item.title} → ${label.toLowerCase()} ✓`, {
+      action: {
+        label: 'Desfazer',
+        run: () => {
+          undo()
+          void persist()
+        },
+      },
+    })
+  }
+  return (
+    <div className="flex flex-wrap gap-1.5 pb-2 pl-9">
+      {options.map((o) => (
+        <button key={o.label} type="button" onClick={() => give(o.date, o.label)} className="h-8 px-3 rounded-full bg-surface-2 text-[12.5px] text-ink-2 active:scale-95 transition">
+          {o.label}
+        </button>
+      ))}
+      <label className="h-8 px-3 rounded-full bg-surface-2 text-[12.5px] text-ink-2 inline-flex items-center gap-1 relative">
+        Outro dia
+        <input type="date" min={today} aria-label={`Escolher dia para ${item.title}`} className="absolute inset-0 opacity-0" onChange={(e) => e.target.value && give(e.target.value, formatDayMonth(e.target.value))} />
+      </label>
+    </div>
+  )
+}
+
 export function ActionRow({ item, today, showTime = true }: { item: ActionItem; today: DateKey; showTime?: boolean }) {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const done = item.status === 'done'
   const routine = item.check === 'routine' && !!item.children?.length
+  const backlog = item.refType === 'backlogItem'
   return (
     <li>
       <div className="flex items-start gap-1.5 min-h-[52px]">
         {showTime && <span className={cn('w-[50px] shrink-0 pt-[13px] font-sport text-[16px] tabular-nums', done ? 'text-muted/60' : 'text-ink')}>{item.start ?? ''}</span>}
         <CheckButton item={item} />
-        <button type="button" onClick={() => (routine ? setOpen((o) => !o) : openItem(item, today, navigate))} className="flex-1 min-w-0 text-left py-[7px] active:opacity-70">
+        <button type="button" aria-expanded={backlog ? open : undefined} onClick={() => (routine || backlog ? setOpen((o) => !o) : openItem(item, today, navigate))} className="flex-1 min-w-0 text-left py-[7px] active:opacity-70">
           {(item.front.label || item.priority !== undefined) && (
             <span className="block text-[10.5px] tracking-[0.12em] uppercase text-muted font-semibold leading-4 truncate">
               {item.priority !== undefined && <span className="text-accent">Top {item.priority + 1}</span>}
@@ -84,6 +126,7 @@ export function ActionRow({ item, today, showTime = true }: { item: ActionItem; 
           </button>
         )}
       </div>
+      {backlog && open && !done && <GiveADay item={item} today={today} />}
       {routine && open && (
         <ul className={cn(showTime ? 'pl-[50px]' : 'pl-2')}>
           {item.children!.map((c) => (
@@ -232,7 +275,7 @@ function DayLine({ day, today, index }: { day: UpcomingDay; today: DateKey; inde
   )
 }
 
-export function ProximosBlock({ days, undated, today }: { days: UpcomingDay[]; undated: ActionItem[]; today: DateKey }) {
+export function ProximosBlock({ days, undated, radar = [], today }: { days: UpcomingDay[]; undated: ActionItem[]; radar?: ActionItem[]; today: DateKey }) {
   const byFront = useMemo(() => {
     const m = new Map<string, ActionItem[]>()
     for (const i of undated) m.set(i.front.label || 'GERAL', [...(m.get(i.front.label || 'GERAL') ?? []), i])
@@ -246,6 +289,18 @@ export function ProximosBlock({ days, undated, today }: { days: UpcomingDay[]; u
           <DayLine key={d.date} day={d} today={today} index={i} />
         ))}
       </ul>
+      {/* Future intentions from the briefing's backlog: not to-dos until she gives them a day. */}
+      {radar.length > 0 && (
+        <div className="border-t border-line/70">
+          <Fold label={`No radar · ${plural(radar.length, 'item futuro', 'itens futuros')}`}>
+            <ul>
+              {radar.map((i) => (
+                <ActionRow key={i.key} item={i} today={today} showTime={false} />
+              ))}
+            </ul>
+          </Fold>
+        </div>
+      )}
       {undated.length > 0 && (
         <div className="border-t border-line/70">
           <Fold label={`Sem dia · ${plural(undated.length, 'coisa pra fazer', 'coisas pra fazer')}`}>

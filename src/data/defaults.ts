@@ -202,6 +202,8 @@ export function emptyDB(): DB {
     contracts: [],
     opportunities: [],
     contacts: [],
+    backlogItems: [],
+    importBatches: [],
   }
 }
 

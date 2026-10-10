@@ -9,6 +9,7 @@ import { backupHandler } from './handlers/backup'
 import { booksHandler } from './handlers/books'
 import { briefingHandler } from './handlers/briefing'
 import { recurringHandler } from './handlers/recurring'
+import { backlogHandler } from './handlers/backlog'
 import { attachmentHandler } from './handlers/attachment'
 import { calendarHandler } from './handlers/calendar'
 import { careerHandler } from './handlers/career'
@@ -24,7 +25,7 @@ import { norm } from './text'
 import type { AttachmentReading } from '../attach/types'
 import type { Handler, LumosReply, TurnContext } from './types'
 
-export const HANDLERS: Handler[] = [briefingHandler, backupHandler, recurringHandler, careerHandler, calendarHandler, attachmentHandler, memoryHandler, booksHandler, kitchenHandler, workHandler, tasksHandler, dayHandler, travelHandler, studyHandler, captureHandler]
+export const HANDLERS: Handler[] = [briefingHandler, backupHandler, recurringHandler, backlogHandler, careerHandler, calendarHandler, attachmentHandler, memoryHandler, booksHandler, kitchenHandler, workHandler, tasksHandler, dayHandler, travelHandler, studyHandler, captureHandler]
 
 export function respond(db: DB, text: string, now: Now, ctx: TurnContext = {}, attachment?: AttachmentReading): LumosReply | undefined {
   const n = norm(text)

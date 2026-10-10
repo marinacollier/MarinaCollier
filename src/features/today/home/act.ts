@@ -95,6 +95,14 @@ export function checkItem(item: ActionItem): boolean | undefined {
         }
         break
       }
+      if (item.refType === 'backlogItem') {
+        // A future intention resolved (it never was a to-do of today).
+        const b = db.backlogItems.find((x) => x.id === item.refId)
+        if (!b) return undefined
+        done = b.status !== 'done'
+        actions.update('backlogItems', b.id, { status: done ? 'done' : 'open' })
+        break
+      }
       if (item.refType === 'milestone') {
         const m = db.milestones.find((x) => x.id === item.refId)
         if (!m) return undefined

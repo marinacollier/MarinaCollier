@@ -71,15 +71,18 @@ export function fallbackAttention(db: DB, now: Now): AttentionItem[] {
   }
   for (const t of db.tasks) {
     if (t.status !== 'waiting' || !t.waiting) continue
-    const due = t.waiting.followUpOn ? t.waiting.followUpOn <= today : diffDays(t.waiting.since, today) >= 7
+    // "ainda não respondeu" (lastCheckedAt) restarts the quiet count; a follow-up day already checked is done.
+    const checked = t.waiting.lastCheckedAt
+    const due = t.waiting.followUpOn ? t.waiting.followUpOn <= today && (!checked || checked < t.waiting.followUpOn) : diffDays(checked ?? t.waiting.since, today) >= 7
     if (!due) continue
     const who = t.waiting.who || 'alguém'
+    const days = diffDays(t.waiting.since, today)
     out.push({
-      key: `waiting:${t.id}`,
+      key: `waiting:${t.id}:${checked ?? t.waiting.since}`,
       kind: 'waiting_reply',
       title: `${t.title} — esperando ${who}`,
-      detail: t.waiting.followUpOn ? 'Era o dia de dar um toque.' : `Desde ${t.waiting.since.split('-').reverse().slice(0, 2).join('/')}.`,
-      options: t.waiting.who ? [{ label: `${who} respondeu`, ask: `${who} me respondeu` }] : undefined,
+      detail: t.waiting.followUpOn && t.waiting.followUpOn <= today ? 'Era o dia de dar um toque.' : `${who} ainda não respondeu há ${days} dias.`,
+      options: t.waiting.who ? [{ label: `${who} respondeu`, ask: `${who} me respondeu` }, { label: 'Ainda não', ask: `${who} ainda não respondeu` }] : undefined,
       provenance: 'fact',
       ref: { type: 'task', id: t.id },
     })

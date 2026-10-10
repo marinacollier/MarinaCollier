@@ -143,14 +143,34 @@ export function needsAttention(db: DB, now: Now): AttentionItem[] {
       ref: { type: 'expense', id: dup[0].id },
     })
 
+  // Backlog (from the briefing): the window it was meant for has started — give it a day, or let it go.
+  for (const b of db.backlogItems ?? []) {
+    const from = b.window?.from
+    if (b.kind !== 'scheduled' || b.status !== 'open' || !from || from > today || (b.window?.until && b.window.until < today)) continue
+    out.push({
+      key: `backlog:${b.id}:${from}`,
+      kind: 'decision',
+      title: `${b.title} — ${b.window!.label}`,
+      detail: from === today ? 'Começa hoje. Coloco num dia?' : 'A janela já começou. Coloco num dia?',
+      options: [
+        { label: 'Hoje', ask: `isso do ${b.title} coloca hoje` },
+        { label: 'Amanhã', ask: `isso do ${b.title} coloca amanhã` },
+        { label: 'Já resolvi', ask: `${b.title} feito` },
+      ],
+      provenance: 'fact',
+      ref: { type: 'backlogItem', id: b.id },
+    })
+  }
+
   // 4. Waiting for someone: follow-up day reached, or a week with no answer and no follow-up date.
   for (const t of db.tasks) {
     if (t.status !== 'waiting' || !t.waiting) continue
-    const due = t.waiting.followUpOn ? t.waiting.followUpOn <= today : diffDays(t.waiting.since, today) >= WAITING_QUIET_DAYS
+    const checked = t.waiting.lastCheckedAt
+    const due = t.waiting.followUpOn ? t.waiting.followUpOn <= today && (!checked || checked < t.waiting.followUpOn) : diffDays(checked ?? t.waiting.since, today) >= WAITING_QUIET_DAYS
     if (!due) continue
     const who = t.waiting.who || 'alguém'
     out.push({
-      key: `waiting:${t.id}:${t.waiting.followUpOn ?? t.waiting.since}`,
+      key: `waiting:${t.id}:${t.waiting.followUpOn ?? checked ?? t.waiting.since}`,
       kind: 'waiting_reply',
       title: `Esperando ${who}: ${t.title}`,
       detail: `desde ${t.waiting.since.slice(8, 10)}/${t.waiting.since.slice(5, 7)}`,
