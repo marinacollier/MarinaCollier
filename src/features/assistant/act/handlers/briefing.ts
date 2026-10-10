@@ -46,7 +46,7 @@ function briefing(input: HandlerInput): LumosReply | undefined {
   const result = [
     s.created ? plural(s.created, 'tarefa adicionada', 'tarefas adicionadas') : undefined,
     s.pulled ? plural(s.pulled, 'tarefa do backlog veio pra hoje', 'tarefas do backlog vieram pra hoje') : undefined,
-    s.backlog ? plural(s.backlog, 'item atualizado no backlog', 'itens atualizados no backlog') : undefined,
+    s.backlog ? plural(s.backlog, 'item no backlog', 'itens no backlog') : undefined,
     s.waitingLinked ? plural(s.waitingLinked, 'Waiting For vinculado', 'Waiting For vinculados') : undefined,
     s.recurring ? plural(s.recurring, 'recorrência reconhecida', 'recorrências reconhecidas') : undefined,
     s.projects ? plural(s.projects, 'frente nova', 'frentes novas') : undefined,

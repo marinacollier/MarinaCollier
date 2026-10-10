@@ -13,6 +13,7 @@ import { exportBackup, restoreBackup } from './backup-io'
 import { CSV_DATASETS, datasetCSV, type CsvDatasetId } from './csv'
 import { formatBytes, saveFile } from './platform'
 import { Hint } from './components'
+import { ImportHistory } from './ImportHistory'
 
 interface StorageInfo {
   usage?: number
@@ -237,6 +238,8 @@ export default function DataPage() {
         ))}
       </div>
       <Hint>Abre no Numbers, Excel ou Google Planilhas.</Hint>
+
+      <ImportHistory />
 
       <SectionTitle>Recomeçar</SectionTitle>
       <Card>

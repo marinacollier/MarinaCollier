@@ -65,7 +65,10 @@ function put(input: HandlerInput): LumosReply | undefined {
   const date = dayIn(m[2], now.date)
   if (!date) return undefined
   const hits = backlogHits(db, m[1])
-  if (!hits.length) return undefined
+  if (!hits.length) {
+    // "isso do X coloca terça" is clearly about the backlog: say so instead of guessing something else.
+    return explicit ? { area: AREA, text: `Não achei nada de “${m[1]}” no backlog pra colocar ${dayLabel(date, now.date)}.`, sub: 'Se for uma tarefa nova, me diz o nome que eu crio.' } : undefined
+  }
   // "coloca X terça" without "isso do": an open to-do with that name is the tasks handler's.
   if (!explicit && db.tasks.some((t) => isTaskOpen(t) && t.status !== 'waiting' && phraseHits(t.title, m[1]) && !hits.some((b) => b.promotedTaskId === t.id))) return undefined
   const act = (b: BacklogItem) => ({ done: `“${b.title}” ${b.promotedTaskId ? 'vai pra' : 'virou tarefa pra'} ${dayLabel(date, now.date)} ✓`, run: () => promote(b, date, input) })

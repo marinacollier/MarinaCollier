@@ -7,26 +7,46 @@ O briefing é escrito fora do app (Claude, com pesquisa na web). O app recebe o 
 
 1. Copie o briefing inteiro (texto + bloco JSON).
 2. Cole na Lumos (Home ou conversa) e envie.
-3. A Lumos mostra o que vai entrar: tarefas novas, itens do backlog puxados para hoje, esperas,
-   pagamentos e frentes novas. Toque em **Colocar no app**. **Desfazer** desfaz tudo de uma vez.
+3. A Lumos mostra a prévia: **Hoje**, **Próximos**, **Waiting For**, **Recorrências** e o que precisa de
+   revisão. Toque em **Importar**. **Desfazer** desfaz só o que ainda está como a importação deixou.
 
 O texto do briefing (sem o JSON) fica guardado como nota: “Daily Executive Briefing · dd/mm”. Colar de novo
 o mesmo briefing não duplica nada (a nota é atualizada).
 
-## O que o app faz com cada campo
+## Cada coisa mantém sua natureza (v2)
+
+| No JSON | No app | Aparece onde |
+|---|---|---|
+| `tasks` | **tarefa do dia do briefing** (sem `due_date` ≠ sem dia) | **Hoje**, na fila única, com a etiqueta da frente |
+| `backlog_watchlist` · `scheduled` | **item de backlog**, que não é tarefa, com a janela lida das notas (“Semana de 12 a 16/10”, “a partir de 13/10”, “próxima semana”) | **Próximos → No radar** (recolhido), com check e Hoje / Amanhã / Segunda / Outro dia; quando a janela começa, vira “precisa de você” |
+| `backlog_watchlist` · `waiting` | **Waiting For** (liga no Esperando que já existe, por exemplo Vitor e Thales) | só quando o retorno vence ou fica parado tempo demais |
+| `backlog_watchlist` · `recurring` | **reconhecida** contra o que já existe (Pagamentos do mês); não cria nada sem valor, dia e frequência | Dinheiro → Pagamentos do mês |
+
+- **Nada duplica:** cada item ganha uma chave fixa (`daily-briefing-2026-10-10-marina-os-verificar-integracao…`). Colar o mesmo JSON 10 vezes grava uma vez só.
+- **O seu estado vence:** o que você marcou como feito, moveu, editou, resolveu ou apagou fica como você deixou, mesmo reimportando.
+- **Equivalente ≠ parecido:** “Multas do carro” (watchlist) liga na sua tarefa “Resolver multas do carro”. Já “Consolidar pendências JNB” (tarefa de hoje) e “Hospedagem e safari JNB” (depois) são coisas diferentes.
+- **Origem:** tudo guarda de onde veio (`daily_briefing`, data, chave, lote). Pergunte à Lumos: **“o que veio do briefing hoje?”**.
+- **Prévia → Importar → só diz “importado ✓” depois de salvo no aparelho.** “Desfazer” desfaz só o que ainda está como a importação deixou. Histórico em **Ajustes → Dados → Importações do briefing**.
+- **Entrada:** aceita `snake_case` (`backlog_watchlist`, `done_criteria`, `estimated_minutes`, `due_date`) e `camelCase`. Categoria desconhecida não derruba nada. Prioridade desconhecida ou data inválida ficam sem esse dado e aparecem em “precisa de revisão”. Item sem título também não some: entra em “precisa de revisão”.
+
+### Depois do import, pela Lumos
+- “B.O. feito.” marca a tarefa como feita.
+- “JNB fica pra segunda.” move a tarefa.
+- “isso do Santander coloca terça” transforma o item de backlog em tarefa na terça.
+- “Vitor respondeu.” resolve o Esperando.
+- “Thales ainda não respondeu.” mantém em Esperando e anota a checagem de hoje.
+
+### Campos das tarefas
 
 | Campo | No app |
 |---|---|
-| `title` | título da tarefa; se já existe uma tarefa com o mesmo título, **não duplica** — num briefing diário ela vem para o dia |
-| `category` | Carreira/Networking/Portfólio → Carreira · Inglês → Estudo · Produto/IA/Operação → Trabalho · Financeiro/Logística → Vida real · Viagem → Viagem |
-| `project` | a frente existente (Santander, FashionFinder, Day One AI, Yoga App, Tranquilo SP…); um nome novo vira frente nova, e a Lumos avisa antes |
-| `priority` | P1 = alta · P2 = média · P3/Optional = baixa |
-| `done_criteria` | nas notas da tarefa: “Feito quando: …” |
-| `estimated_minutes` | duração da tarefa |
-| `status` | `todo` · `done` · `waiting` (vai para Esperando; quem = “retorno do Vitor” → Vitor) |
-| `due_date` | briefing **diário**: a tarefa é do dia do briefing e `due_date` vira prazo. Backlog: até amanhã vira o dia; depois disso, prazo |
-| `backlog_watchlist` | `waiting` → Esperando · `scheduled` → tarefa · `recurring` → pagamento com check |
-| `recurring_financial_categories` | pagamentos com check em Dinheiro → **Pagamentos do mês**. Nunca com valor; “— semanal” = check por semana |
+| `category` | Carreira/Networking/Portfólio → Carreira · Inglês → Estudo · Produto/IA/Operação → Trabalho · Financeiro/Logística → Vida real · Viagem → Viagem · desconhecida → geral |
+| `project` | frente existente (Santander, FashionFinder, Day One AI, Yoga App, Tranquilo SP…); um nome novo vira frente nova, com aviso na prévia |
+| `priority` | P1 = alta · P2 = média · P3 = baixa · Optional = baixa + etiqueta “opcional” |
+| `done_criteria` | “Feito quando: …” (doneCriteria) |
+| `estimated_minutes` | duração |
+| `due_date` | vazio ou o dia do briefing → tarefa desse dia; data depois → tarefa do dia com prazo |
+| `recurring_financial_categories` | pagamentos com check (sem valor) |
 
 O app nunca inventa valor, horário ou vencimento. Em Dinheiro → Pagamentos do mês dá para escolher o dia
 de vencimento de cada pagamento; com o dia escolhido, o pagamento aparece em **Hoje** naquele dia, com check.

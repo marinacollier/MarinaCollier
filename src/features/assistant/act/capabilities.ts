@@ -36,6 +36,12 @@ export const CAPABILITIES: Capability[] = [
   { id: 'task.priority', domain: 'tasks', verb: 'priorizar', example: 'FashionFinder é prioridade hoje', handler: 'work', channels: TA },
   { id: 'waiting.create', domain: 'work', verb: 'esperar alguém', example: 'Fran ficou de me responder sexta', handler: 'work', channels: ALL, from: ['work'] },
   { id: 'waiting.resolve', domain: 'work', verb: 'resolver', example: 'Fran me respondeu', handler: 'work', channels: TA },
+  { id: 'waiting.notyet', domain: 'work', verb: 'continuar esperando', example: 'Thales ainda não respondeu', handler: 'work', channels: TA },
+  { id: 'briefing.import', domain: 'tasks', verb: 'importar o Daily Briefing', example: '{"date":"2026-10-10","source":"Daily Executive Briefing","tasks":[{"title":"Abrir B.O. de pedágio","status":"todo"}]}', handler: 'briefing', channels: ['text'] },
+  { id: 'briefing.what', domain: 'tasks', verb: 'contar o que veio do briefing', example: 'o que veio do briefing hoje?', handler: 'briefing', channels: TA },
+  { id: 'backlog.promote', domain: 'tasks', verb: 'dar um dia a um item do backlog', example: 'isso do Santander coloca terça', handler: 'backlog', channels: TA },
+  { id: 'tasks.done_by_name', domain: 'tasks', verb: 'concluir pelo nome', example: 'B.O. feito', handler: 'backlog', channels: TA },
+  { id: 'tasks.stays', domain: 'tasks', verb: 'mover (fica pra)', example: 'JNB fica pra segunda', handler: 'backlog', channels: TA },
   // workouts
   { id: 'workout.complete', domain: 'workouts', verb: 'registrar feito', example: 'acabei de fazer meu treino, foram 7 km em Z2', handler: 'day', channels: TA },
   { id: 'workout.move', domain: 'workouts', verb: 'mover', example: 'passa minha corrida de sexta pra sábado', via: 'planner', channels: TA },
