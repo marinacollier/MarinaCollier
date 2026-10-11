@@ -240,12 +240,6 @@ describe('rules', () => {
     expect(approachToday(getDB(), MON).map((o) => findBrand(getDB(), 'Snug')?.id === o.brandId)).toEqual([true]) // Breevo is already contatada
   })
 
-  it('"gera uma DM pra Galápagos" says plainly it is the next delivery — nothing fake', async () => {
-    const r = (await say('gera uma DM pra Galápagos')).lumos!.reply
-    expect(r.text).toMatch(/próxima entrega/)
-    expect(r.action).toBeUndefined()
-  })
-
   it('"quem está esperando follow-up?" lists today and the next 7 days', async () => {
     const a = ensureProspect('Snug')
     recordOutbound(a.opportunity.id, 'dm', { date: '2026-10-09' })

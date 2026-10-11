@@ -42,7 +42,7 @@ function relationshipLine(s: MessageStrategy, v: number): string {
   }
   const how = r.howDiscovered?.trim()
   if (how) return pick([`Conheci a ${b} ${lower1(how)}.`, `Cheguei até vocês ${lower1(how)}.`], v)
-  return pick([`Conheci a ${b} recentemente.`, `Tenho acompanhado o trabalho de vocês.`, `Achei muito interessante a proposta da ${b}.`], v)
+  return pick([`Conheci a ${b} recentemente.`, `Tenho acompanhado o trabalho de vocês.`, `Conheci vocês há pouco tempo.`], v)
 }
 
 function factLine(s: MessageStrategy, v: number): string | undefined {
@@ -77,18 +77,30 @@ function introLine(s: MessageStrategy, v: number): string {
   return pick(
     [
       `Sou a Marina, crio conteúdo UGC${how ? ` e ${how}` : ''}.`,
-      `Aqui é a Marina, creator de UGC${how ? ` — ${how}` : ''}.`,
-      `Me chamo Marina e produzo conteúdo UGC para marcas${how ? `; ${how}` : ''}.`,
+      `Aqui é a Marina, trabalho com UGC${how ? ` e ${how}` : ''}.`,
+      `Me chamo Marina, produzo conteúdo UGC para marcas${how ? ` e ${how}` : ''}.`,
     ],
     v,
   )
 }
 
 function proposalLine(s: MessageStrategy, v: number): string {
-  return pick([`Queria propor ${s.angle}.`, `Tenho uma ideia de ${s.angle}.`, `Pensei em ${s.angle} pra vocês.`], v)
+  const a = s.angle.replace(/^conteúdo\b/, 'um conteúdo')
+  return pick([`Queria propor ${a}.`, `Tenho uma ideia de ${s.angle}.`, `Pensei em ${a}.`], v)
 }
 
-const CLOSINGS = ['Faz sentido conversarmos?', 'Posso te mandar algumas ideias?', 'Se fizer sentido, te mando uma proposta rápida.', 'Topam uma conversa curta essa semana?', 'Quer que eu te mande um roteiro de exemplo?']
+const CLOSINGS = [
+  'Faz sentido conversarmos?',
+  'Posso te mandar algumas ideias?',
+  'Se fizer sentido, te mando uma proposta rápida.',
+  'Topam uma conversa curta essa semana?',
+  'Quer que eu te mande um roteiro de exemplo?',
+  'Com quem eu falo sobre isso aí?',
+  'Te mando dois ou três exemplos?',
+  'Se curtirem, monto uma ideia de roteiro.',
+  'Vocês estão trabalhando com creators agora?',
+  'Posso te mostrar como ficaria?',
+]
 
 function greeting(s: MessageStrategy, v: number): string {
   const c = s.contact?.split(' ')[0]

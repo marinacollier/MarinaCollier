@@ -9,7 +9,7 @@
  *   "fechei com a Snug por R$ 800"        → Produção + expected in Dinheiro
  *   "recebi o pagamento da Snug"          → received, deal done
  *   "quem devo abordar hoje?" · "quem está esperando follow-up?" · "quais marcas têm maior potencial?"
- * Writing a message for a brand is the next delivery (message engine) — said plainly, never faked.
+ *   "gera uma DM pra Galápagos"          → strategy + draft (asks “já usou?” first when unknown); never sent
  */
 import { ROUTES } from '@/app/routes'
 import type { Brand, DB, UgcChannel, UgcOpportunity } from '@/data/types'
@@ -31,7 +31,9 @@ import {
   toAnswer,
   weekNumbers,
 } from '@/data/ugc/model'
-import { archiveBrand, closeDeal, ensureProspect, markPaid, opportunityFor, recordOutbound, recordReply, setRelationship } from '@/data/ugc/ops'
+import { archiveBrand, closeDeal, ensureProspect, markPaid, opportunityFor, recordOutbound, recordReply, saveDraft, setRelationship } from '@/data/ugc/ops'
+import { buildStrategy, describeFact } from '@/data/ugc/strategy'
+import { composeDraft } from '@/data/ugc/compose'
 import { addDays, formatDayMonth } from '@/lib/date'
 import { formatBRL, parseSpokenBRL } from '@/lib/money'
 import { uid } from '@/lib/id'
@@ -349,22 +351,59 @@ function questions(input: HandlerInput): LumosReply | undefined {
   return undefined
 }
 
-// ─── "gera uma DM pra Galápagos" (next delivery — said plainly) ─────────────
+// ─── "gera uma DM pra Galápagos" — strategy first, then a draft she reviews (never sent) ──
 
-const WRITE = /^(?:gera|gere|escreve|escreva|faz|faca|cria|crie|monta|monte)\s+(?:uma?\s+)?(?:dm|direct|mensagem|abordagem|e-?mail|email|pitch|texto)\s+(?:pra|para|pro|da|do)\s+(?:a\s+|o\s+)?(.+)$/
+const WRITE = /^(?:gera|gere|escreve|escreva|faz|faca|cria|crie|monta|monte)\s+(?:uma?\s+)?(dm|direct|mensagem|abordagem|e-?mail|email|pitch|texto|linkedin|whats(?:app)?|formulario)\s+(?:no\s+\w+\s+)?(?:pra|para|pro|da|do)\s+(?:a\s+|o\s+)?(.+)$/
 
 function write(input: HandlerInput): LumosReply | undefined {
-  const { db, n } = input
+  const { db, n, now } = input
   const m = WRITE.exec(n)
   if (!m) return undefined
-  const brand = brandFrom(db, m[1], input)
+  const brand = brandFrom(db, m[2], input)
+  if (!brand)
+    return {
+      area: AREA,
+      text: `Não achei ${m[2]} na sua lista de marcas.`,
+      sub: 'Adiciono primeiro — aí eu monto a estratégia e o rascunho.',
+      options: [{ label: 'Adicionar na lista', ask: `adiciona ${m[2]} na minha lista de prospecção` }],
+    }
+  const ref = { type: 'brand', id: brand.id }
+  const channel = channelIn(m[1]) ?? currentOpportunity(db, brand.id)?.primaryChannel ?? 'dm'
+  const s = buildStrategy(db, brand.id, channel, now.date, currentOpportunity(db, brand.id))
+  if (!s) return undefined
+  if (s.missing.includes('relação'))
+    return {
+      area: AREA,
+      text: `Antes de escrever: você já usou ${brand.name}?`,
+      sub: 'Assim a mensagem nunca diz algo que não aconteceu.',
+      ref,
+      options: [
+        { label: 'Já usei', ask: `já usei ${brand.name}` },
+        { label: 'Nunca usei', ask: `nunca usei ${brand.name}` },
+      ],
+    }
+  const draft = composeDraft(s)
+  const opp = currentOpportunity(db, brand.id)
   return {
     area: AREA,
-    text: 'Escrever a mensagem sob medida pra cada marca é a próxima entrega (motor de abordagem).',
-    sub: brand ? `${brand.name} já está na sua lista — quando o motor chegar, ele usa o que você anotar na ficha (o que vende, como você conheceu, se já usa).` : 'Se quiser, adiciono a marca na sua lista agora.',
-    ref: brand ? { type: 'brand', id: brand.id } : undefined,
-    options: brand ? undefined : [{ label: 'Adicionar na lista', ask: `adiciona ${m[1]} na minha lista de prospecção` }],
-    link: brand ? { label: 'Abrir ficha', to: ROUTES.ugcBrand(brand.id) } : undefined,
+    text: `Rascunho de ${CHANNEL_LABEL[channel]} pra ${brand.name} — nada foi enviado.`,
+    sub: [...s.warnings, 'Revise, copie e mande você mesma. Na ficha dá pra pedir outra versão.'].join(' '),
+    sections: [
+      {
+        title: 'Estratégia',
+        lines: [
+          { text: `Falar de: ${s.talk.join(' + ') || '—'}` },
+          { text: `Evitar: ${s.avoid.slice(0, 4).join(', ') || '—'}` },
+          { text: `Ângulo: ${s.angle}` },
+          { text: `Fato: ${s.fact ? describeFact(s.fact) : 'nenhum — não elogio nada específico'}` },
+          { text: `Relação: ${s.relationship.say}` },
+        ],
+      },
+      { title: 'Mensagem', lines: [{ text: draft.subject ? `Assunto: ${draft.subject}\n\n${draft.text}` : draft.text }] },
+    ],
+    ref,
+    action: { mode: 'direct', run: () => logged(now, `UGC: rascunho pra ${brand.name}`, () => saveDraft(s, draft.text, opp?.id, draft.subject).undo, { type: 'brand', id: brand.id }) },
+    link: { label: 'Abrir na ficha', to: ROUTES.ugcBrand(brand.id) },
   }
 }
 

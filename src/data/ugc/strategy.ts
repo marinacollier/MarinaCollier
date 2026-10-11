@@ -61,18 +61,19 @@ export interface RelationshipRule {
   forbidden: RegExp[]
 }
 
-const FAKE_EXPERIENCE = [/\buso h[aá]\b/i, /\bsempre fui f[aã]\b/i, /\bj[aá] faz parte da minha rotina\b/i, /\bh[aá] anos\b/i, /\bh[aá] meses\b/i, /\bsou f[aã] de carteirinha\b/i, /\bj[aá] us[eo]\b/i, /\bsou cliente\b/i]
+// (no trailing \b after accented letters: JS \b is ASCII-only)
+const FAKE_EXPERIENCE = [/\buso h[aá]\s/i, /\bsempre fui f[aã]/i, /\bj[aá] faz parte da minha rotina/i, /\bh[aá] (anos|meses)/i, /\bsou f[aã] de carteirinha/i, /\bj[aá] us(o|ei|amos)\b/i, /\bsou cliente\b/i]
 
 export function relationshipRule(b: Brand): RelationshipRule {
   const how = b.howDiscovered?.trim()
   if (b.alreadyCustomer) {
     const p = b.productsUsed?.length ? ` (${b.productsUsed.slice(0, 2).join(', ')})` : ''
     // she said so — but never a duration or "sempre"
-    return { known: true, say: `já é cliente${p}`, forbidden: [/\bh[aá] (anos|meses)\b/i, /\bsempre fui\b/i, /\bdesde sempre\b/i] }
+    return { known: true, say: `já é cliente${p}`, forbidden: [/\bh[aá] (anos|meses)/i, /\bsempre fui\b/i, /\bdesde sempre\b/i] }
   }
   if (b.alreadyUsedProduct) {
     const p = b.productsUsed?.length ? ` ${b.productsUsed[0]}` : ''
-    return { known: true, say: `já usou${p}`, forbidden: [/\bh[aá] (anos|meses)\b/i, /\bsempre fui\b/i, /\bsou cliente\b/i] }
+    return { known: true, say: `já usou${p}`, forbidden: [/\bh[aá] (anos|meses)/i, /\bsempre fui\b/i, /\bsou cliente\b/i] }
   }
   const known = b.alreadyUsedProduct === false || b.alreadyCustomer === false
   return { known, say: how ? `conheceu ${how} — nunca usou` : 'conhece a marca, nunca usou — “conheci recentemente” / “tenho acompanhado”', forbidden: FAKE_EXPERIENCE }
@@ -194,7 +195,8 @@ export function buildStrategy(db: DB, brandId: string, channel: UgcChannel, toda
     missing,
     warnings,
     recentOpenings: recent.map((t) => firstWords(t)),
-    recentClosings: recent.map(lastSentence),
+    // closings are short questions — only the last few must differ
+    recentClosings: recent.slice(0, 6).map(lastSentence),
     creator,
     trip,
   }

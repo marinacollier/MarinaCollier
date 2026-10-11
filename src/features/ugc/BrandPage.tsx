@@ -17,6 +17,7 @@ import { formatBRL } from '@/lib/money'
 import { formatDayMonth } from '@/lib/date'
 import { cn } from '@/lib/cn'
 import { commit } from './parts'
+import { WriteSection } from './WriteSection'
 
 const tri = (v?: boolean) => (v === true ? 'sim' : v === false ? 'nao' : 'nao_sei')
 
@@ -106,6 +107,8 @@ export default function BrandPage() {
           )}
         </section>
 
+        {!brand.archived && <WriteSection brand={brand} />}
+
         {/* Relationship — never assumed */}
         <section aria-label="Relação com a marca">
           <SectionTitle>Sua relação com a marca</SectionTitle>
@@ -125,6 +128,7 @@ export default function BrandPage() {
           <SectionTitle>Ficha</SectionTitle>
           <Card className="space-y-3">
             <Saved id={`b-cat-${brand.id}`} label="Categoria" value={brand.category} placeholder="Outdoor, Suplementação, Fintech…" onSave={(v) => save({ category: v })} />
+            <Saved id={`b-prod-${brand.id}`} label="Produtos" value={brand.products?.join(', ')} placeholder="mochilas, botas, whey…" onSave={(v) => save({ products: v ? v.split(',').map((x) => x.trim()).filter(Boolean) : undefined })} />
             <Saved id={`b-ig-${brand.id}`} label="Instagram" value={brand.instagram} placeholder="@marca" onSave={(v) => save({ instagram: v })} />
             <Saved id={`b-site-${brand.id}`} label="Site" value={brand.website} placeholder="marca.com.br" onSave={(v) => save({ website: v })} />
             <Saved

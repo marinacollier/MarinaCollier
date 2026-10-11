@@ -27,7 +27,7 @@ tocar no 📎 e enviar diz “entra na sua conta” com o atalho para entrar.
 
 ### O que configurar (uma vez)
 
-1. Projeto Supabase com as funções deste repositório (`supabase functions deploy lumos-read`).
+1. Projeto Supabase com as funções deste repositório (`supabase functions deploy lumos-read lumos-pitch`).
 2. Segredos da função (Supabase → Edge Functions → Secrets):
    - `ANTHROPIC_API_KEY` — chave da API do Claude (nunca vai para o app);
    - `ALLOWED_EMAILS` — seu e-mail (só ele pode usar a leitura);

@@ -61,7 +61,8 @@ function useUgcDB(): DB {
   const inter = useDB((db) => db.ugcInteractions)
   const profile = useDB((db) => db.profile)
   const expenses = useDB((db) => db.expenses)
-  return useMemo(() => ({ brands, ugcOpportunities: opps, ugcInteractions: inter, profile, expenses }) as unknown as DB, [brands, opps, inter, profile, expenses])
+  const messages = useDB((db) => db.ugcMessages)
+  return useMemo(() => ({ brands, ugcOpportunities: opps, ugcInteractions: inter, profile, expenses, ugcMessages: messages }) as unknown as DB, [brands, opps, inter, profile, expenses, messages])
 }
 
 function AddBrand({ autoFocus }: { autoFocus?: boolean }) {
@@ -336,29 +337,54 @@ const TYPE_LABEL = { primeiro_contato: 'primeiro contato', follow_up: 'follow-up
 
 function History() {
   const db = useUgcDB()
+  const drafts = db.ugcMessages.filter((m) => m.status === 'rascunho' || m.status === 'aprovada').sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   const list = [...db.ugcInteractions].sort((a, b) => b.sentAt.localeCompare(a.sentAt)).slice(0, 100)
-  if (!list.length) return <p className="text-[14px] text-muted">Os contatos que você registrar aparecem aqui, com canal e data. Na próxima entrega, as mensagens escritas pra cada marca também.</p>
+  if (!list.length && !drafts.length) return <p className="text-[14px] text-muted">Os contatos que você registrar e as mensagens que escrever pra cada marca aparecem aqui.</p>
   return (
-    <ul className="divide-y divide-line/70">
-      {list.map((i) => {
-        const b = db.brands.find((x) => x.id === i.brandId)
-        return (
-          <li key={i.id}>
-            <Link to={ROUTES.ugcBrand(i.brandId)} className="flex items-start gap-3 min-h-[52px] py-2 active:opacity-70">
-              <span className="w-12 shrink-0 text-[12.5px] text-muted tabular-nums pt-0.5">{formatDayMonth(i.date)}</span>
-              <span className="flex-1 min-w-0">
-                <span className="block text-[15px]">
-                  {i.direction === 'out' ? '→' : '←'} {b?.name ?? 'Marca'}
-                </span>
-                <span className="block text-[12.5px] text-muted">
-                  {CHANNEL_LABEL[i.channel]} · {TYPE_LABEL[i.type]}
-                  {i.content ? ` · ${i.content.slice(0, 80)}` : ''}
-                </span>
-              </span>
-            </Link>
-          </li>
-        )
-      })}
-    </ul>
+    <div className="space-y-5">
+      {drafts.length > 0 && (
+        <section aria-label="Rascunhos">
+          <SectionTitle>Rascunhos — ainda não enviados</SectionTitle>
+          <ul className="divide-y divide-line/70">
+            {drafts.map((m) => (
+              <li key={m.id}>
+                <Link to={ROUTES.ugcBrand(m.brandId)} className="block min-h-[52px] py-2 active:opacity-70">
+                  <span className="block text-[15px]">{db.brands.find((b) => b.id === m.brandId)?.name ?? 'Marca'}</span>
+                  <span className="block text-[12.5px] text-muted truncate">
+                    {CHANNEL_LABEL[m.channel]} · {m.status} · {(m.approvedText ?? m.generatedText ?? '').slice(0, 80)}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {list.length > 0 && (
+        <section aria-label="Contatos">
+          {drafts.length > 0 && <SectionTitle>Contatos</SectionTitle>}
+          <ul className="divide-y divide-line/70">
+            {list.map((i) => {
+              const b = db.brands.find((x) => x.id === i.brandId)
+              return (
+                <li key={i.id}>
+                  <Link to={ROUTES.ugcBrand(i.brandId)} className="flex items-start gap-3 min-h-[52px] py-2 active:opacity-70">
+                    <span className="w-12 shrink-0 text-[12.5px] text-muted tabular-nums pt-0.5">{formatDayMonth(i.date)}</span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-[15px]">
+                        {i.direction === 'out' ? '→' : '←'} {b?.name ?? 'Marca'}
+                      </span>
+                      <span className="block text-[12.5px] text-muted">
+                        {CHANNEL_LABEL[i.channel]} · {TYPE_LABEL[i.type]}
+                        {i.content ? ` · ${i.content.slice(0, 80)}` : ''}
+                      </span>
+                    </span>
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+      )}
+    </div>
   )
 }

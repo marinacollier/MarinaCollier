@@ -4,9 +4,10 @@
  */
 import { actions, getDB } from '../store'
 import { INCOME_CATEGORY_ID } from '../finance/receivables'
-import type { Brand, CollectionKey, DateKey, ItemOf, UgcChannel, UgcInteraction, UgcOpportunity, UgcStage } from '../types'
+import type { Brand, BrandFact, CollectionKey, DateKey, ItemOf, UgcChannel, UgcInteraction, UgcMessage, UgcOpportunity, UgcStage } from '../types'
 import { addDays, monthKey } from '@/lib/date'
 import { nowISO } from '@/lib/id'
+import type { MessageStrategy } from './strategy'
 import { brandOf, currentOpportunity, findBrand, followUpDay, isLive, prefsOf, stageIndex } from './model'
 
 export type Undo = () => void
@@ -230,4 +231,75 @@ export function reopenOpportunity(opportunityId: string): Undo {
   const o = getDB().ugcOpportunities.find((x) => x.id === opportunityId)
   if (!o) return () => {}
   return patch('ugcOpportunities', o.id, { status: o.firstContactAt && !o.responseReceivedAt ? 'aguardando_resposta' : 'aberta', lostReason: undefined })
+}
+
+// ─── Brand facts & messages (Entrega 2) ─────────────────────────────────────
+
+/** A true detail of the brand, with where it came from. What she types herself counts as verified. */
+export function addBrandFact(brandId: string, fact: { text: string; source?: BrandFact['source']; sourceUrl?: string }): Undo {
+  const b = getDB().brands.find((x) => x.id === brandId)
+  const text = fact.text.trim()
+  if (!b || !text) return () => {}
+  const facts = b.personalizationFacts ?? []
+  if (facts.some((f) => f.text.trim().toLowerCase() === text.toLowerCase())) return () => {}
+  const source = fact.source ?? 'marina'
+  const next: BrandFact = { text, source, sourceUrl: fact.sourceUrl?.trim() || undefined, capturedAt: nowISO(), verified: source === 'marina' || !!fact.sourceUrl }
+  return patch('brands', brandId, { personalizationFacts: [...facts, next] })
+}
+
+export function removeBrandFact(brandId: string, index: number): Undo {
+  const b = getDB().brands.find((x) => x.id === brandId)
+  if (!b?.personalizationFacts?.[index]) return () => {}
+  return patch('brands', brandId, { personalizationFacts: b.personalizationFacts.filter((_, i) => i !== index) })
+}
+
+/** "Gerar": the draft is kept (status rascunho) with the strategy that produced it — nothing is sent. */
+export function saveDraft(s: MessageStrategy, text: string, opportunityId?: string, subject?: string): { message: UgcMessage; undo: Undo } {
+  const strategy = [`Ângulo: ${s.angle}`, `Relação: ${s.relationship.say}`, subject ? `Assunto: ${subject}` : ''].filter(Boolean).join(' · ')
+  const { id, undo } = create('ugcMessages', {
+    brandId: s.brand.id,
+    opportunityId,
+    channel: s.channel,
+    strategy,
+    relevantContext: s.talk,
+    avoidedContext: s.avoid,
+    brandFactsUsed: s.fact ? [s.fact.text] : [],
+    generatedText: text,
+    status: 'rascunho',
+  })
+  return { message: getDB().ugcMessages.find((m) => m.id === id)!, undo }
+}
+
+/** She edited the text. */
+export function editDraft(messageId: string, text: string): Undo {
+  return patch('ugcMessages', messageId, { approvedText: text })
+}
+
+/** Copied = approved (the text she chose). */
+export function approveMessage(messageId: string, text: string): Undo {
+  const m = getDB().ugcMessages.find((x) => x.id === messageId)
+  if (!m || m.status === 'enviada') return () => {}
+  return patch('ugcMessages', messageId, { approvedText: text, status: 'aprovada' })
+}
+
+/**
+ * "Mandei": SHE sent it. The message becomes enviada and the contact is logged on the opportunity
+ * (same cadence as any other contact). The app never sends anything.
+ */
+export function markMessageSent(messageId: string, at: When): Undo {
+  const m = getDB().ugcMessages.find((x) => x.id === messageId)
+  if (!m || m.status === 'enviada') return () => {}
+  const text = m.approvedText ?? m.generatedText ?? ''
+  const opp = m.opportunityId ? { opportunity: getDB().ugcOpportunities.find((o) => o.id === m.opportunityId)!, undo: () => {} } : opportunityFor(m.brandId)
+  const undos = [opp.undo]
+  if (!m.opportunityId) undos.push(patch('ugcMessages', m.id, { opportunityId: opp.opportunity.id }))
+  undos.push(patch('ugcMessages', m.id, { status: 'enviada', sentText: text, approvedText: text, sentAt: at.iso ?? nowISO() }))
+  undos.push(recordOutbound(opp.opportunity.id, m.channel, at, text).undo)
+  return all(undos)
+}
+
+export function discardMessage(messageId: string): Undo {
+  const m = getDB().ugcMessages.find((x) => x.id === messageId)
+  if (!m || m.status === 'enviada') return () => {}
+  return patch('ugcMessages', messageId, { status: 'descartada' })
 }
