@@ -22,6 +22,7 @@ import {
   weekNumbers,
 } from '@/data/ugc/model'
 import { ensureProspect } from '@/data/ugc/ops'
+import { LEVEL_LABEL, potential } from '@/data/ugc/score'
 import { useToday } from '@/hooks/useToday'
 import { addDays, formatDayMonth } from '@/lib/date'
 import { normalize } from '@/lib/text'
@@ -132,7 +133,7 @@ function Agora() {
               ))}
             </ul>
           ) : (
-            <p className="text-[14px] text-muted py-2">{prospects(db).length ? 'Nada pendente agora ✨' : 'Nada pendente. Adicione marcas pra ter quem abordar amanhã.'}</p>
+            <p className="text-[14px] text-muted py-2">{prospects(db, today).length ? 'Nada pendente agora ✨' : 'Nada pendente. Adicione marcas pra ter quem abordar amanhã.'}</p>
           )}
           {done.length > 0 && (
             <ul className="divide-y divide-line/70 mt-1">
@@ -252,6 +253,7 @@ function Pipeline() {
 
 function Brands() {
   const db = useUgcDB()
+  const today = useToday()
   const [tier, setTier] = useState<BrandTier | undefined>()
   const [q, setQ] = useState('')
   const [archived, setArchived] = useState(false)
@@ -280,7 +282,8 @@ function Brands() {
         <ul className="divide-y divide-line/70">
           {list.map((b) => {
             const o = db.ugcOpportunities.filter((x) => x.brandId === b.id).sort((x, y) => y.updatedAt.localeCompare(x.updatedAt))[0]
-            const sub = [b.category, o ? STAGES.find((s) => s.id === o.stage)?.label : undefined, o?.lastContactAt ? `último contato ${formatDayMonth(o.lastContactAt)}` : 'sem contato ainda'].filter(Boolean).join(' · ')
+            const p = b.archived ? undefined : potential(db, b, today)
+            const sub = [p ? LEVEL_LABEL[p.level] : undefined, b.category, o ? STAGES.find((s) => s.id === o.stage)?.label : undefined, o?.lastContactAt ? `último contato ${formatDayMonth(o.lastContactAt)}` : 'sem contato ainda'].filter(Boolean).join(' · ')
             return (
               <li key={b.id}>
                 <Link to={ROUTES.ugcBrand(b.id)} className="flex items-center gap-2 min-h-[52px] py-1.5 active:opacity-70">

@@ -13,7 +13,7 @@ import { CREATOR_PROFILE } from './model'
 
 // ─── Relevance by category ──────────────────────────────────────────────────
 
-interface Fit {
+export interface Fit {
   /** Her contexts, strongest first. Only things she actually lives (from CreatorProfile). */
   talk: string[]
   avoid: string[]
@@ -37,6 +37,11 @@ const FITS: [RegExp, Fit][] = [
   [/viage|turism|hotel|hostel|mala|bagagem|passagem|airline|aerea|seguro viagem/, { talk: ['viagens', 'viagens e experiências outdoor'], avoid: ['musculação', 'IA', 'escritório'], trip: true, angle: (_t, trip) => (trip ? `conteúdo da viagem ${trip}` : 'conteúdo de viagem com experiências reais') }],
   [/\btech|tecnolog|software|\bapp\b|aplicativo|\bia\b|inteligencia artificial|produtiv|saas/, { talk: ['tecnologia', 'IA'], avoid: ['musculação', 'suplementos', 'trekking'], angle: () => 'conteúdo de tecnologia e IA aplicadas na rotina de verdade' }],
 ]
+
+/** Which of her contexts fit this kind of brand (undefined = category unknown or no fit). */
+export function fitOf(b: Brand): Fit | undefined {
+  return FITS.find(([re]) => re.test(asText(b)))?.[1]
+}
 
 const asText = (b: Brand) => normalize([b.category, b.subcategory, ...(b.products ?? []), ...(b.tags ?? [])].filter(Boolean).join(' '))
 

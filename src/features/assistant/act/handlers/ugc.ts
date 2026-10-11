@@ -34,6 +34,7 @@ import {
 import { archiveBrand, closeDeal, ensureProspect, markPaid, opportunityFor, recordOutbound, recordReply, saveDraft, setRelationship } from '@/data/ugc/ops'
 import { buildStrategy, describeFact } from '@/data/ugc/strategy'
 import { composeDraft } from '@/data/ugc/compose'
+import { LEVEL_LABEL, MIN_OUTCOMES, outcomes, potential } from '@/data/ugc/score'
 import { addDays, formatDayMonth } from '@/lib/date'
 import { formatBRL, parseSpokenBRL } from '@/lib/money'
 import { uid } from '@/lib/id'
@@ -301,20 +302,24 @@ function questions(input: HandlerInput): LumosReply | undefined {
   const { db, n, now } = input
   if (WHO_TODAY.test(n)) {
     const list = approachToday(db, now.date)
+    const why = (o: UgcOpportunity) => {
+      const b = brandOf(db, o)
+      return b ? `${LEVEL_LABEL[potential(db, b, now.date).level]}: ${potential(db, b, now.date).reasons[0]}` : undefined
+    }
     const due = followUpsDue(db, now.date, now.date)
     const answer = toAnswer(db)
     const w = weekNumbers(db, now.date)
     if (!db.brands.length) return { area: AREA, text: 'Sua lista de marcas ainda está vazia.', sub: 'Me diga “adiciona Galápagos na prospecção” ou abra o UGC Business.', link: { label: 'Abrir UGC Business', to: ROUTES.ugc } }
     const sections = [
       ...(answer.length ? [{ title: 'Responder primeiro', lines: answer.map((o) => line(db, o, o.lastContactAt ? `respondeu ${formatDayMonth(o.lastContactAt)}` : undefined)) }] : []),
-      ...(list.length ? [{ title: 'Abordar hoje', lines: list.map((o) => line(db, o, o.primaryChannel ? CHANNEL_LABEL[o.primaryChannel] : undefined)) }] : []),
+      ...(list.length ? [{ title: 'Abordar hoje', lines: list.map((o) => line(db, o, [o.primaryChannel ? CHANNEL_LABEL[o.primaryChannel] : undefined, why(o)].filter(Boolean).join(' · '))) }] : []),
       ...(due.length ? [{ title: 'Follow-ups', lines: due.map((o) => line(db, o, `follow-up ${(o.followUpStep ?? 0) + 1}`)) }] : []),
     ]
-    const left = prospects(db).length
+    const left = prospects(db, now.date).length
     return {
       area: AREA,
       text: list.length ? `Hoje: ${list.map((o) => brandOf(db, o)?.name).join(', ')}.` : left ? 'A cota de abordagens de hoje já foi ✓' : 'Ninguém novo na fila pra abordar.',
-      sub: [`${w.newApproaches}/${w.target} na semana`, list.length ? 'Ordem: pelo tier que você deu (o score com motivos chega na entrega 3).' : left ? undefined : 'Adicione marcas pra ter quem abordar.'].filter(Boolean).join(' · '),
+      sub: [`${w.newApproaches}/${w.target} na semana`, list.length ? 'Ordem: seu tier primeiro, depois o potencial (com os motivos).' : left ? undefined : 'Adicione marcas pra ter quem abordar.'].filter(Boolean).join(' · '),
       sections,
       provenance: 'fact',
       link: { label: 'Abrir UGC Business', to: ROUTES.ugc },
@@ -338,14 +343,18 @@ function questions(input: HandlerInput): LumosReply | undefined {
   if (POTENTIAL.test(n)) {
     const live = db.brands.filter((b) => !b.archived && db.ugcOpportunities.some((o) => o.brandId === b.id && isLive(db, o)))
     if (!live.length) return { area: AREA, text: 'Ainda não tem marcas ativas na sua lista.' }
-    const ranked = [...live].sort((a, b) => (a.priorityTier ? TIERS.indexOf(a.priorityTier) : 9) - (b.priorityTier ? TIERS.indexOf(b.priorityTier) : 9))
-    const tiered = ranked.filter((b) => b.priorityTier)
+    const scored = live.map((b) => ({ b, p: potential(db, b, now.date) }))
+    const tier = (b: Brand) => (b.priorityTier ? TIERS.indexOf(b.priorityTier) : 9)
+    const ranked = scored.sort((x, y) => tier(x.b) - tier(y.b) || y.p.points - x.p.points)
+    const top = ranked.filter((x) => x.p.level === 'alto')
+    const known = outcomes(db).length
     return {
       area: AREA,
-      text: tiered.length ? `Pelo tier que você deu: ${tiered.slice(0, 3).map((b) => b.name).join(', ')}.` : 'Você ainda não deu tier pras marcas.',
-      sub: 'O score com motivos (resposta, parceria, permuta, remuneração) é a entrega 3 — sem histórico, eu não invento porcentagem.',
-      lines: ranked.slice(0, 8).map((b) => ({ text: b.name, sub: [b.priorityTier ? `Tier ${b.priorityTier}` : 'sem tier', b.category, b.alreadyCustomer ? 'já é cliente' : undefined].filter(Boolean).join(' · ') })),
+      text: top.length ? `Maior potencial agora: ${top.slice(0, 3).map((x) => x.b.name).join(', ')}.` : `Nenhuma com potencial alto ainda — a melhor agora é ${ranked[0].b.name}.`,
+      sub: known >= MIN_OUTCOMES ? `Com ${known} contatos com resultado, já uso números reais nos motivos.` : `Sem porcentagem: com ${known} contatos com resultado ainda é cedo (preciso de ${MIN_OUTCOMES}+). Os motivos vêm do que você anotou.`,
+      lines: ranked.slice(0, 8).map(({ b, p }) => ({ text: b.name, sub: [LEVEL_LABEL[p.level], ...p.reasons.slice(0, 2), ...p.against.slice(0, 1).map((a) => `− ${a}`)].join(' · ') })),
       provenance: 'fact',
+      link: { label: 'Abrir marcas', to: `${ROUTES.ugc}?aba=marcas` },
     }
   }
   return undefined

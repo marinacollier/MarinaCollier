@@ -18,6 +18,7 @@ import { formatDayMonth } from '@/lib/date'
 import { cn } from '@/lib/cn'
 import { commit } from './parts'
 import { WriteSection } from './WriteSection'
+import { LEVEL_LABEL, MIN_OUTCOMES, outcomes, potential } from '@/data/ugc/score'
 
 const tri = (v?: boolean) => (v === true ? 'sim' : v === false ? 'nao' : 'nao_sei')
 
@@ -84,6 +85,8 @@ export default function BrandPage() {
           <Choice label="Tier" value={brand.priorityTier} options={TIERS.map((t) => ({ value: t, label: `Tier ${t}` }))} onPick={(t: BrandTier) => save({ priorityTier: brand.priorityTier === t ? undefined : t }, `Tier ${t} ✓`)} />
           <p className="text-[12.5px] text-muted mt-1.5">S sonho · A muito importante · B boa oportunidade · C volume</p>
         </section>
+
+        {!brand.archived && <PotentialCard brand={brand} today={today} />}
 
         {/* Opportunities */}
         <section aria-label="Oportunidades">
@@ -308,5 +311,31 @@ function OpportunityCard({ o, today, defaultOpen }: { o: UgcOpportunity; today: 
         </div>
       )}
     </Card>
+  )
+}
+
+/** Why this brand is (or isn't) promising now — the reasons, never a made-up percentage. */
+function PotentialCard({ brand, today }: { brand: Brand; today: string }) {
+  const db = useDB((d) => d)
+  const p = potential(db, brand, today)
+  const known = outcomes(db).length
+  return (
+    <section aria-label="Potencial">
+      <SectionTitle>Potencial</SectionTitle>
+      <Card className="space-y-2">
+        <p className="text-[15.5px] font-medium">{LEVEL_LABEL[p.level].replace(/^p/, 'P')}</p>
+        <ul className="text-[13.5px] space-y-1">
+          {p.reasons.map((r) => (
+            <li key={r}>+ {r}</li>
+          ))}
+          {p.against.map((r) => (
+            <li key={r} className="text-muted">− {r}</li>
+          ))}
+        </ul>
+        <p className="text-[12px] text-muted">
+          {p.fromData ? `Com ${known} contatos com resultado, os números já entram nos motivos.` : `Sem porcentagem: só com ${MIN_OUTCOMES}+ contatos com resultado (hoje ${known}). Seu tier continua mandando na fila.`}
+        </p>
+      </Card>
+    </section>
   )
 }

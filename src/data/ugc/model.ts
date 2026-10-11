@@ -9,6 +9,7 @@
 import type { Brand, BrandTier, CreatorProfile, DateKey, DB, UgcChannel, UgcDealType, UgcInteraction, UgcOpportunity, UgcPrefs, UgcStage, UgcStatus } from '../types'
 import { addDays, formatDayMonth, startOfWeek, weekday } from '@/lib/date'
 import { normalize } from '@/lib/text'
+import { LEVEL_LABEL, potential } from './score'
 
 export const DEFAULT_UGC_PREFS: UgcPrefs = { dailyNew: 3, weeklyNew: 15, cadence: [3, 7, 15], reactivateDays: 90 }
 
@@ -120,8 +121,13 @@ export function toAnswer(db: DB): UgcOpportunity[] {
 }
 
 /** Not approached yet — best tier first. */
-export function prospects(db: DB): UgcOpportunity[] {
-  return db.ugcOpportunities.filter((o) => isLive(db, o) && o.stage === 'prospectar' && !o.firstContactAt).sort(byTier(db))
+/** Not contacted yet. Her tier leads; within the same tier, the potential (Entrega 3) decides. */
+export function prospects(db: DB, today?: DateKey): UgcOpportunity[] {
+  const list = db.ugcOpportunities.filter((o) => isLive(db, o) && o.stage === 'prospectar' && !o.firstContactAt)
+  if (!today) return list.sort(byTier(db))
+  const pts = new Map(list.map((o) => [o.id, brandOf(db, o) ? potential(db, brandOf(db, o)!, today).points : 0]))
+  const tier = (o: UgcOpportunity) => TIER_RANK[brandOf(db, o)?.priorityTier ?? ''] ?? 9
+  return list.sort((a, b) => tier(a) - tier(b) || pts.get(b.id)! - pts.get(a.id)! || a.createdAt.localeCompare(b.createdAt))
 }
 
 export function firstContactsOn(db: DB, from: DateKey, to: DateKey = from): number {
@@ -132,7 +138,7 @@ export function firstContactsOn(db: DB, from: DateKey, to: DateKey = from): numb
 export function approachToday(db: DB, today: DateKey): UgcOpportunity[] {
   if (!isWeekday(today)) return []
   const left = Math.max(0, prefsOf(db).dailyNew - firstContactsOn(db, today))
-  return prospects(db).slice(0, left)
+  return prospects(db, today).slice(0, left)
 }
 
 export interface UgcWeek {
@@ -212,7 +218,11 @@ export function ugcDayActions(db: DB, date: DateKey, today: DateKey): UgcAction[
       const i = doneBy(o, ['follow_up'])
       if (i) push({ kind: 'followup', opportunity: o, brand: brandOf(db, o), done: true, interactionId: i.id, doneAt: i.sentAt, channel: i.channel, sub: `follow-up · ${CHANNEL_LABEL[i.channel]}` })
     }
-    for (const o of approachToday(db, today)) push({ kind: 'approach', opportunity: o, brand: brandOf(db, o), done: false, channel: channelOf(db, o), sub: label(o) || 'nova marca' })
+    for (const o of approachToday(db, today)) {
+      const b = brandOf(db, o)
+      const p = b ? potential(db, b, today) : undefined
+      push({ kind: 'approach', opportunity: o, brand: b, done: false, channel: channelOf(db, o), sub: [label(o), p ? `${LEVEL_LABEL[p.level]}: ${p.reasons[0]}` : undefined].filter(Boolean).join(' · ') || 'nova marca' })
+    }
     for (const o of db.ugcOpportunities) {
       const i = doneBy(o, ['primeiro_contato'])
       if (i) push({ kind: 'approach', opportunity: o, brand: brandOf(db, o), done: true, interactionId: i.id, doneAt: i.sentAt, channel: i.channel, sub: CHANNEL_LABEL[i.channel] })
