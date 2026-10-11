@@ -43,7 +43,7 @@ function Line({ line, onOption }: { line: ReplyLine; onOption: (o: ReplyOption) 
           </span>
         )}
         <div className="min-w-0 flex-1">
-          <div className="text-[14px] leading-snug">{line.text}</div>
+          <div className="text-[14px] leading-snug whitespace-pre-line">{line.text}</div>
           {line.sub && <div className="text-[12.5px] text-muted leading-snug mt-0.5">{line.sub}</div>}
         </div>
         {line.isNew && <span className="text-[11px] text-sage font-medium shrink-0 pt-0.5">novo</span>}
