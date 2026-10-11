@@ -40,6 +40,7 @@ export const ROUTES = {
   spaces: '/espacos',
   career: '/carreira',
   careerReview: '/carreira/revisao',
+  careerPosts: '/carreira/posts',
   /** Old "Mais" tab; redirects to Espaços. */
   more: '/mais',
   settings: '/ajustes',
@@ -65,6 +66,7 @@ export const routeTable: { path: string; Component: React.LazyExoticComponent<Re
   { path: '/meal-prep', Component: lazy(() => import('@/features/mealprep/MealPrepPage')) },
   { path: '/carreira', Component: lazy(() => import('@/features/career/CareerPage')) },
   { path: '/carreira/revisao', Component: lazy(() => import('@/features/career/CareerReviewPage')) },
+  { path: '/carreira/posts', Component: lazy(() => import('@/features/career/PostsPage')) },
   { path: '/corpo/evolucao', Component: lazy(() => import('@/features/nutrition/EvolutionPage')) },
   { path: '/dinheiro', Component: lazy(() => import('@/features/finance/FinancePage')) },
   { path: '/metas', Component: lazy(() => import('@/features/goals/GoalsPage')) },

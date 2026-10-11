@@ -50,6 +50,8 @@ export interface SheetPropsMap {
   contact: { id?: ID }
   /** A win as an executive case (owner: features/career). */
   evidence: { id: ID }
+  /** LinkedIn post: draft → approval → publish by hand → URL (owner: features/career). */
+  execPost: { id?: ID; fromWinId?: ID }
   /** Planned meal detail: plan, quantities, macros, trocas, Lumos (owner: features/nutrition). ref = '<planId>#<meal index>'. */
   mealDetail: { date: DateKey; ref: string }
   /** Meus alimentos: add from label / edit (owner: features/nutrition). */

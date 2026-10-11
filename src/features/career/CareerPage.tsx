@@ -49,6 +49,7 @@ function CareerPage() {
   const caseList = useMemo(() => cases(db), [db])
   const nav = useNavigate()
   const reviewDone = !!savedReview(db, today.slice(0, 7))?.completedAt
+  const postsWaiting = db.execPosts.filter((p) => p.status === 'revisao' || p.status === 'aprovado').length
   const promotable = useMemo(() => db.wins.filter((w) => !w.evidence).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3), [db.wins])
 
   return (
@@ -106,6 +107,15 @@ function CareerPage() {
           </div>
         ))}
         <p className="text-[12px] text-muted mt-1">“Monta minha semana” encaixa isso só nos seus espaços livres.</p>
+        <button type="button" onClick={() => nav(ROUTES.careerPosts)} className="mt-2 pt-2.5 border-t border-line/70 w-full text-left flex items-center justify-between gap-3">
+          <span>
+            <span className="block text-[14.5px]">Posts do LinkedIn</span>
+            <span className="block text-[12.5px] text-muted">
+              {postsWaiting ? `${postsWaiting} aguardando você · ` : ''}rascunho → sua aprovação → publicar
+            </span>
+          </span>
+          <span className="text-muted">›</span>
+        </button>
       </Card>
 
       <SectionTitle action={<Add label="oportunidade" onClick={() => openSheet('opportunity', {})} />}>Oportunidades</SectionTitle>
