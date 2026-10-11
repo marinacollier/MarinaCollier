@@ -1,0 +1,40 @@
+// UGC Entrega 3 in a real browser: potential card on a brand, level on Marcas, Lumos explains with reasons.
+import { createRequire } from 'module'
+import fs from 'fs'
+const require = createRequire(new URL('../package.json', import.meta.url))
+const { chromium, devices } = require('playwright')
+const base = 'http://localhost:4310'
+const dir = new URL('./.profiles/profile-ugc-score', import.meta.url).pathname
+const shots = new URL('./.shots/', import.meta.url).pathname
+fs.rmSync(dir, { recursive: true, force: true })
+fs.mkdirSync(shots, { recursive: true })
+const log = (...a) => console.log(...a)
+const ctx = await chromium.launchPersistentContext(dir, { ...devices['iPhone 13'] })
+const page = ctx.pages()[0] ?? (await ctx.newPage())
+page.on('pageerror', (e) => log('PAGEERROR', e.message))
+await page.goto(base + '/')
+await page.waitForTimeout(2000)
+const enter = page.getByRole('button', { name: /Entrar no meu dia/i })
+if (await enter.count()) { await enter.click(); await page.waitForTimeout(800) }
+await page.goto(base + '/trabalho/creator/ugc')
+await page.waitForTimeout(1200)
+await page.getByLabel('Nome da marca').first().fill('Galápagos')
+await page.getByRole('button', { name: 'Adicionar' }).first().click()
+await page.waitForTimeout(800)
+await page.getByRole('radio', { name: 'Tier S' }).click()
+await page.locator('input[id^="b-cat-"]').fill('Outdoor')
+await page.locator('input[id^="b-cat-"]').blur()
+await page.waitForTimeout(500)
+log('potencial:', (await page.locator('section[aria-label="Potencial"]').innerText()).replace(/\n/g, ' | '))
+await page.screenshot({ path: shots + 'ugc-score.png', fullPage: true })
+await page.goto(base + '/trabalho/creator/ugc?aba=marcas')
+await page.waitForTimeout(1000)
+log('marcas:', (await page.locator('main').innerText()).split('\n').filter((l) => /potencial/.test(l)).join(' | '))
+await page.goto(base + '/')
+await page.waitForTimeout(1200)
+const box = page.getByLabel(/^Fal[ae] com a Lumos$/).last()
+await box.fill('quais marcas têm maior potencial?')
+await box.press('Enter')
+await page.waitForTimeout(1500)
+log('lumos:', (await page.getByText(/Maior potencial agora|Nenhuma com potencial alto/).first().textContent().catch(() => 'NO'))?.trim())
+await ctx.close()
