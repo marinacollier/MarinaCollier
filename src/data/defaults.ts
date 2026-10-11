@@ -204,6 +204,10 @@ export function emptyDB(): DB {
     contacts: [],
     backlogItems: [],
     importBatches: [],
+    brands: [],
+    ugcOpportunities: [],
+    ugcInteractions: [],
+    ugcMessages: [],
   }
 }
 

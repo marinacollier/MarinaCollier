@@ -8,12 +8,12 @@ import { Chip, IconButton, Page, PageHeader, Segmented } from '@/components/ui'
 import { pluralize } from '@/lib/text'
 import ContentTab from './ContentTab'
 import IdeasTab from './IdeasTab'
-import PartnershipsTab from './PartnershipsTab'
+import { UgcEntry } from '@/features/ugc/UgcEntry'
 import { activePartnerships, creatorProjects } from './selectors'
 
 type Tab = 'parcerias' | 'conteudo' | 'ideias'
 const TABS: { value: Tab; label: string }[] = [
-  { value: 'parcerias', label: 'Parcerias' },
+  { value: 'parcerias', label: 'UGC Business' },
   { value: 'conteudo', label: 'Conteúdo' },
   { value: 'ideias', label: 'Ideias' },
 ]
@@ -38,8 +38,9 @@ export default function CreatorPage() {
 
   const partnerships = useDB((db) => db.partnerships)
   const items = useDB((db) => db.contentItems)
+  const ugcLive = useDB((db) => db.ugcOpportunities.filter((o) => !['perdida', 'recusada', 'concluida', 'pausada'].includes(o.status)).length)
   const subtitle = useMemo(() => {
-    const active = activePartnerships(partnerships).length
+    const active = activePartnerships(partnerships).length + ugcLive
     const inProgress = items.filter((c) => c.stage !== 'ideia' && c.stage !== 'publicado').length
     const ideas = items.filter((c) => c.stage === 'ideia').length
     const parts: string[] = []
@@ -47,10 +48,10 @@ export default function CreatorPage() {
     if (inProgress) parts.push(`${inProgress} em produção`)
     if (ideas) parts.push(pluralize(ideas, 'ideia', 'ideias'))
     return parts.length ? parts.join(' · ') : 'conteúdo, parcerias e ideias num lugar só'
-  }, [partnerships, items])
+  }, [partnerships, items, ugcLive])
 
   const add = () => {
-    if (tab === 'parcerias') openSheet('partnership', {})
+    if (tab === 'parcerias') nav(`${ROUTES.ugc}?aba=marcas`)
     else openSheet('content', { defaults: serie ? { projectId: serie } : undefined })
   }
 
@@ -66,7 +67,7 @@ export default function CreatorPage() {
         subtitle={subtitle}
         actions={
           tab !== 'ideias' && (
-            <IconButton label={tab === 'parcerias' ? 'Nova parceria' : 'Novo conteúdo'} onClick={add}>
+            <IconButton label={tab === 'parcerias' ? 'Nova marca' : 'Novo conteúdo'} onClick={add}>
               <Plus size={22} />
             </IconButton>
           )
@@ -106,7 +107,7 @@ export default function CreatorPage() {
         </div>
       )}
 
-      {tab === 'parcerias' && <PartnershipsTab />}
+      {tab === 'parcerias' && <UgcEntry />}
       {tab === 'conteudo' && <ContentTab projectId={serie} />}
       {tab === 'ideias' && <IdeasTab projectId={serie} />}
     </Page>

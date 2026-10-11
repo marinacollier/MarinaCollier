@@ -381,6 +381,9 @@ export interface UserProfile {
   /** Base rhythm. Never a streak: if she wakes later, the day just adapts. */
   rhythm: { wakeTime: TimeHM; sleepTime: TimeHM }
   work: WorkSchedule
+  /** UGC Business OS: who she is for brands, and her prospecting rhythm. */
+  creator?: CreatorProfile
+  ugc?: UgcPrefs
   /** Version of the life seed applied to this database (see data/seed/migrate.ts). */
   seedVersion?: number
   /** Seed record ids this install already received (a seed record she deleted never comes back). */
@@ -1093,6 +1096,8 @@ export interface Expense extends Entity {
   currency?: 'BRL' | 'USD' | 'EUR'
   /** Who created it: a contract's monthly expectation, Marina by hand, Lumos, an integration. */
   source?: 'contrato' | 'manual' | 'lumos' | 'organizze'
+  /** UGC deal this money belongs to (expected when closed → received when paid). */
+  ugcOpportunityId?: ID
 }
 
 export interface FinancialAccount extends Entity {
@@ -1466,6 +1471,149 @@ export type PartnershipStage =
   | 'aguardando_pagamento'
   | 'finalizado'
 
+// ─── UGC Business OS (Brand ≠ Opportunity) ──────────────────────────────────
+
+/** A true fact about a brand, with where it came from — the only material a pitch may cite. */
+export interface BrandFact {
+  text: string
+  source: 'marina' | 'site' | 'instagram' | 'print' | 'outro'
+  sourceUrl?: string
+  capturedAt: ISODateTime
+  verified: boolean
+}
+
+export type UgcChannel = 'dm' | 'email' | 'formulario' | 'linkedin' | 'whatsapp'
+export type BrandTier = 'S' | 'A' | 'B' | 'C'
+
+/** The company, once. Everything optional but the name: the CRM works with an incomplete card. */
+export interface Brand extends Entity {
+  name: string
+  category?: string
+  subcategory?: string
+  website?: string
+  instagram?: string
+  linkedin?: string
+  country?: string
+  // who the brand is (Entrega 2 reads these)
+  positioning?: string
+  toneOfVoice?: string
+  products?: string[]
+  audience?: string
+  visualIdentity?: string
+  purpose?: string
+  values?: string[]
+  differentiators?: string[]
+  creatorFitNotes?: string
+  // her relationship with it — undefined = not known yet (never assumed)
+  relationshipStatus?: 'nenhuma' | 'cliente' | 'ex_cliente' | 'parceira' | 'ex_parceira' | 'afiliada'
+  alreadyCustomer?: boolean
+  alreadyUsedProduct?: boolean
+  productsUsed?: string[]
+  howDiscovered?: string
+  relationshipNotes?: string
+  sizeTier?: 'pequena' | 'media' | 'grande'
+  priorityTier?: BrandTier
+  contactChannels?: { channel: UgcChannel; value: string }[]
+  knownContacts?: { name: string; role?: string; email?: string; instagram?: string; linkedin?: string; whatsapp?: string }[]
+  personalizationFacts?: BrandFact[]
+  avoidTopics?: string[]
+  tags?: string[]
+  notes?: string
+  /** No longer a target ("não faz mais sentido") — kept for history, out of every queue. */
+  archived?: boolean
+}
+
+export type UgcStage = 'prospectar' | 'contatada' | 'conversa' | 'producao' | 'entregue' | 'fechada'
+export type UgcStatus = 'aberta' | 'aguardando_resposta' | 'negociando' | 'pausada' | 'sem_resposta' | 'recusada' | 'perdida' | 'concluida'
+export type UgcDealType = 'ugc' | 'permuta' | 'campanha_paga' | 'afiliado' | 'embaixadora' | 'evento' | 'press_kit' | 'programa_creators'
+
+/** One attempt / deal with a brand. A brand can have many over the years. */
+export interface UgcOpportunity extends Entity {
+  brandId: ID
+  title: string
+  type?: UgcDealType
+  stage: UgcStage
+  status: UgcStatus
+  primaryChannel?: UgcChannel
+  objective?: string
+  pitchAngle?: string
+  proposedDeliverables?: string
+  estimatedValueCents?: number
+  agreedValueCents?: number
+  compensationType?: 'dinheiro' | 'permuta' | 'misto' | 'comissao'
+  usageRights?: string
+  exclusivity?: string
+  firstContactAt?: DateKey
+  lastContactAt?: DateKey
+  /** When to write again (cadence D+3 / D+7 / D+15, then reactivation). Undefined = nothing to chase. */
+  nextFollowUpAt?: DateKey
+  /** How many follow-ups were sent in the current cadence. */
+  followUpStep?: number
+  /** Day the current cadence counts from (first contact, or her last message after a reply). */
+  cadenceFrom?: DateKey
+  responseReceivedAt?: DateKey
+  proposalSentAt?: DateKey
+  negotiationStartedAt?: DateKey
+  agreedAt?: DateKey
+  deliveredAt?: DateKey
+  paidAt?: DateKey
+  lostReason?: string
+  /** Entrega 3: qualitative first, explained. */
+  opportunityScore?: { priority?: BrandTier; response?: 'alta' | 'media' | 'baixa'; close?: 'alta' | 'media' | 'baixa' }
+  scoreExplanation?: string[]
+  notes?: string
+}
+
+/** Every contact, both ways — the statistics come from here, never typed by hand. */
+export interface UgcInteraction extends Entity {
+  brandId: ID
+  opportunityId?: ID
+  channel: UgcChannel
+  direction: 'out' | 'in'
+  type: 'primeiro_contato' | 'follow_up' | 'resposta' | 'proposta' | 'reuniao' | 'mensagem'
+  content?: string
+  sentAt: ISODateTime
+  /** Day it happened (Sao Paulo). */
+  date: DateKey
+  /** What the opportunity looked like before this contact (unticking it on Home restores exactly that). */
+  revert?: Record<string, unknown>
+}
+
+/** Entrega 2 (message engine): drafts and what was really sent — the structure exists from day one. */
+export interface UgcMessage extends Entity {
+  brandId: ID
+  opportunityId?: ID
+  channel: UgcChannel
+  strategy?: string
+  relevantContext?: string[]
+  avoidedContext?: string[]
+  brandFactsUsed?: string[]
+  generatedText?: string
+  approvedText?: string
+  sentText?: string
+  status: 'rascunho' | 'aprovada' | 'enviada' | 'descartada'
+  sentAt?: ISODateTime
+}
+
+/** Who Marina is for brands — only what she stated. Context, not a checklist for every pitch. */
+export interface CreatorProfile {
+  name: string
+  instagram?: string
+  portfolio?: string
+  positioning: string[]
+  contexts: string[]
+}
+
+export interface UgcPrefs {
+  /** New brands approached per weekday. */
+  dailyNew: number
+  weeklyNew: number
+  /** Follow-up cadence in days after the first contact (D+3, D+7, D+15). */
+  cadence: number[]
+  /** After the last follow-up with no answer: try again after this many days. */
+  reactivateDays: number
+}
+
 export interface BrandPartnership extends Entity {
   brand: string
   contact?: string
@@ -1481,6 +1629,8 @@ export interface BrandPartnership extends Entity {
   links: Link[]
   notes?: string
   order: number
+  /** Moved into the UGC Business OS (Brand + Opportunity): this record is history only. */
+  ugcOpportunityId?: ID
 }
 
 // ─── Capture ────────────────────────────────────────────────────────────────
@@ -1720,6 +1870,10 @@ export interface DB {
   contacts: ProfessionalContact[]
   backlogItems: BacklogItem[]
   importBatches: ImportBatch[]
+  brands: Brand[]
+  ugcOpportunities: UgcOpportunity[]
+  ugcInteractions: UgcInteraction[]
+  ugcMessages: UgcMessage[]
 }
 
 /** Keys of DB that hold arrays of entities. */
@@ -1736,6 +1890,8 @@ export type NewItem<K extends CollectionKey> = Omit<ItemOf<K>, 'id' | 'createdAt
 
 /** Names used for cross-references (priority refs, brain dump conversions, search results). */
 export type EntityType =
+  | 'brand'
+  | 'ugcOpportunity'
   | 'task'
   | 'priority'
   | 'routineItem'
@@ -1768,6 +1924,8 @@ export type EntityType =
   | 'contract'
 
 export const ENTITY_COLLECTION: Record<EntityType, CollectionKey> = {
+  brand: 'brands',
+  ugcOpportunity: 'ugcOpportunities',
   task: 'tasks',
   priority: 'priorities',
   routineItem: 'routineItems',

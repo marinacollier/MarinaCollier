@@ -10,6 +10,7 @@ import { contextWorkouts } from '@/data/fuel'
 import { actions, getDB, persist } from '@/data/store'
 import type { DateKey, OccurrenceParent } from '@/data/types'
 import { billPeriod } from '@/data/finance/bills'
+import { recordOutbound, revertInteraction } from '@/data/ugc/ops'
 import { workoutFromChoice } from '@/features/body/planner'
 import { haptic } from '@/lib/haptics'
 import { nowISO } from '@/lib/id'
@@ -64,6 +65,22 @@ export function checkItem(item: ActionItem): boolean | undefined {
               },
             },
       })
+      return done
+    }
+    case 'ugc': {
+      // A UGC contact made from Home: registered on the deal (cadence moves); unticking reverts exactly.
+      if (!item.ugc) return undefined
+      const today = item.date
+      if (item.status === 'done' && item.ugc.interactionId) {
+        revertInteraction(item.ugc.interactionId)
+        done = false
+      } else {
+        recordOutbound(item.refId, item.ugc.channel, { date: today })
+        done = true
+      }
+      haptic(done ? 'success' : 'light')
+      save()
+      toast(done ? `${item.title} ✓` : `${item.title}: desmarcado`)
       return done
     }
     case 'mark':
@@ -195,5 +212,10 @@ export function openItem(item: ActionItem, today: DateKey, navigate: (to: string
       return navigate(ROUTES.project(item.refId))
     case 'financialCategory':
       return navigate(ROUTES.money)
+    case 'ugcOpportunity': {
+      const o = getDB().ugcOpportunities.find((x) => x.id === item.refId)
+      if (o) navigate(ROUTES.ugcBrand(o.brandId))
+      return
+    }
   }
 }

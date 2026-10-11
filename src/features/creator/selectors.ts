@@ -58,8 +58,9 @@ export function awaitingPayment(list: BrandPartnership[]): { totalCents: number;
 }
 
 /** Partnerships that are still moving (not finalized). */
+/** Old-style partnerships still in use (the ones moved into UGC Business are history only). */
 export function activePartnerships(list: BrandPartnership[]): BrandPartnership[] {
-  return list.filter((p) => p.stage !== 'finalizado')
+  return list.filter((p) => p.stage !== 'finalizado' && !p.ugcOpportunityId)
 }
 
 export function contentForPartnership(items: ContentItem[], partnershipId: ID): ContentItem[] {

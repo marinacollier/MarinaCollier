@@ -9,9 +9,10 @@
  */
 import { dayTimeline, isoToHM } from '../timeline'
 import { carriedOverTasks, isCareerQuota, prioritiesFor, tasksForDay } from '../selectors'
-import type { DateKey, DB, DayPriority, Project, Task, TimeHM, TimelineEntry } from '../types'
+import type { DateKey, DB, DayPriority, Project, Task, TimeHM, TimelineEntry, UgcChannel } from '../types'
 import { addDays, hmToMinutes } from '@/lib/date'
 import { billPeriod, billsDueOn } from '../finance/bills'
+import { actionTitle, ugcDayActions } from '../ugc/model'
 
 /** Filter chips: Tudo · Trabalho · Corpo · Vida. Career, study and content count as Trabalho. */
 export type FrontGroup = 'trabalho' | 'corpo' | 'vida'
@@ -31,12 +32,13 @@ export interface Front {
  *  mark    → a line with no done-state of its own (follow-up, career next action, deadline): the tick is an
  *            Occurrence of that line on that day — the record itself is not changed
  *  bill    → a recurring payment paid this month/week
+ *  ugc     → a UGC contact made (approach / follow-up / answer): registered as an interaction of that deal
  *  none    → not something you tick (work hours): tap opens it
  * Events tick too ("fui / feito"), through their own occurrence (toggle on the timeline row).
  */
-export type CheckKind = 'toggle' | 'routine' | 'workout' | 'meal' | 'mark' | 'bill' | 'none'
+export type CheckKind = 'toggle' | 'routine' | 'workout' | 'meal' | 'mark' | 'bill' | 'ugc' | 'none'
 
-export type ActionSource = 'timeline' | 'task' | 'waiting' | 'opportunity' | 'contact' | 'tripItem' | 'deadline' | 'bill'
+export type ActionSource = 'timeline' | 'task' | 'waiting' | 'opportunity' | 'contact' | 'tripItem' | 'deadline' | 'bill' | 'ugc'
 
 export interface ActionItem {
   /** Unique in a day: `${refType}:${refId}`. */
@@ -64,6 +66,8 @@ export interface ActionItem {
   children?: ActionItem[]
   /** The timeline row this came from (for the existing check/open helpers). */
   entry?: TimelineEntry
+  /** UGC action details (check registers the contact on that channel). */
+  ugc?: { kind: 'approach' | 'followup' | 'answer'; channel: UgcChannel; interactionId?: string }
 }
 
 export interface ItemOptions {
@@ -314,6 +318,25 @@ export function dayItems(db: DB, date: DateKey, today: DateKey, opts: ItemOption
   for (const p of db.projects) {
     if (p.status === 'concluido' || p.nextDelivery?.date !== date) continue
     push(marked(db, { key: `delivery:${p.id}`, source: 'deadline', refType: 'project', refId: p.id, date, title: p.nextDelivery.title, sub: 'entrega', front: projectFront(p)!, important: true }))
+  }
+
+  // UGC Business: brands to approach today, follow-ups due, replies to answer (nothing when there's nothing).
+  for (const a of ugcDayActions(db, date, today)) {
+    push({
+      key: `ugc-${a.kind}:${a.opportunity.id}`,
+      source: 'ugc',
+      refType: 'ugcOpportunity',
+      refId: a.opportunity.id,
+      date,
+      title: actionTitle(a),
+      sub: a.sub,
+      front: { label: 'UGC', group: 'trabalho' },
+      status: a.done ? 'done' : 'pending',
+      doneAt: a.doneAt ? isoToHM(a.doneAt) : undefined,
+      check: 'ugc',
+      important: a.kind !== 'approach',
+      ugc: { kind: a.kind, channel: a.channel, interactionId: a.interactionId },
+    })
   }
 
   // Recurring payments with a due day she gave (unpaid ones from earlier this month show today).

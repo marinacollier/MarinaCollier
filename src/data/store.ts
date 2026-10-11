@@ -14,6 +14,7 @@ import { create } from 'zustand'
 import { emptyDB, migrate } from './defaults'
 import { buildSeed } from './seed'
 import { applyLifeSeed } from './seed/migrate'
+import { migrateUgc } from './ugc/migrate'
 import { createIndexedDBAdapter, type StorageAdapter } from './storage'
 import type {
   CollectionKey,
@@ -148,7 +149,8 @@ export const actions = {
   },
 
   replaceDB(next: unknown): void {
-    useStore.setState({ db: migrate(next) })
+    // Restore / import / tests: the same one-time UGC migration as on load (idempotent).
+    useStore.setState({ db: migrateUgc(migrate(next)) })
   },
 
   resetToSeed(): void {
@@ -213,7 +215,7 @@ export async function hydrate(storage: StorageAdapter = createIndexedDBAdapter()
     console.error('[marina-os] load failed, starting from seed', err instanceof Error ? err.message : 'unknown')
   }
   const migrated = raw ? migrate(raw) : null
-  const db = migrated ? applyLifeSeed(migrated, todayKey()) : buildSeed(todayKey())
+  const db = migrateUgc(migrated ? applyLifeSeed(migrated, todayKey()) : buildSeed(todayKey()))
   useStore.setState({ db, hydrated: true, saveFailed: false })
   if (!raw || db !== migrated) await storage.save(db)
 

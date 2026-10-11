@@ -23,6 +23,8 @@ export const ROUTES = {
   workInbox: '/trabalho/inbox',
   wins: '/trabalho/wins',
   creator: '/trabalho/creator',
+  ugc: '/trabalho/creator/ugc',
+  ugcBrand: (id: string) => `/trabalho/creator/ugc/marca/${id}`,
   study: '/estudos',
   /** Reference content (newsletters, saved themes) — never tasks. */
   saved: '/estudos?v=salvos',
@@ -71,6 +73,8 @@ export const routeTable: { path: string; Component: React.LazyExoticComponent<Re
   { path: '/trabalho/inbox', Component: lazy(() => import('@/features/work/WorkInboxPage')) },
   { path: '/trabalho/wins', Component: lazy(() => import('@/features/work/WinsPage')) },
   { path: '/trabalho/creator', Component: lazy(() => import('@/features/creator/CreatorPage')) },
+  { path: '/trabalho/creator/ugc', Component: lazy(() => import('@/features/ugc/UgcPage')) },
+  { path: '/trabalho/creator/ugc/marca/:id', Component: lazy(() => import('@/features/ugc/BrandPage')) },
   { path: '/estudos', Component: lazy(() => import('@/features/learning/StudyPage')) },
   { path: '/livros', Component: lazy(() => import('@/features/learning/BooksPage')) },
   { path: '/livros/:id', Component: lazy(() => import('@/features/learning/BookPage')) },
