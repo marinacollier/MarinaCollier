@@ -184,7 +184,8 @@ function channelOf(db: DB, o: UgcOpportunity): UgcChannel {
 export function ugcDayActions(db: DB, date: DateKey, today: DateKey): UgcAction[] {
   const out: UgcAction[] = []
   const todayOut = date === today ? db.ugcInteractions.filter((i) => i.direction === 'out' && i.date === today) : []
-  const doneBy = (o: UgcOpportunity, types: UgcInteraction['type'][]) => todayOut.filter((i) => i.opportunityId === o.id && types.includes(i.type)).at(-1)
+  // Done today stays ticked — unless the brand was archived since (then it's out of every list).
+  const doneBy = (o: UgcOpportunity, types: UgcInteraction['type'][]) => (brandOf(db, o)?.archived ? undefined : todayOut.filter((i) => i.opportunityId === o.id && types.includes(i.type)).at(-1))
   const label = (o: UgcOpportunity) => {
     const b = brandOf(db, o)
     return [b?.priorityTier ? `Tier ${b.priorityTier}` : undefined, b?.category, CHANNEL_LABEL[channelOf(db, o)]].filter(Boolean).join(' · ')

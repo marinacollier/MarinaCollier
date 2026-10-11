@@ -44,7 +44,7 @@ const clean = (s: string) => s.replace(/[.!?…]+$/g, '').replace(/^(?:a|o|as|os
 
 /** Brand named in the sentence, or the one the conversation is about ("essa marca"). */
 function brandFrom(db: DB, name: string | undefined, input: HandlerInput): Brand | undefined {
-  if (name && !/^(essa|esta|ela|isso|essa marca)$/i.test(name.trim())) return findBrand(db, clean(name))
+  if (name && !/^(essa|esta|ela|isso|essa marca)$/i.test(name.trim())) return findBrand(db, name.replace(/[.!?…]+$/g, '').trim()) ?? findBrand(db, clean(name))
   const ref = input.ctx.lastRef
   if (ref?.type === 'brand') return db.brands.find((b) => b.id === ref.id)
   if (ref?.type === 'ugcOpportunity') {
@@ -243,7 +243,7 @@ function noSense(input: HandlerInput): LumosReply | undefined {
   }
 }
 
-const CLOSED = /^(?:fechei|fechamos|fechou)\s+(?:com\s+)?(?:a\s+marca\s+|a\s+|o\s+)?(.+?)(?:\s+(?:por|de|valor|em)\s+(.+))?$/
+const CLOSED = /^(?:fechei|fechamos|fechou)\s+(?:com\s+)?(?:a\s+|o\s+)?(.+?)(?:\s+(?:por|de|valor|em)\s+(.+))?$/
 
 function closed(input: HandlerInput): LumosReply | undefined {
   const { db, n, now } = input

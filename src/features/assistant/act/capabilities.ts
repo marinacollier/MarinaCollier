@@ -42,6 +42,12 @@ export const CAPABILITIES: Capability[] = [
   { id: 'backlog.promote', domain: 'tasks', verb: 'dar um dia a um item do backlog', example: 'isso do Santander coloca terça', handler: 'backlog', channels: TA },
   { id: 'tasks.done_by_name', domain: 'tasks', verb: 'concluir pelo nome', example: 'B.O. feito', handler: 'backlog', channels: TA },
   { id: 'tasks.stays', domain: 'tasks', verb: 'mover (fica pra)', example: 'JNB fica pra segunda', handler: 'backlog', channels: TA },
+  { id: 'ugc.add', domain: 'work', verb: 'colocar marca na prospecção', example: 'adiciona Galápagos na minha lista de prospecção', handler: 'ugc', channels: TA },
+  { id: 'ugc.sent', domain: 'work', verb: 'registrar contato com marca', example: 'mandei DM pra Breevo hoje', handler: 'ugc', channels: TA },
+  { id: 'ugc.replied', domain: 'work', verb: 'registrar resposta da marca', example: 'Breevo respondeu', handler: 'ugc', channels: TA },
+  { id: 'ugc.today', domain: 'work', verb: 'dizer quem abordar hoje', example: 'quem devo abordar hoje?', handler: 'ugc', channels: TA },
+  { id: 'ugc.waiting', domain: 'work', verb: 'listar follow-ups de marcas', example: 'quem está esperando follow-up?', handler: 'ugc', channels: TA },
+  { id: 'ugc.closed', domain: 'work', verb: 'fechar parceria', example: 'fechei com a Breevo por R$ 800', handler: 'ugc', channels: TA },
   // workouts
   { id: 'workout.complete', domain: 'workouts', verb: 'registrar feito', example: 'acabei de fazer meu treino, foram 7 km em Z2', handler: 'day', channels: TA },
   { id: 'workout.move', domain: 'workouts', verb: 'mover', example: 'passa minha corrida de sexta pra sábado', via: 'planner', channels: TA },
