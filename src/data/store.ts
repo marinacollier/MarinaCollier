@@ -14,6 +14,7 @@ import { create } from 'zustand'
 import { emptyDB, migrate } from './defaults'
 import { buildSeed } from './seed'
 import { applyLifeSeed } from './seed/migrate'
+import { applySpiritualSeed } from './seed/spiritual'
 import { migrateUgc } from './ugc/migrate'
 import { createIndexedDBAdapter, type StorageAdapter } from './storage'
 import type {
@@ -215,7 +216,7 @@ export async function hydrate(storage: StorageAdapter = createIndexedDBAdapter()
     console.error('[marina-os] load failed, starting from seed', err instanceof Error ? err.message : 'unknown')
   }
   const migrated = raw ? migrate(raw) : null
-  const db = migrateUgc(migrated ? applyLifeSeed(migrated, todayKey()) : buildSeed(todayKey()))
+  const db = migrateUgc(applySpiritualSeed(migrated ? applyLifeSeed(migrated, todayKey()) : buildSeed(todayKey())))
   useStore.setState({ db, hydrated: true, saveFailed: false })
   if (!raw || db !== migrated) await storage.save(db)
 

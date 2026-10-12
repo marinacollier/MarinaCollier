@@ -208,6 +208,11 @@ export function emptyDB(): DB {
     ugcOpportunities: [],
     ugcInteractions: [],
     ugcMessages: [],
+    spiritualPlans: [],
+    spiritualSessions: [],
+    spiritualStudies: [],
+    spiritualJournal: [],
+    spiritualPrayers: [],
   }
 }
 

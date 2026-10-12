@@ -370,6 +370,8 @@ export interface UserProfile {
   modalities: Modality[]
   notificationPrefs: NotificationPref[]
   featureFlags: FeatureFlags
+  /** "Próximo estudo bíblico" as a quiet line on Home (default on; never overdue). */
+  spiritualOnHome?: boolean
   waterGoal: number
   /** Set when Marina taps "Entrar no meu dia" on first run. */
   onboardedAt?: ISODateTime
@@ -1794,6 +1796,96 @@ export interface WeekPlan extends Entity {
   notes?: string
 }
 
+// ─── Bíblia, Graça & Liberdade ──────────────────────────────────────────────
+
+/** Derived from its sessions (see data/spiritual/model.ts) — never stored as a separate truth. */
+export type SpiritualPlanStatus = 'nao_iniciado' | 'em_andamento' | 'concluido'
+export type SpiritualSessionStatus = 'pendente' | 'em_andamento' | 'concluido'
+
+/** A visual group of sessions inside a plan, by session sortOrder (inclusive). */
+export interface SpiritualBlock {
+  title: string
+  from: number
+  to: number
+}
+
+/** A reading plan (a book or a theme). New plans/sessions are data: no code change needed. */
+export interface SpiritualPlan extends Entity {
+  title: string
+  description?: string
+  bookOrTheme: string
+  sortOrder: number
+  startedAt?: ISODateTime
+  completedAt?: ISODateTime
+  blocks?: SpiritualBlock[]
+  /** A quiet note shown on the plan (e.g. "textos complementares"). */
+  note?: string
+}
+
+/** One study (usually one chapter). Its check is THE done-state — the Home reads this same record. */
+export interface SpiritualSession extends Entity {
+  planId: ID
+  scriptureReference: string
+  chapterNumber?: number
+  title: string
+  sortOrder: number
+  estimatedMinutes: number
+  status: SpiritualSessionStatus
+  /** Unknown for studies done before the app (left empty, never invented). */
+  completedAt?: ISODateTime
+  /** Marked done when it came in (studied before the app). */
+  importedDone?: boolean
+  /** A complementary text inside a plan (e.g. Mateus 5–7 next to Lucas). */
+  complementary?: boolean
+}
+
+/** The ten parts of a guided study (Estudar com IA). */
+export interface BibleStudyContent {
+  temaCentral: string
+  contextoHistorico: string
+  explicacao: string
+  contextoTeologico: string
+  olharProgressista: string
+  leituraContemplativa: string
+  aplicacaoPessoal: string
+  perguntas: string[]
+  oracao: string
+  fraseDoDia: string
+}
+
+export interface SpiritualStudy extends Entity {
+  sessionId: ID
+  content: BibleStudyContent
+  contentSource: 'lumos'
+  generatedAt: ISODateTime
+  /** Her notes/transcription sent along (kept so she knows what the study was based on). */
+  userNotes?: string
+}
+
+/** Her notebook for a session. Survives unchecking the session. */
+export interface SpiritualJournalEntry extends Entity {
+  sessionId: ID
+  planId: ID
+  reference: string
+  /** O que este texto revela sobre Deus? */
+  reflectionGod?: string
+  /** O que revela sobre o ser humano? */
+  reflectionHumanity?: string
+  /** O que isso desperta em mim? */
+  personalReflection?: string
+  keyword?: string
+  prayer?: string
+  notes?: string
+}
+
+export type SpiritualPrayerCategory = 'oracao' | 'intencao' | 'gratidao' | 'reflexao'
+
+export interface SpiritualPrayer extends Entity {
+  title?: string
+  content: string
+  category: SpiritualPrayerCategory
+}
+
 // ─── Database shape ─────────────────────────────────────────────────────────
 
 export interface DB {
@@ -1874,6 +1966,11 @@ export interface DB {
   ugcOpportunities: UgcOpportunity[]
   ugcInteractions: UgcInteraction[]
   ugcMessages: UgcMessage[]
+  spiritualPlans: SpiritualPlan[]
+  spiritualSessions: SpiritualSession[]
+  spiritualStudies: SpiritualStudy[]
+  spiritualJournal: SpiritualJournalEntry[]
+  spiritualPrayers: SpiritualPrayer[]
 }
 
 /** Keys of DB that hold arrays of entities. */
@@ -1922,6 +2019,7 @@ export type EntityType =
   | 'opportunity'
   | 'contact'
   | 'contract'
+  | 'spiritualSession'
 
 export const ENTITY_COLLECTION: Record<EntityType, CollectionKey> = {
   brand: 'brands',
@@ -1956,6 +2054,7 @@ export const ENTITY_COLLECTION: Record<EntityType, CollectionKey> = {
   opportunity: 'opportunities',
   contact: 'contacts',
   contract: 'contracts',
+  spiritualSession: 'spiritualSessions',
 }
 
 // ─── Aliases from the product brief (no duplicated structures) ──────────────

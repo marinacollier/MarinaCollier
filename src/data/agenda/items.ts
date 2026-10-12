@@ -13,6 +13,7 @@ import type { DateKey, DB, DayPriority, Project, Task, TimeHM, TimelineEntry, Ug
 import { addDays, hmToMinutes } from '@/lib/date'
 import { billPeriod, billsDueOn } from '../finance/bills'
 import { actionTitle, ugcDayActions } from '../ugc/model'
+import { homeSpiritualSessions } from '../spiritual/model'
 
 /** Filter chips: Tudo · Trabalho · Corpo · Vida. Career, study and content count as Trabalho. */
 export type FrontGroup = 'trabalho' | 'corpo' | 'vida'
@@ -38,7 +39,7 @@ export interface Front {
  */
 export type CheckKind = 'toggle' | 'routine' | 'workout' | 'meal' | 'mark' | 'bill' | 'ugc' | 'none'
 
-export type ActionSource = 'timeline' | 'task' | 'waiting' | 'opportunity' | 'contact' | 'tripItem' | 'deadline' | 'bill' | 'ugc'
+export type ActionSource = 'timeline' | 'task' | 'waiting' | 'opportunity' | 'contact' | 'tripItem' | 'deadline' | 'bill' | 'ugc' | 'spiritual'
 
 export interface ActionItem {
   /** Unique in a day: `${refType}:${refId}`. */
@@ -346,6 +347,14 @@ export function dayItems(db: DB, date: DateKey, today: DateKey, opts: ItemOption
     const paid = db.occurrences.find((o) => o.parentType === 'bill' && o.parentId === c.id && o.date === period && o.status === 'done')
     if (paid && date === today && dueDate < today) continue
     push({ key: `bill:${c.id}`, source: 'bill', refType: 'financialCategory', refId: c.id, date, title: moneyHidden ? 'Pagamento' : `Pagar ${c.name}`, sub: dueDate < date ? 'venceu antes' : 'vence hoje', emoji: c.emoji, front: { label: 'DINHEIRO', group: 'vida' }, status: paid ? 'done' : 'pending', doneAt: paid ? isoToHM(paid.completedAt) : undefined, check: 'bill', important: true })
+  }
+
+  // Bíblia: the next study as an optional, quiet line (no due date, never overdue). Its check IS the session.
+  if (date === today) {
+    for (const s of homeSpiritualSessions(db, today)) {
+      const done = s.status === 'concluido'
+      push({ key: `spiritualSession:${s.id}`, source: 'spiritual', refType: 'spiritualSession', refId: s.id, date, title: done ? `Estudo bíblico: ${s.scriptureReference}` : `Próximo estudo bíblico: ${s.scriptureReference}`, sub: 'quando der', front: { label: 'BÍBLIA', group: 'vida' }, status: done ? 'done' : 'pending', doneAt: done && s.completedAt ? isoToHM(s.completedAt) : undefined, check: 'toggle', important: false })
+    }
   }
 
   markPriorities(items, prioritiesFor(db, date))

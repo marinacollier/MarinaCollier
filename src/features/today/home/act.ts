@@ -11,6 +11,7 @@ import { actions, getDB, persist } from '@/data/store'
 import type { DateKey, OccurrenceParent } from '@/data/types'
 import { billPeriod } from '@/data/finance/bills'
 import { recordOutbound, revertInteraction } from '@/data/ugc/ops'
+import { toggleSession } from '@/data/spiritual/ops'
 import { workoutFromChoice } from '@/features/body/planner'
 import { haptic } from '@/lib/haptics'
 import { nowISO } from '@/lib/id'
@@ -120,6 +121,11 @@ export function checkItem(item: ActionItem): boolean | undefined {
         actions.update('backlogItems', b.id, { status: done ? 'done' : 'open' })
         break
       }
+      if (item.refType === 'spiritualSession') {
+        // The same session record the Bíblia module checks (one done-state).
+        done = toggleSession(item.refId)
+        break
+      }
       if (item.refType === 'milestone') {
         const m = db.milestones.find((x) => x.id === item.refId)
         if (!m) return undefined
@@ -212,6 +218,8 @@ export function openItem(item: ActionItem, today: DateKey, navigate: (to: string
       return navigate(ROUTES.project(item.refId))
     case 'financialCategory':
       return navigate(ROUTES.money)
+    case 'spiritualSession':
+      return navigate(ROUTES.bibleSession(item.refId))
     case 'ugcOpportunity': {
       const o = getDB().ugcOpportunities.find((x) => x.id === item.refId)
       if (o) navigate(ROUTES.ugcBrand(o.brandId))

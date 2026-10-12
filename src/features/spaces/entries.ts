@@ -10,6 +10,7 @@ import { contextWorkouts } from '@/data/fuel'
 import { isTaskOpen, modalityOf, petTasksDue, readingNow, studyingNow, upcomingTrips, waitingFor } from '@/data/selectors'
 import type { DateKey, DB, ModuleId, Tone } from '@/data/types'
 import { addDays, diffDays } from '@/lib/date'
+import { nextSession } from '@/data/spiritual/model'
 
 export interface SpaceEntry {
   key: string
@@ -119,6 +120,10 @@ function vida(db: DB, today: DateKey): SpaceEntry[] {
     const due = petTasksDue(db, today).length
     const pet = db.pets[0]
     out.push({ key: 'luna', label: db.pets.length === 1 ? pet.name : 'Pets', emoji: '🐾', to: ROUTES.luna, tone: 'sand', module: 'luna', hint: due ? `${plural(due, 'cuidado', 'cuidados')} hoje` : pet.breed })
+  }
+  if (db.spiritualPlans.length) {
+    const next = nextSession(db)
+    out.push({ key: 'biblia', label: 'Bíblia, Graça & Liberdade', emoji: '🕊️', to: ROUTES.bible, tone: 'plum', hint: next ? `próximo: ${next.scriptureReference}` : undefined })
   }
   const admin = db.tasks.filter((t) => t.context === 'vida_real' && isTaskOpen(t))
   if (admin.length) out.push({ key: 'casa', label: 'Casa & admin', emoji: '🏡', to: ROUTES.lifeAdmin, tone: 'sand', module: 'vida_real', hint: plural(admin.length, 'coisa aberta', 'coisas abertas') })
