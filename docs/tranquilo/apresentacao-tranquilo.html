@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Tranquilo — Discovery Executivo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: deck 16:9 de 12 slides fixos (1280×720), empilhados na tela com encaixe por slide; na impressão, um slide por página sem margens. Tema único claro, com slides "palco" escuros na abertura e no fechamento. */
+:root{
+  color-scheme:light;
+  --paper:#EEF0EA; --card:#FFFFFF; --ink:#15201C; --muted:#56625D; --line:#D3D8CF;
+  --cobalt:#2B45C2; --cobalt-soft:#E1E6FA; --night:#121A3B; --night-2:#1C2752; --sun:#F2B33D; --moss:#4E6B2E;
+  --t-fato:#2F6B3A; --t-fato-bg:#E0EEDB; --t-int:#2B45C2; --t-int-bg:#E1E6FA;
+  --t-hip:#875800; --t-hip-bg:#F8EBCB; --t-rec:#5E3F91; --t-rec-bg:#ECE3F5;
+  --f-display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --s:1;
+}
+*{box-sizing:border-box}
+html{background:#D9DDD4;scroll-snap-type:y proximity}
+body{margin:0;background:#D9DDD4;color:var(--ink);font-family:var(--f-body);padding-inline:16px;padding-block:16px}
+.deck{display:grid;justify-content:center;gap:16px;counter-reset:slide}
+.frame{width:calc(1280px * var(--s));height:calc(720px * var(--s));overflow:hidden;scroll-snap-align:center;box-shadow:0 1px 3px rgba(20,30,25,.18);border-radius:calc(6px * var(--s))}
+.slide{width:1280px;height:720px;transform:scale(var(--s));transform-origin:top left;background:var(--paper);position:relative;padding:56px 72px 0;display:flex;flex-direction:column;gap:22px;counter-increment:slide;overflow:hidden}
+.slide.dark{background:var(--night);color:#F3F4EE}
+/* rodapé tipo canhoto de ingresso */
+.stub{position:absolute;left:0;right:0;bottom:0;height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 72px;border-top:2px dashed var(--line);font-family:var(--f-mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.dark .stub{border-top-color:#38426B;color:#A7AEC9}
+.stub .pg::after{content:counter(slide, decimal-leading-zero) " / 12"}
+.body{flex:1;min-height:0;display:flex;flex-direction:column;gap:20px;padding-bottom:64px}
+.eyebrow{font-family:var(--f-mono);font-size:13px;letter-spacing:.09em;text-transform:uppercase;color:var(--cobalt)}
+.dark .eyebrow{color:var(--sun)}
+h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance;line-height:1.08}
+h2{font-size:40px;font-weight:700;letter-spacing:-.015em;max-width:31ch}
+h3{font-size:20px;font-weight:700;line-height:1.2}
+p{margin:0}
+.lead{font-size:20px;line-height:1.45;color:var(--muted);max-width:60ch}
+.dark .lead{color:#C9CEE0}
+.row{display:grid;gap:16px}
+.c2{grid-template-columns:1fr 1fr}.c3{grid-template-columns:repeat(3,1fr)}.c21{grid-template-columns:1.7fr 1fr}
+.row>*{min-width:0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:18px 20px;display:flex;flex-direction:column;gap:8px}
+.card p,.card li{font-size:15.5px;line-height:1.42}
+.card .k{font-family:var(--f-mono);font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.card.hl{border:2px solid var(--cobalt)}
+.night-card{background:var(--night);color:#EEF0F7;border-radius:6px;padding:22px 24px;display:flex;flex-direction:column;gap:12px}
+.night-card .note{color:#B9C0DA}
+.night-card .k{color:var(--sun);font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+ul.l{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px}
+.tag{display:inline-block;font-family:var(--f-mono);font-size:10.5px;font-weight:500;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:3px;vertical-align:2px;white-space:nowrap}
+.fato{background:var(--t-fato-bg);color:var(--t-fato)}.int{background:var(--t-int-bg);color:var(--t-int)}.hip{background:var(--t-hip-bg);color:var(--t-hip)}.rec{background:var(--t-rec-bg);color:var(--t-rec)}
+.note{font-size:13px;color:var(--muted);line-height:1.4}
+.dark .note{color:#A7AEC9}
+/* capa */
+.cover{justify-content:flex-start}
+.cover h1{font-size:68px;font-weight:800;letter-spacing:-.03em;max-width:12ch;line-height:1.02}
+.cover .body{max-width:700px}
+.setlist{position:absolute;right:72px;top:96px;width:360px;border-left:2px dashed #38426B;padding:6px 0 6px 28px;display:flex;flex-direction:column;gap:12px}
+.setlist .k{font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--sun)}
+.setlist ol{margin:0;padding-left:30px;display:flex;flex-direction:column;gap:9px;font-size:16.5px;color:#DCE0EE;counter-reset:none}
+.setlist li::marker{font-family:var(--f-mono);font-size:13px;color:#7E93F0}
+.cover h1 em{font-style:normal;color:var(--sun)}
+.eq{display:flex;align-items:flex-end;gap:5px;height:64px}
+.eq i{display:block;width:9px;background:var(--sun);border-radius:1px}
+.eq i:nth-child(3n){background:#7E93F0}
+/* resultados */
+.res{display:flex;flex-direction:column;gap:0}
+.res .it{display:grid;grid-template-columns:44px 1fr;gap:14px;padding:13px 0;border-top:1px solid var(--line)}
+.res .it:first-child{border-top:0;padding-top:2px}
+.res .n{font-family:var(--f-display);font-weight:800;font-size:30px;color:var(--cobalt);line-height:1}
+.res b{font-family:var(--f-display);font-size:19px;font-weight:700;display:block;margin-bottom:2px}
+.res span{font-size:15.5px;color:var(--muted);line-height:1.4}
+/* prioridades */
+.prio .card{padding:20px 22px;gap:10px}
+.prio .let{font-family:var(--f-display);font-weight:800;font-size:44px;line-height:.9;color:var(--cobalt)}
+.prio dl{margin:0;display:flex;flex-direction:column;gap:8px}
+.prio dt{font-family:var(--f-mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.prio dd{margin:0;font-size:15px;line-height:1.4}
+.band{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--card);border:1px dashed #A9B1A4;border-radius:6px;padding:12px 18px}
+.band .k{font-family:var(--f-mono);font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.chip{font-size:14px;padding:4px 10px;border-radius:999px;background:var(--paper);border:1px solid var(--line)}
+/* estado dos ativos */
+.col h3{display:flex;align-items:center;gap:10px}
+.dot{width:12px;height:12px;border-radius:50%;display:inline-block;flex:none}
+.col>div{display:flex;flex-direction:column}
+.col ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column}
+.col li{font-size:16.5px;line-height:1.38;padding:10px 0;border-top:1px solid var(--line)}
+.col li small{display:block;color:var(--muted);font-size:14px}
+/* quick wins */
+.qw .card{gap:10px}
+.qw .card>p{font-size:16.5px;line-height:1.45}
+.qw .num{font-family:var(--f-mono);font-size:12px;color:var(--t-hip);letter-spacing:.06em;text-transform:uppercase}
+.qw .meta{display:flex;flex-direction:column;gap:4px;border-top:1px solid var(--line);padding-top:10px;margin-top:auto}
+.qw .meta p{font-size:13.5px;color:var(--muted)}
+.warn{background:var(--t-hip-bg);color:#4A3500;border-radius:6px;padding:12px 18px;font-size:15px;line-height:1.4}
+/* movimentos */
+.track{display:grid;grid-template-columns:1fr 56px 1fr 56px 1fr;align-items:stretch}
+.track .card{gap:10px}
+.arrow{display:flex;align-items:center;justify-content:center;color:var(--cobalt)}
+.track .mv{font-family:var(--f-display);font-weight:800;font-size:28px;color:var(--cobalt)}
+/* escopo */
+.scope h3{font-size:22px}
+.scope li{font-size:17px;line-height:1.42}
+.big .card p,.big .card li{font-size:17px;line-height:1.45}
+.role li{font-size:16px}
+/* papéis */
+.roles{display:grid;grid-template-columns:1fr 1.25fr 1fr;gap:0;align-items:stretch}
+.role{padding:18px 20px;display:flex;flex-direction:column;gap:8px;background:var(--card);border:1px solid var(--line)}
+.role:first-child{border-radius:6px 0 0 6px}.role:last-child{border-radius:0 6px 6px 0}
+.role.me{background:var(--night);color:#EEF0F7;border-color:var(--night)}
+.role .k{font-family:var(--f-mono);font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.role.me .k{color:var(--sun)}
+.role li{font-size:16px;line-height:1.4}
+/* avanço */
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:0}
+.st{padding:18px 20px;border-left:2px solid #38426B;display:flex;flex-direction:column;gap:8px}
+.st .w{font-family:var(--f-mono);font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--sun)}
+.st p{font-size:18px;line-height:1.42;color:#DCE0EE}
+.ask{border:2px solid var(--sun);border-radius:6px;padding:18px 22px;font-size:20px;line-height:1.4}
+/* fluxo */
+.flow svg{width:100%;height:auto;display:block}
+@media print{
+  @page{size:1280px 720px;margin:0}
+  html,body{background:none;padding:0}
+  .deck{display:block}
+  .frame{width:1280px;height:720px;box-shadow:none;border-radius:0;break-after:page;page-break-after:always}
+  .frame:last-child{break-after:auto;page-break-after:auto}
+  .slide{transform:none}
+}
+</style>
+</head>
+<body>
+<main class="deck">
+
+<!-- 01 Capa -->
+<div class="frame"><section class="slide dark cover" aria-label="Capa">
+  <div class="body" style="justify-content:center;gap:28px">
+    <div class="eq" aria-hidden="true"><i style="height:30%"></i><i style="height:64%"></i><i style="height:46%"></i><i style="height:90%"></i><i style="height:70%"></i><i style="height:38%"></i><i style="height:100%"></i><i style="height:56%"></i><i style="height:78%"></i><i style="height:42%"></i><i style="height:66%"></i><i style="height:26%"></i></div>
+    <div class="eyebrow">Proposta para Thales · Tranquilo</div>
+    <h1>Tranquilo: transformando <em>inteligência</em> em escala</h1>
+    <p class="lead" style="font-size:24px">Discovery Estratégico de Produto, Tecnologia, IA &amp; Dados</p>
+  </div>
+  <aside class="setlist" aria-label="Roteiro da conversa">
+    <span class="k">Setlist desta conversa</span>
+    <ol><li>O que você leva</li><li>O que eu ouvi</li><li>O que está em jogo</li><li>O Tranquilo que você está imaginando</li><li>Onde concentrar</li><li>O que já existe</li><li>Quick wins</li><li>O Discovery</li><li>Escopo</li><li>Meu papel</li><li>Proposta de avanço</li></ol>
+  </aside>
+  <div class="stub"><span>Marina Collier · Produto, Tecnologia, IA &amp; Dados</span><span>Outubro de 2026 · para conversa</span><span class="pg"></span></div>
+</section></div>
+
+<!-- 02 Resultados -->
+<div class="frame"><section class="slide">
+  <div class="body">
+    <div class="eyebrow">O que você leva</div>
+    <h2>Ao final do Discovery, você terá cinco respostas para decidir onde investir</h2>
+    <div class="row c21" style="flex:1">
+      <div class="res">
+        <div class="it"><span class="n">1</span><div><b>O que já funciona e o que precisa evoluir</b><span>Com evidência, para preservar o que a equipe construiu e não pagar duas vezes pela mesma coisa.</span></div></div>
+        <div class="it"><span class="n">2</span><div><b>Até onde a curadoria pode chegar ao franqueado</b><span>O que já é confiável, o que precisa ser validado e como medir o erro da previsão.</span></div></div>
+        <div class="it"><span class="n">3</span><div><b>O primeiro recorte das três prioridades</b><span>Curadoria, central do franqueado e agenda: o que entra, o que fica de fora e do que cada uma depende.</span></div></div>
+        <div class="it"><span class="n">4</span><div><b>O que construir, comprar ou reaproveitar</b><span>Para cada peça, considerando o custo de manter tudo funcionando com uma equipe enxuta.</span></div></div>
+        <div class="it"><span class="n">5</span><div><b>Um roadmap por ondas, com indicadores</b><span>Com ponto de partida medido, para que cada investimento siga a validação do anterior.</span></div></div>
+      </div>
+      <div class="night-card">
+        <span class="k">E o que você evita</span>
+        <ul class="l" style="font-size:17px;line-height:1.45">
+          <li>Construir um portal antes de saber o que o parceiro precisa no dia a dia</li>
+          <li>Assinar ferramentas que se sobrepõem às que já existem</li>
+          <li>Mostrar ao franqueado uma previsão de público que ainda não foi testada</li>
+        </ul>
+        <p class="note" style="margin-top:auto">O Discovery não implementa nada. Ele prepara a decisão de implementação.</p>
+      </div>
+    </div>
+  </div>
+  <div class="stub"><span>Tranquilo · Discovery</span><span>Resultados</span><span class="pg"></span></div>
+</section></div>
+
+<!-- 03 O que eu ouvi -->
+<div class="frame"><section class="slide">
+  <div class="body">
+    <div class="eyebrow">O que eu ouvi</div>
+    <h2>O Tranquilo está deixando de ser produtora para virar uma rede</h2>
+    <div class="row c2">
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <p class="lead" style="font-size:18px;color:var(--ink)">O centro concentra o que só o Tranquilo sabe fazer: curadoria, leitura de demanda, método, marca e acesso a artistas. Os parceiros locais executam com autonomia.</p>
+        <div class="card"><span class="k">Ambição apresentada</span><p style="font-family:var(--f-display);font-weight:800;font-size:34px;line-height:1;color:var(--ink)">12 → 50 → 100 → 400</p><p class="note">Eventos por estágio de expansão. É meta, não resultado. Começa por SP e interior, MG e Sul.</p></div>
+        <div class="card"><span class="k">A condição</span><p>Crescer sem aumentar na mesma proporção o esforço da equipe central, mantendo uma estrutura pequena, rápida e autônoma.</p></div>
+      </div>
+      <div class="card hl" style="gap:12px">
+        <span class="k">As suas prioridades, na sua ordem</span>
+        <div><h3>1 · Industrializar a curadoria</h3><p>“Artista X em São Paulo, BH, Floripa, Recife: público estimado”, com a lógica do Tranquilo corrigindo viralização, música única e efeito de DJs.</p></div>
+        <div><h3>2 · Central do franqueado</h3><p>O método completo para executar sozinho, inclusive o tripé: liderança local, anfitrião e social media.</p></div>
+        <div><h3>3 · Agenda e match</h3><p>O parceiro informa datas, recebe a oportunidade no WhatsApp e manifesta interesse sem dez mensagens no meio.</p></div>
+        <p class="note" style="border-top:1px solid var(--line);padding-top:10px">Depois: atendimento ao público, ativação da base, contratos e fechamento financeiro.</p>
+      </div>
+    </div>
+  </div>
+  <div class="stub"><span>Tranquilo · Discovery</span><span>Visão do fundador</span><span class="pg"></span></div>
+</section></div>
+
+<!-- 04 O que está em jogo -->
+<div class="frame"><section class="slide">
+  <div class="body">
+    <div class="eyebrow">O que está em jogo</div>
+    <h2>Com equipe enxuta e caixa contado, o custo está no tempo e nas apostas erradas</h2>
+    <div class="row c3" style="flex:1">
+      <div class="card"><span class="k">Tempo do centro</span><h3>Toda oferta e dúvida passa por poucas pessoas</h3><p>Com 50 eventos, a conversa vira gargalo. <strong>O que muda:</strong> o repetitivo vai para o sistema, as aprovações que importam ficam com pessoas.</p></div>
+      <div class="card"><span class="k">Risco de contratação</span><h3>Streaming bruto pode inflar a demanda</h3><p>O custo é casa vazia ou margem negativa. <strong>O que muda:</strong> faixa de público com nível de confiança, medida contra o público real.</p></div>
+      <div class="card"><span class="k">Horas manuais</span><h3>Bilheteria, base e fechamento ainda à mão</h3><p>Importação manual, deduplicação e reconciliação de planilhas. <strong>O que muda:</strong> saber quais automações se pagam antes de construí-las.</p></div>
+      <div class="card"><span class="k">Ferramentas sobrepostas</span><h3>Três ferramentas de mensageria coexistem</h3><p>Meta, ManyChat e NextTags, além de Zapier e 2Sync sem escopo claro. <strong>O que muda:</strong> um papel definido para cada uma antes de contratar mais.</p></div>
+      <div class="card"><span class="k">Investir antes da prova</span><h3>Construir antes de validar sai caro</h3><p>Um portal ou modelo errado custa desenvolvimento e manutenção. <strong>O que muda:</strong> investimento por ondas, cada uma condicionada à anterior.</p></div>
+      <div class="card"><span class="k">Margem na expansão</span><h3>Mais eventos só valem com custo central menor</h3><p>Receita sobe, mas a margem precisa acompanhar. <strong>O que muda:</strong> custo e margem por evento acompanhados desde o começo.</p></div>
+    </div>
+    <p class="note"><span class="tag int">interpretação</span> Leituras feitas a partir do briefing de Inteligência &amp; Dados. O tamanho real de cada problema é medido no Discovery; nenhum valor foi estimado aqui.</p>
+  </div>
+  <div class="stub"><span>Tranquilo · Discovery</span><span>Economia e operação</span><span class="pg"></span></div>
+</section></div>
+
+<!-- 05 O Tranquilo que você está imaginando -->
+<div class="frame"><section class="slide">
+  <div class="body" style="gap:14px">
+    <div class="eyebrow">A visão</div>
+    <h2>O Tranquilo que você está imaginando</h2>
+    <div class="flow" role="img" aria-label="Ciclo: artista, previsão de público, cidade, agenda disponível, oferta, manifestação de interesse, evento e aprendizado, que volta para o artista">
+      <svg viewBox="0 0 1136 452" xmlns="http://www.w3.org/2000/svg">
+        <defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2B45C2"/></marker></defs>
+        <g fill="none" stroke="#2B45C2" stroke-width="2.5" marker-end="url(#ah)">
+          <line x1="234" y1="70" x2="298" y2="70"/><line x1="536" y1="70" x2="600" y2="70"/><line x1="838" y1="70" x2="902" y2="70"/>
+          <line x1="1021" y1="142" x2="1021" y2="268"/>
+          <line x1="902" y1="340" x2="838" y2="340"/><line x1="600" y1="340" x2="536" y2="340"/><line x1="298" y1="340" x2="234" y2="340"/>
+        </g>
+        <path d="M115 268 L115 142" fill="none" stroke="#F2B33D" stroke-width="3" stroke-dasharray="7 6" marker-end="url(#ah2)"/>
+        <defs><marker id="ah2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#C88A12"/></marker></defs>
+        <g font-family="IBM Plex Sans, Segoe UI, sans-serif">
+          <!-- linha 1 -->
+          <g><rect x="0" y="0" width="230" height="140" rx="8" fill="#FFFFFF" stroke="#D3D8CF"/><text x="18" y="34" font-family="IBM Plex Mono, monospace" font-size="13" fill="#2B45C2">01 · CENTRO</text><text x="18" y="66" font-family="Bricolage Grotesque, sans-serif" font-weight="700" font-size="22" fill="#15201C">Artista</text><text x="18" y="94" font-size="14.5" fill="#56625D">Sinais de audiência, histórico</text><text x="18" y="114" font-size="14.5" fill="#56625D">e critérios de curadoria</text></g>
+          <g><rect x="302" y="0" width="230" height="140" rx="8" fill="#FFFFFF" stroke="#D3D8CF"/><text x="320" y="34" font-family="IBM Plex Mono, monospace" font-size="13" fill="#2B45C2">02 · SISTEMA</text><text x="320" y="66" font-family="Bricolage Grotesque, sans-serif" font-weight="700" font-size="22" fill="#15201C">Previsão de público</text><text x="320" y="94" font-size="14.5" fill="#56625D">Faixa estimada e nível</text><text x="320" y="114" font-size="14.5" fill="#56625D">de confiança</text></g>
+          <g><rect x="604" y="0" width="230" height="140" rx="8" fill="#FFFFFF" stroke="#D3D8CF"/><text x="622" y="34" font-family="IBM Plex Mono, monospace" font-size="13" fill="#2B45C2">03 · SISTEMA</text><text x="622" y="66" font-family="Bricolage Grotesque, sans-serif" font-weight="700" font-size="22" fill="#15201C">Cidade</text><text x="622" y="94" font-size="14.5" fill="#56625D">Potencial por praça,</text><text x="622" y="114" font-size="14.5" fill="#56625D">comparado entre artistas</text></g>
+          <g><rect x="906" y="0" width="230" height="140" rx="8" fill="#FFFFFF" stroke="#D3D8CF"/><text x="924" y="34" font-family="IBM Plex Mono, monospace" font-size="13" fill="#2B45C2">04 · PARCEIRO</text><text x="924" y="66" font-family="Bricolage Grotesque, sans-serif" font-weight="700" font-size="22" fill="#15201C">Agenda disponível</text><text x="924" y="94" font-size="14.5" fill="#56625D">Datas que o parceiro</text><text x="924" y="114" font-size="14.5" fill="#56625D">e a casa podem receber</text></g>
+          <!-- linha 2 -->
+          <g><rect x="906" y="270" width="230" height="140" rx="8" fill="#FFFFFF" stroke="#D3D8CF"/><text x="924" y="304" font-family="IBM Plex Mono, monospace" font-size="13" fill="#2B45C2">05 · CENTRO</text><text x="924" y="336" font-family="Bricolage Grotesque, sans-serif" font-weight="700" font-size="22" fill="#15201C">Oferta</text><text x="924" y="364" font-size="14.5" fill="#56625D">Chega ao parceiro pelo</text><text x="924" y="384" font-size="14.5" fill="#56625D">WhatsApp e pela central</text></g>
+          <g><rect x="604" y="270" width="230" height="140" rx="8" fill="#FFFFFF" stroke="#D3D8CF"/><text x="622" y="304" font-family="IBM Plex Mono, monospace" font-size="13" fill="#2B45C2">06 · PARCEIRO</text><text x="622" y="336" font-family="Bricolage Grotesque, sans-serif" font-weight="700" font-size="22" fill="#15201C">Interesse</text><text x="622" y="364" font-size="14.5" fill="#56625D">Manifestado no sistema,</text><text x="622" y="384" font-size="14.5" fill="#56625D">sem troca de mensagens</text></g>
+          <g><rect x="302" y="270" width="230" height="140" rx="8" fill="#FFFFFF" stroke="#D3D8CF"/><text x="320" y="304" font-family="IBM Plex Mono, monospace" font-size="13" fill="#2B45C2">07 · PARCEIRO</text><text x="320" y="336" font-family="Bricolage Grotesque, sans-serif" font-weight="700" font-size="22" fill="#15201C">Evento</text><text x="320" y="364" font-size="14.5" fill="#56625D">Método, checklists, tripé</text><text x="320" y="384" font-size="14.5" fill="#56625D">social e campanha</text></g>
+          <g><rect x="0" y="270" width="230" height="140" rx="8" fill="#121A3B"/><text x="18" y="304" font-family="IBM Plex Mono, monospace" font-size="13" fill="#F2B33D">08 · REDE</text><text x="18" y="336" font-family="Bricolage Grotesque, sans-serif" font-weight="700" font-size="22" fill="#FFFFFF">Aprendizado</text><text x="18" y="364" font-size="14.5" fill="#C9CEE0">Previsto vs. realizado</text><text x="18" y="384" font-size="14.5" fill="#C9CEE0">melhora o próximo ciclo</text></g>
+          <!-- decisões humanas -->
+          <g font-family="IBM Plex Mono, monospace" font-size="12.5" fill="#875800">
+            <rect x="345" y="150" width="144" height="28" rx="14" fill="#F8EBCB"/><text x="359" y="169">curadoria valida</text>
+            <rect x="842" y="190" width="168" height="28" rx="14" fill="#F8EBCB"/><text x="856" y="209">centro aprova oferta</text>
+            <rect x="421" y="420" width="296" height="28" rx="14" fill="#F8EBCB"/><text x="436" y="439">negociação e contrato com pessoas</text>
+          </g>
+          <text x="134" y="200" font-family="IBM Plex Mono, monospace" font-size="12.5" fill="#875800">volta para</text>
+          <text x="134" y="218" font-family="IBM Plex Mono, monospace" font-size="12.5" fill="#875800">a curadoria</text>
+        </g>
+      </svg>
+    </div>
+    <p class="note"><span class="tag hip">fluxo desejado</span> Hoje essas etapas acontecem em conversas, Notion e planilhas. Nenhuma delas existe como sistema integrado; o Discovery define qual parte construir primeiro. Em amarelo, as decisões que continuam humanas.</p>
+  </div>
+  <div class="stub"><span>Tranquilo · Discovery</span><span>Fluxo de valor da franquia</span><span class="pg"></span></div>
+</section></div>
+
+<!-- 06 Três prioridades -->
+<div class="frame"><section class="slide">
+  <div class="body">
+    <div class="eyebrow">Onde concentrar</div>
+    <h2>Três prioridades centrais, avaliadas juntas porque formam um fluxo só</h2>
+    <div class="row c3 prio" style="flex:1">
+      <div class="card hl"><span class="let">A</span><h3>Inteligência de curadoria</h3><dl>
+        <dt>Para quê</dt><dd>Decidir contratação e praça com uma estimativa de público em que o centro e o parceiro confiem.</dd>
+        <dt>Primeiro recorte <span class="tag hip">hipótese</span></dt><dd>Artistas em negociação com faixa e confiança em poucas praças. Primeiro para uso interno.</dd>
+        <dt>Depende de</dt><dd>Entender a lógica atual e ter histórico de público real para comparar.</dd></dl></div>
+      <div class="card hl"><span class="let">B</span><h3>Central do franqueado</h3><dl>
+        <dt>Para quê</dt><dd>O parceiro executa o método sem acionar o centro para dúvidas repetitivas.</dd>
+        <dt>Primeiro recorte <span class="tag hip">hipótese</span></dt><dd>Acesso por praça, método de produção e tripé social organizados a partir do Notion, com busca.</dd>
+        <dt>Depende de</dt><dd>Revisão do conteúdo e definição do papel do Notion.</dd></dl></div>
+      <div class="card hl"><span class="let">C</span><h3>Agenda e match</h3><dl>
+        <dt>Para quê</dt><dd>Levar a oportunidade certa ao parceiro certo sem negociação artesanal.</dd>
+        <dt>Primeiro recorte <span class="tag hip">hipótese</span></dt><dd>Datas informadas pelo parceiro, oferta do centro, interesse e aviso no WhatsApp. A negociação continua com pessoas.</dd>
+        <dt>Depende de</dt><dd>Modelo de praças e casas, regras de reserva e do WhatsApp Business.</dd></dl></div>
+    </div>
+    <div class="band"><span class="k">Segunda onda</span><span class="chip">Atendimento WhatsApp e Instagram</span><span class="chip">Ativação da base</span><span class="chip">Contratos</span><span class="chip">Fechamento financeiro</span><span class="note">Avaliadas no Discovery, sem competir com A, B e C.</span></div>
+  </div>
+  <div class="stub"><span>Tranquilo · Discovery</span><span>Prioridades</span><span class="pg"></span></div>
+</section></div>
+
+<!-- 07 O que já existe -->
+<div class="frame"><section class="slide">
+  <div class="body">
+    <div class="eyebrow">Ponto de partida</div>
+    <h2>Não partimos do zero: a equipe já tirou muita coisa do artesanal</h2>
+    <div class="row c3 col" style="flex:1">
+      <div><h3><span class="dot" style="background:#2F6B3A"></span>Registrado como funcionando</h3><span class="tag fato" style="align-self:flex-start;margin:6px 0 4px">fato documentado</span><ul>
+        <li>Importação da Ingresse e leitura de recorrência<small>Alimentação ainda manual</small></li>
+        <li>Integração Mailchimp–Notion<small>Duplicidades tratadas à mão</small></li>
+        <li>Automação comentário → DM<small>Finalizada para Curitiba</small></li>
+        <li>Criação automática de cards no Notion</li>
+        <li>Central de Artistas e jornada Descubra</li>
+        <li>IA generativa nas campanhas</li></ul></div>
+      <div><h3><span class="dot" style="background:#C88A12"></span>Em evolução</h3><span class="tag fato" style="align-self:flex-start;margin:6px 0 4px">fato documentado</span><ul>
+        <li>Enriquecimento via Chartmetric<small>MVP, consulta por artista por causa do custo</small></li>
+        <li>UTMs e leitura de canais<small>Atribuição ainda não confiável</small></li>
+        <li>Segmentação NextTags + Mailchimp<small>Instabilidade relatada</small></li>
+        <li>Modelo financeiro por evento<small>Fontes com divergências</small></li>
+        <li>WhatsApp com atendimento humano<small>Meta registrada, testes pendentes</small></li></ul></div>
+      <div><h3><span class="dot" style="background:#A3342B"></span>Não encontrado nos registros</h3><span class="tag int" style="align-self:flex-start;margin:6px 0 4px">interpretação</span><ul>
+        <li>Previsão de público comparada com o público real</li>
+        <li>Central do franqueado com acesso por praça</li>
+        <li>Agenda de disponibilidade e fluxo de oferta</li>
+        <li>Identidade única de cliente entre as bases</li></ul>
+        <p class="note" style="margin-top:12px">A lógica de curadoria existe. O que não encontrei foi registro de validação contra resultados.</p></div>
+    </div>
+    <p class="note">Fonte: briefing de Inteligência &amp; Dados, registros de 2026. Cada estado será confirmado no Discovery, junto com quem construiu.</p>
+  </div>
+  <div class="stub"><span>Tranquilo · Discovery</span><span>O que já existe</span><span class="pg"></span></div>
+</section></div>
+
+<!-- 08 Quick wins -->
+<div class="frame"><section class="slide">
+  <div class="body">
+    <div class="eyebrow">Hipóteses de quick win</div>
+    <h2>Três passos baratos que podem gerar dado útil antes de qualquer construção</h2>
+    <p class="warn"><strong>Não fazem parte do escopo contratado.</strong> O Discovery avalia se valem a pena. A execução só acontece se você aprovar, pela equipe atual ou numa etapa seguinte.</p>
+    <div class="row c3 qw">
+      <div class="card"><span class="num">Hipótese 1 · curadoria</span><h3>Registrar cada previsão antes do evento</h3><p>Sem previsão registrada, não há como medir o erro. A partir daí, cada evento vira dado para validar a curadoria.</p><div class="meta"><p><strong>Usa:</strong> Notion ou planilha atuais</p><p><strong>Alimenta:</strong> prioridade A</p><p><strong>Sinal de que funcionou:</strong> previsões registradas para todos os eventos seguintes</p></div></div>
+      <div class="card"><span class="num">Hipótese 2 · demanda</span><h3>Um padrão único de UTM por artista, cidade e evento</h3><p>Testa com mais rigor a leitura de que boa parte do público chega pelos próprios artistas.</p><div class="meta"><p><strong>Usa:</strong> a ferramenta de UTM que já existe</p><p><strong>Alimenta:</strong> prioridade A e marketing</p><p><strong>Sinal de que funcionou:</strong> origem identificável na maior parte das vendas</p></div></div>
+      <div class="card"><span class="num">Hipótese 3 · agenda</span><h3>Testar disponibilidade e interesse com o que já existe</h3><p>Datas informadas por formulário e oferta enviada a alguns parceiros. Mostra se eles respondem antes de construir a agenda.</p><div class="meta"><p><strong>Usa:</strong> formulários e WhatsApp atuais</p><p><strong>Alimenta:</strong> prioridade C</p><p><strong>Sinal de que funcionou:</strong> parceiros respondem às ofertas sem conversa paralela</p></div></div>
+    </div>
+  </div>
+  <div class="stub"><span>Tranquilo · Discovery</span><span>Quick wins</span><span class="pg"></span></div>
+</section></div>
+
+<!-- 09 Como funciona o Discovery -->
+<div class="frame"><section class="slide">
+  <div class="body">
+    <div class="eyebrow">O Discovery</div>
+    <h2>Profundidade suficiente para decidir, não para construir</h2>
+    <div class="track">
+      <div class="card"><span class="mv">Entender</span><p>Modelo de franquia, rotina do centro e das praças, jornadas do franqueado, do tripé e da curadoria.</p></div>
+      <div class="arrow" aria-hidden="true"><svg width="40" height="20" viewBox="0 0 40 20"><path d="M0 10 H32 M24 3 L33 10 L24 17" fill="none" stroke="#2B45C2" stroke-width="2.5"/></svg></div>
+      <div class="card"><span class="mv">Avaliar</span><p>Ativos, dados e lógica de curadoria. A avaliação é focada no que afeta as três prioridades, não em todos os sistemas.</p></div>
+      <div class="arrow" aria-hidden="true"><svg width="40" height="20" viewBox="0 0 40 20"><path d="M0 10 H32 M24 3 L33 10 L24 17" fill="none" stroke="#2B45C2" stroke-width="2.5"/></svg></div>
+      <div class="card"><span class="mv">Desenhar</span><p>Primeiro recorte das três prioridades, arquitetura de referência, decisões de build vs. buy e roadmap.</p></div>
+    </div>
+    <div class="row c2 big">
+      <div class="card"><span class="k">Como eu trabalho</span><ul class="l">
+        <li>Entrevistas curtas com quem opera, inclusive alguns parceiros</li>
+        <li>Leitura dos ativos reais: Notion, planilhas, integrações</li>
+        <li>Sessões de decisão com você nos pontos que mudam o rumo</li>
+        <li>Lado a lado com a equipe de Inteligência &amp; Dados, que conhece o que construiu</li></ul></div>
+      <div class="card"><span class="k">O que o Discovery não é</span><ul class="l">
+        <li>Não é uma auditoria técnica de todos os sistemas</li>
+        <li>Não é especificação pronta para desenvolver</li>
+        <li>Não é programa de transformação digital</li>
+        <li>Não gera relatório para a gaveta: cada etapa termina numa escolha sua</li></ul></div>
+    </div>
+  </div>
+  <div class="stub"><span>Tranquilo · Discovery</span><span>Abordagem</span><span class="pg"></span></div>
+</section></div>
+
+<!-- 10 Entrega e fica para depois -->
+<div class="frame"><section class="slide">
+  <div class="body">
+    <div class="eyebrow">Escopo</div>
+    <h2>O que o Discovery entrega e o que fica para a implementação</h2>
+    <div class="row c2 scope">
+      <div class="card hl" style="gap:12px"><h3>O Discovery entrega</h3><ul class="l">
+        <li><strong>Diagnóstico executivo</strong> do negócio e do estado real dos ativos</li>
+        <li><strong>Parecer sobre a curadoria:</strong> como funciona, o que pode ser exposto e como validar</li>
+        <li><strong>Jornadas prioritárias:</strong> franqueado e tripé, curadoria, agenda e oferta</li>
+        <li><strong>Primeiro recorte da Onda 1</strong> com definição funcional, dependências e build vs. buy</li>
+        <li><strong>Parecer sobre a segunda onda:</strong> vale fazer, quando e com quê</li>
+        <li><strong>Roadmap por ondas</strong> com indicadores, ponto de partida e próximas decisões</li></ul></div>
+      <div class="card" style="gap:12px;background:var(--paper);border-style:dashed"><h3>Fica para uma possível etapa de implementação</h3><p class="note" style="font-size:14px">Contratada à parte, se e quando você decidir.</p><ul class="l">
+        <li>Desenvolvimento, configuração e integração de sistemas</li>
+        <li>Especificação detalhada: telas finais, histórias, integrações técnicas</li>
+        <li>Construção e operação do modelo preditivo</li>
+        <li>Migração e limpeza de bases de dados</li>
+        <li>Produção e revisão do conteúdo dos playbooks</li>
+        <li>Licenças e contratação de ferramentas</li>
+        <li>Parecer jurídico sobre LGPD e contratos</li></ul></div>
+    </div>
+    <p class="note">Premissas, critérios de aceite e a ligação de cada pedido seu com um entregável estão no anexo técnico-estratégico.</p>
+  </div>
+  <div class="stub"><span>Tranquilo · Discovery</span><span>Escopo</span><span class="pg"></span></div>
+</section></div>
+
+<!-- 11 Por que eu -->
+<div class="frame"><section class="slide">
+  <div class="body">
+    <div class="eyebrow">Meu papel</div>
+    <h2>A execução já existe. O que falta é decidir o portfólio com você</h2>
+    <div class="roles">
+      <div class="role"><span class="k">Thales</span><h3>Visão e curadoria</h3><ul class="l"><li>Define a ambição e a identidade</li><li>Decide curadoria e negócio</li><li>Aprova o que é estratégico</li></ul></div>
+      <div class="role me"><span class="k">Liderança de Produto, Tecnologia, IA &amp; Dados</span><h3>Transformar a visão em escolhas</h3><ul class="l"><li>Prioriza o que entra e o que espera</li><li>Desenha os produtos e a arquitetura que conecta tudo</li><li>Decide construir, comprar ou reaproveitar</li><li>Conecta áreas e mede o resultado</li></ul></div>
+      <div class="role"><span class="k">Equipe e parceiros técnicos</span><h3>Construção e operação</h3><ul class="l"><li>Inteligência &amp; Dados constrói dados e automações</li><li>Marketing, comercial e operações usam e validam</li><li>Fornecedores entram quando fizer sentido</li></ul></div>
+    </div>
+    <div class="row c2 big">
+      <div class="card"><span class="k">Trajetória</span><p>Accenture, Banco BV e Involt Holding: produtos e plataformas em fintech, crédito e pagamentos. Hoje, consultoria de Produto em soluções financeiras e liderança de Produto e Tecnologia em produto digital com IA.</p></div>
+      <div class="card"><span class="k">Com franqueza</span><p>Não venho do mercado musical. Venho de transformar operações complexas e dados espalhados em produtos que as pessoas usam, trabalhando perto de quem decide.</p></div>
+    </div>
+  </div>
+  <div class="stub"><span>Tranquilo · Discovery</span><span>Liderança</span><span class="pg"></span></div>
+</section></div>
+
+<!-- 12 Proposta de avanço -->
+<div class="frame"><section class="slide dark">
+  <div class="body" style="justify-content:center;gap:28px">
+    <div class="eyebrow">Proposta de avanço</div>
+    <h2 style="max-width:26ch">Começar pelo Discovery, com o escopo fechado entre nós dois</h2>
+    <div class="steps">
+      <div class="st"><span class="w">Nesta conversa</span><p>Confirmar se as três prioridades e essa ordem refletem o que você quer.</p></div>
+      <div class="st"><span class="w">Em seguida</span><p>Uma conversa só sobre formato: dedicação, acompanhamento e escopo final.</p></div>
+      <div class="st"><span class="w">Para começar</span><p>Acessos de leitura ao Notion, às planilhas e às ferramentas, e a lista de pessoas e parceiros a ouvir.</p></div>
+      <div class="st"><span class="w">Ao final</span><p>Você decide a implementação da Onda 1 com base no material, comigo ou não.</p></div>
+    </div>
+    <div class="ask" style="margin-top:12px">O que eu preciso de você hoje: <strong>concordância com as prioridades</strong> e <strong>um horário para fecharmos o formato</strong>.</div>
+    <p class="note">Se o Discovery cumprir o que propõe, ele pode embasar uma atuação contínua ao seu lado, em formato que definimos juntos.</p>
+  </div>
+  <div class="stub"><span>Marina Collier</span><span>Tranquilo · Discovery</span><span class="pg"></span></div>
+</section></div>
+
+</main>
+<script>
+(function(){
+  function fit(){
+    var w=document.documentElement.clientWidth-32, h=window.innerHeight-32;
+    var s=Math.min(w/1280, Math.max(h,360)/720);
+    if(window.matchMedia('(max-width: 900px)').matches) s=w/1280;
+    document.documentElement.style.setProperty('--s', Math.max(s,0.2).toFixed(4));
+  }
+  fit(); window.addEventListener('resize', fit);
+  window.addEventListener('beforeprint', function(){document.documentElement.style.setProperty('--s','1')});
+  window.addEventListener('afterprint', fit);
+  document.addEventListener('keydown', function(e){
+    var k=e.key; if(['ArrowRight','ArrowDown','PageDown',' ','ArrowLeft','ArrowUp','PageUp'].indexOf(k)<0) return;
+    var fr=[].slice.call(document.querySelectorAll('.frame')); var mid=window.innerHeight/2;
+    var cur=fr.findIndex(function(f){var r=f.getBoundingClientRect();return r.top<=mid&&r.bottom>=mid}); if(cur<0) cur=0;
+    var nx=(k==='ArrowLeft'||k==='ArrowUp'||k==='PageUp')?cur-1:cur+1; nx=Math.max(0,Math.min(fr.length-1,nx));
+    e.preventDefault(); fr[nx].scrollIntoView({behavior:'smooth',block:'center'});
+  });
+})();
+</script>
+</body>
+</html>
