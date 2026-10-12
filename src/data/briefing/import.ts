@@ -240,6 +240,7 @@ export function taskFromBriefing(t: BriefingTask, block: BriefingBlock, ctx: Tas
     order: ctx.order,
     doneCriteria: t.done_criteria?.trim() || undefined,
     tags: optional ? ['optional'] : undefined,
+    optional: optional || undefined,
     source: origin,
   }
   if (status === 'waiting') {
@@ -248,6 +249,8 @@ export function taskFromBriefing(t: BriefingTask, block: BriefingBlock, ctx: Tas
   }
   if (status === 'done') return { ...base, status: 'done', date: block.date, completedAt: `${block.date}T12:00:00.000Z` }
   // Daily briefing: the checklist IS that day. Backlog: dated only when due by the next day; else a deadline.
+  // A deadline already behind the briefing's day stays where it was (overdue since then) — never moved to today.
+  if (daily && due && due < block.date) return { ...base, status: 'todo', date: due, dueDate: due }
   if (daily) return { ...base, status: 'todo', date: block.date, dueDate: due && due > block.date ? due : undefined }
   if (due && due <= addDays(block.date, 1)) return { ...base, status: 'todo', date: due }
   return { ...base, status: 'todo', dueDate: due, bucket: optional ? 'algum_dia' : due || priority === 'alta' ? 'semana' : 'algum_dia' }
@@ -301,7 +304,7 @@ function dayMonth(day: string, month: string, ref: DateKey): DateKey | undefined
 export function windowOf(text: string | undefined, ref: DateKey): BacklogItem['window'] | undefined {
   if (!text) return undefined
   const n = normalize(text)
-  let m = /(\d{1,2})\s*(?:a|ate|-|–)\s*(\d{1,2})\/(\d{1,2})/.exec(n)
+  let m = /(\d{1,2})\s*(?:a|ate|e|-|–)\s*(\d{1,2})\/(\d{1,2})/.exec(n)
   if (m) {
     const from = dayMonth(m[1], m[3], ref)
     const until = dayMonth(m[2], m[3], ref)
@@ -339,12 +342,32 @@ export const slug = (s: string) =>
     .replace(/(^-|-$)/g, '')
 const STOP = new Set(['de', 'do', 'da', 'dos', 'das', 'e', 'com', 'para', 'pra', 'pro', 'os', 'as', 'no', 'na', 'em', 'um', 'uma', 'o', 'a'])
 const words = (s: string) => normalize(s).split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !STOP.has(w))
+/** Infinitive first word = the action ("Regularizar B.O. de pedágio"); the rest is what it acts on. */
+const VERBISH = /(?:ar|er|ir)$/
+const tokensOf = (s: string) => normalize(s).split(/[^a-z0-9]+/).filter(Boolean)
+const objectKey = (s: string) => {
+  const t = tokensOf(s)
+  return (t.length > 1 && VERBISH.test(t[0]) ? t.slice(1) : t).filter((w) => !STOP.has(w)).join('')
+}
+const objectWords = (s: string) => {
+  const w = words(s)
+  return w.length > 1 && VERBISH.test(w[0]) ? w.slice(1) : w
+}
+/**
+ * Stages of ONE obligation: "Abrir" (10/10) → "Verificar" (11/10) → "Regularizar B.O. de pedágio" (12/10).
+ * Deliberately short: "Organizar" ≠ "Confirmar" ≠ "Consolidar" (distinct activities are never merged).
+ */
+const STAGE_VERBS = new Set(['abrir', 'verificar', 'regularizar', 'registrar', 'acompanhar', 'finalizar', 'concluir', 'checar', 'conferir'])
+const stageOf = (s: string) => {
+  const t = tokensOf(s)
+  return t.length > 1 && STAGE_VERBS.has(t[0]) ? objectKey(s) : undefined
+}
 const hasWord = (list: string[], w: string) => list.some((x) => x === w || (x.length >= 5 && w.length >= 5 && (x.startsWith(w) || w.startsWith(x))))
 
 export type BriefingOp =
   | { kind: 'project'; data: Omit<Project, 'createdAt' | 'updatedAt'> }
   | { kind: 'task'; data: Omit<Task, 'createdAt' | 'updatedAt'> }
-  | { kind: 'pull'; id: string; patch: Partial<Task>; title: string }
+  | { kind: 'pull'; id: string; patch: Partial<Task>; title: string; /** 'stage': the same obligation under a new name (filled, not moved). */ why?: 'stage' }
   | { kind: 'backlog'; data: Omit<BacklogItem, 'createdAt' | 'updatedAt'> }
   | { kind: 'seen'; id: string; patch: Partial<BacklogItem>; title: string }
   | { kind: 'category'; data: Omit<FinancialCategory, 'createdAt' | 'updatedAt'> }
@@ -358,7 +381,7 @@ export interface PlanEntry {
   title: string
   /** Quiet second line: front · window · "já estava" … */
   sub?: string
-  how: 'created' | 'linked' | 'kept' | 'ignored'
+  how: 'created' | 'updated' | 'linked' | 'kept' | 'ignored'
   ref?: { collection: 'tasks' | 'backlogItems'; id: string }
 }
 
@@ -420,13 +443,49 @@ export function planBriefing(db: DB, blocks: BriefingBlock[], batchId: string = 
       entries.push({ kind: 'today', title: mine.title, sub: 'já estava no app', how: 'kept', ref: { collection: 'tasks', id: mine.id } })
       return
     }
-    if (imported.has(sourceKey)) {
-      entries.push({ kind: 'today', title: t.title, sub: 'você tirou do app — não volta', how: 'ignored' })
-      return
-    }
+    const gone = () => void entries.push({ kind: 'today', title: t.title, sub: 'você tirou do app — não volta', how: 'ignored' })
     const data = taskFromBriefing(t, block, { africaTripId: africa, order })
     if (planned.some((x) => sameTitle(x.title, data.title))) return
-    const existing = db.tasks.find((x) => x.status !== 'archived' && (sameTitle(x.title, t.title) || sameTitle(x.title, data.title)))
+    const named = db.tasks.filter((x) => sameTitle(x.title, t.title) || sameTitle(x.title, data.title))
+    const existing = named.find((x) => x.status !== 'archived')
+    if (!existing && named.length) return gone() // she cancelled it: never resurrected
+    // The same obligation under a later stage's name (B.O.: abrir → verificar → regularizar): one record.
+    const stage = !existing ? stageOf(t.title) : undefined
+    const sameObligation = stage && stage.length >= 4 ? db.tasks.filter((x) => !x.recurrence && x.context === data.context && stageOf(x.title) === stage) : []
+    const obligation = sameObligation.find((x) => x.status !== 'done' && x.status !== 'archived') ?? sameObligation[0]
+    if (obligation) {
+      sourceKeys.push(sourceKey)
+      if (obligation.status === 'archived') return gone()
+      if (obligation.status === 'done') {
+        entries.push({ kind: 'today', title: obligation.title, sub: `mesma obrigação de “${t.title}” · já feita ✓`, how: 'kept', ref: { collection: 'tasks', id: obligation.id } })
+        return
+      }
+      // Fill only what it does not have (her date, title and edits stay); the new name is kept as an alias.
+      const patch: Partial<Task> = {}
+      if (!obligation.aliases?.some((a) => sameTitle(a, t.title)) && !sameTitle(obligation.title, t.title)) patch.aliases = [...(obligation.aliases ?? []), t.title.trim()]
+      if (!obligation.dueDate && data.dueDate) patch.dueDate = data.dueDate
+      if (!obligation.date && !obligation.dueDate && data.date) patch.date = data.date
+      if (!obligation.doneCriteria && data.doneCriteria) patch.doneCriteria = data.doneCriteria
+      const due = obligation.dueDate ?? patch.dueDate
+      const late = due && due < block.date ? `atrasado desde ${formatDayMonth(due)}` : undefined
+      const changed = Object.keys(patch).length > 0
+      if (changed) ops.push({ kind: 'pull', id: obligation.id, patch, title: obligation.title, why: 'stage' })
+      entries.push({ kind: 'today', title: obligation.title, sub: [`mesma obrigação de “${t.title}”`, late].filter(Boolean).join(' · '), how: changed ? 'updated' : 'kept', ref: { collection: 'tasks', id: obligation.id } })
+      return
+    }
+    // Executive English: a session already planned that day (her study quota, a task or an event) is the same.
+    const quota = /ingles/.test(normalize(`${t.title} ${t.category ?? ''}`)) ? db.tasks.find((x) => x.careerKind === 'ingles_exec' && !x.date && !x.recurrence && x.status !== 'archived' && !x.careerParentId) : undefined
+    if (!existing && quota) {
+      const task = db.tasks.find((x) => x.date === block.date && x.status !== 'archived' && (x.careerParentId === quota.id || (/ingles/.test(normalize(x.title)) && x.id !== quota.id)))
+      const event = db.events.find((e) => e.date === block.date && /ingles|english/.test(normalize(e.title)))
+      const logged = db.occurrences.some((o) => o.parentType === 'task' && o.parentId === quota.id && o.date === block.date)
+      if (task || event || logged) {
+        sourceKeys.push(sourceKey)
+        entries.push({ kind: 'today', title: task?.title ?? event?.title ?? quota.title, sub: logged || task?.status === 'done' ? 'inglês de hoje já feito ✓' : 'já tinha inglês executivo hoje', how: 'linked', ref: task ? { collection: 'tasks', id: task.id } : undefined })
+        return
+      }
+    }
+    if (!existing && imported.has(sourceKey)) return gone()
     if (existing) {
       // The same to-do already exists (her backlog): one record. An open one with no day comes to the
       // briefing's day; one she already placed, finished or edited is left exactly as it is.
@@ -440,7 +499,9 @@ export function planBriefing(db: DB, blocks: BriefingBlock[], batchId: string = 
       return
     }
     const projectId = projectFor(t.project)
-    const full = { ...data, id: uid(), projectId, source: origin(block, sourceKey) }
+    // An English practice counts as a session of her weekly quota (same record the career review counts).
+    const career: Partial<Task> = quota ? { careerKind: 'ingles_exec', careerParentId: quota.id, goalId: quota.goalId, context: 'carreira', area: 'profissional' } : {}
+    const full = { ...data, ...career, id: uid(), projectId, source: origin(block, sourceKey) }
     planned.push(full)
     ops.push({ kind: 'task', data: full })
     entries.push({ kind: data.status === 'waiting' ? 'waiting' : 'today', title: full.title, sub: [frontOf(full, t.project), full.durationMin ? `${full.durationMin} min` : undefined, full.tags?.includes('optional') ? 'opcional' : undefined].filter(Boolean).join(' · ') || undefined, how: 'created', ref: { collection: 'tasks', id: full.id } })
@@ -495,9 +556,19 @@ export function planBriefing(db: DB, blocks: BriefingBlock[], batchId: string = 
             return n ? `Pagamentos do mês (${n})` : undefined
           })()
         : undefined
-    const existing = db.backlogItems.find((b) => b.source.sourceKey === sourceKey) ?? plannedBacklog.find((b) => b.source.sourceKey === sourceKey)
+    const front = (b: Pick<BacklogItem, 'projectId' | 'tripId' | 'context'>) => (projectId ? b.projectId === projectId : tripId ? b.tripId === tripId : b.context === ctx.context)
+    const ow = objectWords(w.title)
+    const subset = (a: string[], b: string[]) => a.length > 0 && a.every((x) => hasWord(b, x))
+    const existing =
+      db.backlogItems.find((b) => b.source.sourceKey === sourceKey) ??
+      plannedBacklog.find((b) => b.source.sourceKey === sourceKey) ??
+      // The same intention named again by a later briefing ("Contas Apple, Google, PJ e LinkedIn" ↔ "Apple, Google, PJ e LinkedIn")
+      db.backlogItems.find((b) => b.kind === kind && kind === 'scheduled' && b.status !== 'dismissed' && front(b) && (subset(ow, objectWords(b.title)) || subset(objectWords(b.title), ow))) ??
+      // Payments are one recurrence, whatever a briefing calls them.
+      (recognized ? db.backlogItems.find((b) => b.kind === 'recurring' && /^Pagamentos do mês/.test(b.recognizedAs ?? '')) : undefined)
     const sub = kind === 'recurring' ? (recognized ? `reconhecida: ${recognized}` : 'não encontrei essa recorrência') : (window?.label ?? 'sem data')
     if (existing) {
+      if (existing.source.sourceKey !== sourceKey) sourceKeys.push(sourceKey)
       // Her state wins: only "seen again" (and a window it didn't have) is updated.
       const patch: Partial<BacklogItem> = { lastSeenBriefing: block.date }
       if (!existing.window && window) patch.window = window
@@ -509,17 +580,11 @@ export function planBriefing(db: DB, blocks: BriefingBlock[], batchId: string = 
       entries.push({ kind: kind === 'recurring' ? 'recurring' : 'future', title: w.title, sub: 'você tirou do app — não volta', how: 'ignored' })
       return
     }
-    // An existing to-do that is the same action (same front, all its words) already carries it.
-    const ww = words(w.title)
+    // An existing to-do about the same thing (same front, everything it acts on) already carries it —
+    // whatever the verb ("Confirmar hospedagem e safari" is her "Resolver hospedagem e safari JNB").
     const equivalent =
-      kind === 'scheduled' && ww.length
-        ? [...db.tasks, ...planned].find(
-            (t) =>
-              t.status !== 'archived' &&
-              !t.recurrence &&
-              (projectId ? t.projectId === projectId : tripId ? t.tripId === tripId : t.context === ctx.context) &&
-              ww.every((x) => hasWord(words(t.title), x)),
-          )
+      kind === 'scheduled' && ow.length
+        ? [...db.tasks, ...planned].find((t) => t.status !== 'archived' && !t.recurrence && front(t) && ow.every((x) => hasWord(objectWords(t.title), x)))
         : undefined
     if (kind === 'recurring' && !recognized) review.push({ title: w.title, reason: 'recorrência que ainda não existe no app — crio quando você me disser valor, dia e frequência' })
     const data: Omit<BacklogItem, 'createdAt' | 'updatedAt'> = {
@@ -544,7 +609,7 @@ export function planBriefing(db: DB, blocks: BriefingBlock[], batchId: string = 
       kind: kind === 'recurring' ? 'recurring' : 'future',
       title: w.title,
       sub: equivalent ? `já é a tarefa “${equivalent.title}”${window ? ` · ${window.label}` : ''}` : sub,
-      how: equivalent ? 'linked' : 'created',
+      how: equivalent || recognized ? 'linked' : 'created',
       ref: { collection: 'backlogItems', id: data.id },
     })
   }
@@ -596,7 +661,8 @@ export function summarize(plan: BriefingPlan) {
     waiting: of('waiting').length,
     recurring: of('recurring').filter((e) => /reconhecida/.test(e.sub ?? '') || e.how === 'kept').length,
     created: tasks.filter((t) => t.data.status !== 'waiting').length,
-    pulled: plan.ops.filter((o) => o.kind === 'pull').length,
+    pulled: plan.ops.filter((o) => o.kind === 'pull' && o.why !== 'stage').length,
+    updated: plan.ops.filter((o) => o.kind === 'pull' && o.why === 'stage').length,
     backlog: plan.ops.filter((o) => o.kind === 'backlog' || o.kind === 'seen').length,
     waitingLinked: of('waiting').filter((e) => e.how !== 'ignored').length,
     projects: plan.ops.filter((o) => o.kind === 'project').length,
@@ -604,4 +670,20 @@ export function summarize(plan: BriefingPlan) {
     kept: plan.kept.length,
     review: plan.review.length,
   }
+}
+
+/** Per item, in her words: criado · atualizado · vinculado · ignorado (já estava / ela tirou) · precisa de revisão. */
+export const HOW_LABEL: Record<PlanEntry['how'], string> = { created: 'criado', updated: 'atualizado', linked: 'vinculado', kept: 'ignorado · já estava', ignored: 'ignorado · você tirou' }
+
+/** "4 criados · 1 atualizado · 6 vinculados · 2 ignorados · 0 precisam de revisão" — counted after reconciliation. */
+export function resultLine(plan: Pick<BriefingPlan, 'entries' | 'review'>): string {
+  const n = (h: PlanEntry['how'][]) => plan.entries.filter((e) => h.includes(e.how)).length
+  const p = (k: number, one: string, many: string) => `${k} ${k === 1 ? one : many}`
+  return [
+    p(n(['created']), 'criado', 'criados'),
+    p(n(['updated']), 'atualizado', 'atualizados'),
+    p(n(['linked']), 'vinculado', 'vinculados'),
+    p(n(['kept', 'ignored']), 'ignorado', 'ignorados'),
+    p(plan.review.length, 'precisa de revisão', 'precisam de revisão'),
+  ].join(' · ')
 }

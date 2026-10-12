@@ -73,3 +73,30 @@ pedágio, multas, hospedagem e safari JNB) e os 28 pagamentos recorrentes já v�
 - A versão nova só recarrega o app depois de salvar no aparelho o que estava pendente.
 - O mesmo endereço do app é obrigatório: os dados ficam guardados por endereço. Se o domínio mudar, use
   Ajustes → Dados → Backup para levar tudo.
+
+## Seu briefing de 12/10
+
+O Daily Briefing de 12/10 vem junto com o app e entra **pelo importador**, igual a um colado por você
+(uma importação no histórico, com Desfazer). Ele roda uma vez por aparelho, só na semana dele, e repetir não
+cria nada. Em Ajustes → Dados → Daily Briefing você também pode colar um JSON: aparece a prévia (novas
+tarefas, existentes que atualiza/vincula, próximos, aguardando, recorrências, revisão) e só grava ao
+confirmar. Na Lumos: “Importa meu Daily Briefing de hoje”.
+
+Como ele se encaixa no que já existe:
+- **B.O. de pedágio**: abrir (10/10), verificar (11/10) e regularizar (12/10) são a mesma obrigação — fica um
+  item só, com os outros nomes guardados; o prazo continua 10/10 e aparece “atrasado desde 10/10”. Se já
+  estiver feito, continua feito.
+- **JNB**: consolidar pendências, organizar hospedagem e confirmar hospedagem/safari são coisas diferentes da
+  mesma viagem — nada é fundido. “Já resolvi a hospedagem de JNB” fecha só a de hospedagem.
+- **Santander / Fashion Finder**: “Preparar pauta” e “Priorizar Fashion Finder” são de hoje; os épicos e
+  agendas (13–16/10) e as pendências de lançamento ficam em Próximos. Nada é copiado.
+- **Vitor / Thales**: os mesmos registros de Aguardando; quem respondeu não volta a esperar.
+- **Inglês**: conta como sessão da sua meta semanal; se já havia inglês no dia, não duplica.
+- **Pagamentos mensais**: reconhecidos nos pagamentos que já existem — nenhum valor inventado.
+
+## Versão nova e itens confirmados
+
+Uma janela antiga do app aberta em segundo plano não grava mais o estado velho por cima do novo ao ser
+escondida ou atualizada (só grava quando ela mesma mudou algo). Se o aparelho falhar ao ler os dados, o app
+não grava o seed por cima. E a migração do seed não recria uma cópia “a confirmar” de um item de viagem que
+você já tem (mesmo nome, mesma viagem).

@@ -4,6 +4,9 @@
  *   "coloca multas do carro hoje"      → same; when it is already a task, that task moves
  *   "B.O. feito" · "multas do carro feito" → the to-do (or the backlog item) is done
  *   "JNB fica pra segunda"             → the to-do of the day moves (same as "passa … pra segunda")
+ *   "já revisei o LinkedIn"            → the to-do whose ACTION she named (not "Criar página no LinkedIn")
+ *   "já resolvi a hospedagem de JNB"   → the to-do about exactly that (not "hospedagem e safari")
+ *   "o B.O. ainda está pendente"       → nothing changes; she hears where it stands (atrasado desde 10/10)
  */
 import { isTaskOpen } from '@/data/selectors'
 import { promoteBacklog } from '@/data/briefing/backlog'
@@ -77,8 +80,10 @@ function put(input: HandlerInput): LumosReply | undefined {
   return { area: AREA, text: a.done, sub: hits[0].window ? `No briefing: ${hits[0].window.label}` : undefined, ref: { type: 'backlogItem', id: hits[0].id }, action: { mode: 'direct', run: a.run } }
 }
 
+const namesOf = (t: Task) => [t.title, ...(t.aliases ?? [])]
+
 function openTasksFor(db: DB, phrase: string, today: DateKey): Task[] {
-  const hits = db.tasks.filter((t) => isTaskOpen(t) && t.status !== 'waiting' && !t.recurrence && phraseHits(t.title, phrase))
+  const hits = db.tasks.filter((t) => isTaskOpen(t) && t.status !== 'waiting' && !t.recurrence && namesOf(t).some((x) => phraseHits(x, phrase)))
   const ofDay = hits.filter((t) => t.date && t.date <= today)
   return ofDay.length ? ofDay : hits
 }
@@ -122,9 +127,64 @@ function stays(input: HandlerInput): LumosReply | undefined {
   return { area: AREA, text: a.done, sub: tasks[0].date === now.date ? 'Saiu de hoje.' : undefined, ref: { type: 'task', id: tasks[0].id }, action: { mode: 'direct', run: a.run } }
 }
 
+// ─── "já revisei o LinkedIn" · "já resolvi a hospedagem de JNB" ───────────────
+
+const DID = /^(?:eu\s+)?ja\s+([a-z]{2,}?)(?:ei|i|ou)\s+(?:o\s+|a\s+|os\s+|as\s+)?(.+)$/
+/** Verbs that only say "it's done" — they name no particular action. */
+const GENERIC_DONE = /^(?:resolv|termin|conclu|finaliz|fech|acab|fiz|faz|cumpr)/
+const stemOf = (v: string) => v.replace(/gu$/, 'g').replace(/qu$/, 'c')
+const firstWord = (s: string) => tokens(s)[0] ?? ''
+const VERBISH = /(?:ar|er|ir)$/
+/** What a title acts on, without its verb ("Organizar hospedagem JNB" → hospedagem, jnb). */
+const objectOf = (s: string) => {
+  const w = keyWords(s)
+  return w.length > 1 && VERBISH.test(w[0]) ? w.slice(1) : w
+}
+const covered = (words: string[], said: string[]) => words.every((w) => said.some((x) => x === w || (x.length >= 4 && w.length >= 4 && (x.startsWith(w) || w.startsWith(x)))))
+
+function did(input: HandlerInput): LumosReply | undefined {
+  const { db, n, now } = input
+  const m = DID.exec(n)
+  if (!m) return undefined
+  const stem = stemOf(m[1])
+  if (stem.length < 3 || lex(db, m[2], now.date).mods.length) return undefined
+  const all = openTasksFor(db, m[2], now.date)
+  if (!all.length) return undefined
+  // The action she named wins ("revisei" → "Revisar…"); a generic "resolvi" names none.
+  const generic = GENERIC_DONE.test(stem)
+  const byVerb = generic ? all : all.filter((t) => namesOf(t).some((x) => firstWord(x).startsWith(stem)))
+  if (!generic && !byVerb.length) return undefined
+  // Then the to-do about exactly what she said: "a hospedagem de JNB" is not "hospedagem e safari JNB".
+  const said = keyWords(m[2])
+  const exact = byVerb.filter((t) => namesOf(t).some((x) => covered(objectOf(x), said)))
+  const hits = exact.length ? exact : byVerb
+  const finish = (t: Task) => ({ done: `“${t.title}” feito ✓`, run: () => runLogged(() => updateUndoable('tasks', t.id, { status: 'done', completedAt: nowISO() } as Partial<Task>), [eventDraft(now, { kind: 'done', title: `Feito: ${t.title}`, area: 'rotina', ref: { type: 'task', id: t.id } })]) })
+  if (hits.length > 1) return { area: AREA, text: 'Qual delas?', options: hits.slice(0, 5).map((t) => ({ label: t.title, act: finish(t) })) }
+  const t = hits[0]
+  const still = all.filter((x) => x.id !== t.id)
+  const a = finish(t)
+  return { area: 'feito', text: a.done, sub: still.length ? `Segue aberta: ${still.map((x) => `“${x.title}”`).join(', ')}.` : undefined, ref: { type: 'task', id: t.id }, action: { mode: 'direct', run: a.run } }
+}
+
+// ─── "o B.O. ainda está pendente" → nothing changes, just where it stands ─────
+
+const PENDING = /^(?:o\s+|a\s+)?(.+?)\s+(?:ainda\s+)?(?:esta|ta|segue|continua)\s+(?:pendente|em aberto|aberto|aberta)$/
+
+function pending(input: HandlerInput): LumosReply | undefined {
+  const { db, n, now } = input
+  const m = PENDING.exec(n)
+  if (!m) return undefined
+  const tasks = openTasksFor(db, m[1], now.date)
+  if (tasks.length !== 1) return undefined
+  const t = tasks[0]
+  const due = t.dueDate ?? t.date
+  const where = due && due < now.date ? `atrasado desde ${formatDayMonth(due)}` : due === now.date ? 'é pra hoje' : due ? `pra ${dayLabel(due, now.date)}` : 'sem dia'
+  return { area: AREA, text: `Combinado: “${t.title}” segue pendente — ${where}.`, sub: 'Não mudei nada: fica no seu dia até você marcar feito.', ref: { type: 'task', id: t.id }, provenance: 'fact' }
+}
+
 export const backlogHandler: Handler = {
   id: 'backlog',
   run(input) {
-    return put(input) ?? stays(input) ?? done(input)
+    return put(input) ?? stays(input) ?? done(input) ?? did(input) ?? pending(input)
   },
 }

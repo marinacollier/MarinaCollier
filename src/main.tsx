@@ -2,7 +2,8 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { registerSW } from 'virtual:pwa-register'
 import App from './App'
-import { flushNow, hydrate } from '@/data/store'
+import { flushNow } from '@/data/store'
+import { bootWithBriefings } from '@/data/briefing/bundled'
 import { initAuth } from '@/integrations/auth'
 import './index.css'
 
@@ -28,5 +29,6 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 )
 
-void hydrate()
+// Load the device, migrate, then run the bundled Daily Briefings through the importer (once each).
+void bootWithBriefings()
 void initAuth()

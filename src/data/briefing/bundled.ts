@@ -1,0 +1,43 @@
+/**
+ * Daily Briefings that ship with the app (her real ones, sent outside the app) reach the device THROUGH
+ * the importer — planBriefing → applyPlan, one ImportBatch — never as seed records. So the same rules
+ * apply to her persisted data: done stays done, moved stays moved, nothing is duplicated.
+ *
+ * - runs at boot, after the stored DB is loaded and migrated (bootWithBriefings, used by main.tsx);
+ * - each bundled briefing runs once per install (profile.briefingsApplied), and only during its own week
+ *   (a briefing from weeks ago is not news); re-running is a no-op anyway (sourceKeys);
+ * - "Desfazer importação" is respected: the date stays recorded, so it is never re-applied.
+ */
+import { actions, getDB, hydrate, persist } from '../store'
+import type { StorageAdapter } from '../storage'
+import type { DateKey } from '../types'
+import { addDays, todayKey } from '@/lib/date'
+import { BRIEFING_2026_10_12 } from '../seed/briefing-1012'
+import { applyPlan } from './apply'
+import { planBriefing, type BriefingBlock } from './import'
+
+export const BUNDLED_BRIEFINGS: BriefingBlock[] = [BRIEFING_2026_10_12]
+
+/** The bundled briefing of that day (what "Importa meu Daily Briefing de hoje" uses without a pasted JSON). */
+export const bundledBriefingFor = (date: DateKey): BriefingBlock | undefined => BUNDLED_BRIEFINGS.find((b) => b.date === date)
+
+/** Applies the bundled briefings this install has not received yet. Returns the dates applied now. */
+export function applyBundledBriefings(today: DateKey = todayKey()): DateKey[] {
+  const done: DateKey[] = []
+  for (const block of BUNDLED_BRIEFINGS) {
+    const db = getDB()
+    if (db.profile.briefingsApplied?.includes(block.date)) continue
+    if (today < block.date || today > addDays(block.date, 6)) continue
+    const plan = planBriefing(db, [block])
+    if (plan?.ops.length) applyPlan(plan)
+    actions.setProfile({ briefingsApplied: [...(getDB().profile.briefingsApplied ?? []), block.date] })
+    done.push(block.date)
+  }
+  return done
+}
+
+/** Boot: load + migrate the device's DB, then run the bundled briefings through the importer and save. */
+export async function bootWithBriefings(storage?: StorageAdapter, today: DateKey = todayKey()): Promise<void> {
+  await hydrate(storage)
+  if (applyBundledBriefings(today).length) await persist()
+}

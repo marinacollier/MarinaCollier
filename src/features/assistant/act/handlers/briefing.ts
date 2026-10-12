@@ -7,7 +7,9 @@
  * Also: "o que veio do briefing hoje?" — today's to-dos, what's next and Waiting For, kept apart.
  */
 import { applyPlan, undoBatch } from '@/data/briefing/apply'
-import { planBriefing, readBriefing, summarize, type PlanEntry, type PlanKind } from '@/data/briefing/import'
+import { bundledBriefingFor } from '@/data/briefing/bundled'
+import { weekPriorities } from './week-priorities'
+import { planBriefing, readBriefing, resultLine, summarize, type BriefingBlock, type PlanEntry, type PlanKind } from '@/data/briefing/import'
 import type { DB, ImportBatch } from '@/data/types'
 import { formatDayMonth } from '@/lib/date'
 import { eventDraft, runLogged } from '../log'
@@ -18,17 +20,34 @@ const MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', '
 const dayLabel = (d: string) => `${Number(d.slice(8))} ${MONTHS[Number(d.slice(5, 7)) - 1]}`
 const EMOJI: Record<PlanKind, string> = { today: '☐', future: '→', waiting: '⏳', recurring: '🔁' }
 const TITLES: Record<PlanKind, string> = { today: 'Hoje', future: 'Próximos', waiting: 'Waiting For', recurring: 'Recorrências' }
+/** Existing records the import touches say so first (new ones are marked isNew). */
+const VERB: Partial<Record<PlanEntry['how'], string>> = { updated: 'atualiza', linked: 'vincula' }
+const subOf = (e: PlanEntry) => (VERB[e.how] ? [VERB[e.how], e.sub].filter(Boolean).join(' — ') : e.sub)
 
 function sectionsOf(entries: PlanEntry[]): ReplySection[] {
   return (['today', 'future', 'waiting', 'recurring'] as PlanKind[])
-    .map((k) => ({ title: TITLES[k], lines: entries.filter((e) => e.kind === k).map((e): ReplyLine => ({ text: e.title, emoji: EMOJI[k], sub: e.sub, isNew: e.how === 'created' })) }))
+    .map((k) => ({ title: TITLES[k], lines: entries.filter((e) => e.kind === k).map((e): ReplyLine => ({ text: e.title, emoji: EMOJI[k], sub: subOf(e), isNew: e.how === 'created' })) }))
     .filter((s) => s.lines.length)
 }
 
 function briefing(input: HandlerInput): LumosReply | undefined {
-  const { db, text, now } = input
-  const { blocks, narrative } = readBriefing(text)
+  const { blocks, narrative } = readBriefing(input.text)
   if (!blocks.length) return undefined
+  return preview(input, blocks, narrative)
+}
+
+// "Importa meu Daily Briefing de hoje" without a pasted JSON → the briefing of today that came with the app.
+const IMPORT_TODAY = /\b(?:importa|importe|importar|traz|traga|puxa|carrega|sobe)\b.*\bbriefing\b/
+
+function importToday(input: HandlerInput): LumosReply | undefined {
+  if (!IMPORT_TODAY.test(input.n)) return undefined
+  const block = bundledBriefingFor(input.now.date)
+  if (!block) return { area: 'briefing', text: `Ainda não tenho o briefing de ${dayLabel(input.now.date)} aqui.`, sub: 'Cola o Daily Executive Briefing (com o bloco JSON) que eu organizo.' }
+  return preview(input, [block], '')
+}
+
+function preview(input: HandlerInput, blocks: BriefingBlock[], narrative: string): LumosReply {
+  const { db, now } = input
   const plan = planBriefing(db, blocks)!
   const s = summarize(plan)
   const head = [
@@ -41,11 +60,12 @@ function briefing(input: HandlerInput): LumosReply | undefined {
   const review = plan.review.length ? `${plural(plan.review.length, 'item precisa', 'itens precisam')} de revisão` : undefined
   const sections = [...sectionsOf(plan.entries), ...(plan.review.length ? [{ title: 'Precisa de revisão', lines: plan.review.map((r) => ({ text: r.title, emoji: '⚠️', sub: r.reason })) }] : [])]
   if (!plan.ops.length) {
-    return { area: 'briefing', text: `Daily Briefing · ${dayLabel(plan.date)}: tudo isso já está no app ✓`, sub: [s.kept ? 'Nada duplicado — o que você marcou ou mudou ficou como estava.' : undefined, review].filter(Boolean).join('\n') || undefined, sections, provenance: 'user' }
+    return { area: 'briefing', text: `Daily Briefing · ${dayLabel(plan.date)}: tudo isso já está no app ✓`, sub: [s.kept ? 'Nada duplicado — o que você marcou ou mudou ficou como estava.' : undefined, review, resultLine(plan)].filter(Boolean).join('\n') || undefined, sections, provenance: 'user' }
   }
   const result = [
     s.created ? plural(s.created, 'tarefa adicionada', 'tarefas adicionadas') : undefined,
     s.pulled ? plural(s.pulled, 'tarefa do backlog veio pra hoje', 'tarefas do backlog vieram pra hoje') : undefined,
+    s.updated ? plural(s.updated, 'tarefa existente atualizada', 'tarefas existentes atualizadas') : undefined,
     s.backlog ? plural(s.backlog, 'item no backlog', 'itens no backlog') : undefined,
     s.waitingLinked ? plural(s.waitingLinked, 'Waiting For vinculado', 'Waiting For vinculados') : undefined,
     s.recurring ? plural(s.recurring, 'recorrência reconhecida', 'recorrências reconhecidas') : undefined,
@@ -55,7 +75,7 @@ function briefing(input: HandlerInput): LumosReply | undefined {
   return {
     area: 'briefing',
     text: `Daily Briefing · ${dayLabel(plan.date)}`,
-    sub: [head.join(' · '), review].filter(Boolean).join('\n'),
+    sub: [head.join(' · '), review, `Resultado: ${resultLine(plan)}`].filter(Boolean).join('\n'),
     sections,
     provenance: 'user',
     action: {
@@ -121,6 +141,6 @@ function whatCame(input: HandlerInput): LumosReply | undefined {
 export const briefingHandler: Handler = {
   id: 'briefing',
   run(input) {
-    return briefing(input) ?? whatCame(input)
+    return briefing(input) ?? importToday(input) ?? weekPriorities(input) ?? whatCame(input)
   },
 }

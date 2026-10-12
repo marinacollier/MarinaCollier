@@ -10,7 +10,7 @@
 import { dayTimeline, isoToHM } from '../timeline'
 import { carriedOverTasks, isCareerQuota, prioritiesFor, tasksForDay } from '../selectors'
 import type { DateKey, DB, DayPriority, Project, Task, TimeHM, TimelineEntry, UgcChannel } from '../types'
-import { addDays, hmToMinutes } from '@/lib/date'
+import { addDays, formatDayMonth, hmToMinutes } from '@/lib/date'
 import { billPeriod, billsDueOn } from '../finance/bills'
 import { actionTitle, ugcDayActions } from '../ugc/model'
 import { homeSpiritualSessions } from '../spiritual/model'
@@ -196,7 +196,8 @@ function taskItem(db: DB, t: Task, date: DateKey, carried = false): ActionItem {
     refId: t.id,
     date,
     title: t.title,
-    sub: carried && t.date ? 'ficou de antes' : t.dueDate === date && t.date !== date ? 'prazo hoje' : undefined,
+    // A missed deadline is said as such ("atrasado desde 10/10") — never silently moved to today.
+    sub: carried && t.dueDate && t.dueDate < date ? `atrasado desde ${formatDayMonth(t.dueDate)}` : carried && t.date ? 'ficou de antes' : t.dueDate === date && t.date !== date ? 'prazo hoje' : undefined,
     front: taskFront(db, t),
     status: done ? 'done' : 'pending',
     check: 'toggle',
