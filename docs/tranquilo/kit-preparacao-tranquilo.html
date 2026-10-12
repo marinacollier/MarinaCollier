@@ -1,0 +1,217 @@
+<title>Tranquilo — Kit da Reunião</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: caderno de preparação em coluna única, leitura linear; roteiro em blocos cronometrados. */
+:root{
+  --bg:#F2F3EF; --surface:#FFFFFF; --ink:#18201E; --muted:#56605C; --line:#D5D9D2;
+  --accent:#2C47C4; --accent-soft:#E3E8FB; --moss:#4E6B2E;
+  --ok:#2F7A45; --ok-bg:#E2F1E6; --warn:#94620B; --warn-bg:#F7EDD6; --gap:#A3342B; --gap-bg:#F7E3E0;
+  --f-display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121715; --surface:#1A211F; --ink:#E7ECE8; --muted:#A3ADA8; --line:#2E3834;
+  --accent:#8EA2FF; --accent-soft:#232C52; --moss:#A9C67F;
+  --ok:#7FD39A; --ok-bg:#1C3324; --warn:#E8BE6A; --warn-bg:#382B12; --gap:#F09A90; --gap-bg:#3D1F1C; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121715; --surface:#1A211F; --ink:#E7ECE8; --muted:#A3ADA8; --line:#2E3834;
+  --accent:#8EA2FF; --accent-soft:#232C52; --moss:#A9C67F;
+  --ok:#7FD39A; --ok-bg:#1C3324; --warn:#E8BE6A; --warn-bg:#382B12; --gap:#F09A90; --gap-bg:#3D1F1C; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.6;margin:0}
+.wrap{max-width:860px;margin:0 auto;padding-inline:20px;padding-block:48px 64px;display:grid;gap:8px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.15}
+h1{font-size:clamp(2rem,5vw,3rem);font-weight:800;letter-spacing:-.02em}
+h2{font-size:1.6rem;font-weight:700}
+h3{font-size:1.08rem;font-weight:700}
+p{margin:0;max-width:68ch}
+section{padding-block:36px;border-top:1px solid var(--line);display:grid;gap:16px}
+.eyebrow{font-family:var(--f-mono);font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+.muted{color:var(--muted)}.small{font-size:.9rem}
+.note{background:var(--warn-bg);color:var(--ink);border-radius:6px;padding:14px 16px}
+.note strong{color:var(--warn)}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.grid>*{min-width:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px;display:grid;gap:8px;align-content:start}
+ul,ol{margin:0;padding-left:20px;display:grid;gap:6px}
+li{max-width:66ch}
+.tag{font-family:var(--f-mono);font-size:11px;padding:2px 6px;border-radius:3px;white-space:nowrap}
+.t-f{background:var(--ok-bg);color:var(--ok)}.t-h{background:var(--accent-soft);color:var(--accent)}.t-r{background:var(--gap-bg);color:var(--gap)}
+.beat{display:grid;grid-template-columns:92px 1fr;gap:14px;padding-block:14px;border-top:1px dashed var(--line)}
+.beat:first-of-type{border-top:0}
+.beat .t{font-family:var(--f-mono);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;padding-top:3px}
+.beat .t b{display:block;color:var(--accent);font-weight:500}
+.beat p{font-size:1.02rem}
+.beat p+p{margin-top:10px}
+@media (max-width:560px){.beat{grid-template-columns:1fr;gap:4px}}
+.qa{display:grid;gap:6px;padding-block:14px;border-top:1px dashed var(--line)}
+.qa:first-of-type{border-top:0}
+.qa .q{font-family:var(--f-display);font-weight:700;font-size:1.05rem}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:640px;font-size:.88rem;line-height:1.45}
+th,td{text-align:left;vertical-align:top;padding:9px 11px;border-bottom:1px solid var(--line)}
+th{font-family:var(--f-mono);font-size:11.5px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:var(--bg)}
+tr:last-child td{border-bottom:0}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+</style>
+
+<div class="wrap">
+<header style="display:grid;gap:12px">
+  <div class="eyebrow">Uso interno · não enviar ao Thales</div>
+  <h1>Kit da reunião com o Thales</h1>
+  <p class="muted">Diagnóstico com fatos separados de hipóteses, roteiro de fala, perguntas de fechamento, objeções e a revisão crítica aplicada à proposta.</p>
+  <div class="note small"><strong>Limitações das fontes.</strong> Esta versão usa o briefing de Inteligência &amp; Dados e as prioridades do Thales descritas no seu prompt. Não recebi o resumo da reunião, as mensagens e transcrições de áudio, os exemplos de melhorias do site nem as referências de jornadas: se existirem, vale enviá-los para uma segunda versão. O site tranquilomusica.com.br (incluindo /descubra e a página de artista) não abriu a partir do meu ambiente, por isso não usei a identidade visual dele nem afirmo tê-lo analisado. Os links do Notion e do Drive citados no briefing também não foram abertos.</div>
+</header>
+
+<!-- A -->
+<section id="diagnostico">
+  <div class="eyebrow">Entrega A · Diagnóstico executivo</div>
+  <h2>Leitura crítica do negócio</h2>
+  <p class="small"><span class="tag t-f">fato</span> está documentado no briefing ou foi dito pelo fundador · <span class="tag t-h">hipótese</span> é leitura nossa, a validar · <span class="tag t-r">risco</span> pede atenção</p>
+  <div class="grid">
+    <div class="card"><h3>Pontos fortes</h3><ul class="small">
+      <li><span class="tag t-f">fato</span> Método, curadoria e marca já existem e são o que o Thales quer entregar à rede</li>
+      <li><span class="tag t-f">fato</span> A área de Inteligência &amp; Dados pensa como produto interno: mede adoção por CES e tem não-escopo explícito</li>
+      <li><span class="tag t-f">fato</span> Primeiras capacidades sistematizadas: Ingresse, frequência de compra, Mailchimp–Notion, UTMs, automações Meta, Chartmetric em MVP</li>
+      <li><span class="tag t-f">fato</span> Uso de IA já incorporado ao marketing (copies, grades, roteiros) e automação de cards com ganho registrado</li>
+      <li><span class="tag t-h">hipótese</span> Time enxuto e rápido é vantagem para testar e ajustar</li></ul></div>
+    <div class="card"><h3>Ativos estratégicos</h3><ul class="small">
+      <li><span class="tag t-f">fato</span> Lógica proprietária de curadoria que corrige distorções do streaming</li>
+      <li><span class="tag t-f">fato</span> Base de público com histórico de compra (ex.: em BH, 76 pessoas com 6+ compras e 153 com 3+ em dois anos)</li>
+      <li><span class="tag t-f">fato</span> Conhecimento operacional registrado no Notion</li>
+      <li><span class="tag t-h">hipótese</span> Artistas como canal de aquisição (leitura de ~70% via artistas, com atribuição ainda não confiável)</li>
+      <li><span class="tag t-h">hipótese</span> Relação com artistas e acesso a negociações como barreira de entrada</li></ul></div>
+    <div class="card"><h3>Gargalos</h3><ul class="small">
+      <li><span class="tag t-f">fato</span> Importação de bilheteria manual, sem API da Ingresse</li>
+      <li><span class="tag t-f">fato</span> Histórico de compradores incompleto e parte fora do Notion</li>
+      <li><span class="tag t-f">fato</span> Financeiro com divergências entre planilhas e DREs, custos não reconciliados</li>
+      <li><span class="tag t-f">fato</span> Esforço de uso de produtos internos entre 3,5 e 7 na retrospectiva de agosto</li>
+      <li><span class="tag t-h">hipótese</span> Decisões de curadoria e de oferta passam pelo Thales: com 50+ eventos isso vira gargalo</li>
+      <li><span class="tag t-h">hipótese</span> Não há agenda estruturada de datas entre parceiros e centro</li></ul></div>
+    <div class="card"><h3>Riscos</h3><ul class="small">
+      <li><span class="tag t-r">risco</span> Expor ao franqueado uma estimativa não validada como se fosse previsão</li>
+      <li><span class="tag t-r">risco</span> Multiplicar ferramentas de mensageria sobrepostas (Meta, ManyChat, NextTags)</li>
+      <li><span class="tag t-r">risco</span> Escalar disparos com base duplicada e consentimento incerto</li>
+      <li><span class="tag t-r">risco</span> Custo de API do Chartmetric crescer com o catálogo</li>
+      <li><span class="tag t-r">risco</span> Conhecimento técnico concentrado em poucas pessoas</li>
+      <li><span class="tag t-r">risco</span> Expandir antes de a margem por evento estar clara</li></ul></div>
+    <div class="card"><h3>Oportunidades</h3><ul class="small">
+      <li><span class="tag t-h">hipótese</span> Registrar previsões antes de cada evento: custo baixo, cria a base de validação</li>
+      <li><span class="tag t-h">hipótese</span> Padronizar UTMs por artista, cidade e evento para medir o canal “artista”</li>
+      <li><span class="tag t-h">hipótese</span> Usar o Notion como fonte de autoria e entregar o conteúdo ao parceiro por outra camada</li>
+      <li><span class="tag t-h">hipótese</span> Uma agenda de eventos confiável serve ao mesmo tempo o Partner OS, o atendimento e o site</li>
+      <li><span class="tag t-h">hipótese</span> Prestação de contas do parceiro padronizada como entrada do fechamento financeiro</li></ul></div>
+    <div class="card"><h3>Hipóteses de vantagem competitiva</h3><ul class="small">
+      <li><span class="tag t-h">hipótese</span> Ciclo de aprendizado em rede: cada evento melhora a previsão de todas as praças</li>
+      <li><span class="tag t-h">hipótese</span> O método vira produto: parceiro compra uma forma de operar, não só uma marca</li>
+      <li><span class="tag t-h">hipótese</span> Curadoria com demanda local medida é difícil de copiar sem o histórico</li></ul></div>
+  </div>
+  <div class="card"><h3>Decisões que o fundador precisa tomar</h3><ol class="small">
+    <li>O que da curadoria o franqueado vê e o que fica exclusivo da equipe interna</li>
+    <li>Qual margem de erro é aceitável para usar a estimativa numa contratação</li>
+    <li>Quais aprovações comerciais continuam humanas, e com quem</li>
+    <li>Qual papel o Notion deve ter: fonte de autoria, sistema operacional ou ambos</li>
+    <li>Até onde construir sob medida e onde aceitar ferramenta pronta</li>
+    <li>Quem é dono dos dados de público gerados nas praças e como fica o consentimento</li>
+    <li>Qual o ritmo de investimento compatível com a situação financeira e com cada estágio (50, 100, 400)</li>
+    <li>Como garantir continuidade técnica se houver mudança na equipe</li></ol></div>
+</section>
+
+<!-- F -->
+<section id="roteiro">
+  <div class="eyebrow">Entrega F · Roteiro de apresentação</div>
+  <h2>Fala de 6 a 7 minutos</h2>
+  <p class="muted small">Tom de conversa. Os tempos são aproximados; o texto é guia, não leitura.</p>
+  <div>
+    <div class="beat"><div class="t"><b>Abertura</b>0:00–0:45</div><div><p>Thales, antes de mostrar qualquer coisa, quero dizer como eu li o momento do Tranquilo. Vocês estão deixando de ser uma produtora que faz eventos e passando a ser uma rede que entrega inteligência para parceiros locais executarem. Isso muda o que a empresa vende. O produto deixa de ser só o evento e passa a ser a curadoria, o método e a capacidade de prever demanda.</p></div></div>
+    <div class="beat"><div class="t"><b>O que já existe</b>0:45–1:45</div><div><p>E tem muita coisa construída. A importação da Ingresse, a leitura de frequência de compra, a integração com Mailchimp, a ferramenta de UTM, as automações no Instagram, o começo do Chartmetric, a Central de Artistas. O trabalho de Inteligência &amp; Dados tirou várias coisas do artesanal no último ano.</p><p>Minha leitura é que o gargalo mudou. Não falta ferramenta. Falta fazer essas peças conversarem, ganharem qualidade e chegarem na mão de quem precisa decidir, que daqui para frente é cada vez mais o parceiro.</p></div></div>
+    <div class="beat"><div class="t"><b>O que ouvi</b>1:45–3:00</div><div><p>Do que você me falou, eu tirei três prioridades, nesta ordem. Primeiro, transformar a curadoria em produto: chegar em “artista X em BH, tantas pessoas; em Recife, tantas”, com a sua lógica corrigindo as distorções do streaming. Segundo, uma central onde o franqueado acessa o método inteiro e consegue executar sozinho, inclusive o tripé de liderança local, anfitrião e social media. Terceiro, a agenda: o parceiro diz quando pode, vocês identificam a oportunidade, ele recebe no WhatsApp e manifesta interesse sem dez mensagens no meio.</p><p>Depois vêm as automações: atendimento, base de contatos, contratos e fechamento financeiro. Elas estão na proposta, mas não vou deixar competirem com as três primeiras.</p></div></div>
+    <div class="beat"><div class="t"><b>A tese</b>3:00–4:00</div><div><p>O que eu vejo é que essas três prioridades são um fluxo só. A curadoria gera a oportunidade, a agenda leva até o parceiro, a central prepara o parceiro para executar, e o resultado do evento volta para melhorar a próxima previsão. Se isso funcionar, cada evento novo deixa a rede inteira mais inteligente. Essa é a vantagem que eu acho que vale construir.</p></div></div>
+    <div class="beat"><div class="t"><b>Por que Discovery</b>4:00–5:15</div><div><p>Agora, a parte honesta. Antes de construir, tem coisas que a gente precisa saber. A lógica de curadoria já foi comparada com público real? Qual erro é aceitável para decidir uma contratação? O Notion aguenta permissões por parceiro? O fechamento financeiro é simples mesmo, ou o difícil está em reconciliar fontes?</p><p>Se a gente construir o portal sem responder isso, o risco é gastar duas vezes. O Discovery é para responder essas perguntas e sair com um MVP definido, uma arquitetura que aproveita o que já existe e um roadmap por ondas. Nada é implementado nessa fase; é ela que prepara a implementação para dar certo.</p></div></div>
+    <div class="beat"><div class="t"><b>Meu papel</b>5:15–6:15</div><div><p>Por que eu? Eu não venho como desenvolvedora nem como alguém que vende sistema. Meu trabalho é pegar a sua visão e transformar em escolha de produto: o que construir, o que comprar, o que adiar, e como as peças se conectam. Fiz isso em ambientes bem complexos, em banco, crédito e pagamentos, e faço hoje num produto de IA para moda. Não conheço o mercado musical como você. O que eu sei fazer é organizar operação complexa e dados espalhados em produto que as pessoas usam.</p></div></div>
+    <div class="beat"><div class="t"><b>Fechamento</b>6:15–7:00</div><div><p>Para avançar, eu queria sair daqui com três coisas: se essa ordem de prioridades faz sentido para você, quem eu preciso ouvir na equipe e entre os parceiros, e como você prefere que a gente desenhe o formato do trabalho. Se o Discovery entregar o que promete, ele vira a base para eu seguir ao seu lado nessa evolução.</p></div></div>
+  </div>
+</section>
+
+<!-- G -->
+<section id="perguntas">
+  <div class="eyebrow">Entrega G · Perguntas para fechamento</div>
+  <h2>Perguntas que levam a decisão</h2>
+  <div class="grid">
+    <div class="card"><h3>Prioridades</h3><ul class="small">
+      <li>Se só uma das três frentes avançasse nos próximos meses, qual mudaria mais o negócio?</li>
+      <li>A segunda onda pode esperar a Onda 1, ou alguma automação tem urgência financeira hoje?</li>
+      <li>O fechamento financeiro hoje toma quanto tempo de quem, por evento?</li></ul></div>
+    <div class="card"><h3>Expectativas</h3><ul class="small">
+      <li>Ao final do Discovery, o que precisa estar na sua mão para você decidir investir?</li>
+      <li>Você quer que a previsão chegue ao franqueado já na primeira versão, ou primeiro só para o time interno?</li>
+      <li>O que faria você considerar o Discovery um fracasso?</li></ul></div>
+    <div class="card"><h3>Pessoas e entrevistas</h3><ul class="small">
+      <li>Quem, além de você, decide sobre curadoria e oferta de artistas?</li>
+      <li>Podemos fazer a auditoria do modelo junto com quem cuida de Inteligência &amp; Dados?</li>
+      <li>Quais dois ou três parceiros representam bem a rede atual, um mais maduro e um mais novo?</li></ul></div>
+    <div class="card"><h3>Acesso a informação</h3><ul class="small">
+      <li>Consigo acesso de leitura ao Notion, às planilhas financeiras e às ferramentas de marketing?</li>
+      <li>Existem previsões de público feitas antes de eventos passados, mesmo informais?</li>
+      <li>Qual é o contrato atual com o Chartmetric e o limite de uso?</li></ul></div>
+    <div class="card"><h3>Escopo definitivo</h3><ul class="small">
+      <li>Algum item da matriz de aderência você tiraria ou incluiria?</li>
+      <li>Quer que a segunda onda seja só avaliada ou também especificada?</li>
+      <li>A tese de oferecer a curadoria a terceiros entra no Discovery ou fica fora por enquanto?</li></ul></div>
+    <div class="card"><h3>Critérios para contratar</h3><ul class="small">
+      <li>O que precisa estar definido no formato para você seguir: dedicação, acompanhamento, entregáveis?</li>
+      <li>Quem mais participa da decisão de contratação?</li>
+      <li>Podemos marcar a conversa sobre formato e começar pela lista de acessos?</li></ul></div>
+  </div>
+</section>
+
+<!-- H -->
+<section id="objecoes">
+  <div class="eyebrow">Entrega H · Objeções e respostas</div>
+  <h2>O que o Thales pode perguntar</h2>
+  <div>
+    <div class="qa"><div class="q">“A gente já tem alguém fazendo tecnologia.”</div><p>E está fazendo bem: boa parte do que existe hoje veio desse trabalho. O que proponho é complementar. A frente atual constrói e mantém produtos de dados; o que falta é decidir o portfólio inteiro, conectar curadoria, central do franqueado e agenda, e fazer escolhas de arquitetura e build vs. buy olhando para 50, 100, 400 eventos. Inclusive, a auditoria é feita junto, para aproveitar o contexto de quem construiu.</p></div>
+    <div class="qa"><div class="q">“Por que precisamos de Discovery?”</div><p>Porque há perguntas que mudam o que vale construir. Se a lógica de curadoria não tiver histórico para validar, o primeiro passo é registrar previsões, não fazer tela. Se o Notion não sustentar permissões por parceiro, a central precisa de outra camada. Descobrir isso depois de desenvolver custa mais caro.</p></div>
+    <div class="qa"><div class="q">“Não dá para construir o portal direto?”</div><p>Dá, e tem quem faça. O risco é construir a central sem saber o que o parceiro de fato precisa no dia a dia, que dados de curadoria podem aparecer e como a agenda funciona. O Discovery entrega o recorte mínimo do portal com dependências claras, para a construção começar certa e menor.</p></div>
+    <div class="qa"><div class="q">“Já temos tudo no Notion.”</div><p>O conteúdo está lá, e isso é um ativo grande; a ideia é reaproveitar. A questão é distribuição: o parceiro precisar achar a resposta certa na hora certa, ver só o que é da praça dele e ter checklists por etapa. O Discovery vai dizer se o próprio Notion resolve isso ou se ele continua como fonte, com outra camada de entrega.</p></div>
+    <div class="qa"><div class="q">“Precisamos economizar.”</div><p>Faz todo sentido, e é um argumento a favor de decidir antes de construir. O Discovery não tem custo de licença nem de desenvolvimento, e a recomendação já vem escalonada por ondas, para que o investimento acompanhe a validação. Parte dele é justamente apontar o que não precisa ser construído.</p></div>
+    <div class="qa"><div class="q">“Não quero burocratizar a operação.”</div><p>Eu também não. O critério de sucesso é menos esforço, não mais processo: horas de suporte por evento, dúvidas repetidas, tempo para ativar uma praça. A própria área já mede esforço de uso pelo CES, e eu manteria essa régua. Entregáveis curtos e voltados a decisão.</p></div>
+    <div class="qa"><div class="q">“Qual é a diferença entre o seu trabalho e o que já está sendo feito?”</div><p>O que está sendo feito é construção de produtos de dados e automação, organizados por sprint. O meu papel é a camada acima: definir o portfólio, a sequência, a arquitetura que conecta tudo e o que fica com cada um. Não é substituir, é dar direção comum para que cada entrega some na mesma plataforma.</p></div>
+    <div class="qa"><div class="q">“O que eu ganho concretamente ao final?”</div><p>Um diagnóstico do que existe e do que funciona de fato; um parecer sobre a lógica de curadoria e o que pode ser mostrado ao franqueado; o MVP da curadoria, da central e da agenda definido, com dependências; uma arquitetura que reaproveita o stack; a avaliação das automações; indicadores com baseline; e um roadmap por ondas. Com isso, você sabe onde investir primeiro. Não prometo ROI sem dados: o baseline é o que vai permitir medir.</p></div>
+    <div class="qa"><div class="q">“E se o modelo de curadoria não for validável agora?”</div><p>Isso também é resposta útil. A recomendação passa a ser começar a registrar previsões e resultados já, usar a curadoria internamente com faixas e confiança, e só expor ao parceiro quando o erro estiver medido.</p></div>
+  </div>
+</section>
+
+<!-- QC -->
+<section id="revisao">
+  <div class="eyebrow">Revisão crítica aplicada</div>
+  <h2>O que cada olhar encontrou e o que mudou na proposta</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Olhar</th><th>Pergunta crítica</th><th>Ajuste feito</th></tr></thead>
+    <tbody>
+    <tr><td>Thales</td><td>Minhas três prioridades estão na frente e na minha ordem?</td><td>A, B e C abrem o slide 06, formam a Onda 1 inteira e são as únicas marcadas como “Especificado” no Discovery. A segunda onda aparece separada e com análise própria.</td></tr>
+    <tr><td>CTPO</td><td>A arquitetura prescreve stack antes da hora? Os seis produtos viram seis sistemas?</td><td>Nenhuma tecnologia definida; slide 08 trata os produtos como domínios; Knowledge AI fica dentro do Partner OS; slide 14 compara quatro abordagens de construção.</td></tr>
+    <tr><td>CFO</td><td>Tem promessa de ROI? O investimento é escalonado?</td><td>Sem metas nem ROI; baseline antes de meta; ondas condicionadas à validação; custo de API por estágio entra na matriz de riscos; fechamento financeiro tratado como hipótese a testar.</td></tr>
+    <tr><td>Operações</td><td>O parceiro vai usar? Não vai virar mais processo?</td><td>Central organizada por momento do parceiro e pelo tripé; entrevistas com parceiros nas premissas; CES mantido; negociação continua humana no MVP.</td></tr>
+    <tr><td>Comercial</td><td>A proposta convence sem entregar o Discovery de graça?</td><td>Mostra perguntas, recortes e trade-offs, mas não responde nenhuma delas: auditoria do modelo, papel do Notion e custos ficam como entregáveis.</td></tr>
+    <tr><td>Responsável técnico atual</td><td>Algo foi chamado de pronto sem ser? O trabalho existente foi diminuído?</td><td>Inventário com seis estados; “WhatsApp automatizado” marcado como previsto; Chartmetric como MVP; atribuição de 70% tratada como hipótese; auditoria feita junto com a equipe; nenhum nome individual citado na proposta.</td></tr>
+    </tbody></table></div>
+  <div class="card"><h3>Checklist final</h3><ul class="small">
+    <li>Problemas certos: organizados nos oito problemas, não em ferramentas ✓</li>
+    <li>Curadoria, central e agenda priorizadas e conectadas no fluxo de ponta a ponta ✓</li>
+    <li>Trabalho existente reconhecido e classificado, sem críticas ✓</li>
+    <li>MVP enxuto: recorte mínimo com “fica para depois” explícito ✓</li>
+    <li>Discovery separado de implementação, com exclusões e critérios de aceite ✓</li>
+    <li>Sem preço, prazo, esforço, cargo ou dedicação presumidos ✓</li>
+    <li>Trade-offs reais: busca vs. assistente, build vs. buy, uso interno vs. exposição ao parceiro ✓</li>
+    <li>Matriz de aderência com os 26 itens, nenhum descoberto ✓</li></ul></div>
+  <div class="card"><h3>Pontos que ainda dependem de você</h3><ul class="small">
+    <li>Conferir se a paráfrase das prioridades do Thales bate com o que ele disse na reunião e nos áudios</li>
+    <li>Confirmar se é adequado citar o Santander e o Fashion Finder no material enviado</li>
+    <li>Revisar a lista de entregáveis depois de definir o formato de contratação, para não prometer profundidade incompatível</li>
+    <li>Se o site abrir do seu lado, ajustar cores e tipografia ao visual do Tranquilo</li></ul></div>
+</section>
+</div>
