@@ -480,6 +480,20 @@ export interface Task extends Entity {
   tags?: string[]
   /** Where it came from (imported records keep it; the record itself is hers once imported). */
   source?: ImportOrigin
+  /** Small steps inside the task (UGC Business checklist). Checked state lives here, persisted with the task. */
+  checklist?: TaskStep[]
+  /** UGC Business: the brand this task is about (link to the source record). */
+  brandId?: ID
+  /** UGC Business: the demo/portfolio piece this task is about. */
+  contentItemId?: ID
+  /** Day it was planned for before she moved it ("Adiado"). */
+  postponedFrom?: DateKey
+}
+
+export interface TaskStep {
+  id: string
+  title: string
+  done: boolean
 }
 
 /** Provenance of anything the Daily Briefing brought in ("o que veio do briefing de hoje?"). */
@@ -1458,6 +1472,22 @@ export interface ContentItem extends Entity {
   projectId?: ID
   links: Link[]
   order: number
+  /** UGC Business: the brand whose product it shows. */
+  brandId?: ID
+  /** UGC Business: a demonstration video for her portfolio — NOT a paid contract. */
+  demo?: UgcDemo
+}
+
+/** Portfolio / demo project: her own production with a product she has. Never revenue. */
+export interface UgcDemo {
+  product: string
+  scenes: TaskStep[]
+  recordDate?: DateKey
+  /** Where the raw/edited files are (optional — nothing has to be uploaded). */
+  files?: string
+  editStatus: 'nao_iniciada' | 'editando' | 'revisao' | 'pronta'
+  finalVersion?: string
+  inPortfolio: boolean
 }
 
 export type PartnershipStage =
@@ -1521,6 +1551,34 @@ export interface Brand extends Entity {
   notes?: string
   /** No longer a target ("não faz mais sentido") — kept for history, out of every queue. */
   archived?: boolean
+  /** Other spellings of the same company (explicit — never guessed from a look-alike name). */
+  aliases?: string[]
+  /** CRM Marcas: relationship status and history (press kits, coupons) — separate from paid UGC deals. */
+  crm?: BrandCrm
+}
+
+export type UgcCrmStatus = 'prospect_pago' | 'aguardando_retorno' | 'aguardando_resposta' | 'negociacao' | 'press_kit' | 'afiliada_sem_vagas' | 'negativa'
+
+export interface BrandCoupon {
+  /** Code when known; a confirmed coupon whose code wasn't given stays without one (never invented). */
+  code?: string
+  source?: string
+  notes?: string
+}
+
+export interface BrandCrm {
+  status?: UgcCrmStatus
+  /** Day of the evidence behind the status — a newer status (hers) is never overwritten by an older one. */
+  statusAt?: DateKey
+  evidence?: string
+  /** No automatic commercial follow-up (affiliate without openings, confirmed negative). */
+  noFollowUp?: boolean
+  affiliate?: boolean
+  /** In the paid-UGC prospect list (not contacted until a real send is recorded). */
+  paidProspect?: boolean
+  /** Relationship history — never payment. */
+  pressKits?: { receivedAt?: DateKey; notes?: string }[]
+  coupons?: BrandCoupon[]
 }
 
 export type UgcStage = 'prospectar' | 'contatada' | 'conversa' | 'producao' | 'entregue' | 'fechada'
@@ -1547,6 +1605,8 @@ export interface UgcOpportunity extends Entity {
   lastContactAt?: DateKey
   /** When to write again (cadence D+3 / D+7 / D+15, then reactivation). Undefined = nothing to chase. */
   nextFollowUpAt?: DateKey
+  /** Last day of the follow-up window that starts at nextFollowUpAt (e.g. 18–21/10). */
+  followUpWindowEnd?: DateKey
   /** How many follow-ups were sent in the current cadence. */
   followUpStep?: number
   /** Day the current cadence counts from (first contact, or her last message after a reply). */

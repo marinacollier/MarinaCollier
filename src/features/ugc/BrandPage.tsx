@@ -18,6 +18,7 @@ import { formatDayMonth } from '@/lib/date'
 import { cn } from '@/lib/cn'
 import { commit } from './parts'
 import { WriteSection } from './WriteSection'
+import { BrandCrmSection } from './Business'
 import { LEVEL_LABEL, MIN_OUTCOMES, outcomes, potential } from '@/data/ugc/score'
 
 const tri = (v?: boolean) => (v === true ? 'sim' : v === false ? 'nao' : 'nao_sei')
@@ -86,7 +87,9 @@ export default function BrandPage() {
           <p className="text-[12.5px] text-muted mt-1.5">S sonho · A muito importante · B boa oportunidade · C volume</p>
         </section>
 
-        {!brand.archived && <PotentialCard brand={brand} today={today} />}
+        <BrandCrmSection brand={brand} />
+
+        {!brand.archived && !brand.crm?.noFollowUp && <PotentialCard brand={brand} today={today} />}
 
         {/* Opportunities */}
         <section aria-label="Oportunidades">

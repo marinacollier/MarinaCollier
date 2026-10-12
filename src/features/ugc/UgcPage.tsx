@@ -1,6 +1,7 @@
 /**
- * UGC Business — inside Trabalho / Creator. It opens on what needs her now (never on a chart):
- *   Agora · Pipeline · Marcas · Follow-ups · Abordagens
+ * UGC Business — inside Trabalho / Creator. It opens on what needs her now:
+ *   Hoje · Esta semana · Pipeline · Todas as marcas · Calendário · Portfólio e produção · Financeiro ·
+ *   Follow-ups · Abordagens
  * One source of truth with the Home: the same actions, the same check, the same records.
  */
 import { useMemo, useState } from 'react'
@@ -8,7 +9,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { ROUTES } from '@/app/routes'
 import { Card, Chip, EmptyState, Page, PageHeader, ProgressBar, SectionTitle, Segmented } from '@/components/ui'
 import { useDB } from '@/data/store'
-import type { BrandTier, DB, UgcOpportunity } from '@/data/types'
+import type { BrandTier, DB, UgcCrmStatus, UgcOpportunity } from '@/data/types'
 import {
   brandOf,
   CHANNEL_LABEL,
@@ -28,12 +29,18 @@ import { addDays, formatDayMonth } from '@/lib/date'
 import { normalize } from '@/lib/text'
 import { cn } from '@/lib/cn'
 import { commit, TierBadge, UgcActionRow } from './parts'
+import { CrmDashboard, CrmFilter, CrmImport, UgcCalendar, UgcFinance, UgcPortfolio, UgcTasksToday, UgcWeek } from './Business'
+import { CRM_STATUS_LABEL } from '@/data/ugc/crm'
 
-type Tab = 'agora' | 'pipeline' | 'marcas' | 'followups' | 'abordagens'
+type Tab = 'agora' | 'semana' | 'pipeline' | 'marcas' | 'calendario' | 'portfolio' | 'financeiro' | 'followups' | 'abordagens'
 const TABS: { value: Tab; label: string }[] = [
-  { value: 'agora', label: 'Agora' },
+  { value: 'agora', label: 'Hoje' },
+  { value: 'semana', label: 'Esta semana' },
   { value: 'pipeline', label: 'Pipeline' },
-  { value: 'marcas', label: 'Marcas' },
+  { value: 'marcas', label: 'Todas as marcas' },
+  { value: 'calendario', label: 'Calendário' },
+  { value: 'portfolio', label: 'Portfólio e produção' },
+  { value: 'financeiro', label: 'Financeiro' },
   { value: 'followups', label: 'Follow-ups' },
   { value: 'abordagens', label: 'Abordagens' },
 ]
@@ -46,9 +53,19 @@ export default function UgcPage() {
     <Page>
       <PageHeader title="UGC Business" eyebrow="Creator" back backTo={ROUTES.creator} />
       <Segmented variant="tabs" value={tab} onChange={(t) => setParams(t === 'agora' ? {} : { aba: t }, { replace: true })} options={TABS} className="mb-4" />
-      {tab === 'agora' && <Agora />}
+      {tab === 'agora' && (
+        <div className="space-y-6">
+          <UgcTasksToday />
+          <Agora />
+          <CrmDashboard />
+        </div>
+      )}
+      {tab === 'semana' && <UgcWeek />}
       {tab === 'pipeline' && <Pipeline />}
       {tab === 'marcas' && <Brands />}
+      {tab === 'calendario' && <UgcCalendar />}
+      {tab === 'portfolio' && <UgcPortfolio />}
+      {tab === 'financeiro' && <UgcFinance />}
       {tab === 'followups' && <FollowUps />}
       {tab === 'abordagens' && <History />}
     </Page>
@@ -257,9 +274,15 @@ function Brands() {
   const [tier, setTier] = useState<BrandTier | undefined>()
   const [q, setQ] = useState('')
   const [archived, setArchived] = useState(false)
+  const [crm, setCrm] = useState<UgcCrmStatus | undefined>()
+  const counts = useMemo(() => {
+    const c: Record<string, number> = {}
+    for (const b of db.brands) if (b.crm?.status) c[b.crm.status] = (c[b.crm.status] ?? 0) + 1
+    return c
+  }, [db.brands])
   const rank = (t?: string) => (t ? TIERS.indexOf(t as BrandTier) : 9)
   const list = db.brands
-    .filter((b) => !!b.archived === archived && (!tier || b.priorityTier === tier) && (!q || normalize(b.name).includes(normalize(q))))
+    .filter((b) => !!b.archived === archived && (!tier || b.priorityTier === tier) && (!crm || b.crm?.status === crm) && (!q || normalize(b.name).includes(normalize(q))))
     .sort((a, b) => rank(a.priorityTier) - rank(b.priorityTier) || a.name.localeCompare(b.name))
   return (
     <div className="space-y-4">
@@ -277,13 +300,14 @@ function Brands() {
           Arquivadas
         </Chip>
       </div>
+      <CrmFilter value={crm} onChange={setCrm} counts={counts} />
       {db.brands.length > 8 && <input id="ugc-brand-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar marca" className="input w-full" aria-label="Buscar marca" />}
       {list.length ? (
         <ul className="divide-y divide-line/70">
           {list.map((b) => {
             const o = db.ugcOpportunities.filter((x) => x.brandId === b.id).sort((x, y) => y.updatedAt.localeCompare(x.updatedAt))[0]
             const p = b.archived ? undefined : potential(db, b, today)
-            const sub = [p ? LEVEL_LABEL[p.level] : undefined, b.category, o ? STAGES.find((s) => s.id === o.stage)?.label : undefined, o?.lastContactAt ? `último contato ${formatDayMonth(o.lastContactAt)}` : 'sem contato ainda'].filter(Boolean).join(' · ')
+            const sub = [b.crm?.status ? CRM_STATUS_LABEL[b.crm.status] : undefined, p && !b.crm?.noFollowUp ? LEVEL_LABEL[p.level] : undefined, b.category, b.crm?.coupons?.length ? 'cupom' : undefined, b.crm?.pressKits?.length && b.crm.status !== 'press_kit' ? 'press kit' : undefined, o ? STAGES.find((s) => s.id === o.stage)?.label : undefined, o?.lastContactAt ? `último contato ${formatDayMonth(o.lastContactAt)}` : 'sem contato ainda'].filter(Boolean).join(' · ')
             return (
               <li key={b.id}>
                 <Link to={ROUTES.ugcBrand(b.id)} className="flex items-center gap-2 min-h-[52px] py-1.5 active:opacity-70">
@@ -300,6 +324,7 @@ function Brands() {
       ) : (
         <p className="text-[14px] text-muted">{archived ? 'Nenhuma marca arquivada.' : 'Nenhuma marca aqui ainda.'}</p>
       )}
+      <CrmImport />
     </div>
   )
 }
