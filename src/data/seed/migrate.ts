@@ -39,6 +39,9 @@ const SAME_AS: Partial<Record<CollectionKey, (a: Record<string, unknown>, b: Rec
   // Her backlog: a task she already wrote herself (same title, open or done) is not added again.
   tasks: (a, b) => !!norm(a.title) && norm(a.title) === norm(b.title) && a.status !== 'archived',
   projects: (a, b) => !!norm(a.name) && norm(a.name) === norm(b.name),
+  // A trip item she already has under another id (an older seed, or her own) — confirmed, done or edited —
+  // is never re-added next to it as a fresh "a confirmar" copy.
+  tripItems: (a, b) => a.tripId === b.tripId && !!norm(a.title) && norm(a.title) === norm(b.title),
 }
 
 const sameName = (a: { name: string }, b: { name: string }) => normalize(a.name).replace(/[^a-z0-9]+/g, '') === normalize(b.name).replace(/[^a-z0-9]+/g, '')

@@ -390,6 +390,8 @@ export interface UserProfile {
   seedIds?: string[]
   /** Seed record ids she deleted herself. */
   removedSeedIds?: string[]
+  /** Bundled Daily Briefings (by date) already run through the importer on this install — never twice. */
+  briefingsApplied?: DateKey[]
   /** Lumos may apply small meal adjustments without asking (off by default; always undoable). */
   lumosAutoApplySmall?: boolean
   /** Last time Marina talked to Lumos / opened Home — ChangeFeed baseline ("o que mudou?"). */
@@ -478,6 +480,10 @@ export interface Task extends Entity {
   doneCriteria?: string
   /** Small free labels ('optional' for a briefing's Optional priority). */
   tags?: string[]
+  /** A briefing's "Optional" (priority P3 + this flag). */
+  optional?: boolean
+  /** Other names a later briefing gave the same obligation ("Verificar/Regularizar B.O. de pedágio"). */
+  aliases?: string[]
   /** Where it came from (imported records keep it; the record itself is hers once imported). */
   source?: ImportOrigin
 }
@@ -528,7 +534,7 @@ export interface ImportBatch extends Entity {
   /** What this import wrote, with what was there before — undo touches only what is still as it left it. */
   changes: { collection: CollectionKey; id: ID; op: 'created' | 'updated'; previous?: Record<string, unknown>; stamp: ISODateTime }[]
   /** How each briefing item was understood (for "o que veio do briefing?"). */
-  items: { kind: 'today' | 'future' | 'waiting' | 'recurring'; title: string; collection?: CollectionKey; id?: ID; how: 'created' | 'linked' | 'kept' | 'ignored' }[]
+  items: { kind: 'today' | 'future' | 'waiting' | 'recurring'; title: string; collection?: CollectionKey; id?: ID; how: 'created' | 'updated' | 'linked' | 'kept' | 'ignored' }[]
   review: { title: string; reason: string }[]
   sourceKeys: string[]
   undoneAt?: ISODateTime

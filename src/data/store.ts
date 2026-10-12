@@ -163,6 +163,13 @@ export const actions = {
 let adapter: StorageAdapter | null = null
 let saveTimer: ReturnType<typeof setTimeout> | undefined
 let unsubscribe: (() => void) | undefined
+/**
+ * Something changed in memory since the last save. A flush with nothing new never writes: an instance
+ * left open in the background (an older version of the app, another tab) going hidden or being asked
+ * to update must not put its stale snapshot over what a newer instance saved — that is how confirmed
+ * things "came back" as before.
+ */
+let dirty = false
 
 /** Saves run one after the other, so an older snapshot never lands after a newer one. */
 let queue: Promise<unknown> = Promise.resolve()
@@ -175,6 +182,7 @@ function save(verify: boolean): Promise<SaveResult> {
     const snapshot = getDB()
     try {
       await adapter.save(snapshot)
+      if (getDB() === snapshot) dirty = false
       if (verify) {
         const back = await adapter.load()
         if (JSON.stringify(back) !== JSON.stringify(snapshot)) throw new Error('read-back mismatch')
@@ -194,7 +202,7 @@ function save(verify: boolean): Promise<SaveResult> {
 }
 
 function flush() {
-  if (!adapter) return
+  if (!adapter || !dirty) return
   clearTimeout(saveTimer)
   saveTimer = undefined
   void save(false)
@@ -209,18 +217,33 @@ export async function hydrate(storage: StorageAdapter = createIndexedDBAdapter()
   unsubscribe?.()
   clearTimeout(saveTimer)
   let raw: unknown = null
-  try {
-    raw = await storage.load()
-  } catch (err) {
-    console.error('[marina-os] load failed, starting from seed', err instanceof Error ? err.message : 'unknown')
+  let loadFailed = false
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      raw = await storage.load()
+      loadFailed = false
+      break
+    } catch (err) {
+      loadFailed = true
+      console.error('[marina-os] load failed', err instanceof Error ? err.message : 'unknown')
+    }
   }
   const migrated = raw ? migrate(raw) : null
   const db = migrateUgc(migrated ? applyLifeSeed(migrated, todayKey()) : buildSeed(todayKey()))
+  dirty = false
+  if (loadFailed) {
+    // Her data may still be on the device: never write the seed over it. This session runs from memory
+    // with the "não salvou" banner; the next start reads the device again.
+    adapter = null
+    useStore.setState({ db, hydrated: true, saveFailed: true })
+    return
+  }
   useStore.setState({ db, hydrated: true, saveFailed: false })
   if (!raw || db !== migrated) await storage.save(db)
 
   unsubscribe = useStore.subscribe((s, prev) => {
     if (s.db === prev.db) return
+    dirty = true
     clearTimeout(saveTimer)
     saveTimer = setTimeout(flush, 250)
   })
@@ -251,6 +274,11 @@ export function persist(): Promise<SaveResult> {
 
 /** Force pending writes (tests, before export, after restore). Throws when the save failed. */
 export async function flushNow(): Promise<void> {
+  // Nothing new in memory → nothing to write (a stale instance never overwrites a newer save).
+  if (!dirty) {
+    await queue
+    return
+  }
   const r = await persist()
   if (!r.ok) throw r.error instanceof Error ? r.error : new Error('save failed')
 }
