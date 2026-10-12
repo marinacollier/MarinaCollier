@@ -71,7 +71,9 @@ export function brandOf(db: DB, o: Pick<UgcOpportunity, 'brandId'>): Brand | und
 
 /** Still something to do with it (not closed, lost, refused, paused, nor its brand archived). */
 export function isLive(db: DB, o: UgcOpportunity): boolean {
-  return !CLOSED.includes(o.status) && !brandOf(db, o)?.archived
+  const b = brandOf(db, o)
+  // Affiliate without openings / confirmed negative: nothing commercial to chase (CRM Marcas).
+  return !CLOSED.includes(o.status) && !b?.archived && !b?.crm?.noFollowUp
 }
 
 const key = (s: string) => normalize(s).replace(/[^a-z0-9]+/g, '')
@@ -80,7 +82,7 @@ const key = (s: string) => normalize(s).replace(/[^a-z0-9]+/g, '')
 export function findBrand(db: DB, name: string): Brand | undefined {
   const k = key(name)
   if (!k) return undefined
-  return db.brands.find((b) => key(b.name) === k) ?? (k.length >= 4 ? db.brands.find((b) => key(b.name).startsWith(k) || (key(b.name).length >= 4 && k.startsWith(key(b.name)))) : undefined)
+  return db.brands.find((b) => key(b.name) === k) ?? db.brands.find((b) => b.aliases?.some((a) => key(a) === k)) ?? (k.length >= 4 ? db.brands.find((b) => key(b.name).startsWith(k) || (key(b.name).length >= 4 && k.startsWith(key(b.name)))) : undefined)
 }
 
 /** The opportunity a sentence about a brand refers to: the live one, most advanced and most recent. */

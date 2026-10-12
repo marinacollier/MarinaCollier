@@ -20,6 +20,7 @@ import { defaultProfile } from '../defaults'
 import { buildSeed, LIFE_SEED_VERSION } from '.'
 import { isSeedRecordId } from './ids'
 import { seedBacklog } from './backlog'
+import { applyUgcCrmSeed } from './ugc-crm'
 import { createSeedContext } from './context'
 import { normalize } from '@/lib/text'
 
@@ -132,7 +133,8 @@ export function applyLifeSeed(db: DB, today: DateKey): DB {
   p.seedVersion = LIFE_SEED_VERSION
   p.seedIds = [...new Set([...received, ...allSeedIds])]
   out.profile = p
-  return out
+  // Seed v10: CRM Marcas + UGC Business plan of 12/10 (reconciled, not rebuilt — see ugc-crm.ts).
+  return applyUgcCrmSeed(out)
 }
 
 /** Every record id the seed produces (collections only). */
