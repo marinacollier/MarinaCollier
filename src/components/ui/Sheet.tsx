@@ -7,9 +7,9 @@ import { Button, IconButton } from './Button'
 
 /**
  * Bottom sheet frame (used by the SheetHost; feature code uses <SheetLayout/>).
- * Drag the handle down to dismiss. Max height 92dvh, scrolls internally, lifts above the keyboard.
+ * Drag the handle down to dismiss. Max height 92dvh (or `maxHeight`), scrolls internally, lifts above the keyboard.
  */
-export function SheetFrame({ onClose, children, depth = 0, isTop = true }: { onClose: () => void; children: ReactNode; depth?: number; isTop?: boolean }) {
+export function SheetFrame({ onClose, children, depth = 0, isTop = true, maxHeight = '92dvh', label }: { onClose: () => void; children: ReactNode; depth?: number; isTop?: boolean; maxHeight?: string; label?: string }) {
   const controls = useDragControls()
   const kb = useKeyboardInset()
   const ref = useRef<HTMLDivElement>(null)
@@ -23,7 +23,7 @@ export function SheetFrame({ onClose, children, depth = 0, isTop = true }: { onC
   }, [onClose, isTop])
 
   return (
-    <div className="fixed inset-0 z-50" style={{ zIndex: 50 + depth }} role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-50" style={{ zIndex: 50 + depth }} role="dialog" aria-modal="true" aria-label={label}>
       <motion.div
         className="absolute inset-0 bg-[var(--scrim)] backdrop-blur-[2px]"
         initial={{ opacity: 0 }}
@@ -34,7 +34,7 @@ export function SheetFrame({ onClose, children, depth = 0, isTop = true }: { onC
       <motion.div
         ref={ref}
         className="absolute left-0 right-0 bottom-0 mx-auto max-w-[560px] bg-surface rounded-t-[28px] shadow-2xl flex flex-col"
-        style={{ maxHeight: `calc(92dvh - ${kb}px)`, bottom: kb }}
+        style={{ maxHeight: `calc(${maxHeight} - ${kb}px)`, bottom: kb }}
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}

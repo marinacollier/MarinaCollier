@@ -1,7 +1,7 @@
 /**
  * INÍCIO — the command center of the day and the week, calm by progressive disclosure:
  *   1. greeting + date + ONE smart line (or nothing)
- *   2. LUMOS — the way in (text, voice, prints, files; answers inline)
+ *   2. LUMOS — the way in (text, voice, prints, files; answers in a sheet over the page)
  *   3. HOJE IMPORTA (Top 3 — what matters most; never a replacement for the full list)
  *   4. HOJE — every real thing of the day, from every front, checkable in place
  *   5. PRÓXIMOS — tomorrow open, the next days one line each, "sem dia" folded
@@ -12,7 +12,6 @@
 import { Suspense, useCallback, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { X } from 'lucide-react'
 import { ROUTES } from '@/app/routes'
 import { Page } from '@/components/ui'
 import { changeFeed, dailyBrief, homeSuggestions, lifeContext, needsAttention, proactiveInsights, type Now } from '@/data/intel'
@@ -28,7 +27,7 @@ import { AttentionRow, ChangesLine, ImportaBlock, InsightLines, TripLine } from 
 import { HojeBlock, ProximosBlock } from './home/agenda'
 import { composerPlaceholder } from './home/day'
 import { LumosBox } from './home/LumosBox'
-import { LumosInline, lumosHref } from './home/lumos'
+import { LumosSheet, lumosHref, type LumosRequest } from './home/lumos'
 import { useMarkSeenOnLeave } from './home/seen'
 
 /** A trip shows on Home only when it's really close. */
@@ -73,19 +72,17 @@ export default function TodayPage() {
     return { id: soon.trip.id, name: soon.trip.name, startDate: soon.trip.startDate ?? today, daysLeft: soon.days, openItems: tripPriorityItems(db, soon.trip, 99).length }
   }, [life.nextTrip, home.tripSoon, db, today])
 
-  const [conversation, setConversation] = useState<{ text: string; n: number }>()
+  // Answers slide up in the Lumos sheet over the page — Home itself never moves.
+  const [lumos, setLumos] = useState<LumosRequest>()
   const ask = useCallback(
     (text: string) => {
-      if (LumosInline) setConversation((c) => ({ text, n: (c?.n ?? 0) + 1 }))
+      if (LumosSheet) setLumos((c) => ({ text, n: (c?.n ?? 0) + 1 }))
       else navigate(lumosHref(text))
     },
     [navigate],
   )
-  // A print/PDF opens the conversation right here and is read there (same Lumos, same pipeline).
-  const attach = useCallback((file: File, caption: string) => {
-    setConversation((c) => ({ text: '', n: (c?.n ?? 0) + 1 }))
-    void import('@/features/assistant/conversation').then((m) => m.sendAttachment(file, caption))
-  }, [])
+  // A print/PDF is read in the same sheet (same Lumos, same pipeline).
+  const attach = useCallback((file: File, caption: string) => setLumos((c) => ({ file, caption, n: (c?.n ?? 0) + 1 })), [])
   const placeholder = composerPlaceholder(home.part, { workNow: home.part === 'dia' })
   const hasLines = attention.length > 0 || insights.length > 0 || changes.items.length > 0 || !!trip
 
@@ -113,22 +110,13 @@ export default function TodayPage() {
       </header>
 
       <motion.div {...rise(1)} className="mt-7">
-        {conversation && LumosInline ? (
-          <section aria-label="Conversa com a Lumos">
-            <div className="flex items-center justify-between min-h-9 mb-1">
-              <span className="eyebrow text-plum">Lumos</span>
-              <button type="button" onClick={() => setConversation(undefined)} className="h-11 -mr-2 px-2 inline-flex items-center gap-1 text-[13px] text-muted">
-                <X size={14} /> fechar conversa
-              </button>
-            </div>
-            <Suspense fallback={<div className="h-24" />}>
-              <LumosInline key={conversation.n} initial={conversation.text} />
-            </Suspense>
-          </section>
-        ) : (
-          <LumosBox placeholder={placeholder} suggestions={suggestions} onAsk={ask} onAttach={attach} />
-        )}
+        <LumosBox placeholder={placeholder} suggestions={suggestions} onAsk={ask} onAttach={attach} />
       </motion.div>
+      {lumos && LumosSheet && (
+        <Suspense fallback={null}>
+          <LumosSheet request={lumos} />
+        </Suspense>
+      )}
 
       {hasLines && (
         <motion.div {...rise(2)} className="mt-6 space-y-1.5">

@@ -6,7 +6,7 @@ import { actions, getDB, hydrate } from '@/data/store'
 import { createMemoryAdapter } from '@/data/storage'
 import { buildSeed } from '@/data/seed'
 import { needsAttention } from '@/data/intel'
-import { LumosInline } from './home/lumos'
+import { LumosSheet } from './home/lumos'
 import TodayPage from './TodayPage'
 
 function Where() {
@@ -74,11 +74,15 @@ describe('Início (Lumos-first Home)', () => {
     expect(screen.queryByLabelText('Precisa de você')).toBeNull()
   })
 
-  it('sending to Lumos answers inline when available, otherwise opens the conversation', () => {
+  it('sending to Lumos opens the answer sheet over Home when available, otherwise the conversation', { timeout: 15000 }, async () => {
     renderHome()
     fireEvent.change(screen.getByLabelText('Fala com a Lumos'), { target: { value: 'amanhã cancelei inglês' } })
     fireEvent.click(screen.getByLabelText('Enviar para a Lumos'))
-    if (LumosInline) expect(screen.getByLabelText('Conversa com a Lumos')).toBeTruthy()
+    if (LumosSheet) {
+      expect(await screen.findByRole('dialog', { name: 'Conversa com a Lumos' }, { timeout: 8000 })).toBeTruthy()
+      // Home itself stays as it was: the composer is still there, the page didn't swap.
+      expect(screen.getByLabelText('Fala com a Lumos')).toBeTruthy()
+    }
     else expect(screen.getByTestId('where').textContent).toBe('/lumos?q=amanh%C3%A3%20cancelei%20ingl%C3%AAs')
   })
 

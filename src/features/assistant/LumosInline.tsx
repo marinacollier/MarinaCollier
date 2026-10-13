@@ -94,7 +94,7 @@ export function contextSuggestions(db: DB, now: Now): string[] {
 
 // ─── Composer ───────────────────────────────────────────────────────────────
 
-function Composer({ variant, placeholder }: { variant: 'home' | 'page'; placeholder: string }) {
+export function Composer({ variant, placeholder }: { variant: 'home' | 'page'; placeholder: string }) {
   const draft = useConversation((s) => s.draft)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -182,7 +182,7 @@ function Composer({ variant, placeholder }: { variant: 'home' | 'page'; placehol
 
 // ─── One exchange ───────────────────────────────────────────────────────────
 
-function ExchangeView({ e, db, today, minutes }: { e: Exchange; db: DB; today: string; minutes: number }) {
+export function ExchangeView({ e, db, today, minutes }: { e: Exchange; db: DB; today: string; minutes: number }) {
   const navigate = useNavigate()
   const answer = useMemo(() => (e.turn?.kind === 'answer' ? askLumos(db, e.question, today, minutes) : undefined), [db, e.turn?.kind, e.question, today, minutes])
   const followUp = (plan: ChangePlan, kind: 'strategy' | 'week' | 'newStrategy') => {

@@ -33,30 +33,32 @@ function Options({ options, onOption, className }: { options: ReplyOption[]; onO
   )
 }
 
+/** One line = the standard row (components/ui/ItemRow): 15.5px title, 12.5px muted meta, hairline between. */
 function Line({ line, onOption }: { line: ReplyLine; onOption: (o: ReplyOption) => void }) {
+  const lead = !!line.emoji
   return (
-    <li className="px-3.5 py-2.5">
-      <div className="flex items-start gap-2.5">
-        {line.emoji && (
-          <span className="text-[15px] leading-snug shrink-0 w-5 text-center" aria-hidden>
+    <li className="py-2.5 min-h-[52px] flex flex-col justify-center">
+      <div className="flex items-start gap-3">
+        {lead && (
+          <span className="text-[15px] leading-snug shrink-0 w-6 text-center" aria-hidden>
             {line.emoji}
           </span>
         )}
         <div className="min-w-0 flex-1">
-          <div className="text-[14px] leading-snug whitespace-pre-line">{line.text}</div>
+          <div className="text-[15.5px] leading-snug whitespace-pre-line [overflow-wrap:anywhere]">{line.text}</div>
           {line.sub && <div className="text-[12.5px] text-muted leading-snug mt-0.5">{line.sub}</div>}
         </div>
-        {line.isNew && <span className="text-[11px] text-sage font-medium shrink-0 pt-0.5">novo</span>}
+        {line.isNew && <span className="text-[12.5px] text-sage font-medium shrink-0 pt-0.5">novo</span>}
         <ProvenanceTag p={line.provenance} className="mt-0.5" />
       </div>
-      {!!line.options?.length && <Options options={line.options} onOption={onOption} className="mt-2 pl-7" />}
+      {!!line.options?.length && <Options options={line.options} onOption={onOption} className={cn('mt-2', lead && 'pl-9')} />}
     </li>
   )
 }
 
 function Lines({ lines, onOption }: { lines: ReplyLine[]; onOption: (o: ReplyOption) => void }) {
   return (
-    <ul className="rounded-2xl border border-line bg-surface divide-y divide-line/70 overflow-hidden">
+    <ul className="divide-y divide-line/60 border-y border-line/60">
       {lines.map((l, i) => (
         <Line key={`${l.text}-${i}`} line={l} onOption={onOption} />
       ))}
@@ -68,9 +70,9 @@ function Section({ section, open: initial, onOption }: { section: ReplySection; 
   const [open, setOpen] = useState(initial)
   return (
     <section>
-      <button type="button" onClick={() => setOpen((o) => !o)} className="w-full min-h-10 flex items-center justify-between gap-2 text-left px-0.5" aria-expanded={open}>
-        <span className="text-[13.5px] font-semibold text-ink-2">{section.title}</span>
-        <span className="flex items-center gap-1.5 text-muted text-[12px]">
+      <button type="button" onClick={() => setOpen((o) => !o)} className="w-full min-h-11 flex items-center justify-between gap-2 text-left" aria-expanded={open}>
+        <span className="text-[12.5px] font-semibold uppercase tracking-[0.12em] text-muted">{section.title}</span>
+        <span className="flex items-center gap-1.5 text-muted text-[12.5px]">
           {!open && section.lines.length}
           <ChevronDown size={16} className={cn('transition-transform', open && 'rotate-180')} aria-hidden />
         </span>
@@ -116,18 +118,18 @@ export function ReplyCard({ reply, status, canUndo, onConfirm, onCancel, onUndo,
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', bounce: 0, duration: 0.45 }} className="card p-4 space-y-3.5">
       <div>
         <div className="flex items-center gap-2">
-          <div className="eyebrow">✨ Lumos · {reply.area}</div>
+          <div className="text-[12.5px] text-muted">✨ {reply.area}</div>
           <ProvenanceTag p={reply.provenance} />
         </div>
-        <p className="font-display text-[19px] leading-snug mt-1">{title}</p>
-        {!quiet && reply.sub && <p className="text-[13.5px] text-ink-2 leading-snug mt-1.5">{reply.sub}</p>}
-        {failed && <p className="text-[13.5px] text-ink-2 leading-snug mt-1.5">{SAVE_FAILED_SUB}</p>}
-        {saveNote && <p role="alert" className="text-[13px] text-accent leading-snug mt-1.5">{saveNote}</p>}
+        <p className="font-display text-[19px] leading-snug mt-0.5">{title}</p>
+        {!quiet && reply.sub && <p className="text-[12.5px] text-muted leading-snug mt-1">{reply.sub}</p>}
+        {failed && <p className="text-[12.5px] text-muted leading-snug mt-1">{SAVE_FAILED_SUB}</p>}
+        {saveNote && <p role="alert" className="text-[12.5px] text-accent leading-snug mt-1">{saveNote}</p>}
       </div>
 
       {!quiet && !!reply.lines?.length && <Lines lines={reply.lines} onOption={onOption} />}
       {!quiet && sections.length > 0 && (
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           {sections.map((s, i) => (
             <Section key={s.title} section={s} open={i < openFirst} onOption={onOption} />
           ))}
