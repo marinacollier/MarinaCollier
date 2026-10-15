@@ -993,6 +993,8 @@ export interface DailyCheckIn extends Entity {
   corpo?: 'cansado' | 'normal' | 'forte'
   humor?: 1 | 2 | 3 | 4 | 5
   nota?: string
+  /** Last night's sleep, recorded on the day she woke up (the quick "Sono" form). `sono` stays the 3-level summary. */
+  sleep?: { bed?: TimeHM; wake?: TimeHM; hours?: number; quality?: 1 | 2 | 3 | 4 | 5 }
   habits: {
     agua: number
     proteina: boolean
