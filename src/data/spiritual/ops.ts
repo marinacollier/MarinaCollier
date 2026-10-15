@@ -17,7 +17,7 @@ export function setSessionDone(id: ID, done: boolean): boolean | undefined {
   if (!s) return undefined
   const patch: Partial<SpiritualSession> = done
     ? { status: 'concluido', completedAt: s.status === 'concluido' ? s.completedAt : nowISO() }
-    : { status: hasWork(id) ? 'em_andamento' : 'pendente', completedAt: undefined, importedDone: undefined }
+    : { status: hasWork(id) ? 'em_andamento' : 'pendente', completedAt: undefined, importedDone: undefined, doneNote: undefined }
   actions.update('spiritualSessions', id, patch)
   return done
 }
@@ -76,4 +76,47 @@ export function savePrayer(fields: { title?: string; content: string; category: 
     return getDB().spiritualPrayers.find((p) => p.id === id)
   }
   return actions.create('spiritualPrayers', { title, content, category: fields.category })
+}
+
+/**
+ * Retroactive marking ("li e não registrei"): several sessions at once, with the date she picks or none
+ * (unknown — never invented). Sessions already done keep their status/date. Returns how many changed.
+ */
+export function markSessionsDone(ids: ID[], date?: string): number {
+  let n = 0
+  for (const id of ids) {
+    const s = getDB().spiritualSessions.find((x) => x.id === id)
+    if (!s || s.status === 'concluido') continue
+    actions.update('spiritualSessions', id, date ? { status: 'concluido', completedAt: new Date(`${date}T12:00:00`).toISOString() } : { status: 'concluido', completedAt: undefined, doneNote: s.doneNote ?? 'data desconhecida' })
+    n++
+  }
+  return n
+}
+
+/** The notebook record the study page edits: the most recent entry of the session. */
+export function currentJournal(sessionId: ID): SpiritualJournalEntry | undefined {
+  return getDB()
+    .spiritualJournal.filter((j) => j.sessionId === sessionId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
+}
+
+/**
+ * Autosave of the notebook: ONE record per session (the current one), created on the first non-empty text
+ * and then updated in place — never duplicated. Clearing a field clears it (her choice); the record itself
+ * is never deleted here. Returns the record (undefined while there is nothing to write).
+ */
+export function saveJournalDraft(sessionId: ID, fields: JournalFields): SpiritualJournalEntry | undefined {
+  const s = getDB().spiritualSessions.find((x) => x.id === sessionId)
+  if (!s) return undefined
+  const current = currentJournal(sessionId)
+  const data = clean(fields)
+  if (current) {
+    const changed = (Object.keys(data) as (keyof JournalFields)[]).some((k) => current[k] !== data[k])
+    if (changed) actions.update('spiritualJournal', current.id, data)
+    return getDB().spiritualJournal.find((j) => j.id === current.id)
+  }
+  if (isEmptyJournal(fields)) return undefined
+  const entry = actions.create('spiritualJournal', { sessionId, planId: s.planId, reference: s.scriptureReference, ...data })
+  touch(sessionId)
+  return entry
 }

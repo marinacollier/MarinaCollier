@@ -80,3 +80,6 @@ export const STUDY_SECTIONS: { key: Exclude<keyof BibleStudyContent, 'perguntas'
   { key: 'leituraContemplativa', label: 'Leitura contemplativa e psicológica' },
   { key: 'aplicacaoPessoal', label: 'Aplicação pessoal' },
 ]
+
+/** "Importar estudo" (optionally for a given session). */
+export const importRoute = (sessionId?: string) => (sessionId ? `/biblia/importar?estudo=${encodeURIComponent(sessionId)}` : '/biblia/importar')

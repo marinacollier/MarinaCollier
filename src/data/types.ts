@@ -394,6 +394,10 @@ export interface UserProfile {
   removedSeedIds?: string[]
   /** Bundled Daily Briefings (by date) already run through the importer on this install — never twice. */
   briefingsApplied?: DateKey[]
+  /** Bíblia reconciliations (by id, e.g. '2026-10-15') she reviewed and applied — never twice. */
+  spiritualUpdatesApplied?: string[]
+  /** "Importar estudo" history (what came in, when, which fields she kept). */
+  spiritualImports?: SpiritualImportLog[]
   /** Lumos may apply small meal adjustments without asking (off by default; always undoable). */
   lumosAutoApplySmall?: boolean
   /** Last time Marina talked to Lumos / opened Home — ChangeFeed baseline ("o que mudou?"). */
@@ -1907,6 +1911,8 @@ export interface SpiritualSession extends Entity {
   importedDone?: boolean
   /** A complementary text inside a plan (e.g. Mateus 5–7 next to Lucas). */
   complementary?: boolean
+  /** A quiet fact about how it was confirmed (e.g. "leitura confirmada por foto"). Never a reflection. */
+  doneNote?: string
 }
 
 /** The ten parts of a guided study (Estudar com IA). */
@@ -1926,7 +1932,8 @@ export interface BibleStudyContent {
 export interface SpiritualStudy extends Entity {
   sessionId: ID
   content: BibleStudyContent
-  contentSource: 'lumos'
+  /** 'lumos' = Estudar com IA; 'importado' = pasted via "Importar estudo" (fields she didn't import stay ''). */
+  contentSource: 'lumos' | 'importado'
   generatedAt: ISODateTime
   /** Her notes/transcription sent along (kept so she knows what the study was based on). */
   userNotes?: string
@@ -1946,6 +1953,16 @@ export interface SpiritualJournalEntry extends Entity {
   keyword?: string
   prayer?: string
   notes?: string
+}
+
+export interface SpiritualImportLog {
+  at: ISODateTime
+  sessionId: ID
+  reference: string
+  /** Import field keys actually written. */
+  fields: string[]
+  /** Fingerprint of session + payload (the same paste is recognised as already imported). */
+  hash: string
 }
 
 export type SpiritualPrayerCategory = 'oracao' | 'intencao' | 'gratidao' | 'reflexao'

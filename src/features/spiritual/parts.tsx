@@ -13,7 +13,7 @@ export const SUBTITLE = 'Uma fé que pensa, questiona, acolhe e transforma.'
 
 /** Check / uncheck a session (same writer as the Home), saved right away, with Desfazer. */
 export function checkSession(s: SpiritualSession, done: boolean) {
-  const before = { status: s.status, completedAt: s.completedAt, importedDone: s.importedDone }
+  const before = { status: s.status, completedAt: s.completedAt, importedDone: s.importedDone, doneNote: s.doneNote }
   setSessionDone(s.id, done)
   void persist()
   toast(done ? `${s.scriptureReference} concluído` : `${s.scriptureReference} desmarcado — suas reflexões continuam aqui`, {
@@ -30,7 +30,8 @@ export function checkSession(s: SpiritualSession, done: boolean) {
 export function doneLabel(s: SpiritualSession): string | undefined {
   if (s.status !== 'concluido') return undefined
   if (s.completedAt) return `concluído em ${formatShortDate(toDateKey(new Date(s.completedAt)))}`
-  return s.importedDone ? 'concluído antes do app' : 'concluído'
+  if (s.importedDone) return 'concluído antes do app'
+  return s.doneNote ? `concluído · ${s.doneNote}` : 'concluído'
 }
 
 export function SessionRow({ s, annotated, showPlan }: { s: SpiritualSession; annotated?: boolean; showPlan?: string }) {
