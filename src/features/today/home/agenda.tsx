@@ -1,148 +1,61 @@
 /**
- * HOJE + PRÓXIMOS — the Home as a command center, calm by progressive disclosure:
- *   Hoje       open: mais cedo (folded) · agora · depois · quando der hoje · feitos hoje (folded)
- *   Próximos   amanhã with its main items · each next day as one line (tap = everything) · sem dia (folded)
- * Rows come from the ActionItem projection (one record each). A small uppercase front label says where it
- * comes from; the action stays the biggest thing on the line.
+ * AGORA · HOJE · PRÓXIMOS DIAS — every list on Home is the standard ItemRow:
+ *   check · title · area tag + one fact · time on the right · priority dot.
+ * Tapping a row (not the check) opens the one quick-edit sheet (Dia · Hora · Obs · Abrir completo).
+ * Rows come from the ActionItem projection (data/agenda/items.ts); the split/meta is ./rows.ts.
  */
-import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Check, ChevronDown, ChevronRight } from 'lucide-react'
-import type { ActionItem, FrontGroup, TodaySections, UpcomingDay } from '@/data/agenda/items'
-import type { DateKey } from '@/data/types'
-import { WEEKDAY_SHORT, addDays, formatDayMonth, weekday } from '@/lib/date'
-import { toast } from '@/app/ui-store'
-import { promoteBacklog } from '@/data/briefing/backlog'
-import { persist } from '@/data/store'
+import { useMemo, useState, type ReactNode } from 'react'
+import { ChevronDown, ChevronRight } from 'lucide-react'
+import type { RowArea } from '@/components/ui/ItemRow'
+import { AREA_TAG, ItemList, ItemRow } from '@/components/ui'
+import { openSheet, toast } from '@/app/ui-store'
+import type { ActionItem, UpcomingDay } from '@/data/agenda/items'
+import { persist, useDB } from '@/data/store'
+import type { DateKey, DayPriority } from '@/data/types'
+import { WEEKDAY_SHORT, weekday } from '@/lib/date'
 import { haptic } from '@/lib/haptics'
 import { cn } from '@/lib/cn'
-import { checkItem, openItem } from './act'
-import { Eyebrow } from './blocks'
+import { setPriorityDone } from '../priorities'
+import { openPriorities } from '../open-priorities'
+import { checkItem } from './act'
+import { areaOf, daySummary, rowView, type HomeLists } from './rows'
 
-type Filter = 'tudo' | FrontGroup
-const FILTERS: { id: Filter; label: string }[] = [
-  { id: 'tudo', label: 'Tudo' },
-  { id: 'trabalho', label: 'Trabalho' },
-  { id: 'corpo', label: 'Corpo' },
-  { id: 'vida', label: 'Vida' },
-]
-const keep = (f: Filter) => (i: ActionItem) => f === 'tudo' || i.front.group === f
-
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
-
-function CheckButton({ item, onDone }: { item: ActionItem; onDone?: () => void }) {
-  const done = item.status === 'done'
-  if (item.check === 'none') {
-    return (
-      <span className="h-11 w-9 shrink-0 inline-flex items-center justify-center" aria-hidden>
-        <span className={cn('h-[7px] w-[7px] rounded-full', item.important ? 'bg-accent' : 'bg-line')} />
-      </span>
-    )
-  }
-  const verb = item.check === 'meal' ? 'Comi' : item.check === 'workout' ? 'Treino feito' : item.check === 'bill' ? 'Paguei' : 'Concluir'
+export function Eyebrow({ children, action }: { children: ReactNode; action?: ReactNode }) {
   return (
-    <button
-      type="button"
-      aria-label={done ? `Desmarcar ${item.title}` : `${verb}: ${item.title}`}
-      aria-pressed={done}
-      onClick={() => {
-        checkItem(item)
-        onDone?.()
-      }}
-      className="h-11 w-9 shrink-0 -ml-1 inline-flex items-center justify-center active:scale-90 transition"
-    >
-      <span className={cn('h-[22px] w-[22px] rounded-full border-[1.5px] inline-flex items-center justify-center transition-colors', done ? 'bg-sage border-sage text-bg' : 'border-ink/30')}>
-        {done && <Check size={13} strokeWidth={3} />}
-      </span>
-    </button>
-  )
-}
-
-/** A backlog item gets a day right here (it becomes a real to-do on that day). */
-function GiveADay({ item, today }: { item: ActionItem; today: DateKey }) {
-  const monday = addDays(today, ((8 - weekday(today)) % 7) || 7)
-  const options: { label: string; date: DateKey }[] = [
-    { label: 'Hoje', date: today },
-    { label: 'Amanhã', date: addDays(today, 1) },
-    ...(monday !== addDays(today, 1) ? [{ label: `Segunda ${formatDayMonth(monday)}`, date: monday }] : []),
-  ]
-  const give = (date: DateKey, label: string) => {
-    const undo = promoteBacklog(item.refId, date)
-    void persist()
-    haptic('success')
-    toast(`${item.title} → ${label.toLowerCase()} ✓`, {
-      action: {
-        label: 'Desfazer',
-        run: () => {
-          undo()
-          void persist()
-        },
-      },
-    })
-  }
-  return (
-    <div className="flex flex-wrap gap-1.5 pb-2 pl-9">
-      {options.map((o) => (
-        <button key={o.label} type="button" onClick={() => give(o.date, o.label)} className="h-8 px-3 rounded-full bg-surface-2 text-[12.5px] text-ink-2 active:scale-95 transition">
-          {o.label}
-        </button>
-      ))}
-      <label className="h-8 px-3 rounded-full bg-surface-2 text-[12.5px] text-ink-2 inline-flex items-center gap-1 relative">
-        Outro dia
-        <input type="date" min={today} aria-label={`Escolher dia para ${item.title}`} className="absolute inset-0 opacity-0" onChange={(e) => e.target.value && give(e.target.value, formatDayMonth(e.target.value))} />
-      </label>
+    <div className="flex items-center justify-between min-h-9 mb-0.5">
+      <h2 className="eyebrow">{children}</h2>
+      {action}
     </div>
   )
 }
 
-export function ActionRow({ item, today, showTime = true }: { item: ActionItem; today: DateKey; showTime?: boolean }) {
-  const navigate = useNavigate()
-  const [open, setOpen] = useState(false)
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+
+/** One ActionItem as the standard row. */
+export function HomeRow({ item, today, minutes, showWhen = true }: { item: ActionItem; today: DateKey; minutes: number; showWhen?: boolean }) {
+  const db = useDB()
+  const v = rowView(db, item, today, minutes)
   const done = item.status === 'done'
-  const routine = item.check === 'routine' && !!item.children?.length
-  const backlog = item.refType === 'backlogItem'
   return (
-    <li>
-      <div className="flex items-start gap-1.5 min-h-[52px]">
-        {showTime && <span className={cn('w-[50px] shrink-0 pt-[13px] font-sport text-[16px] tabular-nums', done ? 'text-muted/60' : 'text-ink')}>{item.start ?? ''}</span>}
-        <CheckButton item={item} />
-        <button type="button" aria-expanded={backlog ? open : undefined} onClick={() => (routine || backlog ? setOpen((o) => !o) : openItem(item, today, navigate))} className="flex-1 min-w-0 text-left py-[7px] active:opacity-70">
-          {(item.front.label || item.priority !== undefined) && (
-            <span className="block text-[10.5px] tracking-[0.12em] uppercase text-muted font-semibold leading-4 truncate">
-              {item.priority !== undefined && <span className="text-accent">Top {item.priority + 1}</span>}
-              {item.priority !== undefined && item.front.label && ' · '}
-              {item.front.label}
-            </span>
-          )}
-          <span className="block text-[15.5px] leading-snug">
-            {item.emoji && <span className="mr-1.5">{item.emoji}</span>}
-            <span className={done ? 'text-muted line-through decoration-muted/40' : 'text-ink'}>{item.title}</span>
-            {(item.sub || (done && item.doneAt)) && <span className="text-muted text-[13px]"> · {done && item.doneAt ? `✓ ${item.doneAt}` : item.sub}</span>}
-          </span>
-        </button>
-        {routine && (
-          <button type="button" aria-label={open ? `Recolher ${item.title}` : `Ver itens de ${item.title}`} onClick={() => setOpen((o) => !o)} className="h-11 w-9 shrink-0 inline-flex items-center justify-center text-muted">
-            <ChevronDown size={16} className={cn('transition-transform', open && 'rotate-180')} />
-          </button>
-        )}
-      </div>
-      {backlog && open && !done && <GiveADay item={item} today={today} />}
-      {routine && open && (
-        <ul className={cn(showTime ? 'pl-[50px]' : 'pl-2')}>
-          {item.children!.map((c) => (
-            <ActionRow key={c.key} item={{ ...c, front: { label: '', group: c.front.group } }} today={today} showTime={false} />
-          ))}
-        </ul>
-      )}
-    </li>
+    <ItemRow
+      title={item.title}
+      area={v.area}
+      meta={v.meta}
+      late={v.late}
+      priority={v.priority}
+      when={showWhen ? item.start : undefined}
+      checked={done}
+      onCheck={item.check === 'none' ? undefined : () => checkItem(item)}
+      onOpen={() => openSheet('itemEdit', { item, today })}
+    />
   )
 }
 
-function Fold({ label, children, defaultOpen = false }: { label: string; children: React.ReactNode; defaultOpen?: boolean }) {
-  const [open, setOpen] = useState(defaultOpen)
+function Fold({ label, children }: { label: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false)
   return (
     <div>
-      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="min-h-11 w-full flex items-center gap-1.5 text-left text-[13px] text-muted active:opacity-70">
+      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="min-h-11 w-full flex items-center gap-1.5 text-left text-[13.5px] text-muted active:opacity-70">
         <ChevronRight size={14} className={cn('transition-transform', open && 'rotate-90')} />
         {label}
       </button>
@@ -151,78 +64,123 @@ function Fold({ label, children, defaultOpen = false }: { label: string; childre
   )
 }
 
-function Sub({ children }: { children: React.ReactNode }) {
-  return <div className="text-[11px] tracking-[0.18em] uppercase text-muted font-semibold mt-4 mb-0.5">{children}</div>
+// ─── AGORA ──────────────────────────────────────────────────────────────────
+
+export function AgoraBlock({ items, today, minutes }: { items: ActionItem[]; today: DateKey; minutes: number }) {
+  if (!items.length) return null
+  return (
+    <section aria-label="Agora">
+      <Eyebrow>
+        <span className="text-accent">Agora</span>
+      </Eyebrow>
+      <ItemList>
+        {items.map((i) => (
+          <HomeRow key={i.key} item={i} today={today} minutes={minutes} />
+        ))}
+      </ItemList>
+    </section>
+  )
 }
 
 // ─── HOJE ───────────────────────────────────────────────────────────────────
 
-export function HojeBlock({ sections, today }: { sections: TodaySections; today: DateKey }) {
-  const [filter, setFilter] = useState<Filter>('tudo')
-  const f = keep(filter)
-  const s = useMemo(() => ({ earlier: sections.earlier.filter(f), now: sections.now.filter(f), later: sections.later.filter(f), anytime: sections.anytime.filter(f), done: sections.done.filter(f) }), [sections, f])
-  const open = s.earlier.length + s.now.length + s.later.length + s.anytime.length
-  const showFilters = sections.total > 8
+type Filter = 'tudo' | RowArea
+const FILTER_KEY = 'marina.home.filter'
+function readFilter(): Filter {
+  try {
+    return (localStorage.getItem(FILTER_KEY) as Filter | null) ?? 'tudo'
+  } catch {
+    return 'tudo'
+  }
+}
+function writeFilter(f: Filter) {
+  try {
+    localStorage.setItem(FILTER_KEY, f)
+  } catch {
+    /* private mode: the choice just isn't remembered */
+  }
+}
+
+/** Area chip order. */
+const ORDER: RowArea[] = ['trabalho', 'creator', 'corpo', 'vida', 'casa', 'luna', 'dinheiro', 'viagem', 'estudo', 'fe']
+
+function LooseRow({ p, today }: { p: DayPriority; today: DateKey }) {
+  return (
+    <ItemRow
+      title={p.title}
+      meta="importante hoje"
+      priority={1}
+      checked={p.done}
+      onCheck={(next) => {
+        setPriorityDone(p.id, next)
+        void persist()
+        if (next) {
+          haptic('success')
+          toast(`${p.title} ✓`, { action: { label: 'Desfazer', run: () => (setPriorityDone(p.id, false), void persist()) } })
+        }
+      }}
+      onOpen={() => openPriorities(today)}
+    />
+  )
+}
+
+export function HojeBlock({ lists, loose, today, minutes }: { lists: HomeLists; loose: DayPriority[]; today: DateKey; minutes: number }) {
+  const [filter, setFilterState] = useState<Filter>(readFilter)
+  const areas = useMemo(() => {
+    const set = new Set([...lists.agora, ...lists.hoje, ...lists.done].map(areaOf))
+    return ORDER.filter((a) => set.has(a))
+  }, [lists])
+  const active: Filter = filter !== 'tudo' && !areas.includes(filter) ? 'tudo' : filter
+  const keep = (i: ActionItem) => active === 'tudo' || areaOf(i) === active
+  const open = lists.hoje.filter(keep)
+  const done = lists.done.filter(keep)
+  const looseOpen = active === 'tudo' ? loose.filter((p) => !p.done) : []
+  const looseDone = active === 'tudo' ? loose.filter((p) => p.done) : []
+  const setFilter = (f: Filter) => {
+    setFilterState(f)
+    writeFilter(f)
+  }
+  if (!lists.hoje.length && !lists.done.length && !loose.length) return null
+  const pending = open.length + looseOpen.length
   return (
     <section aria-label="Hoje">
-      <Eyebrow action={<span className="text-[13px] text-muted">{open ? plural(open, 'pendente', 'pendentes') : ''}</span>}>Hoje</Eyebrow>
-      {showFilters && (
-        <div className="flex gap-1.5 -mt-0.5 mb-1" role="tablist" aria-label="Filtrar">
-          {FILTERS.map((x) => (
-            <button key={x.id} type="button" role="tab" aria-selected={filter === x.id} onClick={() => setFilter(x.id)} className={cn('h-8 px-3 rounded-full text-[12.5px] transition-colors', filter === x.id ? 'bg-ink text-bg' : 'text-muted active:bg-surface-2')}>
-              {x.label}
+      <Eyebrow action={pending ? <span className="text-[13px] text-muted">{plural(pending, 'aberta', 'abertas')}</span> : undefined}>Hoje</Eyebrow>
+      {areas.length > 1 && (
+        <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1" role="tablist" aria-label="Filtrar por área">
+          {(['tudo', ...areas] as Filter[]).map((a) => (
+            <button
+              key={a}
+              type="button"
+              role="tab"
+              aria-selected={active === a}
+              onClick={() => setFilter(a)}
+              className={cn('h-8 px-3 rounded-full text-[13px] shrink-0 transition-colors', active === a ? 'bg-ink text-bg' : 'bg-surface-2 text-ink-2 active:bg-line')}
+            >
+              {a === 'tudo' ? 'Tudo' : AREA_TAG[a].label}
             </button>
           ))}
         </div>
       )}
-      {open === 0 && <p className="text-[15px] text-ink-2 py-2">{s.done.length ? 'Tudo feito por hoje ✨' : 'Nada pendente hoje ✨'}</p>}
-      {s.earlier.length > 0 && (
-        <Fold label={`Mais cedo · ${plural(s.earlier.length, 'em aberto', 'em aberto')}`}>
-          <ul>
-            {s.earlier.map((i) => (
-              <ActionRow key={i.key} item={i} today={today} />
-            ))}
-          </ul>
-        </Fold>
-      )}
-      {s.now.length > 0 && (
-        <>
-          <Sub>Agora</Sub>
-          <ul>
-            {s.now.map((i) => (
-              <ActionRow key={i.key} item={i} today={today} />
-            ))}
-          </ul>
-        </>
-      )}
-      {s.later.length > 0 && (
-        <>
-          <Sub>Depois</Sub>
-          <ul>
-            {s.later.map((i) => (
-              <ActionRow key={i.key} item={i} today={today} />
-            ))}
-          </ul>
-        </>
-      )}
-      {s.anytime.length > 0 && (
-        <>
-          <Sub>Quando der hoje</Sub>
-          <ul>
-            {s.anytime.map((i) => (
-              <ActionRow key={i.key} item={i} today={today} showTime={false} />
-            ))}
-          </ul>
-        </>
-      )}
-      {s.done.length > 0 && (
-        <div className="mt-2">
-          <Fold label={`Feitos hoje · ${s.done.length}`}>
-            <ul>
-              {s.done.map((i) => (
-                <ActionRow key={i.key} item={i} today={today} />
+      {pending === 0 && <p className="text-[15px] text-ink-2 py-3">{done.length || looseDone.length ? 'Tudo feito por aqui ✨' : 'Nada aberto aqui ✨'}</p>}
+      <ItemList>
+        {looseOpen.map((p) => (
+          <LooseRow key={p.id} p={p} today={today} />
+        ))}
+        {open.map((i) => (
+          <HomeRow key={i.key} item={i} today={today} minutes={minutes} />
+        ))}
+      </ItemList>
+      {done.length + looseDone.length > 0 && (
+        <div className="mt-1 border-t border-line/60">
+          <Fold label={`Feitos hoje · ${done.length + looseDone.length}`}>
+            <ItemList>
+              {looseDone.map((p) => (
+                <LooseRow key={p.id} p={p} today={today} />
               ))}
-            </ul>
+              {done.map((i) => (
+                <HomeRow key={i.key} item={i} today={today} minutes={minutes} />
+              ))}
+            </ItemList>
           </Fold>
         </div>
       )}
@@ -230,93 +188,69 @@ export function HojeBlock({ sections, today }: { sections: TodaySections; today:
   )
 }
 
-// ─── PRÓXIMOS ───────────────────────────────────────────────────────────────
+// ─── PRÓXIMOS DIAS ──────────────────────────────────────────────────────────
 
 function dayName(date: DateKey, index: number): string {
   if (index === 0) return 'Amanhã'
-  return `${WEEKDAY_SHORT[weekday(date)]} ${formatDayMonth(date)}`
+  const w = WEEKDAY_SHORT[weekday(date)].toLocaleLowerCase('pt-BR')
+  return `${w.charAt(0).toLocaleUpperCase('pt-BR')}${w.slice(1)} ${Number(date.slice(8, 10))}`
 }
 
 function DayLine({ day, today, index }: { day: UpcomingDay; today: DateKey; index: number }) {
-  const [open, setOpen] = useState(index === 0)
-  const first = index === 0
-  const [all, setAll] = useState(false)
-  // Tomorrow opens with its first 4 (timed first, then Top 3 / what matters); the rest is one tap away.
-  const list = first && !all ? day.items.slice(0, 4) : day.items
-  const summary = day.highlights.map((h) => (h.start ? `${h.title.replace(/^.*?·\s*/, '')} ${h.start}` : h.title)).slice(0, 2).join(' · ')
+  const [open, setOpen] = useState(false)
+  const summary = daySummary(day.items, day.highlights)
+  const empty = day.count === 0
   return (
-    <li className="border-t border-line/70 first:border-t-0">
-      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="w-full min-h-[52px] flex items-baseline gap-3 py-2 text-left active:opacity-70">
-        <span className={cn('w-[86px] shrink-0 text-[14px] font-semibold', first ? 'text-ink' : 'text-ink-2')}>{dayName(day.date, index)}</span>
-        <span className="flex-1 min-w-0">
-          <span className="block text-[13.5px] text-muted">
-            {day.count ? plural(day.count, 'item', 'itens') : 'livre'}
-            {day.prioCount > 0 && ` · ${plural(day.prioCount, 'prioritário', 'prioritários')}`}
-          </span>
-          {!open && summary && <span className="block text-[13.5px] text-ink-2 truncate">{summary}</span>}
-        </span>
-        <ChevronDown size={15} className={cn('text-muted shrink-0 transition-transform self-center', open && 'rotate-180')} />
+    <li>
+      <button type="button" aria-expanded={empty ? undefined : open} disabled={empty} onClick={() => setOpen((o) => !o)} className="w-full min-h-[52px] flex items-center gap-3 text-left enabled:active:opacity-70">
+        <span className={cn('w-[78px] shrink-0 text-[15px]', empty ? 'text-muted' : 'text-ink')}>{dayName(day.date, index)}</span>
+        <span className={cn('flex-1 min-w-0 truncate text-[13.5px]', empty ? 'text-muted/70' : 'text-ink-2')}>{summary}</span>
+        {!empty && <ChevronDown size={15} className={cn('text-muted shrink-0 transition-transform', open && 'rotate-180')} />}
       </button>
-      {open && day.items.length > 0 && (
-        <ul className="pb-2">
-          {list.map((i) => (
-            <ActionRow key={i.key} item={i} today={today} />
+      {open && (
+        <ItemList className="pb-2 border-t border-line/60">
+          {day.items.map((i) => (
+            <HomeRow key={i.key} item={i} today={today} minutes={0} />
           ))}
-          {first && !all && day.items.length > 4 && (
-            <li>
-              <button type="button" onClick={() => setAll(true)} className="h-10 pl-[86px] text-[13px] text-accent font-medium">
-                ver todos os {day.items.length}
-              </button>
-            </li>
-          )}
-        </ul>
+        </ItemList>
       )}
     </li>
   )
 }
 
 export function ProximosBlock({ days, undated, radar = [], today }: { days: UpcomingDay[]; undated: ActionItem[]; radar?: ActionItem[]; today: DateKey }) {
-  const byFront = useMemo(() => {
-    const m = new Map<string, ActionItem[]>()
-    for (const i of undated) m.set(i.front.label || 'GERAL', [...(m.get(i.front.label || 'GERAL') ?? []), i])
-    return [...m.entries()]
-  }, [undated])
+  if (!days.length && !undated.length && !radar.length) return null
   return (
-    <section aria-label="Próximos">
-      <Eyebrow>Próximos</Eyebrow>
-      <ul>
+    <section aria-label="Próximos dias">
+      <Eyebrow>Próximos dias</Eyebrow>
+      <ul className="divide-y divide-line/60">
         {days.map((d, i) => (
           <DayLine key={d.date} day={d} today={today} index={i} />
         ))}
       </ul>
-      {/* Future intentions from the briefing's backlog: not to-dos until she gives them a day. */}
       {radar.length > 0 && (
-        <div className="border-t border-line/70">
-          <Fold label={`No radar · ${plural(radar.length, 'item futuro', 'itens futuros')}`}>
-            <ul>
+        <div className="border-t border-line/60">
+          <Fold label={`No radar · ${plural(radar.length, 'ideia futura', 'ideias futuras')}`}>
+            <ItemList>
               {radar.map((i) => (
-                <ActionRow key={i.key} item={i} today={today} showTime={false} />
+                <HomeRow key={i.key} item={i} today={today} minutes={0} showWhen={false} />
               ))}
-            </ul>
+            </ItemList>
           </Fold>
         </div>
       )}
       {undated.length > 0 && (
-        <div className="border-t border-line/70">
-          <Fold label={`Sem dia · ${plural(undated.length, 'coisa pra fazer', 'coisas pra fazer')}`}>
-            {byFront.map(([front, list]) => (
-              <div key={front}>
-                <Sub>{front}</Sub>
-                <ul>
-                  {list.map((i) => (
-                    <ActionRow key={i.key} item={{ ...i, front: { label: '', group: i.front.group } }} today={today} showTime={false} />
-                  ))}
-                </ul>
-              </div>
-            ))}
+        <div className="border-t border-line/60">
+          <Fold label={`Sem dia · ${plural(undated.length, 'coisa', 'coisas')}`}>
+            <ItemList>
+              {undated.map((i) => (
+                <HomeRow key={i.key} item={i} today={today} minutes={0} showWhen={false} />
+              ))}
+            </ItemList>
           </Fold>
         </div>
       )}
     </section>
   )
 }
+

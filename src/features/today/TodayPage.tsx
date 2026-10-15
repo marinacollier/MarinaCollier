@@ -2,12 +2,12 @@
  * INÍCIO — the command center of the day and the week, calm by progressive disclosure:
  *   1. greeting + date + ONE smart line (or nothing)
  *   2. LUMOS — the way in (text, voice, prints, files; answers inline)
- *   3. HOJE IMPORTA (Top 3 — what matters most; never a replacement for the full list)
- *   4. HOJE — every real thing of the day, from every front, checkable in place
- *   5. PRÓXIMOS — tomorrow open, the next days one line each, "sem dia" folded
- * Discreet lines appear only when they carry something real: needs-attention (one row), 0–3 insights,
- * what changed since the last visit, a close trip. Rows are a projection (data/agenda/items.ts) over
- * the real records — nothing is copied into a Task.
+ *   3. a quiet strip ONLY when something needs a decision (precisa de você · a close trip), one line each
+ *   4. AGORA — max 3: happening, soon, overdue
+ *   5. HOJE — ONE list of everything completable today from every area (filter by area), feitos folded
+ *   6. PRÓXIMOS DIAS — one summary line per day (tap = its rows), "sem dia"/radar folded
+ * Every list is the standard ItemRow; tapping a row opens the one quick-edit sheet (Dia · Hora · Obs).
+ * Rows are a projection (data/agenda/items.ts) over the real records — nothing is copied into a Task.
  */
 import { Suspense, useCallback, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -15,17 +15,18 @@ import { motion } from 'framer-motion'
 import { X } from 'lucide-react'
 import { ROUTES } from '@/app/routes'
 import { Page } from '@/components/ui'
-import { changeFeed, dailyBrief, homeSuggestions, lifeContext, needsAttention, proactiveInsights, type Now } from '@/data/intel'
-import { getDB, useDB } from '@/data/store'
-import { dayItems, todaySections, undatedItems, upcomingDays } from '@/data/agenda/items'
+import { dailyBrief, homeSuggestions, lifeContext, needsAttention, type Now } from '@/data/intel'
+import { useDB } from '@/data/store'
+import { dayItems, undatedItems, upcomingDays } from '@/data/agenda/items'
 import { radarItems } from '@/data/briefing/backlog'
 import { areaLocked, useLockState } from '@/app/lock-store'
 import { useNow } from '@/hooks/useToday'
 import { formatLongDate, greeting } from '@/lib/date'
 import { homeContext, tripPriorityItems } from './context'
-import { prioritiesOf } from './priorities'
-import { AttentionRow, ChangesLine, ImportaBlock, InsightLines, TripLine } from './home/blocks'
-import { HojeBlock, ProximosBlock } from './home/agenda'
+import { MAX_PRIORITIES, prioritiesOf } from './priorities'
+import { AttentionRow, TripLine } from './home/blocks'
+import { AgoraBlock, HojeBlock, ProximosBlock } from './home/agenda'
+import { homeLists, loosePriorities } from './home/rows'
 import { composerPlaceholder } from './home/day'
 import { LumosBox } from './home/LumosBox'
 import { LumosInline, lumosHref } from './home/lumos'
@@ -47,8 +48,7 @@ export default function TodayPage() {
   const now: Now = useMemo(() => ({ date: today, minutes, iso: clock.toISOString() }), [today, minutes, clock])
   const name = db.profile.name?.trim() || 'Marina'
 
-  // "o que mudou" is computed once, when Home opens; the baseline moves only when she leaves.
-  const [changes] = useState(() => changeFeed(getDB(), now))
+  // The "seen" baseline still moves when she leaves (Lumos uses it for "o que mudou").
   useMarkSeenOnLeave()
 
   const home = useMemo(() => homeContext(db, today, minutes), [db, today, minutes])
@@ -56,15 +56,14 @@ export default function TodayPage() {
   const brief = useMemo(() => dailyBrief(db, now) ?? life.today.notes[0]?.value, [db, now, life])
   const suggestions = useMemo(() => homeSuggestions(db, now).slice(0, 3), [db, now])
   const attention = useMemo(() => needsAttention(db, now), [db, now])
-  const insights = useMemo(() => proactiveInsights(db, now, 3), [db, now])
   const lock = useLockState()
   const hidden = useMemo(() => ({ carreira: areaLocked(db.profile.privacyLock, 'carreira', lock), dinheiro: areaLocked(db.profile.privacyLock, 'dinheiro', lock) }), [db.profile.privacyLock, lock])
   const items = useMemo(() => dayItems(db, today, today, { hidden }), [db, today, hidden])
-  const sections = useMemo(() => todaySections(items, minutes), [items, minutes])
-  const next = useMemo(() => upcomingDays(db, today, 6, { hidden }), [db, today, hidden])
+  const lists = useMemo(() => homeLists(items, minutes), [items, minutes])
+  const next = useMemo(() => upcomingDays(db, today, 7, { hidden }), [db, today, hidden])
   const undated = useMemo(() => undatedItems(db, today), [db, today])
   const radar = useMemo(() => radarItems(db, today), [db, today])
-  const priorities = useMemo(() => prioritiesOf(db, today), [db, today])
+  const loose = useMemo(() => loosePriorities(prioritiesOf(db, today).slice(0, MAX_PRIORITIES), items), [db, today, items])
 
   const trip = useMemo(() => {
     if (life.nextTrip) return life.nextTrip.daysLeft <= TRIP_LINE_DAYS ? life.nextTrip : undefined
@@ -87,7 +86,7 @@ export default function TodayPage() {
     void import('@/features/assistant/conversation').then((m) => m.sendAttachment(file, caption))
   }, [])
   const placeholder = composerPlaceholder(home.part, { workNow: home.part === 'dia' })
-  const hasLines = attention.length > 0 || insights.length > 0 || changes.items.length > 0 || !!trip
+  const hasStrip = attention.length > 0 || !!trip
 
   return (
     <Page>
@@ -130,22 +129,21 @@ export default function TodayPage() {
         )}
       </motion.div>
 
-      {hasLines && (
-        <motion.div {...rise(2)} className="mt-6 space-y-1.5">
+      {hasStrip && (
+        <motion.div {...rise(2)} className="mt-5">
           <AttentionRow items={attention} onAsk={ask} />
-          {/* The trip shows once, as its own line (with its to-dos and a check each) — not also as an insight. */}
-          <InsightLines items={trip ? insights.filter((i) => !i.key.startsWith(`trip:${trip.id}`)) : insights} onAsk={ask} />
-          <ChangesLine summary={changes.summary} items={changes.items} />
           {trip && <TripLine trip={trip} />}
         </motion.div>
       )}
 
-      <motion.div {...rise(3)} className="mt-9">
-        <ImportaBlock list={priorities} today={today} onAsk={ask} />
-      </motion.div>
+      {lists.agora.length > 0 && (
+        <motion.div {...rise(3)} className="mt-7">
+          <AgoraBlock items={lists.agora} today={today} minutes={minutes} />
+        </motion.div>
+      )}
 
-      <motion.div {...rise(4)} className="mt-8">
-        <HojeBlock sections={sections} today={today} />
+      <motion.div {...rise(4)} className="mt-7">
+        <HojeBlock lists={lists} loose={loose} today={today} minutes={minutes} />
       </motion.div>
 
       <motion.div {...rise(5)} className="mt-9">

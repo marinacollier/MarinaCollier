@@ -584,6 +584,8 @@ export interface Routine extends Entity {
   hasEssential?: boolean
   /** Label for the short version, e.g. "Essential". */
   essentialName?: string
+  /** Free note about the routine ("obs"), edited from any row of it. */
+  notes?: string
 }
 
 export interface RoutineItem extends Entity {

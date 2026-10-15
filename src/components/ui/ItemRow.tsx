@@ -53,9 +53,9 @@ export function ItemRow({ title, meta, area, when, priority, late, checked, onCh
   const tag = area ? AREA_TAG[area] : undefined
   const body = (
     <span className="flex-1 min-w-0 py-2.5">
-      <span className={cn('flex items-center gap-1.5 text-[15.5px] leading-snug', checked && 'line-through text-muted')}>
-        {priority && <span aria-label={priority === 1 ? 'prioridade alta' : 'prioridade média'} className={cn('h-1.5 w-1.5 rounded-full shrink-0', priority === 1 ? 'bg-accent' : 'bg-sand')} />}
-        <span className="truncate">{title}</span>
+      <span className={cn('flex items-baseline gap-1.5 text-[15.5px] leading-snug', checked && 'line-through text-muted')}>
+        {priority && <span aria-label={priority === 1 ? 'prioridade alta' : 'prioridade média'} className={cn('h-1.5 w-1.5 rounded-full shrink-0 self-center', priority === 1 ? 'bg-accent' : 'bg-sand')} />}
+        <span className="line-clamp-2 break-words">{title}</span>
       </span>
       {(tag?.label || meta) && (
         <span className="block text-[12.5px] leading-snug mt-0.5 truncate">
