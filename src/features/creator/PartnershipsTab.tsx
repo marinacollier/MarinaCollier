@@ -7,7 +7,7 @@ import type { BrandPartnership, Task } from '@/data/types'
 import { actions } from '@/data/store'
 import { haptic } from '@/lib/haptics'
 import { nowISO } from '@/lib/id'
-import { Button, Card, Checkbox, EmptyState, SectionTitle } from '@/components/ui'
+import { Button, Card, EmptyState, ItemList, ItemRow, SectionTitle } from '@/components/ui'
 import { useToday } from '@/hooks/useToday'
 import { relativeDay } from '@/lib/date'
 import { formatBRL } from '@/lib/money'
@@ -73,26 +73,20 @@ export default function PartnershipsTab() {
       {reviews.length > 0 && (
         <Card padded={false} className="overflow-hidden mb-3">
           <div className="eyebrow px-4 pt-3.5 pb-1">Para revisar</div>
-          <div className="divide-y divide-line/70">
+          <ItemList className="px-4">
             {reviews.map((t) => (
-              <div key={t.id} className="flex items-start gap-3 px-4 py-2.5 min-h-[52px]">
-                <div className="pt-0.5">
-                  <Checkbox
-                    checked={false}
-                    label={`Concluir ${t.title}`}
-                    onChange={() => {
-                      actions.update('tasks', t.id, { status: 'done', completedAt: nowISO() })
-                      haptic('success')
-                    }}
-                  />
-                </div>
-                <button type="button" onClick={() => openSheet('task', { id: t.id })} className="flex-1 min-w-0 text-left">
-                  <span className="block text-[15px] leading-snug">{t.title}</span>
-                  <span className="block text-[12.5px] text-muted mt-0.5">{reviewLabel(t, today)} · a confirmar</span>
-                </button>
-              </div>
+              <ItemRow
+                key={t.id}
+                title={t.title}
+                meta={reviewLabel(t, today)}
+                onCheck={() => {
+                  actions.update('tasks', t.id, { status: 'done', completedAt: nowISO() })
+                  haptic('success')
+                }}
+                onOpen={() => openSheet('task', { id: t.id })}
+              />
             ))}
-          </div>
+          </ItemList>
         </Card>
       )}
 

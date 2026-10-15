@@ -5,7 +5,7 @@ import { useDB } from '@/data/store'
 import type { DateKey } from '@/data/types'
 import { weekReport, type MenuItem } from '@/data/mealprep'
 import { toast } from '@/app/ui-store'
-import { Card, IconButton, Page, PageHeader, Segmented, SheetFrame } from '@/components/ui'
+import { Card, Chip, IconButton, Page, PageHeader, Segmented, SheetFrame } from '@/components/ui'
 import { useToday } from '@/hooks/useToday'
 import { addDays, formatDayMonth, startOfWeek, weekday } from '@/lib/date'
 import { Fade } from './components'
@@ -15,7 +15,7 @@ import { RecipeSheet, SwapSheet } from './sheets'
 
 type Tab = 'estrategia' | 'cardapio' | 'lista' | 'cozinhar' | 'potes' | 'portateis' | 'geladeira' | 'kit'
 
-/** Section-15 order. */
+/** Section-15 order (the sub-chips inside each of the three tabs). */
 const TABS: { value: Tab; label: string }[] = [
   { value: 'estrategia', label: 'Estratégia' },
   { value: 'cardapio', label: 'Cardápio' },
@@ -26,6 +26,15 @@ const TABS: { value: Tab; label: string }[] = [
   { value: 'geladeira', label: 'Geladeira x freezer' },
   { value: 'kit', label: 'Kit presencial' },
 ]
+
+/** Three tabs; each holds one or more sections, picked with chips. */
+type Group = 'cardapio' | 'compras' | 'preparo'
+const GROUPS: { value: Group; label: string; sections: Tab[] }[] = [
+  { value: 'cardapio', label: 'Cardápio', sections: ['estrategia', 'cardapio'] },
+  { value: 'compras', label: 'Compras', sections: ['lista'] },
+  { value: 'preparo', label: 'Preparo', sections: ['cozinhar', 'potes', 'portateis', 'geladeira', 'kit'] },
+]
+const groupOf = (t: Tab): Group => GROUPS.find((g) => g.sections.includes(t))!.value
 
 const SECTIONS: Record<Tab, (p: SectionProps) => React.ReactNode> = {
   estrategia: StrategySection,
@@ -76,6 +85,7 @@ export default function MealPrepPage() {
   }
 
   const Section = SECTIONS[tab]
+  const group = GROUPS.find((g) => g.value === groupOf(tab))!
   const end = addDays(weekStart, 6)
   const isDefault = weekStart === defaultWeek(today)
   const props: SectionProps = {
@@ -89,7 +99,7 @@ export default function MealPrepPage() {
 
   return (
     <Page>
-      <PageHeader eyebrow="corpo · alimentação" title="Meal prep da semana" subtitle="Seu plano do nutri, pronto pra semana real." back search={false} />
+      <PageHeader eyebrow="corpo · alimentação" title="Meal prep da semana" subtitle="o plano do nutri, pronto" back search={false} />
 
       <div className="flex items-center justify-between -mx-1.5 -mt-1 mb-3">
         <IconButton label="Semana anterior" onClick={() => setWeekStart(addDays(weekStart, -7))}>
@@ -117,8 +127,17 @@ export default function MealPrepPage() {
       </Card>
 
       <div className="sticky top-0 z-10 -mx-4 px-4 bg-bg/95 backdrop-blur mt-4 mb-4">
-        <Segmented<Tab> variant="tabs" value={tab} onChange={setTab} options={TABS} />
+        <Segmented<Group> variant="tabs" value={group.value} onChange={(g) => setTab(GROUPS.find((x) => x.value === g)!.sections[0])} options={GROUPS} />
       </div>
+      {group.sections.length > 1 && (
+        <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-1 px-1 -mt-1 mb-4" aria-label="Seções">
+          {TABS.filter((t) => group.sections.includes(t.value)).map((t) => (
+            <Chip key={t.value} selected={tab === t.value} onClick={() => setTab(t.value)} className="whitespace-nowrap">
+              {t.label}
+            </Chip>
+          ))}
+        </div>
+      )}
 
       <Fade k={`${tab}-${weekStart}`}>
         <Section {...props} />

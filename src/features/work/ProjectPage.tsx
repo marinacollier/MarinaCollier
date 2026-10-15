@@ -32,6 +32,14 @@ const TABS: { value: Tab; label: string }[] = [
   { value: 'changelog', label: 'Changelog' },
 ]
 
+/** Three tabs on top; the sections inside a tab are chips. ?tab= keeps naming the section (old links work). */
+type Group = 'geral' | 'trabalho' | 'registro'
+const GROUPS: { value: Group; label: string; sections: Tab[] }[] = [
+  { value: 'geral', label: 'Visão geral', sections: ['geral'] },
+  { value: 'trabalho', label: 'Tarefas', sections: ['tarefas', 'roadmap', 'waiting'] },
+  { value: 'registro', label: 'Registro', sections: ['reunioes', 'decisoes', 'wins', 'pessoas', 'links', 'notas', 'changelog'] },
+]
+
 /** Old links used ?tab=milestones. */
 function readTab(raw: string | null): Tab {
   const v = raw === 'milestones' ? 'roadmap' : raw
@@ -46,12 +54,13 @@ export default function ProjectPage() {
   const [params, setParams] = useSearchParams()
   const tab = readTab(params.get('tab'))
   const setTab = (t: Tab) => setParams(t === 'geral' ? {} : { tab: t }, { replace: true })
+  const group = GROUPS.find((g) => g.sections.includes(tab))!
   const project = db.projects.find((p) => p.id === id)
   const lastUpdate = useMemo(() => projectLastUpdate(db, id), [db, id])
   const tabsRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     // Keep the active tab visible in the horizontally scrolling tab bar.
-    const el = tabsRef.current?.querySelector<HTMLElement>('[aria-selected="true"]')
+    const el = tabsRef.current?.querySelector<HTMLElement>('[aria-pressed="true"]')
     el?.scrollIntoView?.({ block: 'nearest', inline: 'center', behavior: 'smooth' })
   }, [tab])
 
@@ -94,9 +103,16 @@ export default function ProjectPage() {
         </div>
       </Reveal>
 
-      <div ref={tabsRef}>
-        <Segmented variant="tabs" className="mt-5 -mx-4 px-4" value={tab} onChange={setTab} options={TABS} />
-      </div>
+      <Segmented variant="tabs" className="mt-5 -mx-4 px-4" value={group.value} onChange={(g) => setTab(GROUPS.find((x) => x.value === g)!.sections[0])} options={GROUPS} />
+      {group.sections.length > 1 && (
+        <div ref={tabsRef} className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-4 px-4 mt-3" aria-label="Seções">
+          {TABS.filter((t) => group.sections.includes(t.value)).map((t) => (
+            <Chip key={t.value} selected={tab === t.value} onClick={() => setTab(t.value)} className="whitespace-nowrap">
+              {t.label}
+            </Chip>
+          ))}
+        </div>
+      )}
 
       <div className="mt-4">
         {tab === 'geral' && <ProjectHome project={project} today={today} onTab={setTab} />}

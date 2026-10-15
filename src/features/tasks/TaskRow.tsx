@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { openSheet, toast } from '@/app/ui-store'
 import { removeWithUndo } from '@/app/undo'
-import { Checkbox, SwipeRow } from '@/components/ui'
+import { ItemRow, SwipeRow } from '@/components/ui'
 import { useDB } from '@/data/store'
 import { isTaskDoneOn } from '@/data/selectors'
 import type { DateKey, Task } from '@/data/types'
@@ -34,24 +34,21 @@ export function TaskRow({ task, date, note, className, showContext = true }: Tas
   const db = useDB()
   const day = date ?? todayKey()
   const done = isTaskDoneOn(db, task, day)
+  // One quiet fact on the meta line (the most useful one), the time/day on the right.
   const meta = useMemo(() => {
-    const parts: string[] = []
-    if (task.time) parts.push(task.time)
-    if (task.status === 'waiting' && task.waiting) {
-      parts.push(`com ${task.waiting.who}`)
-      if (task.waiting.followUpOn) parts.push(`cobrar ${relativeDay(task.waiting.followUpOn, day)}`)
-    }
-    if (task.status === 'review') parts.push('revisar / confirmar')
-    if (task.dueDate && task.dueDate !== task.date) parts.push(task.dueDate === day ? 'prazo hoje' : `prazo ${relativeDay(task.dueDate, day)}`)
-    if (task.date && task.date !== day && !note && task.status !== 'waiting') parts.push(relativeDay(task.date, day))
-    if (task.recurrence) parts.push(describeRecurrence(task.recurrence))
+    if (note) return note
+    if (task.status === 'waiting' && task.waiting) return task.waiting.followUpOn ? `${task.waiting.who} · cobrar ${relativeDay(task.waiting.followUpOn, day)}` : `com ${task.waiting.who}`
+    if (task.status === 'review') return 'revisar / confirmar'
+    if (task.dueDate && task.dueDate !== task.date) return task.dueDate === day ? 'prazo hoje' : `prazo ${relativeDay(task.dueDate, day)}`
     const project = task.projectId ? db.projects.find((p) => p.id === task.projectId) : undefined
-    if (project) parts.push(`${project.emoji} ${project.name}`)
+    if (project) return `${project.emoji} ${project.name}`
     const trip = task.tripId ? db.trips.find((t) => t.id === task.tripId) : undefined
-    if (trip) parts.push(`${trip.flag} ${trip.name}`)
-    if (task.needsMe && !done) parts.push('precisa de mim')
-    return parts
+    if (trip) return `${trip.flag} ${trip.name}`
+    if (task.recurrence) return describeRecurrence(task.recurrence)
+    if (task.needsMe && !done) return 'precisa de mim'
+    return undefined
   }, [task, db.projects, db.trips, day, note, done])
+  const when = task.time ?? (task.date && task.date !== day && !note && task.status !== 'waiting' ? relativeDay(task.date, day) : undefined)
 
   const ctx = contextOf(task)
 
@@ -61,24 +58,26 @@ export function TaskRow({ task, date, note, className, showContext = true }: Tas
       onComplete={done ? undefined : () => completeWithFeedback(task, true, day)}
       onDelete={() => removeWithUndo('tasks', task.id, 'Tarefa apagada')}
     >
-      <div className="flex items-center gap-3 pl-4 pr-3 min-h-[56px] py-2">
-        <Checkbox checked={done} onChange={(v) => completeWithFeedback(task, v, day)} label={`Concluir ${task.title}`} />
-        <button type="button" onClick={() => openSheet('task', { id: task.id })} className="flex-1 min-w-0 text-left py-1 pl-1">
-          <div className={cn('text-[15px] leading-snug transition-colors', done && 'text-muted line-through decoration-muted/40')}>{task.title}</div>
-          {(note || meta.length > 0) && (
-            <div className="text-[12.5px] text-muted mt-0.5 truncate">
-              {note && <span className="text-sand font-medium">{note}</span>}
-              {note && meta.length > 0 && ' · '}
-              {meta.join(' · ')}
-            </div>
-          )}
-        </button>
-        {showContext && ctx !== 'geral' && (
-          <span className="text-[15px] opacity-70 shrink-0" aria-hidden>
-            {CONTEXT_EMOJI[ctx]}
-          </span>
-        )}
-      </div>
+      <ul>
+        <ItemRow
+          className="pl-3.5 pr-3"
+          title={task.title}
+          meta={meta}
+          when={when}
+          priority={task.priority === 'alta' ? 1 : task.priority === 'media' ? 2 : undefined}
+          late={(!!task.dueDate && task.dueDate < day) || (!!note && !done)}
+          checked={done}
+          onCheck={(v) => completeWithFeedback(task, v, day)}
+          onOpen={() => openSheet('task', { id: task.id })}
+          trailing={
+            showContext && ctx !== 'geral' ? (
+              <span className="text-[15px] opacity-70 shrink-0" aria-hidden>
+                {CONTEXT_EMOJI[ctx]}
+              </span>
+            ) : undefined
+          }
+        />
+      </ul>
     </SwipeRow>
   )
 }

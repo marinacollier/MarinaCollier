@@ -7,7 +7,7 @@ import type { DateKey, DB, WorkoutGoal } from '@/data/types'
 import { modalityOf } from '@/data/selectors'
 import { openSheet } from '@/app/ui-store'
 import { ROUTES } from '@/app/routes'
-import { Button, Card, Checkbox, EmptyState, Pill, ProgressBar, SectionTitle } from '@/components/ui'
+import { Button, Card, EmptyState, ItemList, ItemRow, Pill, ProgressBar, SectionTitle } from '@/components/ui'
 import { addDays, countdownLabel, formatShortDate, relativeDay, startOfWeek } from '@/lib/date'
 import { cn } from '@/lib/cn'
 import { haptic } from '@/lib/haptics'
@@ -170,15 +170,11 @@ function GoalCard({ goal: g, today }: { goal: WorkoutGoal; today: DateKey }) {
         {g.kind === 'event' && (
           <div className="mt-1">
             {g.milestones.length > 0 ? (
-              <ul className="space-y-0.5">
+              <ItemList>
                 {g.milestones.map((m) => (
-                  <li key={m.id} className="flex items-center gap-3 min-h-11">
-                    <Checkbox size="sm" checked={m.done} onChange={() => toggleMilestone(m.id)} label={m.title} className="ml-0.5" />
-                    <span className={cn('text-[14.5px] leading-snug flex-1', m.done && 'text-muted line-through decoration-muted/40')}>{m.title}</span>
-                    {m.date && <span className="text-[12px] text-muted">{formatShortDate(m.date)}</span>}
-                  </li>
+                  <ItemRow key={m.id} title={m.title} when={m.date ? formatShortDate(m.date) : undefined} checked={m.done} onCheck={() => toggleMilestone(m.id)} onOpen={() => openSheet('workoutGoal', { id: g.id })} />
                 ))}
-              </ul>
+              </ItemList>
             ) : (
               <button type="button" className="text-[13.5px] text-muted h-10" onClick={() => openSheet('workoutGoal', { id: g.id })}>
                 + adicionar marcos da preparação

@@ -7,7 +7,7 @@ import type { Expense, Trip, TripItem, TripSection } from '@/data/types'
 import { useToday } from '@/hooks/useToday'
 import { ROUTES } from '@/app/routes'
 import { openSheet, toast } from '@/app/ui-store'
-import { Button, Card, EmptyState, IconButton, Page, Pill, ProgressBar, TextArea } from '@/components/ui'
+import { Button, Card, EmptyState, IconButton, Page, Pill, ProgressBar, Segmented, TextArea } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { formatBRL } from '@/lib/money'
 import { formatShortDate } from '@/lib/date'
@@ -31,6 +31,15 @@ import {
   tripExpenses,
   type TripTab,
 } from './selectors'
+
+/** Three tabs on top; the trip's sections inside each are chips (?s= still names the section). */
+type TripGroup = 'geral' | 'itens' | 'mais'
+const TRIP_GROUPS: { value: TripGroup; label: string; sections: TripTab[] }[] = [
+  { value: 'geral', label: 'Geral', sections: ['visao', 'revisar', 'antes_de_ir'] },
+  { value: 'itens', label: 'Itens', sections: ['roteiro', 'voo', 'hospedagem', 'transporte', 'reserva', 'quero_ir', 'comida', 'esporte', 'mala', 'comprar', 'documento'] },
+  { value: 'mais', label: 'Gastos e notas', sections: ['orcamento', 'gastos', 'notas', 'links', 'emergencia'] },
+]
+const groupOfTab = (t: TripTab) => TRIP_GROUPS.find((g) => g.sections.includes(t)) ?? TRIP_GROUPS[0]
 
 export default function TripPage() {
   const { id } = useParams()
@@ -72,6 +81,7 @@ export default function TripPage() {
   }
 
   const meta = tabMeta(tab)
+  const tabGroup = groupOfTab(tab)
 
   return (
     <Page>
@@ -106,18 +116,18 @@ export default function TripPage() {
         </button>
       )}
 
-      {/* Section navigation */}
+      {/* Section navigation: 3 tabs, then the sections of the current tab as chips */}
       <div className="sticky top-0 z-20 -mx-4 mt-4 bg-bg/92 backdrop-blur-md">
-        <div ref={navRef} className="flex gap-2 overflow-x-auto no-scrollbar px-4 py-2.5" role="tablist" aria-label="Seções da viagem">
-          {TRIP_TABS.map((t) => {
+        <Segmented variant="tabs" className="px-4" value={tabGroup.value} onChange={(g) => setTab(TRIP_GROUPS.find((x) => x.value === g)!.sections[0])} options={TRIP_GROUPS} />
+        <div ref={navRef} className="flex gap-2 overflow-x-auto no-scrollbar px-4 py-2.5" aria-label="Seções da viagem">
+          {TRIP_TABS.filter((t) => tabGroup.sections.includes(t.id)).map((t) => {
             const c = t.items ? counts[t.id as TripSection] : t.id === 'revisar' ? { total: toReview } : undefined
             const active = t.id === tab
             return (
               <button
                 key={t.id}
                 data-tab={t.id}
-                role="tab"
-                aria-selected={active}
+                aria-pressed={active}
                 type="button"
                 onClick={() => setTab(t.id)}
                 className={cn(

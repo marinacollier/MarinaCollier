@@ -1,73 +1,71 @@
 /**
- * UGC Business — inside Trabalho / Creator. It opens on what needs her now:
- *   Hoje · Esta semana · Pipeline · Todas as marcas · Calendário · Portfólio e produção · Financeiro ·
- *   Follow-ups · Abordagens
- * One source of truth with the Home: the same actions, the same check, the same records.
+ * UGC Business — inside Trabalho / Creator. Three tabs:
+ *   Hoje (tasks, actions, follow-ups, the week, the compact dashboard) · Marcas (all brands, filter chips) ·
+ *   Produção (portfólio + financeiro).
+ * Old ?aba= values (semana, pipeline, followups, abordagens, calendario, portfolio, financeiro) land on the
+ * tab that now holds them. One source of truth with the Home: the same actions, the same check, the same records.
  */
 import { useMemo, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ROUTES } from '@/app/routes'
-import { Card, Chip, EmptyState, Page, PageHeader, ProgressBar, SectionTitle, Segmented } from '@/components/ui'
+import { Card, Chip, EmptyState, ItemList, ItemRow, Page, PageHeader, ProgressBar, SectionTitle, Segmented } from '@/components/ui'
 import { useDB } from '@/data/store'
-import type { BrandTier, DB, UgcCrmStatus, UgcOpportunity } from '@/data/types'
-import {
-  brandOf,
-  CHANNEL_LABEL,
-  followUpsDue,
-  isLive,
-  prospects,
-  STAGES,
-  STATUS_LABEL,
-  TIERS,
-  ugcDayActions,
-  weekNumbers,
-} from '@/data/ugc/model'
+import type { BrandTier, DB, UgcCrmStatus, UgcOpportunity, UgcStage } from '@/data/types'
+import { brandOf, CHANNEL_LABEL, followUpsDue, isLive, STAGES, STATUS_LABEL, TIERS, ugcDayActions, weekNumbers } from '@/data/ugc/model'
 import { ensureProspect } from '@/data/ugc/ops'
-import { LEVEL_LABEL, potential } from '@/data/ugc/score'
 import { useToday } from '@/hooks/useToday'
 import { addDays, formatDayMonth } from '@/lib/date'
 import { normalize } from '@/lib/text'
-import { cn } from '@/lib/cn'
 import { commit, TierBadge, UgcActionRow } from './parts'
-import { CrmDashboard, CrmFilter, CrmImport, UgcCalendar, UgcFinance, UgcPortfolio, UgcTasksToday, UgcWeek } from './Business'
+import { CrmDashboard, CrmFilter, CrmImport, UgcFinance, UgcPortfolio, UgcTasksToday, UgcWeek } from './Business'
 import { CRM_STATUS_LABEL } from '@/data/ugc/crm'
 
-type Tab = 'agora' | 'semana' | 'pipeline' | 'marcas' | 'calendario' | 'portfolio' | 'financeiro' | 'followups' | 'abordagens'
+type Tab = 'hoje' | 'marcas' | 'producao'
 const TABS: { value: Tab; label: string }[] = [
-  { value: 'agora', label: 'Hoje' },
-  { value: 'semana', label: 'Esta semana' },
-  { value: 'pipeline', label: 'Pipeline' },
-  { value: 'marcas', label: 'Todas as marcas' },
-  { value: 'calendario', label: 'Calendário' },
-  { value: 'portfolio', label: 'Portfólio e produção' },
-  { value: 'financeiro', label: 'Financeiro' },
-  { value: 'followups', label: 'Follow-ups' },
-  { value: 'abordagens', label: 'Abordagens' },
+  { value: 'hoje', label: 'Hoje' },
+  { value: 'marcas', label: 'Marcas' },
+  { value: 'producao', label: 'Produção' },
 ]
+/** Old tab ids → the tab that holds them now (links from Lumos, ROUTES, bookmarks). */
+const LEGACY: Record<string, Tab> = {
+  agora: 'hoje',
+  semana: 'hoje',
+  calendario: 'hoje',
+  followups: 'hoje',
+  pipeline: 'marcas',
+  abordagens: 'marcas',
+  portfolio: 'producao',
+  financeiro: 'producao',
+}
+
+function readUgcTab(raw: string | null): Tab {
+  if (!raw) return 'hoje'
+  if (TABS.some((t) => t.value === raw)) return raw as Tab
+  return LEGACY[raw] ?? 'hoje'
+}
 
 export default function UgcPage() {
   const [params, setParams] = useSearchParams()
-  const raw = params.get('aba') as Tab | null
-  const tab: Tab = TABS.some((t) => t.value === raw) ? raw! : 'agora'
+  const tab = readUgcTab(params.get('aba'))
   return (
     <Page>
       <PageHeader title="UGC Business" eyebrow="Creator" back backTo={ROUTES.creator} />
-      <Segmented variant="tabs" value={tab} onChange={(t) => setParams(t === 'agora' ? {} : { aba: t }, { replace: true })} options={TABS} className="mb-4" />
-      {tab === 'agora' && (
+      <Segmented variant="tabs" value={tab} onChange={(t) => setParams(t === 'hoje' ? {} : { aba: t }, { replace: true })} options={TABS} className="mb-4" />
+      {tab === 'hoje' && (
         <div className="space-y-6">
           <UgcTasksToday />
           <Agora />
+          <UgcWeek />
           <CrmDashboard />
         </div>
       )}
-      {tab === 'semana' && <UgcWeek />}
-      {tab === 'pipeline' && <Pipeline />}
       {tab === 'marcas' && <Brands />}
-      {tab === 'calendario' && <UgcCalendar />}
-      {tab === 'portfolio' && <UgcPortfolio />}
-      {tab === 'financeiro' && <UgcFinance />}
-      {tab === 'followups' && <FollowUps />}
-      {tab === 'abordagens' && <History />}
+      {tab === 'producao' && (
+        <div className="space-y-6">
+          <UgcPortfolio />
+          <UgcFinance />
+        </div>
+      )}
     </Page>
   )
 }
@@ -106,7 +104,7 @@ function AddBrand({ autoFocus }: { autoFocus?: boolean }) {
         add()
       }}
     >
-      <input id="ugc-add-brand" value={name} onChange={(e) => setName(e.target.value)} placeholder="Adicionar marca (ex.: Galápagos)" autoFocus={autoFocus} className="input flex-1 min-w-0" aria-label="Nome da marca" />
+      <input id="ugc-add-brand" value={name} onChange={(e) => setName(e.target.value)} placeholder="Adicionar marca" autoFocus={autoFocus} className="input flex-1 min-w-0" aria-label="Nome da marca" />
       <button type="submit" disabled={!name.trim()} className="h-11 px-4 rounded-full bg-ink text-bg text-[14px] font-medium disabled:opacity-40">
         Adicionar
       </button>
@@ -114,14 +112,12 @@ function AddBrand({ autoFocus }: { autoFocus?: boolean }) {
   )
 }
 
-// ─── Agora ──────────────────────────────────────────────────────────────────
+// ─── Hoje ───────────────────────────────────────────────────────────────────
 
 function Agora() {
   const db = useUgcDB()
   const today = useToday()
   const actions = useMemo(() => ugcDayActions(db, today, today), [db, today])
-  const open = actions.filter((a) => !a.done)
-  const done = actions.filter((a) => a.done)
   const next = useMemo(() => {
     const out: { date: string; o: UgcOpportunity }[] = []
     for (let i = 1; i <= 7; i++) {
@@ -130,148 +126,110 @@ function Agora() {
     }
     return out
   }, [db, today])
+  const later = db.ugcOpportunities.filter((o) => isLive(db, o) && o.nextFollowUpAt && o.status === 'sem_resposta').sort((a, b) => a.nextFollowUpAt!.localeCompare(b.nextFollowUpAt!))
   const inConversation = db.ugcOpportunities.filter((o) => isLive(db, o) && o.stage === 'conversa')
   const w = weekNumbers(db, today)
   const empty = !db.brands.length
 
+  if (empty)
+    return (
+      <Card>
+        <EmptyState compact emoji="🤝" title="Sua prospecção começa aqui" text="Adicione a primeira marca." action={<AddBrand autoFocus />} />
+      </Card>
+    )
+
+  // Open first, then the ones already done today.
+  const ordered = [...actions.filter((a) => !a.done), ...actions.filter((a) => a.done)]
   return (
     <div className="space-y-6">
-      {empty ? (
-        <Card>
-          <EmptyState compact emoji="🤝" title="Sua prospecção começa aqui" text="Adicione a primeira marca. Daqui pra frente, quem abordar, quando voltar a falar e o que respondeu aparece sozinho." action={<AddBrand autoFocus />} />
-        </Card>
-      ) : (
+      {ordered.length > 0 && (
         <section aria-label="Precisa de você agora">
-          <SectionTitle>Precisa de você agora</SectionTitle>
-          {open.length ? (
-            <ul className="divide-y divide-line/70">
-              {open.map((a) => (
-                <UgcActionRow key={`${a.kind}:${a.opportunity.id}`} action={a} />
-              ))}
-            </ul>
-          ) : (
-            <p className="text-[14px] text-muted py-2">{prospects(db, today).length ? 'Nada pendente agora ✨' : 'Nada pendente. Adicione marcas pra ter quem abordar amanhã.'}</p>
-          )}
-          {done.length > 0 && (
-            <ul className="divide-y divide-line/70 mt-1">
-              {done.map((a) => (
-                <UgcActionRow key={`${a.kind}:${a.opportunity.id}:done`} action={a} />
-              ))}
-            </ul>
-          )}
+          <SectionTitle>Precisa de você</SectionTitle>
+          <ItemList>
+            {ordered.map((a) => (
+              <UgcActionRow key={`${a.kind}:${a.opportunity.id}${a.done ? ':done' : ''}`} action={a} />
+            ))}
+          </ItemList>
         </section>
       )}
 
       {inConversation.length > 0 && (
         <section>
           <SectionTitle>Em conversa</SectionTitle>
-          <ul className="divide-y divide-line/70">
+          <ItemList>
             {inConversation.map((o) => (
-              <OppLine key={o.id} db={db} o={o} sub={o.responseReceivedAt ? `respondeu ${formatDayMonth(o.responseReceivedAt)}` : STATUS_LABEL[o.status]} />
+              <OppLine key={o.id} db={db} o={o} meta={o.responseReceivedAt ? `respondeu ${formatDayMonth(o.responseReceivedAt)}` : STATUS_LABEL[o.status]} />
             ))}
-          </ul>
+          </ItemList>
         </section>
       )}
 
       {next.length > 0 && (
         <section>
           <SectionTitle>Próximos follow-ups</SectionTitle>
-          <ul className="divide-y divide-line/70">
+          <ItemList>
             {next.map(({ date, o }) => (
-              <OppLine key={o.id} db={db} o={o} sub={`${formatDayMonth(date)} · ${CHANNEL_LABEL[o.primaryChannel ?? 'dm']}`} />
+              <OppLine key={o.id} db={db} o={o} meta={CHANNEL_LABEL[o.primaryChannel ?? 'dm']} when={formatDayMonth(date)} />
             ))}
-          </ul>
+          </ItemList>
         </section>
       )}
 
-      {!empty && (
-        <section aria-label="Esta semana">
-          <SectionTitle>Esta semana</SectionTitle>
-          <Card className="space-y-3">
-            <div>
-              <div className="flex justify-between text-[14px] tabular-nums">
-                <span>Novas abordagens</span>
-                <span>
-                  {w.newApproaches} / {w.target}
-                </span>
-              </div>
-              <ProgressBar value={w.newApproaches} max={w.target} className="mt-1.5" />
+      {later.length > 0 && (
+        <section>
+          <SectionTitle>Sem resposta · reativar</SectionTitle>
+          <ItemList>
+            {later.map((o) => (
+              <OppLine key={o.id} db={db} o={o} meta="tentar de novo" when={formatDayMonth(o.nextFollowUpAt!)} />
+            ))}
+          </ItemList>
+        </section>
+      )}
+
+      <section aria-label="Esta semana">
+        <SectionTitle>Esta semana</SectionTitle>
+        <Card className="space-y-3">
+          <div>
+            <div className="flex justify-between text-[14px] tabular-nums">
+              <span>Novas abordagens</span>
+              <span>
+                {w.newApproaches} / {w.target}
+              </span>
             </div>
-            <div className="grid grid-cols-3 gap-2 text-center">
-              {[
-                ['Respostas', w.responses],
-                ['Conversas', w.conversations],
-                ['Fechadas', w.closed],
-              ].map(([l, n]) => (
-                <div key={l as string}>
-                  <div className="font-sport text-[24px] tabular-nums leading-none">{n}</div>
-                  <div className="text-[12px] text-muted mt-1">{l}</div>
-                </div>
-              ))}
-            </div>
-          </Card>
-          <div className="mt-4">
-            <AddBrand />
+            <ProgressBar value={w.newApproaches} max={w.target} className="mt-1.5" />
           </div>
-        </section>
-      )}
+          <div className="grid grid-cols-3 gap-2 text-center">
+            {[
+              ['Respostas', w.responses],
+              ['Conversas', w.conversations],
+              ['Fechadas', w.closed],
+            ].map(([l, n]) => (
+              <div key={l as string}>
+                <div className="font-sport text-[24px] tabular-nums leading-none">{n}</div>
+                <div className="text-[12px] text-muted mt-1">{l}</div>
+              </div>
+            ))}
+          </div>
+        </Card>
+        <div className="mt-4">
+          <AddBrand />
+        </div>
+      </section>
     </div>
   )
 }
 
-function OppLine({ db, o, sub }: { db: DB; o: UgcOpportunity; sub?: string }) {
+function OppLine({ db, o, meta, when }: { db: DB; o: UgcOpportunity; meta?: string; when?: string }) {
   const b = brandOf(db, o)
-  return (
-    <li>
-      <Link to={ROUTES.ugcBrand(o.brandId)} className="flex items-center gap-2 min-h-[52px] py-1.5 active:opacity-70">
-        <TierBadge tier={b?.priorityTier} />
-        <span className="flex-1 min-w-0">
-          <span className="block text-[15px] leading-snug truncate">{b?.name ?? o.title}</span>
-          {sub && <span className="block text-[12.5px] text-muted truncate">{sub}</span>}
-        </span>
-      </Link>
-    </li>
-  )
+  return <ItemRow title={b?.name ?? o.title} meta={meta} when={when} to={ROUTES.ugcBrand(o.brandId)} trailing={<TierBadge tier={b?.priorityTier} />} />
 }
 
-// ─── Pipeline ───────────────────────────────────────────────────────────────
-
-function Pipeline() {
-  const db = useUgcDB()
-  const [stage, setStage] = useState(STAGES[0].id)
-  const live = db.ugcOpportunities.filter((o) => isLive(db, o) || (o.stage === 'fechada' && o.status === 'concluida'))
-  const list = live.filter((o) => o.stage === stage).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-  return (
-    <div className="space-y-4">
-      <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-1 px-1" role="tablist" aria-label="Estágios">
-        {STAGES.map((s) => {
-          const n = live.filter((o) => o.stage === s.id).length
-          return (
-            <button key={s.id} type="button" role="tab" aria-selected={stage === s.id} onClick={() => setStage(s.id)} className={cn('h-9 px-3 rounded-full text-[13px] whitespace-nowrap shrink-0', stage === s.id ? 'bg-ink text-bg' : 'bg-surface-2 text-ink-2')}>
-              {s.label} <span className="tabular-nums opacity-70">{n}</span>
-            </button>
-          )
-        })}
-      </div>
-      {list.length ? (
-        <ul className="divide-y divide-line/70">
-          {list.map((o) => (
-            <OppLine key={o.id} db={db} o={o} sub={[STATUS_LABEL[o.status], o.nextFollowUpAt ? `follow-up ${formatDayMonth(o.nextFollowUpAt)}` : undefined, o.lastContactAt ? `último contato ${formatDayMonth(o.lastContactAt)}` : undefined].filter(Boolean).join(' · ')} />
-          ))}
-        </ul>
-      ) : (
-        <p className="text-[14px] text-muted">Nenhuma oportunidade em {STAGES.find((s) => s.id === stage)!.label.toLowerCase()}.</p>
-      )}
-    </div>
-  )
-}
-
-// ─── Marcas ─────────────────────────────────────────────────────────────────
+// ─── Marcas (pipeline, CRM status, tier, search, rascunhos) ─────────────────
 
 function Brands() {
   const db = useUgcDB()
-  const today = useToday()
   const [tier, setTier] = useState<BrandTier | undefined>()
+  const [stage, setStage] = useState<UgcStage | undefined>()
   const [q, setQ] = useState('')
   const [archived, setArchived] = useState(false)
   const [crm, setCrm] = useState<UgcCrmStatus | undefined>()
@@ -280,139 +238,68 @@ function Brands() {
     for (const b of db.brands) if (b.crm?.status) c[b.crm.status] = (c[b.crm.status] ?? 0) + 1
     return c
   }, [db.brands])
+  const live = db.ugcOpportunities.filter((o) => isLive(db, o) || (o.stage === 'fechada' && o.status === 'concluida'))
+  const latest = (brandId: string) => db.ugcOpportunities.filter((x) => x.brandId === brandId).sort((x, y) => y.updatedAt.localeCompare(x.updatedAt))[0]
+  const inStage = (brandId: string) => !stage || live.some((o) => o.brandId === brandId && o.stage === stage)
   const rank = (t?: string) => (t ? TIERS.indexOf(t as BrandTier) : 9)
   const list = db.brands
-    .filter((b) => !!b.archived === archived && (!tier || b.priorityTier === tier) && (!crm || b.crm?.status === crm) && (!q || normalize(b.name).includes(normalize(q))))
+    .filter((b) => !!b.archived === archived && (!tier || b.priorityTier === tier) && (!crm || b.crm?.status === crm) && inStage(b.id) && (!q || normalize(b.name).includes(normalize(q))))
     .sort((a, b) => rank(a.priorityTier) - rank(b.priorityTier) || a.name.localeCompare(b.name))
+  const drafts = db.ugcMessages.filter((m) => m.status === 'rascunho' || m.status === 'aprovada').sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  const clear = () => {
+    setStage(undefined)
+    setTier(undefined)
+    setArchived(false)
+  }
   return (
     <div className="space-y-4">
       <AddBrand />
-      <div className="flex flex-wrap gap-1.5">
-        <Chip selected={!tier} onClick={() => setTier(undefined)}>
+      <input id="ugc-brand-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar marca" className="input w-full" aria-label="Buscar marca" />
+      <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-1 px-1" aria-label="Filtrar marcas">
+        <Chip selected={!stage && !tier && !archived} onClick={clear} className="whitespace-nowrap">
           Todas
         </Chip>
+        {STAGES.map((s) => {
+          const n = live.filter((o) => o.stage === s.id).length
+          if (!n) return null
+          return (
+            <Chip key={s.id} selected={stage === s.id} onClick={() => setStage(stage === s.id ? undefined : s.id)} className="whitespace-nowrap">
+              {s.label} <span className="tabular-nums opacity-70">{n}</span>
+            </Chip>
+          )
+        })}
         {TIERS.map((t) => (
-          <Chip key={t} selected={tier === t} onClick={() => setTier(tier === t ? undefined : t)}>
+          <Chip key={t} selected={tier === t} onClick={() => setTier(tier === t ? undefined : t)} className="whitespace-nowrap">
             Tier {t}
           </Chip>
         ))}
-        <Chip selected={archived} onClick={() => setArchived((v) => !v)}>
+        <Chip selected={archived} onClick={() => setArchived((v) => !v)} className="whitespace-nowrap">
           Arquivadas
         </Chip>
       </div>
       <CrmFilter value={crm} onChange={setCrm} counts={counts} />
-      {db.brands.length > 8 && <input id="ugc-brand-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar marca" className="input w-full" aria-label="Buscar marca" />}
       {list.length ? (
-        <ul className="divide-y divide-line/70">
+        <ItemList label="Marcas">
           {list.map((b) => {
-            const o = db.ugcOpportunities.filter((x) => x.brandId === b.id).sort((x, y) => y.updatedAt.localeCompare(x.updatedAt))[0]
-            const p = b.archived ? undefined : potential(db, b, today)
-            const sub = [b.crm?.status ? CRM_STATUS_LABEL[b.crm.status] : undefined, p && !b.crm?.noFollowUp ? LEVEL_LABEL[p.level] : undefined, b.category, b.crm?.coupons?.length ? 'cupom' : undefined, b.crm?.pressKits?.length && b.crm.status !== 'press_kit' ? 'press kit' : undefined, o ? STAGES.find((s) => s.id === o.stage)?.label : undefined, o?.lastContactAt ? `último contato ${formatDayMonth(o.lastContactAt)}` : 'sem contato ainda'].filter(Boolean).join(' · ')
-            return (
-              <li key={b.id}>
-                <Link to={ROUTES.ugcBrand(b.id)} className="flex items-center gap-2 min-h-[52px] py-1.5 active:opacity-70">
-                  <TierBadge tier={b.priorityTier} />
-                  <span className="flex-1 min-w-0">
-                    <span className="block text-[15px] truncate">{b.name}</span>
-                    <span className="block text-[12.5px] text-muted truncate">{sub}</span>
-                  </span>
-                </Link>
-              </li>
-            )
+            const o = latest(b.id)
+            const meta = b.crm?.status ? CRM_STATUS_LABEL[b.crm.status] : o ? STAGES.find((s) => s.id === o.stage)?.label : b.category
+            return <ItemRow key={b.id} title={b.name} meta={meta} when={o?.lastContactAt ? formatDayMonth(o.lastContactAt) : undefined} to={ROUTES.ugcBrand(b.id)} trailing={<TierBadge tier={b.priorityTier} />} />
           })}
-        </ul>
+        </ItemList>
       ) : (
-        <p className="text-[14px] text-muted">{archived ? 'Nenhuma marca arquivada.' : 'Nenhuma marca aqui ainda.'}</p>
+        <p className="text-[14px] text-muted">Nenhuma marca aqui.</p>
       )}
-      <CrmImport />
-    </div>
-  )
-}
-
-// ─── Follow-ups ─────────────────────────────────────────────────────────────
-
-function FollowUps() {
-  const db = useUgcDB()
-  const today = useToday()
-  const live = db.ugcOpportunities.filter((o) => isLive(db, o) && o.nextFollowUpAt)
-  const due = live.filter((o) => o.nextFollowUpAt! <= today && o.status !== 'sem_resposta')
-  const soon = live.filter((o) => o.nextFollowUpAt! > today && o.status !== 'sem_resposta').sort((a, b) => a.nextFollowUpAt!.localeCompare(b.nextFollowUpAt!))
-  const later = live.filter((o) => o.status === 'sem_resposta').sort((a, b) => a.nextFollowUpAt!.localeCompare(b.nextFollowUpAt!))
-  const block = (title: string, list: UgcOpportunity[], sub: (o: UgcOpportunity) => string) =>
-    list.length > 0 && (
-      <section>
-        <SectionTitle>{title}</SectionTitle>
-        <ul className="divide-y divide-line/70">
-          {list.map((o) => (
-            <OppLine key={o.id} db={db} o={o} sub={sub(o)} />
-          ))}
-        </ul>
-      </section>
-    )
-  if (!live.length) return <p className="text-[14px] text-muted">Ninguém pra cobrar agora. Os follow-ups nascem sozinhos quando você registra um contato.</p>
-  return (
-    <div className="space-y-6">
-      {block('Hoje', due, (o) => `${o.nextFollowUpAt! < today ? 'era pra ' + formatDayMonth(o.nextFollowUpAt!) : 'hoje'} · follow-up ${(o.followUpStep ?? 0) + 1}`)}
-      {block('Próximos', soon, (o) => `${formatDayMonth(o.nextFollowUpAt!)} · follow-up ${(o.followUpStep ?? 0) + 1} · ${CHANNEL_LABEL[o.primaryChannel ?? 'dm']}`)}
-      {block('Sem resposta · reativar depois', later, (o) => `tentar de novo em ${formatDayMonth(o.nextFollowUpAt!)}`)}
-    </div>
-  )
-}
-
-// ─── Abordagens (histórico de contatos) ─────────────────────────────────────
-
-const TYPE_LABEL = { primeiro_contato: 'primeiro contato', follow_up: 'follow-up', resposta: 'resposta', proposta: 'proposta', reuniao: 'reunião', mensagem: 'mensagem' } as const
-
-function History() {
-  const db = useUgcDB()
-  const drafts = db.ugcMessages.filter((m) => m.status === 'rascunho' || m.status === 'aprovada').sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-  const list = [...db.ugcInteractions].sort((a, b) => b.sentAt.localeCompare(a.sentAt)).slice(0, 100)
-  if (!list.length && !drafts.length) return <p className="text-[14px] text-muted">Os contatos que você registrar e as mensagens que escrever pra cada marca aparecem aqui.</p>
-  return (
-    <div className="space-y-5">
       {drafts.length > 0 && (
         <section aria-label="Rascunhos">
-          <SectionTitle>Rascunhos — ainda não enviados</SectionTitle>
-          <ul className="divide-y divide-line/70">
+          <SectionTitle>Rascunhos</SectionTitle>
+          <ItemList>
             {drafts.map((m) => (
-              <li key={m.id}>
-                <Link to={ROUTES.ugcBrand(m.brandId)} className="block min-h-[52px] py-2 active:opacity-70">
-                  <span className="block text-[15px]">{db.brands.find((b) => b.id === m.brandId)?.name ?? 'Marca'}</span>
-                  <span className="block text-[12.5px] text-muted truncate">
-                    {CHANNEL_LABEL[m.channel]} · {m.status} · {(m.approvedText ?? m.generatedText ?? '').slice(0, 80)}
-                  </span>
-                </Link>
-              </li>
+              <ItemRow key={m.id} title={db.brands.find((b) => b.id === m.brandId)?.name ?? 'Marca'} meta={`${CHANNEL_LABEL[m.channel]} · ${m.status}`} to={ROUTES.ugcBrand(m.brandId)} />
             ))}
-          </ul>
+          </ItemList>
         </section>
       )}
-      {list.length > 0 && (
-        <section aria-label="Contatos">
-          {drafts.length > 0 && <SectionTitle>Contatos</SectionTitle>}
-          <ul className="divide-y divide-line/70">
-            {list.map((i) => {
-              const b = db.brands.find((x) => x.id === i.brandId)
-              return (
-                <li key={i.id}>
-                  <Link to={ROUTES.ugcBrand(i.brandId)} className="flex items-start gap-3 min-h-[52px] py-2 active:opacity-70">
-                    <span className="w-12 shrink-0 text-[12.5px] text-muted tabular-nums pt-0.5">{formatDayMonth(i.date)}</span>
-                    <span className="flex-1 min-w-0">
-                      <span className="block text-[15px]">
-                        {i.direction === 'out' ? '→' : '←'} {b?.name ?? 'Marca'}
-                      </span>
-                      <span className="block text-[12.5px] text-muted">
-                        {CHANNEL_LABEL[i.channel]} · {TYPE_LABEL[i.type]}
-                        {i.content ? ` · ${i.content.slice(0, 80)}` : ''}
-                      </span>
-                    </span>
-                  </Link>
-                </li>
-              )
-            })}
-          </ul>
-        </section>
-      )}
+      <CrmImport />
     </div>
   )
 }

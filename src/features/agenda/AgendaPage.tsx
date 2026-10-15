@@ -16,18 +16,19 @@ import { UpcomingView, WeekView } from './ListViews'
 import { dayEntries, timedOnly } from './selectors'
 import { SourcesPanel } from './SourcesPanel'
 
-type View = 'hoje' | 'dia' | 'semana' | 'agenda'
+/** Three views. "Dia" opens on today (the old Hoje); old ?v=dia links land on it with their ?d=. */
+type View = 'hoje' | 'semana' | 'agenda'
 const VIEWS: { value: View; label: string }[] = [
-  { value: 'hoje', label: 'Hoje' },
-  { value: 'dia', label: 'Dia' },
+  { value: 'hoje', label: 'Dia' },
   { value: 'semana', label: 'Semana' },
-  { value: 'agenda', label: 'Agenda' },
+  { value: 'agenda', label: 'Lista' },
 ]
 
 export default function AgendaPage() {
   const { today, minutes } = useNow()
   const [params, setParams] = useSearchParams()
-  const view = (VIEWS.some((v) => v.value === params.get('v')) ? params.get('v') : 'hoje') as View
+  const rawView = params.get('v')
+  const view = (VIEWS.some((v) => v.value === rawView) ? rawView : 'hoje') as View
   const dParam = params.get('d')
   const date: DateKey = isDateKey(dParam) ? dParam : today
 
@@ -72,15 +73,15 @@ export default function AgendaPage() {
         title="Agenda"
         subtitle={subtitle}
         actions={
-          <IconButton label="Novo compromisso" onClick={() => openSheet('event', { date: view === 'hoje' || view === 'agenda' ? today : date })}>
+          <IconButton label="Novo compromisso" onClick={() => openSheet('event', { date: view === 'agenda' ? today : date })}>
             <CalendarPlus size={20} />
           </IconButton>
         }
       />
 
       <div className="sticky top-0 z-20 -mx-4 px-4 pb-3 pt-[max(env(safe-area-inset-top),8px)] bg-bg/90 backdrop-blur-md">
-        <Segmented value={view} onChange={(v) => set({ v, d: v === 'hoje' ? today : date })} options={VIEWS} />
-        {view === 'dia' && (
+        <Segmented value={view} onChange={(v) => set({ v, d: v === 'hoje' && view === 'hoje' ? today : date })} options={VIEWS} />
+        {view === 'hoje' && (
           <div className="mt-3">
             <DayStrip date={date} today={today} onChange={(d) => set({ d })} />
           </div>
@@ -88,8 +89,7 @@ export default function AgendaPage() {
       </div>
 
       <div className="mt-2">
-        {view === 'hoje' && <DayView date={today} today={today} nowMinutes={minutes} autoScroll />}
-        {view === 'dia' && (
+        {view === 'hoje' && (
           <motion.div onPanEnd={onPanEnd} style={{ touchAction: 'pan-y' }}>
             <AnimatePresence mode="wait" initial={false}>
               <motion.div key={date} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.16 }}>
@@ -98,8 +98,8 @@ export default function AgendaPage() {
             </AnimatePresence>
           </motion.div>
         )}
-        {view === 'semana' && <WeekView date={date} today={today} onDate={(d) => set({ d })} onOpenDay={(d) => set({ v: 'dia', d })} />}
-        {view === 'agenda' && <UpcomingView today={today} onOpenDay={(d) => set({ v: 'dia', d })} />}
+        {view === 'semana' && <WeekView date={date} today={today} onDate={(d) => set({ d })} onOpenDay={(d) => set({ v: 'hoje', d })} />}
+        {view === 'agenda' && <UpcomingView today={today} onOpenDay={(d) => set({ v: 'hoje', d })} />}
       </div>
 
       <div className="mt-6">
