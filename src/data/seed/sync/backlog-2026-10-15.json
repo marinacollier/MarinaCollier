@@ -1,0 +1,702 @@
+{
+  "date": "2026-10-15",
+  "source": "Executive backlog consolidation",
+  "period": {
+    "start": "2026-10-15",
+    "end": "2026-10-23",
+    "timezone": "America/Sao_Paulo"
+  },
+  "import_note": "Planejamento sugerido, não sincronizado automaticamente. suggested_date é sugestão, due_date indica vencimento/meta; status todo não significa atraso confirmado. Não duplicar por id.",
+  "tasks": [
+    {
+      "id": "ff-go-no-go",
+      "title": "Homologar jornada crítica e definir Go/No-Go",
+      "category": "Produto/IA",
+      "project": "Fashion Finder",
+      "priority": "P1",
+      "done_criteria": "Busca por imagem, ranking, fotos, disponibilidade e mobile testados; bloqueios classificados",
+      "estimated_minutes": 60,
+      "status": "todo",
+      "due_date": null,
+      "suggested_date": "2026-10-16",
+      "notes": "16/10 era estimativa de conclusão de desenvolvimento, não publicação confirmada"
+    },
+    {
+      "id": "ff-apple",
+      "title": "Solucionar conta Apple Developer",
+      "category": "Operação",
+      "project": "Fashion Finder",
+      "priority": "P1",
+      "done_criteria": "Status da conta validado, bloqueio/responsável e ação definida",
+      "estimated_minutes": 30,
+      "status": "todo",
+      "due_date": null,
+      "suggested_date": "2026-10-16",
+      "notes": ""
+    },
+    {
+      "id": "ff-google",
+      "title": "Solucionar conta Google Play",
+      "category": "Operação",
+      "project": "Fashion Finder",
+      "priority": "P1",
+      "done_criteria": "Status da conta validado, bloqueio/responsável e ação definida",
+      "estimated_minutes": 30,
+      "status": "todo",
+      "due_date": null,
+      "suggested_date": "2026-10-16",
+      "notes": ""
+    },
+    {
+      "id": "san-layout",
+      "title": "Revisar épicos de layout",
+      "category": "Operação",
+      "project": "Santander",
+      "priority": "P1",
+      "done_criteria": "Inconsistências, regras e correções registradas",
+      "estimated_minutes": 45,
+      "status": "todo",
+      "due_date": null,
+      "suggested_date": "2026-10-16",
+      "notes": "Era uma entrega desejada para a semana de 12 a 16/10"
+    },
+    {
+      "id": "san-dup0005",
+      "title": "Revisar épico DUP0005 de sacador",
+      "category": "Operação",
+      "project": "Santander",
+      "priority": "P1",
+      "done_criteria": "Épico DUP0005 revisado e pontos abertos identificados",
+      "estimated_minutes": 45,
+      "status": "todo",
+      "due_date": null,
+      "suggested_date": "2026-10-16",
+      "notes": "Era uma entrega desejada para a semana de 12 a 16/10"
+    },
+    {
+      "id": "san-agendas",
+      "title": "Cobrar agendas e dependências Santander",
+      "category": "Operação",
+      "project": "Santander",
+      "priority": "P2",
+      "done_criteria": "Solicitações e responsáveis acionados",
+      "estimated_minutes": 15,
+      "status": "todo",
+      "due_date": null,
+      "suggested_date": "2026-10-16",
+      "notes": ""
+    },
+    {
+      "id": "recebimento-santander",
+      "title": "Conferir recebimento Santander previsto para 15/10",
+      "category": "Financeiro",
+      "project": "Vida/Admin",
+      "priority": "P2",
+      "done_criteria": "R$ 20.000 conciliados ou pendência registrada",
+      "estimated_minutes": 10,
+      "status": "todo",
+      "due_date": "2026-10-15",
+      "suggested_date": "2026-10-16",
+      "notes": "Pagamento não confirmado"
+    },
+    {
+      "id": "bo-pedagio",
+      "title": "Abrir ou confirmar B.O. do pedágio",
+      "category": "Logística",
+      "project": "Vida/Admin",
+      "priority": "P1",
+      "done_criteria": "B.O. registrado ou protocolo de registro existente salvo",
+      "estimated_minutes": 30,
+      "status": "todo",
+      "due_date": "2026-10-10",
+      "suggested_date": "2026-10-17",
+      "notes": "Pendente de confirmação desde 10/10"
+    },
+    {
+      "id": "jnb-hotel-13",
+      "title": "Confirmar hospedagem JNB de 13/11",
+      "category": "Viagem",
+      "project": "África do Sul",
+      "priority": "P1",
+      "done_criteria": "Reserva confirmada e comprovante salvo",
+      "estimated_minutes": 30,
+      "status": "todo",
+      "due_date": null,
+      "suggested_date": "2026-10-17",
+      "notes": "Conferir compatibilidade com coleta para safari"
+    },
+    {
+      "id": "jnb-hotel-15",
+      "title": "Confirmar hospedagem JNB de 15/11",
+      "category": "Viagem",
+      "project": "África do Sul",
+      "priority": "P1",
+      "done_criteria": "Reserva confirmada e comprovante salvo",
+      "estimated_minutes": 30,
+      "status": "todo",
+      "due_date": null,
+      "suggested_date": "2026-10-17",
+      "notes": "Considerar voo de retorno 16/11"
+    },
+    {
+      "id": "jnb-safari",
+      "title": "Conferir safari 14–15/11 e transfers",
+      "category": "Viagem",
+      "project": "África do Sul",
+      "priority": "P1",
+      "done_criteria": "Comprovantes, pagamento, ponto/horário de coleta e retorno checados",
+      "estimated_minutes": 20,
+      "status": "todo",
+      "due_date": null,
+      "suggested_date": "2026-10-17",
+      "notes": "Não duplicar reserva: safari já foi planejado/contratado anteriormente; confirmar status"
+    },
+    {
+      "id": "multas-carro",
+      "title": "Resolver multas do carro",
+      "category": "Logística",
+      "project": "Vida/Admin",
+      "priority": "P2",
+      "done_criteria": "Multas consultadas e pagamentos ou contestações encaminhados",
+      "estimated_minutes": 45,
+      "status": "todo",
+      "due_date": null,
+      "suggested_date": "2026-10-18",
+      "notes": "Planejado para semana de 12 a 16/10; se não resolvido, prioridade no fim de semana"
+    },
+    {
+      "id": "planejamento-semanal",
+      "title": "Planejar semana pré-viagem",
+      "category": "Operação",
+      "project": "Marina OS",
+      "priority": "P2",
+      "done_criteria": "Prioridades 19–23/10 distribuídas e dependências identificadas",
+      "estimated_minutes": 25,
+      "status": "todo",
+      "due_date": null,
+      "suggested_date": "2026-10-18",
+      "notes": "Evento no calendário domingo às 19h"
+    },
+    {
+      "id": "seguro-viagem",
+      "title": "Verificar e resolver seguro viagem África do Sul",
+      "category": "Viagem",
+      "project": "África do Sul",
+      "priority": "P2",
+      "done_criteria": "Cobertura vigente e apólice offline ou pendência clara",
+      "estimated_minutes": 30,
+      "status": "todo",
+      "due_date": null,
+      "suggested_date": "2026-10-18",
+      "notes": ""
+    },
+    {
+      "id": "san-ativacao",
+      "title": "Escrever épicos de ativação do sacador",
+      "category": "Operação",
+      "project": "Santander",
+      "priority": "P1",
+      "done_criteria": "Fluxos, regras e critérios de aceite registrados",
+      "estimated_minutes": 60,
+      "status": "todo",
+      "due_date": null,
+      "suggested_date": "2026-10-19",
+      "notes": "Data sugerida, ajustar conforme prioridade do time"
+    },
+    {
+      "id": "san-enquadramento",
+      "title": "Escrever épicos de enquadramento do sacador",
+      "category": "Operação",
+      "project": "Santander",
+      "priority": "P1",
+      "done_criteria": "Fluxos, regras, exceções e critérios de aceite registrados",
+      "estimated_minutes": 60,
+      "status": "todo",
+      "due_date": null,
+      "suggested_date": "2026-10-20",
+      "notes": "Data sugerida"
+    },
+    {
+      "id": "san-instrucoes",
+      "title": "Escrever épicos de instruções",
+      "category": "Operação",
+      "project": "Santander",
+      "priority": "P1",
+      "done_criteria": "Épicos/rascunhos de instruções escritos e pendências identificadas",
+      "estimated_minutes": 60,
+      "status": "todo",
+      "due_date": null,
+      "suggested_date": "2026-10-21",
+      "notes": "Data sugerida"
+    },
+    {
+      "id": "san-handoff",
+      "title": "Alinhar responsáveis e continuidade Santander durante viagem",
+      "category": "Operação",
+      "project": "Santander",
+      "priority": "P2",
+      "done_criteria": "Status, responsáveis, decisões pendentes e próximos marcos alinhados",
+      "estimated_minutes": 25,
+      "status": "todo",
+      "due_date": null,
+      "suggested_date": "2026-10-21",
+      "notes": "Planejamento sugerido antes do embarque"
+    },
+    {
+      "id": "ff-conta-pj",
+      "title": "Abrir ou encaminhar conta PJ Fashion Finder",
+      "category": "Operação",
+      "project": "Fashion Finder",
+      "priority": "P2",
+      "done_criteria": "Conta aberta ou documentação/responsável para abertura definidos",
+      "estimated_minutes": 45,
+      "status": "todo",
+      "due_date": null,
+      "suggested_date": "2026-10-19",
+      "notes": ""
+    },
+    {
+      "id": "ff-linkedin",
+      "title": "Criar página institucional Fashion Finder no LinkedIn",
+      "category": "Carreira",
+      "project": "Fashion Finder",
+      "priority": "P2",
+      "done_criteria": "Página com identidade, descrição e dados institucionais criada",
+      "estimated_minutes": 30,
+      "status": "todo",
+      "due_date": null,
+      "suggested_date": "2026-10-20",
+      "notes": ""
+    },
+    {
+      "id": "ff-handoff",
+      "title": "Consolidar roadmap, bloqueios e responsáveis Fashion Finder antes da viagem",
+      "category": "Produto/IA",
+      "project": "Fashion Finder",
+      "priority": "P1",
+      "done_criteria": "Matriz de bloqueios, responsáveis e cronograma revisada",
+      "estimated_minutes": 40,
+      "status": "todo",
+      "due_date": null,
+      "suggested_date": "2026-10-21",
+      "notes": ""
+    },
+    {
+      "id": "os-claude",
+      "title": "Retomar melhorias do Marina OS no Claude",
+      "category": "Produto/IA",
+      "project": "Marina OS",
+      "priority": "P3",
+      "done_criteria": "Pendências priorizadas e instruções enviadas ao Claude quando houver créditos",
+      "estimated_minutes": 40,
+      "status": "todo",
+      "due_date": null,
+      "suggested_date": "2026-10-19",
+      "notes": "Sem créditos durante a semana; não considerar feito"
+    },
+    {
+      "id": "os-import",
+      "title": "Testar importação e atualização de tarefas sem duplicação",
+      "category": "Produto/IA",
+      "project": "Marina OS",
+      "priority": "P2",
+      "done_criteria": "JSON importado, tarefas persistidas, status marcável e idempotência verificada",
+      "estimated_minutes": 40,
+      "status": "todo",
+      "due_date": null,
+      "suggested_date": "2026-10-20",
+      "notes": "Integração nunca confirmada como concluída"
+    },
+    {
+      "id": "linkedin-pessoal",
+      "title": "Atualizar headline e case executivo no LinkedIn pessoal",
+      "category": "Carreira",
+      "project": "Carreira",
+      "priority": "P3",
+      "done_criteria": "Headline revisada e uma evidência concreta publicada ou salva",
+      "estimated_minutes": 30,
+      "status": "todo",
+      "due_date": null,
+      "suggested_date": "2026-10-20",
+      "notes": "Evitar novo post só para cumprir tarefa"
+    },
+    {
+      "id": "yoga-duda",
+      "title": "Definir próximos passos Yoga App com Duda",
+      "category": "Operação",
+      "project": "Yoga App",
+      "priority": "P3",
+      "done_criteria": "Mensagem enviada ou alinhamento e responsáveis definidos",
+      "estimated_minutes": 20,
+      "status": "todo",
+      "due_date": null,
+      "suggested_date": "2026-10-21",
+      "notes": ""
+    },
+    {
+      "id": "ing_exec",
+      "title": "Praticar apresentação executiva em inglês",
+      "category": "Inglês",
+      "project": "Carreira",
+      "priority": "Optional",
+      "done_criteria": "Pitch oral de 90 segundos e resposta a uma pergunta de entrevista",
+      "estimated_minutes": 15,
+      "status": "todo",
+      "due_date": null,
+      "suggested_date": "2026-10-20",
+      "notes": "Opcional além das aulas regulares"
+    },
+    {
+      "id": "recife-22",
+      "title": "Confirmar logística da etapa Recife de 22/10",
+      "category": "Viagem",
+      "project": "África do Sul",
+      "priority": "P2",
+      "done_criteria": "Passagens e deslocamentos da etapa anterior ao voo internacional conferidos",
+      "estimated_minutes": 20,
+      "status": "todo",
+      "due_date": null,
+      "suggested_date": "2026-10-21",
+      "notes": "Viagem a Recife registrada em plano anterior; validar se permanece"
+    },
+    {
+      "id": "trip-documents",
+      "title": "Revisar documentos, voos, seguro, comprovantes e acesso offline",
+      "category": "Viagem",
+      "project": "África do Sul",
+      "priority": "P1",
+      "done_criteria": "Passaporte, passagens, seguro, hospedagem, escola, transfer, comprovantes e contatos acessíveis offline",
+      "estimated_minutes": 35,
+      "status": "todo",
+      "due_date": null,
+      "suggested_date": "2026-10-22",
+      "notes": ""
+    },
+    {
+      "id": "trip-money-connectivity",
+      "title": "Preparar conectividade, pagamento e compartilhamento de localização",
+      "category": "Viagem",
+      "project": "África do Sul",
+      "priority": "P2",
+      "done_criteria": "SIM/eSIM ou roaming decidido, meios de pagamento conferidos e rastreamento familiar configurado",
+      "estimated_minutes": 25,
+      "status": "todo",
+      "due_date": null,
+      "suggested_date": "2026-10-22",
+      "notes": ""
+    },
+    {
+      "id": "trip-luggage",
+      "title": "Finalizar mala e equipamentos para África do Sul",
+      "category": "Viagem",
+      "project": "África do Sul",
+      "priority": "P2",
+      "done_criteria": "Documentos, camadas para vento/frio, roupas, eletrônicos, equipamentos e itens essenciais conferidos",
+      "estimated_minutes": 35,
+      "status": "todo",
+      "due_date": null,
+      "suggested_date": "2026-10-22",
+      "notes": ""
+    },
+    {
+      "id": "sars",
+      "title": "Conferir necessidade e enviar declaração SARS Traveller Declaration, se aplicável",
+      "category": "Viagem",
+      "project": "África do Sul",
+      "priority": "P1",
+      "done_criteria": "Procedimento oficial aplicável verificado e, se requerido, declaração enviada e comprovante offline",
+      "estimated_minutes": 20,
+      "status": "todo",
+      "due_date": "2026-10-23",
+      "suggested_date": "2026-10-23",
+      "notes": "Checar exigência atual; não presumir obrigação para toda viagem"
+    },
+    {
+      "id": "flight-final",
+      "title": "Conferir check-in, embarque e deslocamento de 24/10",
+      "category": "Viagem",
+      "project": "África do Sul",
+      "priority": "P1",
+      "done_criteria": "Horários, check-in, regras de bagagem e transporte ao aeroporto conferidos",
+      "estimated_minutes": 20,
+      "status": "todo",
+      "due_date": "2026-10-23",
+      "suggested_date": "2026-10-23",
+      "notes": ""
+    }
+  ],
+  "backlog_watchlist": [
+    {
+      "id": "dayone-vitor",
+      "title": "Aguardar retorno do Vitor",
+      "project": "Day One",
+      "status": "waiting",
+      "notes": "Verificar resposta; follow-up só quando necessário"
+    },
+    {
+      "id": "tranquilo-thales",
+      "title": "Aguardar retorno do Thales",
+      "project": "Tranquilo SP",
+      "status": "waiting",
+      "notes": "Verificar resposta; follow-up só quando necessário"
+    }
+  ],
+  "confirmed_completed": [
+    {
+      "id": "agents-initial",
+      "title": "Fazer/ajustar agentes prioritários",
+      "status": "done"
+    },
+    {
+      "id": "lovable-initial",
+      "title": "Atualização inicial do Lovable",
+      "status": "done"
+    },
+    {
+      "id": "os-tasks-schema",
+      "title": "Definir estrutura inicial de tarefas do Marina OS",
+      "status": "done"
+    }
+  ],
+  "financial_registry": [
+    {
+      "title": "Carro",
+      "frequency": "monthly",
+      "type": "expense",
+      "amount_brl": null,
+      "due_day": null,
+      "paid_for_current_period": null,
+      "notes": "Valor e vencimento editáveis mensalmente; não presumir pagamento"
+    },
+    {
+      "title": "Aluguel",
+      "frequency": "monthly",
+      "type": "expense",
+      "amount_brl": null,
+      "due_day": null,
+      "paid_for_current_period": null,
+      "notes": "Valor e vencimento editáveis mensalmente; não presumir pagamento"
+    },
+    {
+      "title": "Faculdade",
+      "frequency": "monthly",
+      "type": "expense",
+      "amount_brl": null,
+      "due_day": null,
+      "paid_for_current_period": null,
+      "notes": "Valor e vencimento editáveis mensalmente; não presumir pagamento"
+    },
+    {
+      "title": "Seguro Setembro",
+      "frequency": "one_off_pending_validation",
+      "type": "expense",
+      "amount_brl": null,
+      "due_day": null,
+      "paid_for_current_period": null,
+      "notes": "Valor e vencimento editáveis mensalmente; não presumir pagamento"
+    },
+    {
+      "title": "Seguro Outubro",
+      "frequency": "one_off_pending_validation",
+      "type": "expense",
+      "amount_brl": null,
+      "due_day": null,
+      "paid_for_current_period": null,
+      "notes": "Valor e vencimento editáveis mensalmente; não presumir pagamento"
+    },
+    {
+      "title": "Seguro Bike",
+      "frequency": "monthly_pending_validation",
+      "type": "expense",
+      "amount_brl": null,
+      "due_day": null,
+      "paid_for_current_period": null,
+      "notes": "Valor e vencimento editáveis mensalmente; não presumir pagamento"
+    },
+    {
+      "title": "Plano de saúde",
+      "frequency": "monthly",
+      "type": "expense",
+      "amount_brl": null,
+      "due_day": null,
+      "paid_for_current_period": null,
+      "notes": "Valor e vencimento editáveis mensalmente; não presumir pagamento"
+    },
+    {
+      "title": "Enel",
+      "frequency": "monthly",
+      "type": "expense",
+      "amount_brl": null,
+      "due_day": null,
+      "paid_for_current_period": null,
+      "notes": "Valor e vencimento editáveis mensalmente; não presumir pagamento"
+    },
+    {
+      "title": "Plano de Luna",
+      "frequency": "monthly",
+      "type": "expense",
+      "amount_brl": null,
+      "due_day": null,
+      "paid_for_current_period": null,
+      "notes": "Valor e vencimento editáveis mensalmente; não presumir pagamento"
+    },
+    {
+      "title": "Cartão de Crédito BV",
+      "frequency": "monthly",
+      "type": "expense",
+      "amount_brl": null,
+      "due_day": null,
+      "paid_for_current_period": null,
+      "notes": "Valor e vencimento editáveis mensalmente; não presumir pagamento"
+    },
+    {
+      "title": "Cartão de Crédito Rico",
+      "frequency": "monthly",
+      "type": "expense",
+      "amount_brl": null,
+      "due_day": null,
+      "paid_for_current_period": null,
+      "notes": "Valor e vencimento editáveis mensalmente; não presumir pagamento"
+    },
+    {
+      "title": "Cartão de Crédito Neon",
+      "frequency": "monthly",
+      "type": "expense",
+      "amount_brl": null,
+      "due_day": null,
+      "paid_for_current_period": null,
+      "notes": "Valor e vencimento editáveis mensalmente; não presumir pagamento"
+    },
+    {
+      "title": "Cartão de Crédito C6",
+      "frequency": "monthly",
+      "type": "expense",
+      "amount_brl": null,
+      "due_day": null,
+      "paid_for_current_period": null,
+      "notes": "Valor e vencimento editáveis mensalmente; não presumir pagamento"
+    },
+    {
+      "title": "Dívida Banco do Brasil",
+      "frequency": "monthly_pending_validation",
+      "type": "expense",
+      "amount_brl": null,
+      "due_day": null,
+      "paid_for_current_period": null,
+      "notes": "Valor e vencimento editáveis mensalmente; não presumir pagamento"
+    },
+    {
+      "title": "Mercado Livre",
+      "frequency": "as_needed",
+      "type": "expense",
+      "amount_brl": null,
+      "due_day": null,
+      "paid_for_current_period": null,
+      "notes": "Valor e vencimento editáveis mensalmente; não presumir pagamento"
+    },
+    {
+      "title": "Assinaturas",
+      "frequency": "monthly",
+      "type": "expense",
+      "amount_brl": null,
+      "due_day": null,
+      "paid_for_current_period": null,
+      "notes": "Valor e vencimento editáveis mensalmente; não presumir pagamento"
+    },
+    {
+      "title": "Ração Luna",
+      "frequency": "as_needed",
+      "type": "expense",
+      "amount_brl": null,
+      "due_day": null,
+      "paid_for_current_period": null,
+      "notes": "Valor e vencimento editáveis mensalmente; não presumir pagamento"
+    },
+    {
+      "title": "Gasolina",
+      "frequency": "as_needed",
+      "type": "expense",
+      "amount_brl": null,
+      "due_day": null,
+      "paid_for_current_period": null,
+      "notes": "Valor e vencimento editáveis mensalmente; não presumir pagamento"
+    },
+    {
+      "title": "Multas",
+      "frequency": "as_needed",
+      "type": "expense",
+      "amount_brl": null,
+      "due_day": null,
+      "paid_for_current_period": null,
+      "notes": "Valor e vencimento editáveis mensalmente; não presumir pagamento"
+    },
+    {
+      "title": "Pedágio",
+      "frequency": "as_needed",
+      "type": "expense",
+      "amount_brl": null,
+      "due_day": null,
+      "paid_for_current_period": null,
+      "notes": "Valor e vencimento editáveis mensalmente; não presumir pagamento"
+    },
+    {
+      "title": "Feira",
+      "frequency": "weekly_pending_validation",
+      "type": "expense",
+      "amount_brl": null,
+      "due_day": null,
+      "paid_for_current_period": null,
+      "notes": "Valor e vencimento editáveis mensalmente; não presumir pagamento"
+    },
+    {
+      "title": "Hortifruti e carnes",
+      "frequency": "weekly",
+      "type": "expense",
+      "amount_brl": null,
+      "due_day": null,
+      "paid_for_current_period": null,
+      "notes": "Valor e vencimento editáveis mensalmente; não presumir pagamento"
+    },
+    {
+      "title": "Material de limpeza",
+      "frequency": "as_needed",
+      "type": "expense",
+      "amount_brl": null,
+      "due_day": null,
+      "paid_for_current_period": null,
+      "notes": "Valor e vencimento editáveis mensalmente; não presumir pagamento"
+    },
+    {
+      "title": "Estacionamento Santander — reembolso",
+      "frequency": "as_needed",
+      "type": "reimbursable",
+      "amount_brl": null,
+      "due_day": null,
+      "paid_for_current_period": null,
+      "notes": "Valor e vencimento editáveis mensalmente; não presumir pagamento"
+    },
+    {
+      "title": "Estacionamento pessoal",
+      "frequency": "as_needed",
+      "type": "expense",
+      "amount_brl": null,
+      "due_day": null,
+      "paid_for_current_period": null,
+      "notes": "Valor e vencimento editáveis mensalmente; não presumir pagamento"
+    }
+  ],
+  "expected_income": [
+    {
+      "title": "Santander PJ",
+      "amount_brl": 20000,
+      "expected_day_of_month": 15,
+      "status": "unverified"
+    },
+    {
+      "title": "Fashion Finder PJ",
+      "amount_brl": 10000,
+      "expected_day_of_month": 30,
+      "status": "unverified"
+    }
+  ]
+}
