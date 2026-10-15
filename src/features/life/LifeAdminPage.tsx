@@ -7,7 +7,7 @@ import { openSheet, toast } from '@/app/ui-store'
 import { removeWithUndo } from '@/app/undo'
 import { actions, getDB, nextOrder, useDB } from '@/data/store'
 import type { LifeAdminCategory, Task } from '@/data/types'
-import { Card, Checkbox, Chip, EmptyState, IconButton, Page, PageHeader, SectionTitle, SwipeRow } from '@/components/ui'
+import { Card, Chip, EmptyState, IconButton, ItemRow, Page, PageHeader, SectionTitle, SwipeRow } from '@/components/ui'
 import { useToday } from '@/hooks/useToday'
 import { haptic } from '@/lib/haptics'
 import { nowISO } from '@/lib/id'
@@ -258,7 +258,8 @@ function LifeRow({ item, today, showCategory, showKind }: { item: LifeItem; toda
   const meta = lifeCategoryMeta(lifeCategoryOf(t))
   const kind = adminKindMeta(item.kind)
   const checked = item.doneToday
-  const sub = [showCategory ? meta.label : undefined, showKind ? kind.label.toLowerCase() : undefined, item.detail].filter(Boolean).join(' · ')
+  // One quiet fact: the detail, else the category/kind.
+  const sub = item.detail || (showCategory ? meta.label : showKind ? kind.label.toLowerCase() : undefined)
   return (
     <SwipeRow
       className="rounded-none"
@@ -266,18 +267,17 @@ function LifeRow({ item, today, showCategory, showKind }: { item: LifeItem; toda
       completeLabel={checked ? 'Desmarcar' : 'Feito'}
       onDelete={() => removeWithUndo('tasks', t.id, 'Apagado')}
     >
-      <div className="flex items-center gap-3 min-h-[60px] px-4 py-2.5">
-        <Checkbox checked={checked} label={checked ? `Desmarcar ${t.title}` : `Concluir ${t.title}`} onChange={() => complete(item, today)} />
-        <button type="button" onClick={() => openSheet('task', { id: t.id })} className="flex-1 min-w-0 flex items-center gap-3 text-left">
-          <span aria-hidden className="text-[18px] shrink-0">
-            {showCategory ? meta.emoji : kind.emoji}
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className={cn('block text-[15px] leading-snug', checked && 'text-muted line-through decoration-muted/50')}>{t.title}</span>
-            {sub && <span className="block text-[12.5px] text-muted mt-0.5 truncate">{sub}</span>}
-          </span>
-        </button>
-      </div>
+      <ul>
+        <ItemRow
+          className="px-4"
+          title={`${showCategory ? meta.emoji : kind.emoji} ${t.title}`}
+          meta={sub}
+          when={t.time}
+          checked={checked}
+          onCheck={() => complete(item, today)}
+          onOpen={() => openSheet('task', { id: t.id })}
+        />
+      </ul>
     </SwipeRow>
   )
 }

@@ -4,15 +4,14 @@ import type { DateKey, Task } from '@/data/types'
 import { isTaskDoneOn } from '@/data/selectors'
 import { openSheet } from '@/app/ui-store'
 import { removeWithUndo } from '@/app/undo'
-import { Checkbox, SwipeRow } from '@/components/ui'
+import { ItemRow, SwipeRow } from '@/components/ui'
 import { describeRecurrence } from '@/lib/recurrence'
-import { cn } from '@/lib/cn'
 import { toggleTaskDone } from './mutations'
 import { dueLabel, projectById } from './selectors'
 
 /**
  * One work task: swipe right to complete, left to delete (with undo), tap to edit.
- * `showProject` adds the project's emoji + name in the subtitle.
+ * `showProject` puts the project's emoji + name in the meta line; `extra` (legacy) shows the task's section there.
  */
 export function WorkTaskRow({
   task,
@@ -30,25 +29,24 @@ export function WorkTaskRow({
   const db = useDB()
   const done = isTaskDoneOn(db, task, today)
   const project = showProject ? projectById(db, task.projectId) : undefined
-  const bits = [
-    project ? `${project.emoji} ${project.name}` : undefined,
-    task.recurrence ? describeRecurrence(task.recurrence) : undefined,
-    task.time,
-    task.dueDate && !done ? `entrega ${dueLabel(task.dueDate, today)}` : undefined,
-    task.status === 'review' ? 'revisar' : undefined,
-  ].filter(Boolean)
+  // One quiet fact; the time/delivery goes on the right.
+  const meta = extra && task.group ? task.group : project ? `${project.emoji} ${project.name}` : task.status === 'review' ? 'revisar' : task.recurrence ? describeRecurrence(task.recurrence) : undefined
+  const when = task.time ?? (task.dueDate && !done ? dueLabel(task.dueDate, today) : undefined)
 
   const row = (
-    <div className="flex items-start gap-3 px-4 py-3 min-h-[56px]">
-      <div className="pt-0.5">
-        <Checkbox checked={done} onChange={() => toggleTaskDone(task, today)} label={`Concluir ${task.title}`} />
-      </div>
-      <button type="button" className="flex-1 min-w-0 text-left" onClick={() => openSheet('task', { id: task.id })}>
-        <div className={cn('text-[15px] leading-snug', done && 'text-muted line-through decoration-muted/50')}>{task.title}</div>
-        {bits.length > 0 && <div className="text-[12.5px] text-muted mt-0.5 truncate">{bits.join(' · ')}</div>}
-        {extra}
-      </button>
-    </div>
+    <ul>
+      <ItemRow
+        className="pl-3.5 pr-4"
+        title={task.title}
+        meta={meta}
+        when={when}
+        priority={task.priority === 'alta' ? 1 : task.priority === 'media' ? 2 : undefined}
+        late={!!task.dueDate && task.dueDate < today}
+        checked={done}
+        onCheck={() => toggleTaskDone(task, today)}
+        onOpen={() => openSheet('task', { id: task.id })}
+      />
+    </ul>
   )
   if (!swipe) return row
   return (

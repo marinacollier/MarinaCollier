@@ -16,7 +16,7 @@ import {
   studyingNow,
   workoutsOn,
 } from '@/data/selectors'
-import { Checkbox, Page, PageHeader, SectionTitle, TONE } from '@/components/ui'
+import { ItemList, ItemRow, Page, PageHeader, SectionTitle, TONE } from '@/components/ui'
 import { useToday } from '@/hooks/useToday'
 import { formatBRLShort } from '@/lib/money'
 import { formatLongDate, formatShortDate, formatMonth, weekday, WEEKDAY_LONG } from '@/lib/date'
@@ -440,32 +440,32 @@ function VidaTop3({ db, today }: { db: DB; today: DateKey }) {
         </button>
       )}
       {list.length > 0 && (
-        <ul className="divide-y divide-line/70">
+        <ItemList className="px-4">
           {list.map((p) => (
-            <li key={p.id} className="flex items-center gap-3 px-4 min-h-[52px]">
-              <Checkbox
-                checked={p.done}
-                label={p.done ? `Desmarcar ${p.title}` : `Concluir ${p.title}`}
-                onChange={(done) => {
-                  actions.update('priorities', p.id, { done })
-                  if (done) haptic('success')
-                }}
-              />
-              <span className={cn('flex-1 min-w-0 text-[15px] leading-snug', p.done && 'text-muted line-through decoration-muted/50')}>{p.title}</span>
-              <button
-                type="button"
-                onClick={() => {
-                  actions.remove('priorities', p.id)
-                  toast('Tirei do Top 3', { action: { label: 'Desfazer', run: () => actions.create('priorities', p) } })
-                }}
-                className="text-[12px] text-muted h-9 px-2 -mr-2"
-                aria-label={`Tirar ${p.title} do Top 3`}
-              >
-                tirar
-              </button>
-            </li>
+            <ItemRow
+              key={p.id}
+              title={p.title}
+              checked={p.done}
+              onCheck={(done) => {
+                actions.update('priorities', p.id, { done })
+                if (done) haptic('success')
+              }}
+              trailing={
+                <button
+                  type="button"
+                  onClick={() => {
+                    actions.remove('priorities', p.id)
+                    toast('Tirei do Top 3', { action: { label: 'Desfazer', run: () => actions.create('priorities', p) } })
+                  }}
+                  className="text-[12px] text-muted h-9 px-2 -mr-2"
+                  aria-label={`Tirar ${p.title} do Top 3`}
+                >
+                  tirar
+                </button>
+              }
+            />
           ))}
-        </ul>
+        </ItemList>
       )}
       {list.length < 3 && (adding || list.length > 0) && (
         <form

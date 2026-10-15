@@ -13,6 +13,7 @@ import {
   Chip,
   EmptyState,
   IconButton,
+  ItemRow,
   ListCard,
   Page,
   PageHeader,
@@ -51,7 +52,7 @@ export default function GoalsPage() {
 
   return (
     <Page>
-      <PageHeader title="Metas" subtitle="Poucas e boas: o que realmente importa." />
+      <PageHeader title="Metas" subtitle="poucas e boas" />
       <Segmented
         value={tab}
         onChange={(v) => setParams(v === 'semana' ? {} : { n: v }, { replace: true })}
@@ -449,21 +450,17 @@ function SmallGoalRow({ goal }: { goal: Goal }) {
       completeLabel={done ? 'Reabrir' : 'Feita'}
       className="rounded-none"
     >
-      <div className="flex items-center gap-3 min-h-[52px] px-4 py-2">
-        <Checkbox
+      <ul>
+        <ItemRow
+          className="px-4"
+          title={goal.title}
+          meta={goal.deadline ? `até ${formatShortDate(goal.deadline)}` : undefined}
           checked={done}
-          onChange={() => toggleDone(goal)}
-          label={done ? 'Reabrir meta' : 'Marcar como feita'}
-          size="sm"
-          className="ml-0"
+          onCheck={() => toggleDone(goal)}
+          onOpen={() => openSheet('goal', { id: goal.id })}
+          trailing={<AreaTag area={goal.category} />}
         />
-        <button className="flex-1 min-w-0 text-left py-1" onClick={() => openSheet('goal', { id: goal.id })}>
-          <div className={cn('text-[15px] leading-snug', done && 'line-through text-muted decoration-muted/50')}>
-            {goal.title}
-          </div>
-        </button>
-        <AreaTag area={goal.category} />
-      </div>
+      </ul>
     </SwipeRow>
   )
 }

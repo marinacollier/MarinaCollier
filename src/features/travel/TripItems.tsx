@@ -5,7 +5,7 @@ import { actions, nextOrder, useDB } from '@/data/store'
 import type { Trip, TripItem, TripSection } from '@/data/types'
 import { openSheet, toast } from '@/app/ui-store'
 import { removeWithUndo } from '@/app/undo'
-import { Button, Checkbox, EmptyState, SwipeRow } from '@/components/ui'
+import { Button, EmptyState, ItemRow as Row, SwipeRow } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { haptic } from '@/lib/haptics'
 import { formatBRL } from '@/lib/money'
@@ -100,17 +100,12 @@ export function ItemRow({ item, showDate, review }: { item: TripItem; showDate?:
   const [choosing, setChoosing] = useState<'status' | 'payment' | null>(null)
   const checkable = isCheckable(item.section)
   const done = item.status === 'feito'
-  const cancelled = item.status === 'cancelado'
   const toggle = (k: 'status' | 'payment') => setChoosing((c) => (c === k ? null : k))
   const section = tabMeta(item.section)
-  const meta = [
-    review ? `${section.emoji} ${section.label}` : undefined,
-    showDate || item.endDate ? itemDateLabel(item) : undefined,
-    item.time,
-    item.amountCents != null ? formatBRL(item.amountCents) : undefined,
-    item.confirmationCode ? `cód. ${item.confirmationCode}` : undefined,
-    item.notes,
-  ].filter(Boolean)
+  // One quiet line: when it is (or, undated, the value / code); in Revisar, the section first.
+  const dateBit = showDate || item.endDate ? [itemDateLabel(item), item.time].filter(Boolean).join(' ') : item.time
+  const fact = dateBit || (item.amountCents != null ? formatBRL(item.amountCents) : item.confirmationCode ? `cód. ${item.confirmationCode}` : undefined)
+  const meta = [review ? `${section.emoji} ${section.label}` : undefined, fact].filter(Boolean).join(' · ') || undefined
   // The check says done/confirmed; the pill only for the other states (a confirmar, cancelado…).
   const showStatusPill = item.status !== 'feito' && item.status !== 'confirmado' && item.status !== 'a_fazer'
   const statusMeta = useMemo(
@@ -128,36 +123,34 @@ export function ItemRow({ item, showDate, review }: { item: TripItem; showDate?:
       }}
       onDelete={() => removeWithUndo('tripItems', item.id, 'Item apagado')}
     >
-      <div className="px-4 py-2.5">
-        <div className="flex items-center gap-3 min-h-11">
+      <div className="px-4">
+        <ul>
           {/* Every line has a check (no sheet, no confirm): to-dos → feito; bookings/flights/stays → confirmado. */}
-          <Checkbox
+          <Row
+            title={item.title}
+            meta={meta}
             checked={done || item.status === 'confirmado'}
-            label={item.title}
-            className="ml-0.5"
-            onChange={(v) => {
+            onCheck={(v) => {
               const before = item.status
               setStatus(item, v ? (checkable ? 'feito' : 'confirmado') : checkable ? 'a_fazer' : 'a_confirmar')
               if (v) haptic('success')
               toast(v ? (checkable ? `${item.title} ✓` : `${item.title}: confirmado ✓`) : `${item.title}: desmarcado`, { action: { label: 'Desfazer', run: () => actions.update('tripItems', item.id, { status: before }) } })
             }}
+            onOpen={() => openSheet('tripItem', { id: item.id })}
+            trailing={
+              showStatusPill || item.paymentStatus ? (
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                  {showStatusPill && <StatusPill status={item.status} review={review} onClick={() => toggle('status')} />}
+                  {item.paymentStatus && <PaymentPill status={item.paymentStatus} onClick={() => toggle('payment')} />}
+                </div>
+              ) : (
+                <button type="button" aria-label="Mudar status" onClick={() => toggle('status')} className="h-11 w-6 -mr-1 text-muted/70 text-lg leading-none">
+                  ⋯
+                </button>
+              )
+            }
           />
-          <button type="button" className="flex-1 min-w-0 text-left py-1" onClick={() => openSheet('tripItem', { id: item.id })}>
-            <div className={cn('text-[15px] leading-snug', (done || cancelled) && 'text-muted line-through decoration-muted/50')}>{item.title}</div>
-            {meta.length > 0 && <div className="text-[12.5px] text-muted mt-0.5 line-clamp-2">{meta.join(' · ')}</div>}
-          </button>
-          {(showStatusPill || item.paymentStatus) && (
-            <div className="flex flex-col items-end gap-1 shrink-0">
-              {showStatusPill && <StatusPill status={item.status} review={review} onClick={() => toggle('status')} />}
-              {item.paymentStatus && <PaymentPill status={item.paymentStatus} onClick={() => toggle('payment')} />}
-            </div>
-          )}
-          {!showStatusPill && (
-            <button type="button" aria-label="Mudar status" onClick={() => toggle('status')} className="h-11 w-6 -mr-1 text-muted/70 text-lg leading-none">
-              ⋯
-            </button>
-          )}
-        </div>
+        </ul>
         <AnimatePresence initial={false}>
           {choosing && (
             <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.18 }} className="overflow-hidden">

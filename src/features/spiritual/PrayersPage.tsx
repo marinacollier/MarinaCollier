@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ROUTES } from '@/app/routes'
 import { toast } from '@/app/ui-store'
-import { Button, Card, ChipSelect, EmptyState, Page, PageHeader, Segmented, TextArea, TextInput } from '@/components/ui'
+import { Button, Card, ChipSelect, EmptyState, Page, PageHeader, TextArea, TextInput } from '@/components/ui'
 import { actions, persist, useDB } from '@/data/store'
 import { savePrayer } from '@/data/spiritual/ops'
 import type { SpiritualPrayer, SpiritualPrayerCategory } from '@/data/types'
@@ -39,7 +39,7 @@ export default function PrayersPage() {
     <Page>
       <PageHeader title="Diário de oração" eyebrow="Bíblia, Graça & Liberdade" back backTo={ROUTES.bible} />
       <PrayerForm key={prayers.length} initialCategory={tab === 'todas' ? 'oracao' : tab} />
-      <Segmented variant="tabs" value={tab} onChange={(t) => setParams(t === 'todas' ? {} : { aba: t }, { replace: true })} options={TABS} className="mt-6 mb-4" />
+      <ChipSelect wrap={false} value={tab} onChange={(t) => t && setParams(t === 'todas' ? {} : { aba: t }, { replace: true })} options={TABS} className="mt-6 mb-4" />
       {list.length ? (
         <div className="grid gap-3">
           {list.map((p) => (

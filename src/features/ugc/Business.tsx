@@ -1,22 +1,22 @@
 /**
  * UGC Business — CRM Marcas views inside the UGC space: the commercial dashboard (every card a count of ONE
  * kind of record, tap/hover reveals them), the day's UGC tasks (existing Tasks — the same check as Home),
- * Esta semana, Calendário, Portfólio e produção, Financeiro, the brand CRM card and "Importar CRM".
+ * the rest of the week, Portfólio, Financeiro, the brand CRM card and "Importar CRM". Every list uses ItemRow.
  */
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronDown, ExternalLink } from 'lucide-react'
+import { ChevronDown, ExternalLink, Pencil } from 'lucide-react'
 import { ROUTES } from '@/app/routes'
-import { toast } from '@/app/ui-store'
-import { Card, Checkbox, Chip, SectionTitle } from '@/components/ui'
+import { openSheet, toast } from '@/app/ui-store'
+import { Card, Checkbox, Chip, ItemList, ItemRow, SectionTitle } from '@/components/ui'
 import { persist, useDB } from '@/data/store'
 import { carriedOverTasks, isTaskDoneOn, tasksForDay } from '@/data/selectors'
 import type { Brand, ContentItem, DateKey, Task, UgcCrmStatus, UgcDemo } from '@/data/types'
-import { COUPONS_CONFIRMED_IN_SHEET, CRM_STATUS_LABEL, CRM_STATUSES, crmDashboard, isUgcTask, nextActionOf, PRIORITY_P, TASK_STATE_LABEL, taskState, ugcMoney, type DashCard, type UgcTaskState } from '@/data/ugc/crm'
+import { COUPONS_CONFIRMED_IN_SHEET, CRM_STATUS_LABEL, CRM_STATUSES, crmDashboard, isUgcTask, nextActionOf, TASK_STATE_LABEL, taskState, ugcMoney, type DashCard, type UgcTaskState } from '@/data/ugc/crm'
 import { addCoupon, addPressKit, addStep, importCrmText, patchContent, patchDemo, removeCoupon, removePressKit, removeStep, rescheduleTask, setCrmStatus, setUgcTaskState, toggleStep } from '@/data/ugc/crm-ops'
 import { setTaskDone } from '@/features/tasks/ops'
 import { useToday } from '@/hooks/useToday'
-import { addDays, endOfWeek, formatDayMonth, relativeDay, startOfWeek } from '@/lib/date'
+import { endOfWeek, formatDayMonth, relativeDay, startOfWeek } from '@/lib/date'
 import { haptic } from '@/lib/haptics'
 import { uid } from '@/lib/id'
 import { cn } from '@/lib/cn'
@@ -64,23 +64,11 @@ function DashRecords({ card }: { card: DashCard }) {
       </p>
       {card.note && <p className="text-[12.5px] text-muted mb-1">{card.note}</p>}
       {card.records.length ? (
-        <ul className="divide-y divide-line/70 max-h-72 overflow-y-auto">
+        <ItemList className="max-h-72 overflow-y-auto">
           {card.records.map((r) => (
-            <li key={r.id}>
-              {r.brandId ? (
-                <Link to={ROUTES.ugcBrand(r.brandId)} className="block py-2 active:opacity-70">
-                  <span className="block text-[14.5px]">{r.title}</span>
-                  {r.sub && <span className="block text-[12.5px] text-muted">{r.sub}</span>}
-                </Link>
-              ) : (
-                <div className="py-2">
-                  <span className="block text-[14.5px]">{r.title}</span>
-                  {r.sub && <span className="block text-[12.5px] text-muted">{r.sub}</span>}
-                </div>
-              )}
-            </li>
+            <ItemRow key={r.id} title={r.title} meta={r.sub} to={r.brandId ? ROUTES.ugcBrand(r.brandId) : undefined} />
           ))}
-        </ul>
+        </ItemList>
       ) : (
         <p className="text-[13.5px] text-muted">Nenhum registro.</p>
       )}
@@ -102,13 +90,9 @@ export function UgcTaskRow({ task, date }: { task: Task; date: DateKey }) {
   const brand = task.brandId ? db.brands.find((b) => b.id === task.brandId) : undefined
   const project = task.projectId ? db.projects.find((p) => p.id === task.projectId) : undefined
   const demo = task.contentItemId ? db.contentItems.find((c) => c.id === task.contentItemId) : undefined
-  const meta = [
-    task.priority ? PRIORITY_P[task.priority] : undefined,
-    brand?.name ?? (project ? `${project.emoji} ${project.name}` : undefined),
-    task.dueDate ? `prazo ${relativeDay(task.dueDate, today)}` : task.date && task.date !== date ? relativeDay(task.date, today) : undefined,
-    task.durationMin ? `${task.durationMin} min` : undefined,
-    TASK_STATE_LABEL[state],
-  ].filter(Boolean)
+  // One quiet fact: the brand (or project), else the state.
+  const meta = brand?.name ?? (project ? `${project.emoji} ${project.name}` : TASK_STATE_LABEL[state])
+  const when = task.time ?? (task.dueDate ? `prazo ${relativeDay(task.dueDate, today)}` : task.date && task.date !== date ? relativeDay(task.date, today) : undefined)
   const next = nextActionOf(task)
   const tick = (v: boolean) => {
     setTaskDone(task.id, v, date)
@@ -117,20 +101,20 @@ export function UgcTaskRow({ task, date }: { task: Task; date: DateKey }) {
     toast(v ? 'Feito ✓' : 'Desmarcado', { action: { label: 'Desfazer', run: () => (setTaskDone(task.id, !v, date), void persist()) } })
   }
   return (
-    <li className="py-1.5">
-      <div className="flex items-start gap-2 min-h-[52px]">
-        <span className="pt-2.5 pl-1.5">
-          <Checkbox checked={done} onChange={tick} label={done ? `Desmarcar ${task.title}` : `Feito: ${task.title}`} />
-        </span>
-        <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex-1 min-w-0 text-left py-1.5 active:opacity-70">
-          <span className={cn('block text-[15px] leading-snug', done && 'line-through text-muted')}>{task.title}</span>
-          <span className="block text-[12.5px] text-muted">{meta.join(' · ')}</span>
-          {next && !done && <span className="block text-[12.5px] text-ink-2 mt-0.5">→ {next}</span>}
-        </button>
-        <ChevronDown size={16} className={cn('mt-3 text-muted shrink-0 transition', open && 'rotate-180')} aria-hidden />
-      </div>
+    <>
+      <ItemRow
+        title={task.title}
+        meta={next && !done ? `→ ${next}` : meta}
+        when={when}
+        priority={task.priority === 'alta' ? 1 : task.priority === 'media' ? 2 : undefined}
+        late={!!task.dueDate && task.dueDate < today}
+        checked={done}
+        onCheck={tick}
+        onOpen={() => setOpen((o) => !o)}
+        trailing={<ChevronDown size={16} className={cn('text-muted shrink-0 transition', open && 'rotate-180')} aria-hidden />}
+      />
       {open && (
-        <div className="pl-11 pr-1 pb-2 space-y-3">
+        <li className="pl-9 pr-1 pb-3 pt-1 space-y-3">
           {task.notes && <p className="text-[13px] text-ink-2 whitespace-pre-line">{task.notes}</p>}
           <div role="radiogroup" aria-label="Status" className="flex flex-wrap gap-1.5">
             {STATES.map((s) => (
@@ -181,17 +165,17 @@ export function UgcTaskRow({ task, date }: { task: Task; date: DateKey }) {
               </Link>
             )}
             {demo && (
-              <Link to={`${ROUTES.ugc}?aba=portfolio`} className="text-accent inline-flex items-center gap-1">
+              <Link to={`${ROUTES.ugc}?aba=producao`} className="text-accent inline-flex items-center gap-1">
                 <ExternalLink size={13} /> {demo.title}
               </Link>
             )}
-            <Link to={ROUTES.tasks} className="text-accent inline-flex items-center gap-1">
-              <ExternalLink size={13} /> Tarefas
-            </Link>
+            <button type="button" onClick={() => openSheet('task', { id: task.id })} className="text-accent inline-flex items-center gap-1">
+              <Pencil size={13} /> Editar hora, dia, notas
+            </button>
           </div>
-        </div>
+        </li>
       )}
-    </li>
+    </>
   )
 }
 
@@ -203,131 +187,51 @@ export function UgcTasksToday() {
     return [...carriedOverTasks(db, today), ...tasksForDay(db, today)].filter((t) => isUgcTask(t) && t.status !== 'archived' && !seen.has(t.id) && !!seen.add(t.id))
   }, [db, today])
   const done = list.filter((t) => isTaskDoneOn(db, t, today)).length
+  if (!list.length) return null
   return (
     <section aria-label="Hoje — UGC Business">
-      <SectionTitle action={list.length ? <span className="text-[12.5px] text-muted tabular-nums">{done}/{list.length} feitas</span> : undefined}>Hoje — UGC Business</SectionTitle>
-      {list.length ? (
-        <ul className="divide-y divide-line/70">
-          {list.map((t) => (
-            <UgcTaskRow key={t.id} task={t} date={today} />
-          ))}
-        </ul>
-      ) : (
-        <p className="text-[14px] text-muted py-1">Nenhuma tarefa de UGC pra hoje.</p>
-      )}
+      <SectionTitle action={<span className="text-[12.5px] text-muted tabular-nums">{done}/{list.length}</span>}>Tarefas de hoje</SectionTitle>
+      <ItemList>
+        {list.map((t) => (
+          <UgcTaskRow key={t.id} task={t} date={today} />
+        ))}
+      </ItemList>
     </section>
   )
 }
 
-// ─── Esta semana ────────────────────────────────────────────────────────────
+// ─── Resto da semana (inside Hoje) ──────────────────────────────────────────
 
 export function UgcWeek() {
   const db = useDB()
   const today = useToday()
   const from = startOfWeek(today)
   const to = endOfWeek(today)
+  // Today's tasks are already above; this is what's still ahead this week.
   const tasks = db.tasks
     .filter((t) => isUgcTask(t) && t.status !== 'archived')
-    .filter((t) => [t.date, t.dueDate].some((d) => !!d && d >= from && d <= to) || (t.bucket === 'semana' && !t.date && !t.dueDate && t.status !== 'done'))
+    .filter((t) => [t.date, t.dueDate].some((d) => !!d && d > today && d <= to) || (t.bucket === 'semana' && !t.date && !t.dueDate && t.status !== 'done'))
     .sort((a, b) => (a.date ?? a.dueDate ?? '9').localeCompare(b.date ?? b.dueDate ?? '9') || a.order - b.order)
   const followUps = db.ugcOpportunities.filter((o) => o.nextFollowUpAt && o.nextFollowUpAt <= to && (o.followUpWindowEnd ?? o.nextFollowUpAt) >= from && !['recusada', 'perdida', 'concluida', 'pausada'].includes(o.status))
+  if (!tasks.length && !followUps.length) return null
   return (
-    <div className="space-y-5">
-      <p className="text-[13px] text-muted">
-        {formatDayMonth(from)} – {formatDayMonth(to)}
-      </p>
-      {tasks.length ? (
-        <ul className="divide-y divide-line/70">
-          {tasks.map((t) => (
-            <UgcTaskRow key={t.id} task={t} date={t.date && t.date >= from ? t.date : today} />
-          ))}
-        </ul>
-      ) : (
-        <p className="text-[14px] text-muted">Nada de UGC planejado pra esta semana.</p>
-      )}
-      {followUps.length > 0 && (
-        <section>
-          <SectionTitle>Follow-ups da semana (só se não responderem)</SectionTitle>
-          <ul className="divide-y divide-line/70">
-            {followUps.map((o) => (
-              <li key={o.id}>
-                <Link to={ROUTES.ugcBrand(o.brandId)} className="block min-h-[48px] py-2 active:opacity-70">
-                  <span className="block text-[15px]">{db.brands.find((b) => b.id === o.brandId)?.name ?? o.title}</span>
-                  <span className="block text-[12.5px] text-muted">
-                    {formatDayMonth(o.nextFollowUpAt!)}
-                    {o.followUpWindowEnd ? `–${formatDayMonth(o.followUpWindowEnd)}` : ''}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-    </div>
-  )
-}
-
-// ─── Calendário ─────────────────────────────────────────────────────────────
-
-export function UgcCalendar() {
-  const db = useDB()
-  const today = useToday()
-  const days = useMemo(() => {
-    const out: { date: DateKey; lines: { id: string; title: string; sub: string; to?: string }[] }[] = []
-    for (let i = 0; i < 21; i++) {
-      const d = addDays(today, i)
-      const lines: { id: string; title: string; sub: string; to?: string }[] = []
-      for (const t of db.tasks) {
-        if (!isUgcTask(t) || t.status === 'archived' || t.status === 'done') continue
-        if (t.date === d) lines.push({ id: t.id, title: t.title, sub: [t.priority ? PRIORITY_P[t.priority] : undefined, 'tarefa'].filter(Boolean).join(' · ') })
-        else if (t.dueDate === d) lines.push({ id: `${t.id}:due`, title: t.title, sub: 'prazo' })
-      }
-      for (const o of db.ugcOpportunities) {
-        if (!o.nextFollowUpAt || ['recusada', 'perdida', 'concluida', 'pausada'].includes(o.status)) continue
-        const end = o.followUpWindowEnd ?? o.nextFollowUpAt
-        if (d === o.nextFollowUpAt || (d > o.nextFollowUpAt && d <= end && d === today)) lines.push({ id: `${o.id}:fu`, title: `Follow-up ${db.brands.find((b) => b.id === o.brandId)?.name ?? ''}`.trim(), sub: o.followUpWindowEnd ? `janela até ${formatDayMonth(o.followUpWindowEnd)} · só se não responder` : 'follow-up', to: ROUTES.ugcBrand(o.brandId) })
-      }
-      for (const c of db.contentItems) if (c.demo?.recordDate === d) lines.push({ id: `${c.id}:rec`, title: `Gravar ${c.title}`, sub: 'portfólio', to: `${ROUTES.ugc}?aba=portfolio` })
-      if (lines.length) out.push({ date: d, lines })
-    }
-    return out
-  }, [db, today])
-  return (
-    <div className="space-y-4">
-      <p className="text-[13px] text-muted">
-        Próximas 3 semanas. Os mesmos registros aparecem na{' '}
-        <Link to={ROUTES.agenda} className="text-accent">
-          Agenda
-        </Link>
-        .
-      </p>
-      {days.length ? (
-        days.map((g) => (
-          <section key={g.date}>
-            <h3 className="eyebrow px-1 mb-1">{relativeDay(g.date, today)} · {formatDayMonth(g.date)}</h3>
-            <ul className="divide-y divide-line/70">
-              {g.lines.map((l) => (
-                <li key={l.id} className="min-h-[44px] py-1.5">
-                  {l.to ? (
-                    <Link to={l.to} className="block active:opacity-70">
-                      <span className="block text-[14.5px]">{l.title}</span>
-                      <span className="block text-[12.5px] text-muted">{l.sub}</span>
-                    </Link>
-                  ) : (
-                    <>
-                      <span className="block text-[14.5px]">{l.title}</span>
-                      <span className="block text-[12.5px] text-muted">{l.sub}</span>
-                    </>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))
-      ) : (
-        <p className="text-[14px] text-muted">Nada de UGC com data nas próximas semanas.</p>
-      )}
-    </div>
+    <section aria-label="Resto da semana">
+      <SectionTitle action={<span className="text-[12.5px] text-muted tabular-nums">até {formatDayMonth(to)}</span>}>Resto da semana</SectionTitle>
+      <ItemList>
+        {tasks.map((t) => (
+          <UgcTaskRow key={t.id} task={t} date={t.date && t.date >= from ? t.date : today} />
+        ))}
+        {followUps.map((o) => (
+          <ItemRow
+            key={o.id}
+            title={`Follow-up ${db.brands.find((b) => b.id === o.brandId)?.name ?? o.title}`}
+            meta="só se não responder"
+            when={`${formatDayMonth(o.nextFollowUpAt!)}${o.followUpWindowEnd ? `–${formatDayMonth(o.followUpWindowEnd)}` : ''}`}
+            to={ROUTES.ugcBrand(o.brandId)}
+          />
+        ))}
+      </ItemList>
+    </section>
   )
 }
 
@@ -338,10 +242,18 @@ const EDIT_LABEL: Record<UgcDemo['editStatus'], string> = { nao_iniciada: 'Não 
 export function UgcPortfolio() {
   const items = useDB((db) => db.contentItems).filter((c) => c.demo)
   return (
-    <div className="space-y-3">
-      <p className="text-[13px] text-muted">Projetos demonstrativos com produtos que você tem — portfólio, não contratos pagos.</p>
-      {items.length ? items.map((c) => <DemoCard key={c.id} c={c} />) : <p className="text-[14px] text-muted">Nenhum projeto demonstrativo ainda.</p>}
-    </div>
+    <section aria-label="Portfólio">
+      <SectionTitle className="mt-0">Portfólio</SectionTitle>
+      {items.length ? (
+        <ItemList>
+          {items.map((c) => (
+            <DemoCard key={c.id} c={c} />
+          ))}
+        </ItemList>
+      ) : (
+        <p className="text-[14px] text-muted px-1">Nenhum projeto demonstrativo.</p>
+      )}
+    </section>
   )
 }
 
@@ -354,15 +266,16 @@ function DemoCard({ c }: { c: ContentItem }) {
   const done = d.scenes.filter((s) => s.done).length
   const save = (p: Partial<UgcDemo>, msg = 'Salvo ✓') => commit(() => patchDemo(c.id, p), msg)
   return (
-    <Card>
-      <button type="button" className="w-full text-left" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
-        <span className="block text-[15px] font-medium">{c.title}</span>
-        <span className="block text-[12.5px] text-muted">
-          {[c.script ? 'roteiro ✓' : 'sem roteiro', `${done}/${d.scenes.length} cenas`, d.recordDate ? `gravação ${formatDayMonth(d.recordDate)}` : 'gravação sem data', `edição: ${EDIT_LABEL[d.editStatus].toLowerCase()}`, d.inPortfolio ? 'no portfólio' : undefined].filter(Boolean).join(' · ')}
-        </span>
-      </button>
+    <>
+      <ItemRow
+        title={c.title}
+        meta={d.inPortfolio ? 'no portfólio' : `${done}/${d.scenes.length} cenas · ${EDIT_LABEL[d.editStatus].toLowerCase()}`}
+        when={d.recordDate ? formatDayMonth(d.recordDate) : undefined}
+        onOpen={() => setOpen((o) => !o)}
+        trailing={<ChevronDown size={16} className={cn('text-muted shrink-0 transition', open && 'rotate-180')} aria-hidden />}
+      />
       {open && (
-        <div className="space-y-3 mt-3">
+        <li className="pl-9 pr-1 pb-3 pt-1 space-y-3">
           <label className="block text-[12.5px] text-muted">
             Roteiro
             <textarea key={c.script} defaultValue={c.script ?? ''} rows={4} className="input w-full mt-1 py-2" onBlur={(e) => e.target.value.trim() !== (c.script ?? '') && commit(() => patchContent(c.id, { script: e.target.value.trim() || undefined }), 'Roteiro salvo ✓')} />
@@ -425,9 +338,9 @@ function DemoCard({ c }: { c: ContentItem }) {
               <ExternalLink size={13} /> {b.name}
             </Link>
           )}
-        </div>
+        </li>
       )}
-    </Card>
+    </>
   )
 }
 
@@ -438,7 +351,8 @@ export function UgcFinance() {
   const m = useMemo(() => ugcMoney(db), [db])
   const nameOf = (id: string) => db.brands.find((b) => b.id === id)?.name ?? 'Marca'
   return (
-    <div className="space-y-4">
+    <section aria-label="Financeiro">
+      <SectionTitle>Financeiro</SectionTitle>
       <div className="grid grid-cols-3 gap-2 text-center">
         {[
           ['Contratos pagos', String(m.paid.length)],
@@ -451,25 +365,21 @@ export function UgcFinance() {
           </Card>
         ))}
       </div>
-      <p className="text-[13px] text-muted">Só conta contrato de UGC pago, com valor combinado. Press kits, permutas, afiliações (cupom) e conteúdo espontâneo são relacionamento — nunca receita.</p>
-      {m.paid.length > 0 ? (
-        <ul className="divide-y divide-line/70">
+      <p className="text-[12.5px] text-muted px-1 mt-2">Só UGC pago conta como receita.</p>
+      {m.paid.length > 0 && (
+        <ItemList className="mt-2">
           {m.paid.map((o) => (
-            <li key={o.id}>
-              <Link to={ROUTES.ugcBrand(o.brandId)} className="block min-h-[48px] py-2">
-                <span className="block text-[15px]">{nameOf(o.brandId)}</span>
-                <span className="block text-[12.5px] text-muted">
-                  {o.agreedValueCents ? BRL(o.agreedValueCents) : ''} · fechado {o.agreedAt ? formatDayMonth(o.agreedAt) : ''}
-                  {o.paidAt ? ` · pago ${formatDayMonth(o.paidAt)}` : ''}
-                </span>
-              </Link>
-            </li>
+            <ItemRow
+              key={o.id}
+              title={nameOf(o.brandId)}
+              meta={o.agreedValueCents ? BRL(o.agreedValueCents) : undefined}
+              when={o.paidAt ? `pago ${formatDayMonth(o.paidAt)}` : o.agreedAt ? formatDayMonth(o.agreedAt) : undefined}
+              to={ROUTES.ugcBrand(o.brandId)}
+            />
           ))}
-        </ul>
-      ) : (
-        <p className="text-[14px]">Nenhum UGC pago fechado ainda — R$ 0,00 recebido.</p>
+        </ItemList>
       )}
-    </div>
+    </section>
   )
 }
 

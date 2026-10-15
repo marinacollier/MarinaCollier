@@ -5,7 +5,7 @@ import { useDB } from '@/data/store'
 import type { DateKey, Workout } from '@/data/types'
 import { checkinFor, modalityOf, workoutsOn } from '@/data/selectors'
 import { openSheet } from '@/app/ui-store'
-import { Button, Card, CardHeader, IconButton, SectionTitle, tone } from '@/components/ui'
+import { Button, Card, CardHeader, IconButton, ItemList, ItemRow, SectionTitle, tone } from '@/components/ui'
 import { addDays, relativeDay } from '@/lib/date'
 import { cn } from '@/lib/cn'
 import { haptic } from '@/lib/haptics'
@@ -54,41 +54,28 @@ export default function TodayTab({ today }: { today: DateKey }) {
       </div>
 
       <SectionTitle>Comida de hoje</SectionTitle>
-      <div className="card overflow-hidden divide-y divide-line/70">
+      <ItemList label="Comida de hoje">
         {MEAL_SLOTS.map(({ slot, label, emoji }) => {
           const list = meals[slot] ?? []
           const tags = [...new Set(list.flatMap((m) => m.tags))]
+          const tagEmoji = FOOD_TAGS.filter((t) => tags.includes(t.value)).map((t) => t.emoji).join('')
           return (
-            <div key={slot} className="flex items-center gap-3 min-h-[56px] pl-4 pr-2">
-              <span className={cn('h-9 w-9 rounded-full inline-flex items-center justify-center text-[17px] shrink-0', list.length ? 'bg-sage-soft' : 'bg-surface-2')} aria-hidden>
-                {emoji}
-              </span>
-              <button
-                type="button"
-                className="flex-1 min-w-0 text-left py-2.5"
-                onClick={() => (list.length === 1 ? openSheet('meal', { id: list[0].id }) : openSheet('meal', { date: today, slot }))}
-              >
-                <div className="text-[12px] text-muted">{label}</div>
-                {list.length ? (
-                  <div className="text-[15px] leading-snug truncate">{list.map((m) => m.description).join(' · ')}</div>
-                ) : (
-                  <div className="text-[14.5px] text-muted/90">+ registrar refeição</div>
-                )}
-              </button>
-              {tags.length > 0 && (
-                <span className="text-[14px] shrink-0 tracking-tight" aria-label={tags.join(', ')}>
-                  {FOOD_TAGS.filter((t) => tags.includes(t.value)).map((t) => t.emoji).join('')}
-                </span>
-              )}
-              {list.length > 0 && (
-                <IconButton label={`Adicionar em ${label}`} size="sm" onClick={() => openSheet('meal', { date: today, slot })}>
-                  <Plus size={16} />
-                </IconButton>
-              )}
-            </div>
+            <ItemRow
+              key={slot}
+              title={list.length ? list.map((m) => m.description).join(' · ') : `${emoji} ${label}`}
+              meta={list.length ? `${emoji} ${label}${tagEmoji ? ` ${tagEmoji}` : ''}` : '+ registrar'}
+              onOpen={() => (list.length === 1 ? openSheet('meal', { id: list[0].id }) : openSheet('meal', { date: today, slot }))}
+              trailing={
+                list.length > 0 ? (
+                  <IconButton label={`Adicionar em ${label}`} size="sm" onClick={() => openSheet('meal', { date: today, slot })}>
+                    <Plus size={16} />
+                  </IconButton>
+                ) : undefined
+              }
+            />
           )
         })}
-      </div>
+      </ItemList>
 
       <SectionTitle>Hábitos simples</SectionTitle>
       <HabitsCard date={today} />
@@ -210,33 +197,22 @@ function HabitsCard({ date }: { date: DateKey }) {
           />
         ))}
       </div>
-      <div className="grid grid-cols-2 gap-2 mt-4">
+      <ItemList className="mt-3" label="Hábitos">
         {HABIT_ROWS.filter((h) => h.key !== 'agua').map((h) => {
           const on = !!c?.habits[h.key]
           return (
-            <button
+            <ItemRow
               key={h.key}
-              type="button"
-              aria-pressed={on}
-              onClick={() => {
-                if (!on) haptic('light')
-                setHabits(date, { [h.key]: !on })
+              title={`${h.emoji} ${h.label}`}
+              checked={on}
+              onCheck={(v) => {
+                if (v) haptic('light')
+                setHabits(date, { [h.key]: v })
               }}
-              className={cn(
-                'flex items-center gap-2 h-12 px-3 rounded-2xl text-[14px] text-left transition active:scale-[0.98]',
-                on ? 'bg-sage-soft text-ink' : 'bg-surface-2 text-ink-2',
-                h.key === 'refeicoesPlanejadas' && 'col-span-2',
-              )}
-            >
-              <span className="text-[17px]">{h.emoji}</span>
-              <span className="flex-1 leading-tight">{h.label}</span>
-              <span className={cn('h-5 w-5 rounded-full inline-flex items-center justify-center', on ? 'bg-sage text-bg' : 'border border-muted/50')}>
-                {on && <Check size={12} strokeWidth={3} />}
-              </span>
-            </button>
+            />
           )
         })}
-      </div>
+      </ItemList>
     </Card>
   )
 }

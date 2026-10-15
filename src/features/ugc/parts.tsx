@@ -2,10 +2,9 @@
  * Small shared pieces of the UGC space: a write that saves right away with Desfazer, the action row
  * (same check as Home), and labels.
  */
-import { Check } from 'lucide-react'
-import { Link } from 'react-router-dom'
 import { ROUTES } from '@/app/routes'
 import { toast } from '@/app/ui-store'
+import { ItemRow } from '@/components/ui'
 import { persist } from '@/data/store'
 import type { UgcAction } from '@/data/ugc/model'
 import { actionTitle } from '@/data/ugc/model'
@@ -36,25 +35,7 @@ export function UgcActionRow({ action }: { action: UgcAction }) {
     if (action.done && action.interactionId) commit(() => revertInteraction(action.interactionId!), `${title}: desmarcado`)
     else commit(() => recordOutbound(action.opportunity.id, action.channel, { date: todayKey() }).undo, `${title} ✓`)
   }
-  return (
-    <li className="flex items-center gap-2 min-h-[52px]">
-      <button
-        type="button"
-        aria-pressed={action.done}
-        aria-label={action.done ? `Desmarcar ${title}` : `Feito: ${title}`}
-        onClick={tick}
-        className="h-11 w-9 shrink-0 -ml-1 inline-flex items-center justify-center active:scale-90 transition"
-      >
-        <span className={cn('h-[22px] w-[22px] rounded-full border-[1.5px] inline-flex items-center justify-center', action.done ? 'bg-sage border-sage text-bg' : 'border-ink/30')}>
-          {action.done && <Check size={13} strokeWidth={3} />}
-        </span>
-      </button>
-      <Link to={ROUTES.ugcBrand(action.opportunity.brandId)} className="flex-1 min-w-0 py-1.5 active:opacity-70">
-        <span className={cn('block text-[15.5px] leading-snug', action.done && 'line-through text-muted')}>{title}</span>
-        <span className="block text-[12.5px] text-muted truncate">{action.sub}</span>
-      </Link>
-    </li>
-  )
+  return <ItemRow title={title} meta={action.sub} checked={action.done} onCheck={tick} to={ROUTES.ugcBrand(action.opportunity.brandId)} />
 }
 
 export function TierBadge({ tier }: { tier?: string }) {

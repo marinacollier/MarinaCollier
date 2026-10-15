@@ -91,16 +91,12 @@ export default function BiblePage() {
               <p className="text-[15px] text-ink-2 mt-2 leading-relaxed line-clamp-3">{last.personalReflection || last.reflectionGod || last.notes}</p>
             )}
           </Card>
-        ) : (
-          <Card>
-            <p className="text-[14px] text-muted">Suas reflexões aparecem aqui quando você escrever no caderno de um estudo.</p>
-          </Card>
-        )}
+        ) : null}
         <Card onPress={() => nav(ROUTES.biblePrayers)}>
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className="font-display text-[19px]">Diário de oração</div>
-              <div className="text-[13px] text-muted mt-0.5">Orações, intenções, gratidão e reflexões</div>
+              <div className="text-[13px] text-muted mt-0.5">orações e gratidão</div>
             </div>
             <span className="text-[13px] text-muted">{db.spiritualPrayers.length || ''}</span>
           </div>
