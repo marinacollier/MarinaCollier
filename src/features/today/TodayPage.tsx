@@ -25,7 +25,8 @@ import { homeContext, tripPriorityItems } from './context'
 import { MAX_PRIORITIES, prioritiesOf } from './priorities'
 import { AttentionRow, TripLine } from './home/blocks'
 import { AgoraBlock, HojeBlock, ProximosBlock } from './home/agenda'
-import { homeLists, loosePriorities } from './home/rows'
+import { dayProgress, homeLists, loosePriorities } from './home/rows'
+import { DayProgressLine } from './home/progress'
 import { composerPlaceholder } from './home/day'
 import { LumosBox } from './home/LumosBox'
 import { LumosSheet, lumosHref, type LumosRequest } from './home/lumos'
@@ -63,6 +64,7 @@ export default function TodayPage() {
   const undated = useMemo(() => undatedItems(db, today), [db, today])
   const radar = useMemo(() => radarItems(db, today), [db, today])
   const loose = useMemo(() => loosePriorities(prioritiesOf(db, today).slice(0, MAX_PRIORITIES), items), [db, today, items])
+  const progress = useMemo(() => dayProgress(lists, loose), [lists, loose])
 
   const trip = useMemo(() => {
     if (life.nextTrip) return life.nextTrip.daysLeft <= TRIP_LINE_DAYS ? life.nextTrip : undefined
@@ -104,6 +106,7 @@ export default function TodayPage() {
             {greeting(minutes)}, {name}.
           </h1>
           <p className="text-[15px] text-muted mt-1 first-letter:uppercase">{formatLongDate(today)}.</p>
+          <DayProgressLine {...progress} />
           {brief && <p className="font-display italic text-[17px] text-ink-2 mt-3 leading-snug">{brief}</p>}
         </motion.div>
       </header>

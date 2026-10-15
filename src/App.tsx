@@ -7,6 +7,7 @@ import { ROUTES, routeTable } from '@/app/routes'
 import { openSheet } from '@/app/ui-store'
 import { useTheme } from '@/app/useTheme'
 import { BottomNav } from '@/components/layout/BottomNav'
+import { QuickAddFab } from '@/components/layout/QuickAddFab'
 import { SaveFailedBanner } from '@/components/layout/SaveFailedBanner'
 import { SheetHost } from '@/components/layout/SheetHost'
 import { Toaster } from '@/components/ui/Toaster'
@@ -74,6 +75,7 @@ export default function App() {
         </Routes>
       </Suspense>
       <BottomNav />
+      {onboarded && <QuickAddFab />}
       <SheetHost />
       <Toaster />
       <SaveFailedBanner />

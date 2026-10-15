@@ -10,6 +10,7 @@ import { WEEKDAY_LETTER, WEEKDAY_SHORT, addDays, formatShortDate, startOfWeek, w
 import { cn } from '@/lib/cn'
 import { CORPO, ENERGIA, HABIT_ROWS, MOODS, SONO } from './constants'
 import { Dot } from './components'
+import { SleepMoodSummary } from './SleepMoodSummary'
 import { habitDone, isDone, modalityIdsFor, orderedModalities, pastWeeks, patternNotes, summaryParts, weekLabel, weekSummary, workoutsBetween } from './selectors'
 
 export default function HistoryTab({ today }: { today: DateKey }) {
@@ -35,6 +36,7 @@ export default function HistoryTab({ today }: { today: DateKey }) {
       <HabitsWeek today={today} />
 
       <SectionTitle>Como você esteve</SectionTitle>
+      <SleepMoodSummary today={today} />
       <CheckinHistory today={today} />
 
       {notes.length > 0 && (
@@ -164,7 +166,7 @@ function HabitsWeek({ today }: { today: DateKey }) {
 function CheckinHistory({ today }: { today: DateKey }) {
   const db = useDB()
   const list = useMemo(
-    () => db.checkins.filter((c) => c.date <= today && c.date > addDays(today, -21) && (c.energia || c.sono || c.corpo || c.humor || c.nota)).sort((a, b) => b.date.localeCompare(a.date)),
+    () => db.checkins.filter((c) => c.date <= today && c.date > addDays(today, -21) && (c.energia || c.sono || c.corpo || c.humor || c.nota || c.sleep)).sort((a, b) => b.date.localeCompare(a.date)),
     [db.checkins, today],
   )
   if (!list.length)
@@ -179,7 +181,7 @@ function CheckinHistory({ today }: { today: DateKey }) {
       {list.slice(0, 10).map((c) => {
         const bits = [
           c.energia && `energia ${lbl(ENERGIA, c.energia)}`,
-          c.sono && `sono ${lbl(SONO, c.sono)}`,
+          c.sleep?.hours ? `${String(c.sleep.hours).replace('.', ',')} h de sono${c.sleep.quality ? ` (${c.sleep.quality}/5)` : ''}` : c.sono && `sono ${lbl(SONO, c.sono)}`,
           c.corpo && `corpo ${lbl(CORPO, c.corpo)}`,
         ].filter(Boolean)
         return (

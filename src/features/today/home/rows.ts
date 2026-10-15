@@ -109,6 +109,14 @@ export function loosePriorities(priorities: DayPriority[], items: ActionItem[]):
   return priorities.filter((p) => !items.some((it) => it.priority !== undefined && ((p.ref && it.refType === p.ref.type && it.refId === p.ref.id) || it.title.trim().toLowerCase() === p.title.trim().toLowerCase())))
 }
 
+/** "N de M hoje": every row of the day you can tick (Agora + Hoje + feitos, free-text Top 3 included). */
+export function dayProgress(lists: HomeLists, loose: Pick<DayPriority, 'done'>[] = []): { done: number; total: number; pct: number } {
+  const rows = [...lists.agora, ...lists.hoje, ...lists.done].filter((i) => i.check !== 'none')
+  const done = rows.filter((i) => i.status === 'done').length + loose.filter((p) => p.done).length
+  const total = rows.length + loose.length
+  return { done, total, pct: total ? Math.round((done / total) * 100) : 0 }
+}
+
 /** "3 coisas · Santander épicos · Cerâmica 18:00" for a closed day. */
 export function daySummary(items: ActionItem[], highlights: ActionItem[]): string {
   const n = items.filter((i) => i.status !== 'done').length
