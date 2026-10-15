@@ -2,8 +2,8 @@
  * Bíblia, Graça & Liberdade — pure selectors. Progress is ALWAYS sessions concluded / total
  * (opening a page or generating a study never counts). Plan status is derived from its sessions.
  */
-import type { DateKey, DB, ID, SpiritualJournalEntry, SpiritualPlan, SpiritualPlanStatus, SpiritualSession } from '../types'
-import { toDateKey } from '@/lib/date'
+import type { DateKey, DB, ID, SpiritualJournalEntry, SpiritualPlan, SpiritualPlanStatus, SpiritualPrayer, SpiritualSession } from '../types'
+import { addDays, startOfWeek, toDateKey } from '@/lib/date'
 
 export interface Progress {
   done: number
@@ -120,4 +120,43 @@ export function homeSpiritualSessions(db: DB, today: DateKey): SpiritualSession[
   if (!plan || planStatus(db, plan.id) !== 'em_andamento') return []
   const next = nextSession(db, plan.id)
   return next ? [next] : []
+}
+
+export interface WeekSummary {
+  from: DateKey
+  to: DateKey
+  done: SpiritualSession[]
+  inProgress: SpiritualSession[]
+  next?: SpiritualSession
+  reflections: SpiritualJournalEntry[]
+  prayers: SpiritualPrayer[]
+}
+
+/** "Esta semana" (Mon–Sun): facts only — what she concluded, what is open, what could come next. */
+export function weekSummary(db: DB, today: DateKey): WeekSummary {
+  const from = startOfWeek(today)
+  const to = addDays(from, 6)
+  const inWeek = (iso?: string) => {
+    if (!iso) return false
+    const k = toDateKey(new Date(iso))
+    return k >= from && k <= to
+  }
+  return {
+    from,
+    to,
+    done: db.spiritualSessions.filter((s) => isDone(s) && inWeek(s.completedAt)).sort((a, b) => b.completedAt!.localeCompare(a.completedAt!)),
+    inProgress: db.spiritualSessions.filter((s) => s.status === 'em_andamento'),
+    next: nextSession(db),
+    reflections: db.spiritualJournal.filter((j) => inWeek(j.updatedAt)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+    prayers: db.spiritualPrayers.filter((p) => inWeek(p.createdAt)).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+  }
+}
+
+/** The next not-concluded session after `id` in its plan (wrapping to the plan's first pending). */
+export function nextPendingAfter(db: DB, id: ID): SpiritualSession | undefined {
+  const s = db.spiritualSessions.find((x) => x.id === id)
+  if (!s) return undefined
+  const list = sessionsOf(db, s.planId)
+  const i = list.findIndex((x) => x.id === id)
+  return [...list.slice(i + 1), ...list.slice(0, i)].find((x) => !isDone(x))
 }
