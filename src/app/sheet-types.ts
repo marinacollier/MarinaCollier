@@ -3,6 +3,7 @@
  * registered in ./sheets.tsx. Each sheet component receives its props plus nothing else; it closes
  * itself with closeSheet() from '@/app/ui-store'.
  */
+import type { ActionItem } from '@/data/agenda/items'
 import type {
   BookStatus,
   CalendarEvent,
@@ -31,6 +32,8 @@ export interface SheetPropsMap {
   task: { id?: ID; defaults?: Partial<Task> }
   /** Edit the day's top 3 (owner: features/today). */
   priorities: { date?: DateKey; domain?: 'trabalho' | 'corpo' | 'vida' }
+  /** Quick edit of any Home row: Dia · Hora · Obs + "Abrir completo" (owner: features/today). */
+  itemEdit: { item: ActionItem; today: DateKey }
   /** Edit routine items + weekdays (owner: features/today). */
   routineEditor: { routineId: ID }
   /** Daily closing "Dia encerrado 🌙" (owner: features/today). */

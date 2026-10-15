@@ -38,28 +38,35 @@ beforeEach(async () => {
 afterEach(cleanup)
 
 describe('Início (Lumos-first Home)', () => {
-  it('renders greeting · Lumos · Top 3 · Hoje · Próximos — and nothing of the old dashboard', () => {
+  it('renders greeting · Lumos · Hoje · Próximos dias — and nothing of the old dashboard', () => {
     renderHome()
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Bom dia, Marina.')
     expect(screen.getByLabelText('Fala com a Lumos')).toBeTruthy()
-    expect(screen.getByLabelText('Hoje importa')).toBeTruthy()
     expect(screen.getByLabelText('Hoje')).toBeTruthy()
-    expect(screen.getByLabelText('Próximos')).toBeTruthy()
+    expect(screen.getByLabelText('Próximos dias')).toBeTruthy()
     const text = document.body.textContent ?? ''
-    for (const gone of ['Brain dump', 'Top 3 de hoje', 'Lendo agora', 'Gastos', 'Linha do dia']) expect(text).not.toContain(gone)
+    for (const gone of ['Brain dump', 'Top 3 de hoje', 'Lendo agora', 'Gastos', 'Linha do dia', 'Hoje importa', 'Quando der hoje', 'Mais cedo']) expect(text).not.toContain(gone)
   })
 
-  it('no priorities yet → one tap to choose them with Lumos', () => {
-    renderHome()
-    expect(screen.getByText('escolher com a Lumos')).toBeTruthy()
-  })
-
-  it('shows today’s priorities as 01 · 02, max three', () => {
+  it('free-text priorities show as rows of Hoje (max three), checkable', () => {
     for (const title of ['Um', 'Dois', 'Três', 'Quatro']) actions.create('priorities', { date: '2026-10-02', title, order: getDB().priorities.length, done: false })
     renderHome()
-    expect(screen.getByText('01')).toBeTruthy()
-    expect(screen.getByText('03')).toBeTruthy()
-    expect(screen.queryByText('Quatro')).toBeNull()
+    const hoje = screen.getByLabelText('Hoje')
+    expect(hoje.textContent).toContain('Um')
+    expect(hoje.textContent).toContain('Três')
+    expect(hoje.textContent).not.toContain('Quatro')
+    fireEvent.click(screen.getByLabelText('Concluir: Um'))
+    expect(getDB().priorities.find((p) => p.title === 'Um')?.done).toBe(true)
+  })
+
+  it('every row uses the standard check, and tapping a row opens the quick-edit sheet', async () => {
+    const { useUI } = await import('@/app/ui-store')
+    renderHome()
+    const hoje = screen.getByLabelText('Hoje')
+    expect(hoje.querySelectorAll('button[role="checkbox"]').length).toBeGreaterThan(0)
+    const body = hoje.querySelector('li button:not([role="checkbox"])') as HTMLButtonElement
+    fireEvent.click(body)
+    expect(useUI.getState().sheets.at(-1)?.name).toBe('itemEdit')
   })
 
   it('the needs-attention row follows the real queue and disappears once everything is acked', () => {

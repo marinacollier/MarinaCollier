@@ -15,6 +15,7 @@ export const SHEETS: Record<SheetName, AnySheet> = {
   note: lazy(() => import('@/features/inbox/NoteSheet')),
   task: lazy(() => import('@/features/tasks/TaskSheet')),
   priorities: lazy(() => import('@/features/today/PrioritiesSheet')),
+  itemEdit: lazy(() => import('@/features/today/home/ItemEditSheet')),
   routineEditor: lazy(() => import('@/features/today/RoutineEditorSheet')),
   dailyClosing: lazy(() => import('@/features/today/DailyClosingSheet')),
   expense: lazy(() => import('@/features/finance/ExpenseSheet')),
