@@ -212,23 +212,14 @@ export function UgcWeek() {
     .filter((t) => isUgcTask(t) && t.status !== 'archived')
     .filter((t) => [t.date, t.dueDate].some((d) => !!d && d > today && d <= to) || (t.bucket === 'semana' && !t.date && !t.dueDate && t.status !== 'done'))
     .sort((a, b) => (a.date ?? a.dueDate ?? '9').localeCompare(b.date ?? b.dueDate ?? '9') || a.order - b.order)
-  const followUps = db.ugcOpportunities.filter((o) => o.nextFollowUpAt && o.nextFollowUpAt <= to && (o.followUpWindowEnd ?? o.nextFollowUpAt) >= from && !['recusada', 'perdida', 'concluida', 'pausada'].includes(o.status))
-  if (!tasks.length && !followUps.length) return null
+  // Follow-ups are listed once, in "Próximos follow-ups" above.
+  if (!tasks.length) return null
   return (
     <section aria-label="Resto da semana">
       <SectionTitle action={<span className="text-[12.5px] text-muted tabular-nums">até {formatDayMonth(to)}</span>}>Resto da semana</SectionTitle>
       <ItemList>
         {tasks.map((t) => (
           <UgcTaskRow key={t.id} task={t} date={t.date && t.date >= from ? t.date : today} />
-        ))}
-        {followUps.map((o) => (
-          <ItemRow
-            key={o.id}
-            title={`Follow-up ${db.brands.find((b) => b.id === o.brandId)?.name ?? o.title}`}
-            meta="só se não responder"
-            when={`${formatDayMonth(o.nextFollowUpAt!)}${o.followUpWindowEnd ? `–${formatDayMonth(o.followUpWindowEnd)}` : ''}`}
-            to={ROUTES.ugcBrand(o.brandId)}
-          />
         ))}
       </ItemList>
     </section>

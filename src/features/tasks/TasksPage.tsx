@@ -37,7 +37,7 @@ export default function TasksPage() {
       <PageHeader
         back
         title="Tarefas"
-        subtitle="Tudo num lugar só. Um passo de cada vez."
+        subtitle="um passo de cada vez"
         actions={
           <IconButton label="Nova tarefa" onClick={() => openSheet('task', { defaults: context ? { context } : undefined })}>
             <Plus size={22} />
