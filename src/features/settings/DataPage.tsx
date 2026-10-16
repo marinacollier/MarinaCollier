@@ -9,7 +9,7 @@ import { toast } from '@/app/ui-store'
 import { nowISO } from '@/lib/id'
 import { haptic } from '@/lib/haptics'
 import { formatFullDate, todayKey } from '@/lib/date'
-import { parseBackupText, type BackupPreview } from './backup'
+import { makeBackup, parseBackupText, type BackupPreview } from './backup'
 import { daysSinceBackup, exportBackup, restoreBackup } from './backup-io'
 import { listSnapshots, restoreSnapshot, type SnapshotInfo } from '@/data/snapshots'
 import { ImportCenter } from './ImportCenter'
@@ -108,10 +108,44 @@ export default function DataPage() {
   const [importError, setImportError] = useState<string | null>(null)
   const [resetArmed, setResetArmed] = useState(false)
   const [busy, setBusy] = useState(false)
+  // Inside the Claude app/preview (an iframe) the share sheet and downloads are blocked by the host,
+  // so "Exportar" can silently do nothing there. The text path always works: select → Copiar → paste anywhere.
+  const embedded = typeof window !== 'undefined' && window.self !== window.top
+  const [asText, setAsText] = useState<string>()
+  const [restoreText, setRestoreText] = useState('')
+  const textRef = useRef<HTMLTextAreaElement>(null)
+
+  const showAsText = async () => {
+    await flushNow()
+    setAsText(JSON.stringify(makeBackup(getDB())))
+    requestAnimationFrame(() => textRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' }))
+  }
+  const selectAll = async () => {
+    const el = textRef.current
+    if (!el) return
+    el.focus()
+    el.setSelectionRange(0, el.value.length)
+    try {
+      await navigator.clipboard.writeText(el.value)
+      toast('Copiado ✓ Cole numa nota, no e-mail ou na conversa com o Claude.')
+    } catch {
+      toast('Texto selecionado — toque nele e escolha “Copiar”.')
+    }
+  }
+  const markSaved = async () => {
+    actions.setProfile({ lastBackupAt: nowISO() })
+    await flushNow()
+    setAsText(undefined)
+    toast('Anotado: backup guardado ✓')
+  }
 
   const exportJSON = async () => {
     setBusy(true)
     try {
+      if (embedded) {
+        await showAsText()
+        return
+      }
       const ok = await exportBackup()
       if (ok) toast('Backup pronto 💾 Guarda o arquivo num lugar seguro (iCloud, Drive).')
     } catch (err) {
@@ -252,6 +286,56 @@ export default function DataPage() {
           aria-label="Escolher arquivo de backup"
           onChange={(e) => void onFile(e.target.files?.[0])}
         />
+        {!asText && (
+          <button type="button" onClick={() => void showAsText()} className="mt-2 h-10 text-[13px] text-ink-2 underline underline-offset-4">
+            Backup como texto (funciona dentro do app do Claude)
+          </button>
+        )}
+        {asText && (
+          <div className="mt-3 space-y-2 rounded-2xl bg-surface-2 p-3">
+            <p className="text-[13px] text-ink-2 leading-snug">
+              Seu backup completo ({formatBytes(new Blob([asText]).size)}). Toque em “Copiar tudo” e cole numa nota do iPhone, no e-mail ou na conversa com o Claude.
+            </p>
+            <textarea ref={textRef} readOnly value={asText} rows={5} aria-label="Backup em texto" className="w-full rounded-xl bg-surface p-2 font-mono text-[11px] leading-snug" />
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="primary" onClick={() => void selectAll()}>
+                Copiar tudo
+              </Button>
+              <Button size="sm" variant="soft" onClick={() => void markSaved()}>
+                Já guardei
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setAsText(undefined)}>
+                Fechar
+              </Button>
+            </div>
+          </div>
+        )}
+        <details className="mt-2">
+          <summary className="h-10 flex items-center text-[13px] text-ink-2 cursor-pointer">Restaurar colando o texto do backup</summary>
+          <textarea
+            value={restoreText}
+            onChange={(e) => setRestoreText(e.target.value)}
+            rows={4}
+            placeholder="Toque aqui e escolha Colar"
+            aria-label="Colar backup em texto"
+            spellCheck={false}
+            className="w-full rounded-xl bg-surface-2 p-2 font-mono text-[11px] leading-snug"
+          />
+          <Button
+            size="sm"
+            variant="soft"
+            className="mt-2"
+            disabled={!restoreText.trim()}
+            onClick={() => {
+              setImportError(null)
+              const r = parseBackupText(restoreText)
+              if (r.ok) setPreview(r)
+              else setImportError(r.error)
+            }}
+          >
+            Ver o que tem no backup
+          </Button>
+        </details>
         <AnimatePresence initial={false}>
           {importError && (
             <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="text-[13.5px] text-accent mt-3" role="alert">
@@ -295,7 +379,11 @@ export default function DataPage() {
           )}
         </AnimatePresence>
       </Card>
-      <Hint>No iPhone, “Exportar” abre o compartilhar: escolha “Salvar em Arquivos” ou mande pra você mesma.</Hint>
+      <Hint>
+        {embedded
+          ? 'Dentro do app do Claude, “Exportar” mostra o backup como texto: copie e cole numa nota ou mande para você mesma.'
+          : 'No iPhone, “Exportar” abre o compartilhar: escolha “Salvar em Arquivos” ou mande pra você mesma.'}
+      </Hint>
 
       <SectionTitle>Planilhas (CSV)</SectionTitle>
       <div className="grid grid-cols-3 gap-2.5">

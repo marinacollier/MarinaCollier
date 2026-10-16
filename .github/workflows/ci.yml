@@ -34,3 +34,4 @@ jobs:
           npx vite preview --port 4319 --strictPort &
           for i in $(seq 30); do curl -sf http://localhost:4319 >/dev/null && break; sleep 1; done
           node e2e/import-manual.mjs
+          node e2e/backup-text.mjs
