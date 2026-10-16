@@ -4,8 +4,11 @@
  * and at most three context suggestions from the intelligence layer (nothing generic).
  */
 import { useRef, useState, type FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowUp, Mic, Paperclip, X } from 'lucide-react'
+import { ArrowUp, ClipboardPaste, Mic, Paperclip, X } from 'lucide-react'
+import { ROUTES } from '@/app/routes'
+import { readClipboard } from '@/lib/clipboard'
 import { normalizeCapture } from '@/data/intel'
 import { cn } from '@/lib/cn'
 import { haptic } from '@/lib/haptics'
@@ -15,6 +18,14 @@ import { canReadAttachments } from '@/features/assistant/attach/read'
 
 export function LumosBox({ placeholder, suggestions, onAsk, onAttach }: { placeholder: string; suggestions: string[]; onAsk: (text: string) => void; onAttach?: (file: File, caption: string) => void }) {
   const canAttach = !!onAttach && canReadAttachments()
+  const navigate = useNavigate()
+  // "Colar e importar JSON" (ChatGPT / Daily Briefing): reads the clipboard in this tap and opens the
+  // Central de importação with the preview already open — nothing is written until she confirms there.
+  const importFromClipboard = async () => {
+    haptic('light')
+    const t = await readClipboard()
+    navigate(`${ROUTES.data}?importar=1`, { state: t && t.includes('{') ? { importText: t } : undefined })
+  }
   const [text, setText] = useState('')
   const [note, setNote] = useState<string>()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -87,6 +98,9 @@ export function LumosBox({ placeholder, suggestions, onAsk, onAttach }: { placeh
                   <Paperclip size={19} />
                 </button>
               )}
+              <button type="button" aria-label="Colar e importar JSON" onClick={() => void importFromClipboard()} className="h-11 w-11 rounded-full inline-flex items-center justify-center text-muted active:bg-surface-2 transition">
+                <ClipboardPaste size={19} />
+              </button>
               {speech.available && (
                 <button type="button" aria-label="Falar com a Lumos" onClick={() => speech.start()} className="h-11 w-11 rounded-full inline-flex items-center justify-center transition text-muted active:bg-surface-2">
                   <Mic size={19} />

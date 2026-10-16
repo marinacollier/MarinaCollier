@@ -510,7 +510,8 @@ export interface TaskStep {
 
 /** Provenance of anything the Daily Briefing brought in ("o que veio do briefing de hoje?"). */
 export interface ImportOrigin {
-  type: 'daily_briefing'
+  /** 'changes' = a marina-os/changes@1 file (ChatGPT round trip, Central de importação). */
+  type: 'daily_briefing' | 'changes'
   label: string
   briefingDate: DateKey
   /** Deterministic key: the same item imported again is recognised, never duplicated. */
@@ -552,11 +553,16 @@ export interface ImportBatch extends Entity {
   importedAt: ISODateTime
   counts: { created: number; updated: number; ignored: number; reviewRequired: number }
   /** What this import wrote, with what was there before — undo touches only what is still as it left it. */
-  changes: { collection: CollectionKey; id: ID; op: 'created' | 'updated'; previous?: Record<string, unknown>; stamp: ISODateTime }[]
-  /** How each briefing item was understood (for "o que veio do briefing?"). */
-  items: { kind: 'today' | 'future' | 'waiting' | 'recurring'; title: string; collection?: CollectionKey; id?: ID; how: 'created' | 'updated' | 'linked' | 'kept' | 'ignored' }[]
+  /** 'removed' keeps the whole record in `previous` (an explicit delete), so undo can put it back. */
+  changes: { collection: CollectionKey; id: ID; op: 'created' | 'updated' | 'removed'; previous?: Record<string, unknown>; stamp: ISODateTime }[]
+  /** How each item was understood (for "o que veio do briefing?"). 'change' = an item of a marina-os/changes@1 file. */
+  items: { kind: 'today' | 'future' | 'waiting' | 'recurring' | 'change'; title: string; collection?: CollectionKey; id?: ID; how: 'created' | 'updated' | 'linked' | 'kept' | 'ignored'; /** changes@1: the item's type and per-item result in her words. */ type?: string; result?: string }[]
   review: { title: string; reason: string }[]
   sourceKeys: string[]
+  /** changes@1: sourceKey / externalRef → the record it became (identity for the next import of the same thing). */
+  refs?: Record<string, { collection: CollectionKey; id: ID }>
+  /** Where the file came from ('Daily Executive Briefing', 'ChatGPT'…); `kind` tells the two importers apart. */
+  kind?: 'briefing' | 'changes'
   undoneAt?: ISODateTime
 }
 

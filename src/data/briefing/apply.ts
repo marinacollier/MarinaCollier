@@ -79,6 +79,14 @@ export function undoBatch(batchId: string): UndoResult {
   if (!batch || batch.undoneAt) return out
   for (const c of [...batch.changes].reverse()) {
     const cur = (getDB()[c.collection] as unknown as { id: string; updatedAt: string; title?: string; name?: string }[]).find((r) => r.id === c.id)
+    if (c.op === 'removed') {
+      // An explicit delete of the import: put the record back exactly as it was (unless she recreated it).
+      if (!cur && c.previous) {
+        actions.restore(c.collection, c.previous as never)
+        out.reverted++
+      }
+      continue
+    }
     if (!cur) continue
     if (cur.updatedAt !== c.stamp) {
       out.keptEdited.push(cur.title ?? cur.name ?? c.id)

@@ -172,7 +172,7 @@ export function readBriefing(text: string): { blocks: BriefingBlock[]; narrative
 // ─── Mapping ────────────────────────────────────────────────────────────────
 
 const key = (s: string) => normalize(s).replace(/[^a-z0-9]+/g, '')
-const sameTitle = (a: string, b: string) => key(a) === key(b)
+export const sameTitle = (a: string, b: string) => key(a) === key(b)
 
 export function priorityOf(p?: string): Priority | undefined {
   const v = (p ?? '').trim().toUpperCase()
@@ -358,7 +358,7 @@ const objectWords = (s: string) => {
  * Deliberately short: "Organizar" ≠ "Confirmar" ≠ "Consolidar" (distinct activities are never merged).
  */
 const STAGE_VERBS = new Set(['abrir', 'verificar', 'regularizar', 'registrar', 'acompanhar', 'finalizar', 'concluir', 'checar', 'conferir'])
-const stageOf = (s: string) => {
+export const stageOf = (s: string) => {
   const t = tokensOf(s)
   return t.length > 1 && STAGE_VERBS.has(t[0]) ? objectKey(s) : undefined
 }
