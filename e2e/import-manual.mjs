@@ -6,7 +6,8 @@ import { createRequire } from 'module'
 import fs from 'fs'
 const require = createRequire(new URL('../package.json', import.meta.url))
 const { chromium, devices } = require('playwright')
-const base = 'http://localhost:4319'
+const base = process.env.E2E_BASE ?? 'http://localhost:4319'
+const ok = (cond, what) => { if (!cond) { console.error('FALHOU:', what); process.exitCode = 1 } }
 const dir = new URL('./.profiles/profile-import-manual', import.meta.url).pathname
 const shots = new URL('./.shots/', import.meta.url).pathname
 fs.rmSync(dir, { recursive: true, force: true })
@@ -28,26 +29,26 @@ const doc = { schemaVersion: 'marina-os/changes@1', generatedAt: new Date().toIS
 const json = JSON.stringify(doc, null, 2)
 
 let { ctx, page } = await open()
-log('clipboard api present:', await page.evaluate(() => !!navigator.clipboard))
+ok(!(await page.evaluate(() => !!navigator.clipboard)), 'clipboard API should be absent in this run')
 await page.getByRole('button', { name: 'Importar JSON' }).click()
 await page.waitForTimeout(1200)
 log('url:', page.url().replace(base, ''))
 const field = page.getByLabel('JSON para importar')
 const btn = page.getByRole('button', { name: /prévia/i })
-log('buttons that start the flow:', await btn.count(), '· disabled when empty:', await btn.first().isDisabled())
+ok((await btn.count()) === 1, 'exactly one button starts the import'); ok(await btn.first().isDisabled(), 'button disabled when empty')
 await page.screenshot({ path: shots + 'import-1-empty.png' })
 // invalid
 const bad = json.replace('"op": "create",', '"op": "create"')
 await field.fill(bad)
 await btn.first().click(); await page.waitForTimeout(400)
-log('invalid →', await page.getByRole('alert').innerText(), '· text kept:', (await field.inputValue()) === bad)
+ok(/linha \d+/.test(await page.getByRole('alert').innerText()), 'invalid JSON names the line'); ok((await field.inputValue()) === bad, 'invalid text kept')
 await page.screenshot({ path: shots + 'import-2-invalid.png' })
 // valid
 await field.fill(json)
 const before = JSON.stringify((await stored(page)).tasks)
 await btn.first().click(); await page.waitForTimeout(800)
 log('preview:', await page.getByTestId('changes-line').innerText())
-log('preview wrote nothing:', JSON.stringify((await stored(page)).tasks) === before)
+ok(JSON.stringify((await stored(page)).tasks) === before, 'preview writes nothing')
 await page.screenshot({ path: shots + 'import-3-preview.png' })
 await page.getByRole('button', { name: /^Confirmar \d+ mudanças?/ }).click(); await page.waitForTimeout(1200)
 log('result:', await page.getByRole('status').first().innerText())
@@ -55,7 +56,7 @@ await ctx.close()
 ;({ ctx, page } = await open())
 let db = await stored(page)
 const t = db.tasks.find((x) => x.title === 'Tarefa importada manualmente (e2e)')
-log('after reopen: task exists once:', db.tasks.filter((x) => x.title === t?.title).length === 1, '· on Home:', (await page.locator('main').innerText()).includes('Tarefa importada manualmente'))
+ok(!!t && db.tasks.filter((x) => x.title === t.title).length === 1, 'task persisted once after reopen'); ok((await page.locator('main').innerText()).includes('Tarefa importada manualmente'), 'task on Home')
 // mark done on Home, then reimport
 await page.locator('button[aria-label="Concluir: Tarefa importada manualmente (e2e)"]').first().click(); await page.waitForTimeout(800)
 await page.goto(base + '/ajustes/dados?importar=1'); await page.waitForTimeout(1200)
@@ -63,6 +64,7 @@ await page.getByLabel('JSON para importar').fill(json)
 await page.getByRole('button', { name: /prévia/i }).first().click(); await page.waitForTimeout(800)
 log('reimport preview:', await page.getByTestId('changes-line').innerText(), '· confirm:', await page.getByRole('button', { name: /Confirmar|Nada a gravar/ }).first().innerText())
 db = await stored(page)
-log('still done:', db.tasks.find((x) => x.title === 'Tarefa importada manualmente (e2e)')?.status, '· copies:', db.tasks.filter((x) => x.title === 'Tarefa importada manualmente (e2e)').length)
-log('page errors:', errors.length ? errors : 'none')
+ok(db.tasks.find((x) => x.title === 'Tarefa importada manualmente (e2e)')?.status === 'done', 'reimport keeps done'); ok(db.tasks.filter((x) => x.title === 'Tarefa importada manualmente (e2e)').length === 1, 'reimport no duplicate')
+ok(!errors.length, 'no page errors: ' + errors.join(' | '))
+console.log(process.exitCode ? 'IMPORTADOR: FALHOU' : 'IMPORTADOR: OK')
 await ctx.close()
