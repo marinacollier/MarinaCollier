@@ -394,6 +394,8 @@ export interface UserProfile {
   removedSeedIds?: string[]
   /** Bundled Daily Briefings (by date) already run through the importer on this install — never twice. */
   briefingsApplied?: DateKey[]
+  /** Bundled weekly syncs (marina-os/changes@1, by id) she confirmed in the Central — never offered again. */
+  syncsApplied?: string[]
   /** Bíblia reconciliations (by id, e.g. '2026-10-15') she reviewed and applied — never twice. */
   spiritualUpdatesApplied?: string[]
   /** "Importar estudo" history (what came in, when, which fields she kept). */

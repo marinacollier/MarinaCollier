@@ -33,6 +33,8 @@ export interface BriefingTask {
   estimated_minutes?: number
   status?: string
   due_date?: string | null
+  /** Planned day (the to-do shows that day only); due_date stays the deadline. */
+  suggested_date?: string | null
 }
 
 export interface BriefingWatch {
@@ -111,6 +113,7 @@ function normalizeTask(v: Record<string, unknown>): BriefingTask {
     estimated_minutes: typeof mins === 'number' ? mins : typeof mins === 'string' && /^\d+$/.test(mins) ? Number(mins) : undefined,
     status: str(v.status),
     due_date: due === null ? null : str(due),
+    suggested_date: str(v.suggested_date ?? v.suggestedDate),
   }
 }
 
@@ -248,6 +251,9 @@ export function taskFromBriefing(t: BriefingTask, block: BriefingBlock, ctx: Tas
     return { ...base, title: who && /aguardar/i.test(t.title) ? `Retorno · ${t.project ?? who}` : base.title, status: 'waiting', waiting: { who: who ?? 'alguém', since: block.date, followUpOn: due } }
   }
   if (status === 'done') return { ...base, status: 'done', date: block.date, completedAt: `${block.date}T12:00:00.000Z` }
+  // A suggested day is the plan (it shows that day only); the due date stays the deadline.
+  const planned = t.suggested_date && isDateKey(t.suggested_date) ? t.suggested_date : undefined
+  if (planned) return { ...base, status: 'todo', date: planned, dueDate: due }
   // Daily briefing: the checklist IS that day. Backlog: dated only when due by the next day; else a deadline.
   // A deadline already behind the briefing's day stays where it was (overdue since then) — never moved to today.
   if (daily && due && due < block.date) return { ...base, status: 'todo', date: due, dueDate: due }

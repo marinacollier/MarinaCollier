@@ -104,7 +104,16 @@ export function planChanges(db: DB, doc: ChangesDoc, opts: PlanOptions = {}, inv
   const confirmed = new Set(opts.confirmed ?? [])
   const refs = knownRefs(db)
   const plannedKeys = new Set<string>()
-  const items = doc.changes.map((c, index) => planOne(db, doc, c, index, { today, batchId, confirmed, refs, plannedKeys, choice: opts.choices?.[index], isLocked: opts.isLocked ?? (() => false), problems: invalid.get(index) }))
+  // A project created by this file is visible to the changes after it (its tasks can name it).
+  let seen = db
+  const items = doc.changes.map((c, index) => {
+    const item = planOne(seen, doc, c, index, { today, batchId, confirmed, refs, plannedKeys, choice: opts.choices?.[index], isLocked: opts.isLocked ?? (() => false), problems: invalid.get(index) })
+    if (item.action === 'create' && item.type === 'project' && item.data) {
+      item.data.id ??= uid()
+      seen = { ...seen, projects: [...seen.projects, { ...item.data, createdAt: '', updatedAt: '' } as unknown as DB['projects'][number]] }
+    }
+    return item
+  })
   return { doc, batchId, today, items, issues }
 }
 
@@ -182,6 +191,8 @@ function planOne(db: DB, doc: ChangesDoc, c: Change, index: number, ctx: Ctx): P
 
   // ── no record: create (or nothing to act on) ──
   if (!rec) {
+    // Taking out something that isn't there is already done (a day's session that was never stored).
+    if (c.op === 'archive') return withIgnored({ action: 'unchanged', reason: 'não está no app — nada a tirar' })
     if (c.op !== 'create') return withIgnored({ action: 'refused', reason: 'não encontrei no app — nada pra mudar' })
     if (ctx.plannedKeys.has(key)) return withIgnored({ action: 'unchanged', reason: 'repetido neste arquivo' })
     const missing = (def.required ?? []).filter((k) => EMPTY(f[k]))
@@ -212,6 +223,7 @@ function planOne(db: DB, doc: ChangesDoc, c: Change, index: number, ctx: Ctx): P
   }
   if (state === 'gone') {
     if (c.op === 'create') return withIgnored({ ...found, action: 'unchanged', reason: 'você cancelou/arquivou — não volta' })
+    if (c.op === 'archive') return withIgnored({ ...found, action: 'unchanged', reason: 'já estava fora' })
     return withIgnored({ ...found, action: 'refused', reason: 'está cancelado/arquivado — não ressuscito' })
   }
 
@@ -247,7 +259,7 @@ function planOne(db: DB, doc: ChangesDoc, c: Change, index: number, ctx: Ctx): P
     action = 'complete'
   } else if (c.op === 'move') {
     if (state === 'done') return withIgnored({ ...found, action: 'refused', reason: 'já está feito — não mexo' })
-    target = Object.fromEntries(def.moveFields.filter((k) => f[k] !== undefined).map((k) => [k, f[k]]))
+    target = Object.fromEntries(def.moveFields.filter((k) => k in f).map((k) => [k, f[k]]))
     if (!Object.keys(target).length) return withIgnored({ ...found, action: 'invalid', reason: `move precisa de ${def.moveFields.join(' / ') || 'algo que mova'}` })
     exec = 'move'
     action = 'move'

@@ -9,6 +9,7 @@ import { ClipboardPaste } from 'lucide-react'
 import { toast } from '@/app/ui-store'
 import { Button, Card, TextArea } from '@/components/ui'
 import { undoBatch } from '@/data/briefing/apply'
+import { bundledSyncOf, markSyncApplied } from '@/data/briefing/bundled'
 import { planBriefing, readBriefing, type BriefingPlan } from '@/data/briefing/import'
 import { importChanges, lockNow } from '@/data/changes/apply'
 import { looksLikeChanges, parseChanges, type ChangesDoc, type ValidationIssue } from '@/data/changes/contract'
@@ -113,6 +114,12 @@ function ChangesPreview({ doc, invalid, issues, onDone, onCancel }: { doc: Chang
     setBusy(true)
     try {
       const r = await importChanges(doc, { choices, confirmed, batchId })
+      // A bundled weekly sync is offered once: confirmed = recorded, never offered again.
+      const sync = bundledSyncOf(doc)
+      if (sync) {
+        markSyncApplied(sync.id)
+        await persist()
+      }
       haptic('success')
       const c = countPlan(r.plan)
       const pending = r.plan.items.filter((i) => i.needsConfirm && !i.confirmed).length
@@ -126,6 +133,7 @@ function ChangesPreview({ doc, invalid, issues, onDone, onCancel }: { doc: Chang
     }
   }
   const groups = ORDER.map((a) => ({ a, list: plan.items.filter((i) => i.action === a) })).filter((g) => g.list.length)
+  const byType = [...plan.items.reduce((m, i) => m.set(i.typeLabel, (m.get(i.typeLabel) ?? 0) + 1), new Map<string, number>())]
   return (
     <div className="space-y-3">
       <div>
@@ -133,6 +141,11 @@ function ChangesPreview({ doc, invalid, issues, onDone, onCancel }: { doc: Chang
         <div className="text-[13px] text-ink-2 mt-0.5" data-testid="changes-line">
           {planLine(plan)}
         </div>
+        {byType.length > 1 && (
+          <div className="text-[12.5px] text-muted mt-0.5" data-testid="changes-types">
+            {byType.map(([t, n]) => `${n} ${t}`).join(' · ')}
+          </div>
+        )}
         {issues.map((x) => (
           <div key={x.message} className="text-[12.5px] text-muted mt-1">
             {x.message}

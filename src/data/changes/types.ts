@@ -16,7 +16,7 @@
 import { actions, getDB } from '../store'
 import { findProject, sameTitle, stageOf } from '../briefing/import'
 import { addExtraIncome, cancelReceivable, findContract, isIncome, markReceived, nextPeriod, receivablesFor, updateReceivable } from '../finance/receivables'
-import { addOpportunity, archiveBrand, endOpportunity, ensureProspect, setStage } from '../ugc/ops'
+import { addOpportunity, archiveBrand, endOpportunity, ensureProspect, recordProposalSent, setStage } from '../ugc/ops'
 import { currentOpportunity, findBrand } from '../ugc/model'
 import type { CollectionKey, DateKey, DB, LockArea, Weekday } from '../types'
 import { isDateKey, monthKey, todayKey } from '@/lib/date'
@@ -91,8 +91,8 @@ const looseTitle = (a: unknown, b: unknown) => {
 }
 const projectName = (db: DB, id?: string) => db.projects.find((p) => p.id === id)?.name
 const nextOrder = (list: { order?: number }[]) => list.reduce((m, x) => Math.max(m, x.order ?? 0), -1) + 1
-/** Only keys that were sent. */
-const pick = (f: Fields, keys: string[]) => Object.fromEntries(keys.filter((k) => f[k] !== undefined).map((k) => [k, f[k]]))
+/** Only keys that were sent (a key sent as null = cleared, kept as undefined). */
+const pick = (f: Fields, keys: string[]) => Object.fromEntries(keys.filter((k) => k in f).map((k) => [k, f[k]]))
 const dateOf = (r: Rec) => r.date ?? r.dueDate
 
 function projectRef(db: DB, f: Fields): { projectId?: string } | string {
@@ -101,6 +101,16 @@ function projectRef(db: DB, f: Fields): { projectId?: string } | string {
   const p = findProject(db.projects, String(f.project))
   return p ? { projectId: p.id } : `projeto “${String(f.project)}” não existe no app (crie com type "project" antes)`
 }
+
+/** "África do Sul" → the trip ("South Africa 2026"); any trip by its own name. */
+function tripRef(db: DB, f: Fields): { tripId?: string } | string {
+  if (f.trip === undefined) return {}
+  if (f.trip === null || f.trip === '') return { tripId: undefined }
+  const k = key(f.trip)
+  const t = db.trips.find((x) => key(x.name) === k) ?? (/africa/.test(k) ? db.trips.find((x) => /africa/.test(key(x.name))) : undefined)
+  return t ? { tripId: t.id } : `viagem “${String(f.trip)}” não existe no app`
+}
+const tripName = (db: DB, id?: string) => db.trips.find((t) => t.id === id)?.name
 
 function modalityRef(db: DB, v: unknown): string | undefined {
   const k = key(v)
@@ -151,16 +161,47 @@ const task: TypeDef = {
     context: CONTEXT,
     doneCriteria: { kind: 'text', label: 'feito quando' },
     tags: { kind: 'strs', label: 'tags' },
+    trip: { kind: 'str', label: 'viagem' },
+    brand: { kind: 'str', label: 'marca' },
+    checklist: { kind: 'strs', label: 'checklist' },
+    /** A done item of history: the day it was done (never "now" when she told it later). */
+    completedOn: { kind: 'date', label: 'feita em' },
   },
   moveFields: ['date', 'time', 'dueDate'],
   required: ['title'],
   belongs: (r) => !r.recurrence && r.status !== 'waiting' && !r.waiting,
-  read: (r, db) => ({ title: r.title, notes: r.notes, status: r.status, date: r.date, time: r.time, durationMin: r.durationMin, dueDate: r.dueDate, priority: r.priority, project: projectName(db, r.projectId), context: r.context, doneCriteria: r.doneCriteria, tags: r.tags }),
+  read: (r, db) => ({
+    title: r.title,
+    notes: r.notes,
+    status: r.status,
+    date: r.date,
+    time: r.time,
+    durationMin: r.durationMin,
+    dueDate: r.dueDate,
+    priority: r.priority,
+    project: projectName(db, r.projectId),
+    context: r.context,
+    doneCriteria: r.doneCriteria,
+    tags: r.tags,
+    trip: tripName(db, r.tripId),
+    brand: db.brands.find((b) => b.id === r.brandId)?.name,
+    checklist: r.checklist?.map((s: { title: string }) => s.title),
+    completedOn: r.completedAt?.slice(0, 10),
+  }),
   write: (f, db) => {
     const proj = projectRef(db, f)
     if (typeof proj === 'string') return proj
-    const out: Record<string, unknown> = { ...pick(f, ['title', 'notes', 'status', 'date', 'time', 'durationMin', 'dueDate', 'priority', 'context', 'doneCriteria', 'tags']), ...proj }
+    const trip = tripRef(db, f)
+    if (typeof trip === 'string') return trip
+    const out: Record<string, unknown> = { ...pick(f, ['title', 'notes', 'status', 'date', 'time', 'durationMin', 'dueDate', 'priority', 'context', 'doneCriteria', 'tags']), ...proj, ...trip }
+    if (f.brand !== undefined) {
+      const b = f.brand ? findBrand(db, String(f.brand)) : undefined
+      if (f.brand && !b) return `marca “${String(f.brand)}” não existe (crie com type "ugcProspect" antes)`
+      out.brandId = b?.id
+    }
+    if (f.checklist !== undefined) out.checklist = ((f.checklist as string[] | undefined) ?? []).map((title, i) => ({ id: `s${i + 1}-${key(title).slice(0, 24)}`, title, done: false }))
     if (f.status === 'done') out.completedAt = nowISO()
+    if (f.completedOn) out.completedAt = `${String(f.completedOn)}T12:00:00.000-03:00`
     // A day given = it is planned for that day (no longer in a "someday" bucket).
     if (f.date) out.bucket = undefined
     return out
@@ -302,6 +343,8 @@ const workoutBase = {
     if (!date) return []
     const m = q.fields.modality !== undefined ? modalityRef(db, q.fields.modality) : undefined
     let list = db.workouts.filter((w) => w.date === date && (!m || w.modality === m)) as Rec[]
+    // A line of the weekly plan under another name is another session ("Superiores" ≠ "Pernas — key session").
+    if (q.title) list = list.filter((w) => !w.templateId || !w.title || looseTitle(w.title, q.title))
     if (list.length > 1 && q.title) {
       const t = list.filter((w) => looseTitle(w.title, q.title))
       if (t.length) list = t
@@ -314,11 +357,13 @@ const workoutBase = {
 const plannedWorkout: TypeDef = {
   ...workoutBase,
   label: 'treino planejado',
-  fields: workoutFields,
+  // rest: a planned rest day on that date (status 'descanso' — the weekly plan itself is untouched).
+  fields: { ...workoutFields, rest: { kind: 'bool', label: 'descanso' } },
+  read: (r) => ({ ...workoutBase.read(r), rest: r.status === 'descanso' || undefined }),
   build: (f, db) => {
     const w = workoutBase.write(f, db)
     if (typeof w === 'string') return w
-    return { status: 'planejado', planType: 'base', order: nextOrder(db.workouts.filter((x) => x.date === f.date)), ...w }
+    return { status: f.rest ? 'descanso' : 'planejado', planType: 'base', order: nextOrder(db.workouts.filter((x) => x.date === f.date)), ...w }
   },
 }
 
@@ -535,12 +580,14 @@ const ugcDeal: TypeDef = {
     estimatedValueCents: { kind: 'cents', label: 'valor estimado (centavos)' },
     agreedValueCents: { kind: 'cents', label: 'valor fechado (centavos)' },
     notes: { kind: 'text', label: 'notas' },
+    /** "proposta enviada em 13/10": opens the wait (stage, status, cadence) through the UGC op. */
+    proposalSentOn: { kind: 'date', label: 'proposta enviada em' },
   },
   moveFields: ['stage', 'nextFollowUpAt'],
   required: ['brand'],
   belongs: () => true,
   titleOf: (r, db) => `${db.brands.find((b) => b.id === r.brandId)?.name ?? ''} · ${r.title}`.replace(/^ · /, ''),
-  read: (r, db) => ({ brand: db.brands.find((b) => b.id === r.brandId)?.name, title: r.title, stage: r.stage, status: r.status, type: r.type, nextFollowUpAt: r.nextFollowUpAt, proposedDeliverables: r.proposedDeliverables, estimatedValueCents: r.estimatedValueCents, agreedValueCents: r.agreedValueCents, notes: r.notes }),
+  read: (r, db) => ({ brand: db.brands.find((b) => b.id === r.brandId)?.name, title: r.title, stage: r.stage, status: r.status, type: r.type, nextFollowUpAt: r.nextFollowUpAt, proposedDeliverables: r.proposedDeliverables, estimatedValueCents: r.estimatedValueCents, agreedValueCents: r.agreedValueCents, notes: r.notes, proposalSentOn: r.proposalSentAt }),
   write: (f, db) => {
     const out: Record<string, unknown> = pick(f, ['title', 'stage', 'status', 'type', 'nextFollowUpAt', 'proposedDeliverables', 'estimatedValueCents', 'agreedValueCents', 'notes'])
     if (f.brand !== undefined) {
@@ -568,6 +615,13 @@ const ugcDeal: TypeDef = {
     create: (c) => {
       const { brandId, ...data } = c.data as { brandId: string }
       void addOpportunity(brandId, data)
+    },
+    update: (c) => {
+      const sent = c.target.proposalSentOn as DateKey | undefined
+      const { nextFollowUpAt, ...rest } = c.patch as { nextFollowUpAt?: DateKey }
+      if (sent) void recordProposalSent(c.id!, sent, nextFollowUpAt)
+      const p = sent ? rest : c.patch
+      if (Object.keys(p).length) actions.update('ugcOpportunities', c.id!, p)
     },
     move: (c) => {
       const { stage, ...rest } = c.patch as { stage?: (typeof STAGES)[number] }
@@ -654,6 +708,49 @@ const routine: TypeDef = {
   },
 }
 
+// ─── trips (items of an existing trip — the itinerary itself is never rebuilt) ─
+
+const tripItem: TypeDef = {
+  label: 'item da viagem',
+  collection: 'tripItems',
+  fields: {
+    trip: { kind: 'str', label: 'viagem' },
+    title: { kind: 'str', label: 'título' },
+    section: { kind: 'enum', label: 'seção', values: ['voo', 'hospedagem', 'transporte', 'reserva', 'roteiro', 'quero_ir', 'comida', 'esporte', 'mala', 'comprar', 'documento', 'antes_de_ir'] },
+    group: { kind: 'str', label: 'grupo' },
+    status: { kind: 'enum', label: 'status', values: ['a_confirmar', 'a_fazer', 'confirmado', 'feito'] },
+    paymentStatus: { kind: 'enum', label: 'pagamento', values: ['a_confirmar', 'pendente', 'pago', 'nao_se_aplica'] },
+    date: { kind: 'date', label: 'dia' },
+    endDate: { kind: 'date', label: 'até' },
+    notes: { kind: 'text', label: 'notas' },
+  },
+  moveFields: ['date', 'endDate'],
+  required: ['trip', 'title', 'section'],
+  belongs: () => true,
+  titleOf: (r) => r.title,
+  read: (r, db) => ({ trip: tripName(db, r.tripId), title: r.title, section: r.section, group: r.group, status: r.status, paymentStatus: r.paymentStatus, date: r.date, endDate: r.endDate, notes: r.notes }),
+  write: (f, db) => {
+    const trip = tripRef(db, f)
+    if (typeof trip === 'string') return trip
+    return { ...pick(f, ['title', 'section', 'group', 'status', 'paymentStatus', 'date', 'endDate', 'notes']), ...trip }
+  },
+  build: (f, db) => {
+    const w = tripItem.write(f, db)
+    if (typeof w === 'string') return w
+    return { status: 'a_confirmar', order: nextOrder(db.tripItems.filter((x) => x.tripId === w.tripId)), ...w }
+  },
+  state: (r) => (r.status === 'feito' ? 'done' : r.status === 'cancelado' ? 'gone' : 'open'),
+  completeTarget: () => ({ status: 'feito' }),
+  archiveTarget: { status: 'cancelado' },
+  match: (db, q) => {
+    if (!q.title) return []
+    const trip = tripRef(db, q.fields)
+    const tripId = typeof trip === 'string' ? undefined : trip.tripId
+    return db.tripItems.filter((x) => (!tripId || x.tripId === tripId) && sameTitle(x.title, q.title!)) as Rec[]
+  },
+  sub: (r, db) => [tripName(db, r.tripId), r.group, r.paymentStatus === 'pago' ? 'pago' : undefined].filter(Boolean).join(' · ') || undefined,
+}
+
 export const TYPE_DEFS: Partial<Record<ChangeType, TypeDef>> = {
   task,
   waiting,
@@ -669,6 +766,7 @@ export const TYPE_DEFS: Partial<Record<ChangeType, TypeDef>> = {
   ugcDeal,
   project,
   routine,
+  tripItem,
 }
 
 /** Labels for every type, supported or not (the preview names things in her words). */
@@ -680,10 +778,15 @@ export function findRecurring(db: DB, title: string): { collection: CollectionKe
   if (t) return { collection: 'tasks', id: t.id, title: t.title }
   const b = db.backlogItems.find((x) => x.kind === 'recurring' && (looseTitle(x.title, title) || looseTitle(x.recognizedAs, title)))
   if (b) return { collection: 'backlogItems', id: b.id, title: b.title }
-  const c = db.financialCategories.find((x) => x.bill && !x.archived && looseTitle(x.name, title))
+  // "Cartão de Crédito BV" ≈ "Cartão BV": the same bill whatever words name the card.
+  const bill = (s: string) => key(s).replace(/(?:de)?credito/g, '')
+  const c = db.financialCategories.find((x) => x.bill && !x.archived && (looseTitle(x.name, title) || bill(x.name) === bill(title)))
   if (c) return { collection: 'financialCategories', id: c.id, title: c.name }
   const r = db.routineItems.find((x) => x.active && looseTitle(x.title, title))
   if (r) return { collection: 'routineItems', id: r.id, title: r.title }
+  // A recurring appointment already in her agenda (Fisioterapia às sextas).
+  const e = db.events.find((x) => x.recurrence && looseTitle(x.title, title))
+  if (e) return { collection: 'events', id: e.id, title: e.title }
   return undefined
 }
 

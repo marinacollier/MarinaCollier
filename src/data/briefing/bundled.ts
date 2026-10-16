@@ -10,9 +10,11 @@
  */
 import { actions, getDB, hydrate, persist } from '../store'
 import type { StorageAdapter } from '../storage'
-import type { DateKey } from '../types'
+import type { DateKey, DB } from '../types'
+import type { ChangesDoc } from '../changes/contract'
 import { addDays, todayKey } from '@/lib/date'
 import { BRIEFING_2026_10_12 } from '../seed/briefing-1012'
+import { SYNC_2026_10_15 } from '../seed/sync/sync-2026-10-15'
 import { applyPlan } from './apply'
 import { planBriefing, type BriefingBlock } from './import'
 
@@ -34,6 +36,28 @@ export function applyBundledBriefings(today: DateKey = todayKey()): DateKey[] {
     done.push(block.date)
   }
   return done
+}
+
+// ─── Bundled weekly syncs (marina-os/changes@1) ─────────────────────────────
+// Unlike a briefing, a sync is NEVER applied at boot: Home offers it once, she reviews it in the Central
+// Universal and only her "Confirmar" writes (one batch). Confirmed once = never offered again (even if
+// she later undoes that import); offered only inside its own window.
+
+export const BUNDLED_SYNCS = [SYNC_2026_10_15]
+export type BundledSync = (typeof BUNDLED_SYNCS)[number]
+
+/** The sync Home should offer today, if any. */
+export function pendingSync(db: DB, today: DateKey = todayKey()): BundledSync | undefined {
+  return BUNDLED_SYNCS.find((s) => today >= s.from && today <= s.until && !db.profile.syncsApplied?.includes(s.id))
+}
+
+/** The bundled sync this changes file is (same source and version), if any. */
+export const bundledSyncOf = (doc: Pick<ChangesDoc, 'source' | 'generatedAt'>): BundledSync | undefined => BUNDLED_SYNCS.find((s) => s.doc.source === doc.source && s.doc.generatedAt === doc.generatedAt)
+
+/** Records the sync as reviewed and confirmed on this install (profile flag, persisted with the DB). */
+export function markSyncApplied(id: string): void {
+  const done = getDB().profile.syncsApplied ?? []
+  if (!done.includes(id)) actions.setProfile({ syncsApplied: [...done, id] })
 }
 
 /** Boot: load + migrate the device's DB, then run the bundled briefings through the importer and save. */

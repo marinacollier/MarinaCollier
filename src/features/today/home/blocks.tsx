@@ -5,7 +5,8 @@
 import { useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ChevronDown, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, X } from 'lucide-react'
+import type { BundledSync } from '@/data/briefing/bundled'
 import { toast } from '@/app/ui-store'
 import { ROUTES } from '@/app/routes'
 import { ItemList, ItemRow } from '@/components/ui'
@@ -35,6 +36,24 @@ function StripLine({ dot, text, open, onToggle, children }: { dot: ReactNode; te
         )}
       </AnimatePresence>
     </div>
+  )
+}
+
+/** A bundled weekly sync waiting for her review: one quiet line that opens the Central with it preloaded. */
+export function SyncLine({ sync }: { sync: BundledSync }) {
+  const nav = useNavigate()
+  return (
+    <button
+      type="button"
+      onClick={() => nav(`${ROUTES.data}?importar=1`, { state: { importText: JSON.stringify(sync.doc) } })}
+      className="w-full flex items-center gap-2.5 min-h-11 text-left text-[14.5px] text-ink-2 active:opacity-70"
+    >
+      <span aria-hidden className="w-4 shrink-0 inline-flex justify-center">
+        <span className="h-2 w-2 rounded-full bg-plum" />
+      </span>
+      <span className="flex-1 min-w-0 truncate">{sync.label} pronta para revisar</span>
+      <ChevronRight size={15} className="text-muted shrink-0" />
+    </button>
   )
 }
 

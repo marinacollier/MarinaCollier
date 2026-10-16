@@ -98,6 +98,27 @@ export function recordOutbound(opportunityId: string, channel: UgcChannel, at: W
   return { type, undo: all([i.undo, patch('ugcOpportunities', o.id, p)]) }
 }
 
+/**
+ * "Proposta enviada em 13/10" told from outside (a sync, no channel given): opens the same wait as
+ * recordOutbound — stage, status, cadence — without inventing a channel or an interaction.
+ */
+export function recordProposalSent(opportunityId: string, date: DateKey, nextFollowUpAt?: DateKey): Undo {
+  const db = getDB()
+  const o = db.ugcOpportunities.find((x) => x.id === opportunityId)
+  if (!o) return () => {}
+  const p: Partial<UgcOpportunity> = {
+    proposalSentAt: date,
+    firstContactAt: o.firstContactAt ?? date,
+    lastContactAt: o.lastContactAt && o.lastContactAt > date ? o.lastContactAt : date,
+    cadenceFrom: date,
+    followUpStep: 0,
+    nextFollowUpAt: nextFollowUpAt ?? followUpDay(prefsOf(db), date, 0),
+  }
+  if (stageIndex(o.stage) < stageIndex('contatada')) p.stage = 'contatada'
+  if (stageIndex(o.stage) < stageIndex('producao')) p.status = 'aguardando_resposta'
+  return patch('ugcOpportunities', o.id, p)
+}
+
 /** Untick a contact (Home): the interaction goes away and the opportunity is exactly as before it. */
 export function revertInteraction(interactionId: string): Undo {
   const i = getDB().ugcInteractions.find((x) => x.id === interactionId)

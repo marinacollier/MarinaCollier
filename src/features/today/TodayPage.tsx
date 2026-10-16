@@ -18,12 +18,13 @@ import { dailyBrief, homeSuggestions, lifeContext, needsAttention, type Now } fr
 import { useDB } from '@/data/store'
 import { dayItems, undatedItems, upcomingDays } from '@/data/agenda/items'
 import { radarItems } from '@/data/briefing/backlog'
+import { pendingSync } from '@/data/briefing/bundled'
 import { areaLocked, useLockState } from '@/app/lock-store'
 import { useNow } from '@/hooks/useToday'
 import { formatLongDate, greeting } from '@/lib/date'
 import { homeContext, tripPriorityItems } from './context'
 import { MAX_PRIORITIES, prioritiesOf } from './priorities'
-import { AttentionRow, TripLine } from './home/blocks'
+import { AttentionRow, SyncLine, TripLine } from './home/blocks'
 import { AgoraBlock, HojeBlock, ProximosBlock } from './home/agenda'
 import { dayProgress, homeLists, loosePriorities } from './home/rows'
 import { DayProgressLine } from './home/progress'
@@ -56,6 +57,7 @@ export default function TodayPage() {
   const brief = useMemo(() => dailyBrief(db, now) ?? life.today.notes[0]?.value, [db, now, life])
   const suggestions = useMemo(() => homeSuggestions(db, now).slice(0, 3), [db, now])
   const attention = useMemo(() => needsAttention(db, now), [db, now])
+  const sync = useMemo(() => pendingSync(db, today), [db, today])
   const lock = useLockState()
   const hidden = useMemo(() => ({ carreira: areaLocked(db.profile.privacyLock, 'carreira', lock), dinheiro: areaLocked(db.profile.privacyLock, 'dinheiro', lock) }), [db.profile.privacyLock, lock])
   const items = useMemo(() => dayItems(db, today, today, { hidden }), [db, today, hidden])
@@ -85,7 +87,7 @@ export default function TodayPage() {
   // A print/PDF is read in the same sheet (same Lumos, same pipeline).
   const attach = useCallback((file: File, caption: string) => setLumos((c) => ({ file, caption, n: (c?.n ?? 0) + 1 })), [])
   const placeholder = composerPlaceholder(home.part, { workNow: home.part === 'dia' })
-  const hasStrip = attention.length > 0 || !!trip
+  const hasStrip = attention.length > 0 || !!trip || !!sync
 
   return (
     <Page>
@@ -122,6 +124,7 @@ export default function TodayPage() {
 
       {hasStrip && (
         <motion.div {...rise(2)} className="mt-5">
+          {sync && <SyncLine sync={sync} />}
           <AttentionRow items={attention} onAsk={ask} />
           {trip && <TripLine trip={trip} />}
         </motion.div>
