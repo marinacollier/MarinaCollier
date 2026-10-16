@@ -410,6 +410,25 @@ export interface UserProfile {
   privacyLock?: PrivacyLock
   /** Food likes / aversions Lumos respects when choosing among the nutritionist's substitutions. */
   foodPrefs?: { likes: string[]; dislikes: string[] }
+  /** This device syncs with the cloud (src/data/sync). Off unless she turns it on after "Enviar meus dados". Device-only. */
+  cloudSync?: boolean
+  /** When the first upload was verified on this device. Device-only. */
+  cloudSyncSince?: ISODateTime
+  /** Both this device and another edited the same record: the newer version was kept, the other is here for review. Device-only. */
+  syncConflicts?: SyncConflict[]
+}
+
+export interface SyncConflict {
+  id: ID
+  /** DB collection key (or '_profile'). */
+  collection: string
+  recordId: string
+  at: ISODateTime
+  /** Which side was kept in the app. */
+  kept: 'local' | 'remote'
+  /** The version that was NOT kept (null = it was a deletion). */
+  other: Record<string, unknown> | null
+  otherVersion: number
 }
 
 export interface WorkSchedule {

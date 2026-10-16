@@ -5,6 +5,7 @@ import App from './App'
 import { flushNow } from '@/data/store'
 import { bootWithBriefings } from '@/data/briefing/bundled'
 import { initAuth } from '@/integrations/auth'
+import { initCloudSync } from '@/data/sync'
 import './index.css'
 
 // A new deploy never loses a tick: the new version only takes over after the pending save reached the
@@ -31,4 +32,4 @@ createRoot(document.getElementById('root')!).render(
 
 // Load the device, migrate, then run the bundled Daily Briefings through the importer (once each).
 void bootWithBriefings()
-void initAuth()
+void initAuth().then(initCloudSync)

@@ -18,6 +18,7 @@ import { CSV_DATASETS, datasetCSV, type CsvDatasetId } from './csv'
 import { formatBytes, saveFile } from './platform'
 import { Hint } from './components'
 import { ImportHistory } from './ImportHistory'
+import { CloudStatusLine, CloudSyncSection } from './CloudSyncSection'
 
 interface StorageInfo {
   usage?: number
@@ -180,8 +181,11 @@ export default function DataPage() {
           <div className="min-w-0">
             <div className="font-display text-[18px] leading-tight">Onde ficam</div>
             <p className="text-[14px] text-ink-2 mt-1 leading-snug">
-              No seu iPhone, em IndexedDB; ainda não sincroniza entre aparelhos. Por isso vale fazer um backup de vez em quando.
+              {db.profile.cloudSync
+                ? 'No seu iPhone, em IndexedDB, e uma cópia na sua conta na nuvem. Backup continua valendo.'
+                : 'No seu iPhone, em IndexedDB; ainda não sincroniza entre aparelhos. Por isso vale fazer um backup de vez em quando.'}
             </p>
+            <CloudStatusLine className="block text-[12.5px] text-muted mt-1" />
           </div>
         </div>
         <dl className="grid grid-cols-2 gap-2 mt-4">
@@ -212,6 +216,8 @@ export default function DataPage() {
           </p>
         )}
       </Card>
+
+      <CloudSyncSection />
 
       <SectionTitle>Central de importação</SectionTitle>
       <ImportCenter initialText={pasted} focus={wantsImport} />
