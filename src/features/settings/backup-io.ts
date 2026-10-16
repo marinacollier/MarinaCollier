@@ -3,6 +3,7 @@
  * duplicates), is persisted before success is announced, and keeps this device's onboarding mark.
  */
 import { actions, flushNow, getDB } from '@/data/store'
+import { takeSnapshot } from '@/data/snapshots'
 import { nowISO } from '@/lib/id'
 import { backupFilename, makeBackup, type BackupPreview } from './backup'
 import { saveFile } from './platform'
@@ -21,6 +22,8 @@ export async function exportBackup(now: Date = new Date()): Promise<boolean> {
 
 /** Replaces everything with the validated backup and waits for it to be on disk. Throws if saving fails. */
 export async function restoreBackup(preview: BackupPreview): Promise<void> {
+  // A local copy of what is here now, so a wrong file can be undone (Dados → Cópias automáticas).
+  await takeSnapshot('antes de restaurar um backup')
   const current = getDB().profile
   const imported = preview.db
   actions.replaceDB({

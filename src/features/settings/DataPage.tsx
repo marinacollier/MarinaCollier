@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Download, FileSpreadsheet, HardDrive, RotateCcw, ShieldCheck, Sprout, Upload } from 'lucide-react'
+import { Download, FileSpreadsheet, HardDrive, History, RotateCcw, ShieldCheck, Sprout, Upload } from 'lucide-react'
 import { Button, Card, Page, PageHeader, SectionTitle } from '@/components/ui'
 import { actions, flushNow, getDB, useDB } from '@/data/store'
 import { ROUTES } from '@/app/routes'
@@ -9,7 +10,10 @@ import { nowISO } from '@/lib/id'
 import { haptic } from '@/lib/haptics'
 import { formatFullDate, todayKey } from '@/lib/date'
 import { parseBackupText, type BackupPreview } from './backup'
-import { exportBackup, restoreBackup } from './backup-io'
+import { daysSinceBackup, exportBackup, restoreBackup } from './backup-io'
+import { listSnapshots, restoreSnapshot, type SnapshotInfo } from '@/data/snapshots'
+import { ImportCenter } from './ImportCenter'
+import { ContextExport } from './ContextExport'
 import { CSV_DATASETS, datasetCSV, type CsvDatasetId } from './csv'
 import { formatBytes, saveFile } from './platform'
 import { Hint } from './components'
@@ -37,8 +41,66 @@ function useStorageInfo(): StorageInfo | null {
   return info
 }
 
+/** Copies the app took by itself before each import / restore (this device only). */
+function Snapshots() {
+  const batches = useDB((db) => db.importBatches)
+  const [list, setList] = useState<SnapshotInfo[]>([])
+  const [armed, setArmed] = useState<string>()
+  useEffect(() => {
+    let alive = true
+    void listSnapshots().then((l) => alive && setList(l))
+    return () => {
+      alive = false
+    }
+  }, [batches])
+  if (!list.length) return null
+  const restore = async (id: string) => {
+    try {
+      await restoreSnapshot(id)
+      setArmed(undefined)
+      haptic('success')
+      toast('Voltei o app para antes da importação ✓')
+    } catch {
+      toast('Não consegui gravar a cópia no aparelho — nada mudou.')
+    }
+  }
+  return (
+    <>
+      <SectionTitle>Cópias automáticas</SectionTitle>
+      <Card className="p-0 overflow-hidden">
+        <ul className="divide-y divide-line/70">
+          {list.map((s) => (
+            <li key={s.id} className="flex items-center gap-3 px-4 min-h-[56px] py-2">
+              <History size={16} className="text-muted shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="text-[14px] truncate">{s.reason}</div>
+                <div className="text-[12.5px] text-muted">
+                  {new Date(s.at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} · {s.records.toLocaleString('pt-BR')} registros
+                </div>
+              </div>
+              {armed === s.id ? (
+                <button type="button" onClick={() => void restore(s.id)} className="h-9 px-3 rounded-full bg-accent text-white text-[12.5px] shrink-0">
+                  Sim, voltar
+                </button>
+              ) : (
+                <button type="button" onClick={() => setArmed(s.id)} className="h-9 px-3 rounded-full bg-surface-2 text-[12.5px] text-ink-2 shrink-0">
+                  Restaurar
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      </Card>
+      <Hint>Antes de cada importação eu guardo uma cópia de tudo aqui no aparelho (as 3 últimas). Restaurar troca o app inteiro por aquela cópia.</Hint>
+    </>
+  )
+}
+
 export default function DataPage() {
   const info = useStorageInfo()
+  const location = useLocation()
+  const pasted = (location.state as { importText?: string } | null)?.importText
+  const wantsImport = new URLSearchParams(location.search).has('importar')
   const db = useDB()
   const total = useMemo(() => Object.values(db).reduce((s: number, v) => s + (Array.isArray(v) ? v.length : 0), 0), [db])
   const fileRef = useRef<HTMLInputElement>(null)
@@ -151,6 +213,12 @@ export default function DataPage() {
         )}
       </Card>
 
+      <SectionTitle>Central de importação</SectionTitle>
+      <ImportCenter initialText={pasted} focus={wantsImport} />
+
+      <SectionTitle>ChatGPT</SectionTitle>
+      <ContextExport />
+
       <SectionTitle>Backup</SectionTitle>
       <Card>
         <p className="text-[14px] text-ink-2 leading-snug">Um arquivo com tudo: tarefas, treinos, comida, livros, carreira, dinheiro, viagens, ajustes.</p>
@@ -159,6 +227,15 @@ export default function DataPage() {
             ? `Último backup: ${formatFullDate(todayKey(new Date(db.profile.lastBackupAt)))}.`
             : 'Você ainda não gerou um backup. Seus dados vivem só neste aparelho.'}
         </p>
+        {(() => {
+          const days = daysSinceBackup(db.profile)
+          if (days === undefined || days < 7) return null
+          return (
+            <p className="text-[13px] text-ink-2 mt-2 rounded-2xl bg-sand-soft px-3 py-2" role="note">
+              {db.profile.lastBackupAt ? `Faz ${days} dias do último backup.` : 'Nenhum backup ainda.'} Que tal exportar agora? Leva 10 segundos e protege tudo se o aparelho ou o link mudar.
+            </p>
+          )
+        })()}
         <div className="grid grid-cols-2 gap-2.5 mt-3.5">
           <Button variant="primary" icon={<Download size={17} />} onClick={() => void exportJSON()} disabled={busy}>
             Exportar
@@ -238,6 +315,8 @@ export default function DataPage() {
         ))}
       </div>
       <Hint>Abre no Numbers, Excel ou Google Planilhas.</Hint>
+
+      <Snapshots />
 
       <ImportHistory />
 
