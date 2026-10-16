@@ -3,6 +3,9 @@
 Status: **preparado, desligado.** Nada foi criado, publicado ou ligado. O código fica inerte até você
 fazer os passos da seção 3 e ligar a sincronização em Ajustes → Dados.
 
+> Dentro do Artifact no app do Claude, o mesmo motor sincroniza sozinho com o armazenamento do próprio
+> Artifact, sem login. Ele tem preferência sobre o Supabase. Veja [CLAUDE_DB.md](CLAUDE_DB.md).
+
 ## 1. Como funciona
 
 ```

@@ -9,6 +9,7 @@ import { useTheme } from '@/app/useTheme'
 import { BottomNav } from '@/components/layout/BottomNav'
 import { QuickAddFab } from '@/components/layout/QuickAddFab'
 import { SaveFailedBanner } from '@/components/layout/SaveFailedBanner'
+import { CloudErrorDot } from '@/features/settings/CloudSyncSection'
 import { SheetHost } from '@/components/layout/SheetHost'
 import { Toaster } from '@/components/ui/Toaster'
 import { useLocalReminders } from '@/features/settings/useLocalReminders'
@@ -79,6 +80,7 @@ export default function App() {
       <SheetHost />
       <Toaster />
       <SaveFailedBanner />
+      <CloudErrorDot />
       {!onboarded && (
         <Suspense fallback={null}>
           <Welcome />

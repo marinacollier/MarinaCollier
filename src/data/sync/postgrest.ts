@@ -2,23 +2,13 @@
  * The `records` table over Supabase's REST API (PostgREST), with plain fetch and the user's access
  * token — no SDK. RLS on the server limits every request to her own rows.
  */
-export interface RemoteRow {
-  collection: string
-  id: string
-  /** null for a tombstone. */
-  data: unknown
-  version: number
-  deleted: boolean
-  /** Server change counter (pull cursor). */
-  seq?: number
-}
+import type { RemoteRow, SyncTransport } from './transport'
 
-export interface RecordsApi {
-  /** Every row changed after `afterSeq`, oldest first (pages internally). */
-  pull(afterSeq: number): Promise<RemoteRow[]>
-  /** Upsert rows (the server keeps the higher version). */
-  push(rows: RemoteRow[]): Promise<void>
-}
+export type { RemoteRow } from './transport'
+export type RecordsApi = SyncTransport
+
+/** Re-read this many seqs before the cursor: a row whose transaction committed late with a lower seq is still picked up. */
+const CURSOR_OVERLAP = 100
 
 export type SyncErrorCode = 'auth' | 'network' | 'http'
 
@@ -69,7 +59,7 @@ export function createRecordsApi(o: RecordsApiOptions): RecordsApi {
   return {
     async pull(afterSeq) {
       const out: RemoteRow[] = []
-      let after = afterSeq
+      let after = Math.max(0, afterSeq - CURSOR_OVERLAP)
       for (;;) {
         const q = `select=collection,id,data,version,deleted,seq&seq=gt.${after}&order=seq.asc&limit=${pageSize}`
         const page = (await (await req(`${root}?${q}`)).json()) as RemoteRow[]

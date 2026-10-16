@@ -10,16 +10,16 @@
  *   the other version goes to profile.syncConflicts for her to review. Never silently dropped.
  * - Deletes travel as tombstones (deleted = true); nothing is hard-deleted in the cloud.
  *
- * Pure of app wiring (deps injected) so it runs against a fake PostgREST in tests.
+ * Pure of app wiring (deps injected); the cloud is a SyncTransport (Supabase PostgREST or the Claude
+ * Artifact db), each with an in-memory fake for tests.
  */
 import { isSeedRecordId } from '../seed/ids'
 import type { DB, SyncConflict, UserProfile } from '../types'
 import { hashData } from './hash'
-import type { RecordsApi, RemoteRow } from './postgrest'
+import type { RemoteRow, SyncTransport } from './transport'
 
 export const PROFILE_COLLECTION = '_profile'
 export const PROFILE_ID = 'me'
-const CURSOR_OVERLAP = 100
 /** Profile fields that never leave this device (PIN hash / passkey id, sync state). */
 const DEVICE_ONLY: (keyof UserProfile)[] = ['privacyLock', 'cloudSync', 'cloudSyncSince', 'syncConflicts']
 
@@ -43,6 +43,8 @@ export interface SyncMeta {
   lastSyncedAt?: string
   /** Set by a verified first upload on this device; sync refuses to run without it. */
   migratedAt?: string
+  /** Set by adopt(): the next merge lets the cloud win every record this device never synced. */
+  adopt?: boolean
 }
 export interface MetaStore {
   load(): Promise<SyncMeta | null>
@@ -50,7 +52,7 @@ export interface MetaStore {
 }
 
 export interface SyncDeps {
-  api: RecordsApi
+  api: SyncTransport
   meta: MetaStore
   getDB(): DB
   /** Put the merged DB in the app and make sure it reached the device before the cursor moves. */
@@ -64,6 +66,8 @@ export interface SyncResult {
   pulled: number
   pushed: number
   conflicts: number
+  /** Records the cloud could not take (too big); they stay only on this device. */
+  skipped: string[]
 }
 
 export interface CollectionCompare {
@@ -77,8 +81,9 @@ export interface MigrationIssue {
   /**
    * missing / different → the upload did not land as sent (blocks turning sync on).
    * cloud-newer / cloud-deleted → another device already had a newer version (expected; merges on sync).
+   * too-big → over the cloud's document size limit: stays only on this device (does not block).
    */
-  kind: 'missing' | 'different' | 'cloud-newer' | 'cloud-deleted'
+  kind: 'missing' | 'different' | 'cloud-newer' | 'cloud-deleted' | 'too-big'
 }
 export interface MigrationReport {
   ok: boolean
@@ -226,8 +231,11 @@ export function createSyncEngine(deps: SyncDeps) {
         delete m.outbox[key]
         continue
       }
-      const localWins = out.version > r.version
-      if (Math.min(out.version, r.version) > 0) {
+      // Adopting an existing cloud: the cloud wins anything this device never synced (a fresh install
+      // never overwrites her data); a real local edit that loses is kept as a conflict.
+      const adopting = !!m.adopt && !base
+      const localWins = !adopting && out.version > r.version
+      if (adopting ? out.version > 0 : Math.min(out.version, r.version) > 0) {
         const local = locals.get(key)
         conflicts.push({
           id: newId(),
@@ -271,26 +279,30 @@ export function createSyncEngine(deps: SyncDeps) {
     return { next: next as unknown as DB, conflicts: conflicts.length }
   }
 
-  async function pushOutbox(m: SyncMeta): Promise<number> {
+  async function pushOutbox(m: SyncMeta): Promise<{ pushed: number; skipped: string[] }> {
     const locals = localRecords(deps.getDB())
     diff(m, locals)
     const entries = Object.values(m.outbox)
     const BATCH = 200
     let pushed = 0
+    const skipped: string[] = []
     for (let i = 0; i < entries.length; i += BATCH) {
       const chunk = entries.slice(i, i + BATCH)
-      await deps.api.push(
+      const res = await deps.api.push(
         chunk.map((e) => ({ collection: e.collection, id: e.id, version: e.version, deleted: e.deleted, data: e.deleted ? null : locals.get(recordKey(e.collection, e.id))?.data })),
       )
+      const skip = new Set((res?.skipped ?? []).map((x) => recordKey(x.collection, x.id)))
+      skipped.push(...skip)
       for (const e of chunk) {
         const key = recordKey(e.collection, e.id)
+        if (skip.has(key)) continue // stays in the outbox: goes out if it shrinks
         m.base[key] = { v: e.version, h: e.h }
         if (m.outbox[key] === e) delete m.outbox[key]
       }
-      pushed += chunk.length
+      pushed += chunk.length - skip.size
       await deps.meta.save(m)
     }
-    return pushed
+    return { pushed, skipped }
   }
 
   return {
@@ -315,21 +327,33 @@ export function createSyncEngine(deps: SyncDeps) {
     sync(): Promise<SyncResult> {
       return serial(async () => {
         const m = await loadMeta()
-        if (!m.migratedAt) return { status: 'not-migrated', pulled: 0, pushed: 0, conflicts: 0 }
-        // Small overlap: a row whose transaction committed late with a lower seq is still picked up
-        // (re-reading a row already applied is a no-op).
-        const rows = await deps.api.pull(Math.max(0, m.cursor - CURSOR_OVERLAP))
+        if (!m.migratedAt) return { status: 'not-migrated', pulled: 0, pushed: 0, conflicts: 0, skipped: [] }
+        // The transport re-reads a small overlap before the cursor (re-reading an applied row is a no-op).
+        const rows = await deps.api.pull(m.cursor)
         // Read the DB and merge with no await in between, so an edit made meanwhile is never overwritten.
         const db = deps.getDB()
         diff(m, localRecords(db))
         const { next, conflicts } = merge(m, db, rows)
         if (next !== db) await deps.commitDB(next)
         for (const r of rows) if (r.seq !== undefined && r.seq > m.cursor) m.cursor = r.seq
+        delete m.adopt
         await deps.meta.save(m)
-        const pushed = await pushOutbox(m)
+        const { pushed, skipped } = await pushOutbox(m)
         m.lastSyncedAt = new Date(now()).toISOString()
         await deps.meta.save(m)
-        return { status: 'ok', pulled: rows.length, pushed, conflicts }
+        return { status: 'ok', pulled: rows.length, pushed, conflicts, skipped }
+      })
+    },
+
+    /**
+     * First time on this device when the cloud already has her data: start tracking with nothing agreed
+     * yet, so the next sync pulls everything and lets the cloud win every record (local-only records are
+     * then pushed; differing local edits are kept as conflicts). The caller snapshots the DB first.
+     */
+    adopt(): Promise<void> {
+      return serial(async () => {
+        meta = { cursor: 0, base: {}, outbox: {}, migratedAt: new Date(now()).toISOString(), adopt: true }
+        await deps.meta.save(meta)
       })
     },
 
@@ -348,7 +372,8 @@ export function createSyncEngine(deps: SyncDeps) {
           sent.set(key, v)
           rows.push({ collection: l.collection, id: l.id, data: l.data, version: v, deleted: false })
         }
-        await deps.api.push(rows)
+        const res = await deps.api.push(rows)
+        const tooBig = new Set((res?.skipped ?? []).map((x) => recordKey(x.collection, x.id)))
         const remote = new Map<string, RemoteRow>()
         for (const r of await deps.api.pull(0)) remote.set(recordKey(r.collection, r.id), r)
 
@@ -365,7 +390,8 @@ export function createSyncEngine(deps: SyncDeps) {
           const v = sent.get(key)!
           // v 0 = an untouched seed / never-synced profile: whatever the cloud has is legitimately preferred.
           const cloudWins = !!r && (r.version > v || v === 0)
-          if (!r) issues.push({ collection: l.collection, id: l.id, kind: 'missing' })
+          if (tooBig.has(key) && (!r || r.version < v)) issues.push({ collection: l.collection, id: l.id, kind: 'too-big' })
+          else if (!r) issues.push({ collection: l.collection, id: l.id, kind: 'missing' })
           else if (r.deleted) issues.push({ collection: l.collection, id: l.id, kind: cloudWins ? 'cloud-deleted' : 'missing' })
           else if (hashData(r.data) === l.h) {
             matched++
@@ -381,7 +407,7 @@ export function createSyncEngine(deps: SyncDeps) {
           diff(meta, localRecords(deps.getDB()))
           await deps.meta.save(meta)
         }
-        return { ok, uploaded: rows.length, matched, collections: [...counts.values()].sort((a, b) => a.collection.localeCompare(b.collection)), issues, onlyInCloud }
+        return { ok, uploaded: rows.length - tooBig.size, matched, collections: [...counts.values()].sort((a, b) => a.collection.localeCompare(b.collection)), issues, onlyInCloud }
       })
     },
   }

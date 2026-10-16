@@ -1,43 +1,84 @@
 /**
- * App wiring for cloud sync. INERT unless all of these hold:
+ * App wiring for cloud sync. Two transports for the same engine:
+ *  - Claude Artifact db: when the page runs inside a claude.ai Artifact whose `claude.use("db")` resolves,
+ *    sync turns on by itself (no sign-in, no button) — see docs/CLAUDE_DB.md. Preferred when present.
+ *  - Supabase: INERT unless all of these hold:
  *   1. the build has VITE_SUPABASE_URL (or VITE_MARINA_API_URL) + VITE_SUPABASE_ANON_KEY,
  *   2. she is signed in (Conta do MARINA OS),
  *   3. she turned it on on this device (profile.cloudSync, set only after a verified "Enviar meus dados").
- * Otherwise no request is ever made and the status stays 'local-only' ("Salvo neste aparelho").
+ * Otherwise no request is ever made and the status stays 'local-only' ("Salvo só neste aparelho").
  */
-import { createStore, get, set } from 'idb-keyval'
+import { createStore, del, get, set } from 'idb-keyval'
 import { create } from 'zustand'
-import { actions, flushNow, getDB, onSaved, useStore } from '../store'
+import { actions, flushNow, getDB, hasStorage, onSaved, useStore } from '../store'
+import { takeSnapshot } from '../snapshots'
 import { accessToken, authAvailable, authBaseUrl, useAuth } from '@/integrations/auth'
+import { getArtifactDb, type ArtifactDB } from '@/integrations/artifact-db'
 import { readBackendEnv } from '@/integrations/backend'
+import { claudeFirstRun, createArtifactTransport, type ArtifactTransport } from './artifact-db'
 import { createSyncEngine, type MetaStore, type MigrationReport, type SyncEngine, type SyncMeta } from './engine'
 import { createRecordsApi, SyncError } from './postgrest'
 import { nowISO } from '@/lib/id'
 
 export type CloudStatus = 'local-only' | 'syncing' | 'synced' | 'error'
+/** claude = the Artifact's own document store (preferred when present); supabase = her own server. */
+export type CloudTarget = 'claude' | 'supabase'
 
 export interface CloudSyncState {
   status: CloudStatus
+  target?: CloudTarget
   lastSyncedAt?: string
   pending: number
   error?: string
+  /** Not an error: e.g. a record too big for the cloud stayed only on this device. */
+  warning?: string
 }
 
-export const useCloudSync = create<CloudSyncState>(() => ({ status: 'local-only', pending: 0 }))
+export const useCloudSync = create<CloudSyncState>(() => ({
+  status: 'local-only',
+  pending: 0,
+}))
+
+function ago(iso: string, nowMs: number): string {
+  const min = Math.floor((nowMs - Date.parse(iso)) / 60_000)
+  if (!Number.isFinite(min) || min < 1) return 'agora'
+  if (min < 60) return `há ${min} min`
+  const h = Math.floor(min / 60)
+  if (h < 24) return `há ${h} h`
+  return `em ${new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`
+}
 
 /** The honest one-liner for the UI. */
-export function cloudLabel(s: CloudSyncState): string {
-  if (s.status === 'local-only') return 'Salvo neste aparelho'
+export function cloudLabel(s: CloudSyncState, nowMs = Date.now()): string {
+  if (s.status === 'local-only') return 'Salvo só neste aparelho'
+  if (s.target === 'claude') {
+    if (s.status === 'syncing') return 'Sincronizando com o Claude…'
+    if (s.status === 'error') return `Salvo só neste aparelho · Claude: ${s.error ?? 'erro'}`
+    const line = `Sincronizado com o Claude · ${s.lastSyncedAt ? ago(s.lastSyncedAt, nowMs) : 'agora'}`
+    return s.pending > 0 ? `${line} · ${s.pending} alteração(ões) para enviar` : line
+  }
   if (s.status === 'syncing') return 'Salvo neste aparelho · sincronizando…'
   if (s.status === 'error') return `Salvo neste aparelho · nuvem: ${s.error ?? 'erro'}`
   if (s.pending > 0) return `Salvo neste aparelho · ${s.pending} alteração(ões) para enviar`
-  const t = s.lastSyncedAt ? new Date(s.lastSyncedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''
+  const t = s.lastSyncedAt
+    ? new Date(s.lastSyncedAt).toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : ''
   return t ? `Sincronizado às ${t}` : 'Sincronizado'
 }
 
+// ——— Claude Artifact store state ———
+
+let artifact: { transport: ArtifactTransport; engine: SyncEngine } | null = null
+let artifactDead = false
+
 export const cloudConfigured = (): boolean => authAvailable()
 export const cloudReady = (): boolean => cloudConfigured() && useAuth.getState().signedIn
-export const cloudEnabled = (): boolean => cloudReady() && getDB().profile.cloudSync === true
+/** The Claude Artifact store is in use on this view (auto-enabled; no sign-in). */
+export const artifactActive = (): boolean => !!artifact && !artifactDead
+export const cloudEnabled = (): boolean => artifactActive() || (cloudReady() && getDB().profile.cloudSync === true)
 
 function jwtSub(token: string): string | undefined {
   try {
@@ -61,7 +102,7 @@ function idbMetaStore(userId: string): MetaStore {
 let engine: SyncEngine | null = null
 let engineUser: string | undefined
 
-async function getEngine(): Promise<SyncEngine | null> {
+async function supabaseEngine(): Promise<SyncEngine | null> {
   if (!cloudReady()) return null
   const token = await accessToken()
   const sub = token ? jwtSub(token) : undefined
@@ -92,39 +133,91 @@ function scheduleRetry() {
   retryTimer = setTimeout(() => void syncNow(), RETRY_MS[Math.min(retries++, RETRY_MS.length - 1)])
 }
 
-/** One sync round now (no-op when not enabled). */
-export async function syncNow(): Promise<void> {
+let inflight: Promise<void> | null = null
+let again = false
+
+/** One sync round now (no-op when not enabled). Calls made meanwhile coalesce into one more round. */
+export function syncNow(): Promise<void> {
+  if (inflight) {
+    again = true
+    return inflight
+  }
+  inflight = (async () => {
+    do {
+      again = false
+      await syncOnce()
+    } while (again)
+  })().finally(() => (inflight = null))
+  return inflight
+}
+
+async function syncOnce(): Promise<void> {
   if (!cloudEnabled()) {
     useCloudSync.setState({ status: 'local-only', error: undefined })
     return
   }
-  const e = await getEngine()
+  const claude = artifactActive()
+  if (claude && !useStore.getState().hydrated) return // the hydrated listener syncs right after
+  const e = claude ? artifact!.engine : await supabaseEngine()
   if (!e) return
-  useCloudSync.setState({ status: 'syncing' })
+  useCloudSync.setState({
+    status: 'syncing',
+    target: claude ? 'claude' : 'supabase',
+  })
   try {
+    let tooBig = 0
+    if (claude && !(await e.meta()).migratedAt) tooBig = await firstRunClaude(e)
     const r = await e.sync()
     if (r.status === 'not-migrated') {
       // e.g. a backup with cloudSync on restored onto a new device: needs its own verified upload first.
       actions.setProfile({ cloudSync: false })
-      useCloudSync.setState({ status: 'local-only', pending: 0, error: undefined })
+      useCloudSync.setState({
+        status: 'local-only',
+        pending: 0,
+        error: undefined,
+      })
       return
     }
     retries = 0
     clearTimeout(retryTimer)
+    const skipped = Math.max(tooBig, r.skipped.length)
     const m = await e.meta()
-    useCloudSync.setState({ status: 'synced', lastSyncedAt: m.lastSyncedAt, pending: e.pending(), error: undefined })
+    useCloudSync.setState({
+      status: 'synced',
+      lastSyncedAt: m.lastSyncedAt,
+      pending: Math.max(0, e.pending() - r.skipped.length),
+      error: undefined,
+      warning: skipped ? `${skipped} registro(s) grande(s) demais para a nuvem ficaram só neste aparelho` : undefined,
+    })
   } catch (err) {
-    useCloudSync.setState({ status: 'error', pending: e.pending(), error: err instanceof SyncError ? err.message : 'erro inesperado' })
-    if (!(err instanceof SyncError && err.code === 'auth')) scheduleRetry()
+    useCloudSync.setState({
+      status: 'error',
+      pending: e.pending(),
+      error: err instanceof SyncError ? err.message : 'erro inesperado',
+    })
+    if (err instanceof SyncError && err.code === 'auth') {
+      if (claude) artifactDead = true // revoked / not granted: terminal for this page load
+    } else scheduleRetry()
   }
+}
+
+async function firstRunClaude(e: SyncEngine): Promise<number> {
+  return claudeFirstRun(e, artifact!.transport, async () => {
+    try {
+      await flushNow()
+    } catch {
+      /* the device store is failing: the cloud copy is what protects her now */
+    }
+    await takeSnapshot('Antes da primeira sincronização com o Claude')
+  })
 }
 
 /** Ajustes → Dados → "Enviar meus dados para a nuvem". Turns sync on only when the comparison is clean. */
 export async function migrateToCloud(): Promise<MigrationReport> {
-  const e = await getEngine()
+  const e = await supabaseEngine()
   if (!e) throw new Error('Entre na sua conta primeiro')
   await flushNow()
-  useCloudSync.setState({ status: 'syncing' })
+  useCloudSync.setState({ status: 'syncing', target: 'supabase' })
   try {
     const report = await e.uploadAll()
     if (report.ok) {
@@ -147,7 +240,7 @@ export function pauseCloudSync(): void {
 
 /** Resume after a pause — only if this device already did its verified upload. */
 export async function resumeCloudSync(): Promise<boolean> {
-  const e = await getEngine()
+  const e = await supabaseEngine()
   if (!e || !(await e.meta()).migratedAt) return false
   actions.setProfile({ cloudSync: true })
   await syncNow()
@@ -156,39 +249,159 @@ export async function resumeCloudSync(): Promise<boolean> {
 
 /** True when this device already did its verified first upload for the signed-in account. */
 export async function hasMigrated(): Promise<boolean> {
-  const e = await getEngine()
+  const e = await supabaseEngine()
   return !!e && !!(await e.meta()).migratedAt
 }
 
+// ——— Claude Artifact store wiring ———
+
+let applyingRemote = false
+
+function deviceId(): string {
+  const make = () => `d${Math.random().toString(36).slice(2, 10)}`
+  try {
+    const k = 'marina-os-device-id'
+    const cur = localStorage.getItem(k)
+    if (cur) return cur
+    const id = make()
+    localStorage.setItem(k, id)
+    return id
+  } catch {
+    return make()
+  }
+}
+
+/**
+ * Sync bookkeeping for the Claude store. It may only persist while the app's own save to the device
+ * works: bookkeeping saying "synced" next to a DB that never reached the device would turn into
+ * deletions on the next start. So on any device-save failure it drops the persisted copy (the next start
+ * re-adopts the cloud, which is safe) and lives in memory.
+ */
+function artifactMetaStore() {
+  const kv = createStore('marina-os-sync', 'kv')
+  const key = 'meta:claude-artifact'
+  let memory: SyncMeta | null = null
+  let degraded = !hasStorage()
+  return {
+    async load(): Promise<SyncMeta | null> {
+      if (degraded) return memory
+      try {
+        return ((await get(key, kv)) as SyncMeta | undefined) ?? null
+      } catch {
+        degraded = true
+        return memory
+      }
+    },
+    async save(m: SyncMeta): Promise<void> {
+      memory = m
+      if (degraded) return
+      try {
+        await set(key, m, kv)
+      } catch {
+        degraded = true
+      }
+    },
+    degrade() {
+      degraded = true
+      void del(key, kv).catch(() => undefined)
+    },
+  }
+}
+
+let liveDebounce: ReturnType<typeof setTimeout> | undefined
+let unwatch: (() => void) | undefined
+
+function watchLive() {
+  unwatch?.()
+  unwatch = artifact!.transport.watch(
+    () => {
+      clearTimeout(liveDebounce)
+      liveDebounce = setTimeout(() => void syncNow(), 400)
+    },
+    (err) => {
+      if (['revoked', 'not_granted', 'capability_disabled', 'capability_removed'].includes(err.code)) {
+        artifactDead = true
+        useCloudSync.setState({ status: 'local-only', error: undefined })
+      } else setTimeout(() => artifactActive() && watchLive(), 60_000) // re-subscribe later
+    },
+  )
+}
+
+function startArtifact(db: ArtifactDB) {
+  const meta = artifactMetaStore()
+  const transport = createArtifactTransport({ db, deviceId: deviceId() })
+  const e = createSyncEngine({
+    api: transport,
+    meta,
+    getDB,
+    commitDB: async (next) => {
+      applyingRemote = true
+      useStore.setState({ db: next })
+      applyingRemote = false
+      try {
+        await flushNow()
+      } catch {
+        meta.degrade()
+      }
+    },
+  })
+  artifact = { transport, engine: e }
+  useCloudSync.setState({ target: 'claude' })
+  listen()
+  // Push after every change (debounced), not only after a device save: here the device store is the
+  // unreliable part and the cloud copy is the safety net.
+  useStore.subscribe((s, prev) => {
+    if (s.db === prev.db || applyingRemote || !artifactActive()) return
+    clearTimeout(debounce)
+    debounce = setTimeout(() => void syncNow(), 2000)
+  })
+  watchLive()
+  void syncNow()
+}
+
+// ——— boot ———
+
+let listening = false
+function listen() {
+  if (listening) return
+  listening = true
+  window.addEventListener('online', () => void syncNow())
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') void syncNow()
+  })
+  useStore.subscribe((s, prev) => {
+    if (s.hydrated && !prev.hydrated) void syncNow()
+  })
+}
+
 let started = false
-/** Call once at boot. Without configuration it returns immediately and listens to nothing. */
+/**
+ * Call once at boot. Inside a claude.ai Artifact that grants its db, sync turns on by itself. Otherwise,
+ * without Supabase configuration, it listens to nothing and makes no request.
+ */
 export function initCloudSync(): void {
-  if (started || !cloudConfigured() || typeof window === 'undefined') return
+  if (started || typeof window === 'undefined') return
   started = true
+  void getArtifactDb().then((db) => db && startArtifact(db))
+  if (!cloudConfigured()) return
+  listen()
   onSaved(() => {
-    if (!cloudEnabled()) return
+    if (artifactActive() || !cloudEnabled()) return
     clearTimeout(debounce)
     debounce = setTimeout(() => {
-      void getEngine().then(async (e) => {
+      void supabaseEngine().then(async (e) => {
         if (!e) return
         useCloudSync.setState({ pending: await e.refreshOutbox() })
         await syncNow()
       })
     }, 2000)
   })
-  window.addEventListener('online', () => void syncNow())
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') void syncNow()
-  })
   useAuth.subscribe((s, prev) => {
     if (s.signedIn && !prev.signedIn) void syncNow()
     if (!s.signedIn) {
       engine = null
-      useCloudSync.setState({ status: 'local-only', error: undefined })
+      if (!artifactActive()) useCloudSync.setState({ status: 'local-only', error: undefined })
     }
-  })
-  useStore.subscribe((s, prev) => {
-    if (s.hydrated && !prev.hydrated) void syncNow()
   })
   if (useStore.getState().hydrated) void syncNow()
 }
