@@ -178,6 +178,13 @@ let queue: Promise<unknown> = Promise.resolve()
 
 export type SaveResult = { ok: true } | { ok: false; error: unknown }
 
+const savedListeners = new Set<() => void>()
+/** Called after each successful save to the device (cloud sync diffs from here). Returns an unsubscribe. */
+export function onSaved(fn: () => void): () => void {
+  savedListeners.add(fn)
+  return () => savedListeners.delete(fn)
+}
+
 function save(verify: boolean): Promise<SaveResult> {
   const run = async (): Promise<SaveResult> => {
     if (!adapter) return { ok: true }
@@ -190,6 +197,13 @@ function save(verify: boolean): Promise<SaveResult> {
         if (JSON.stringify(back) !== JSON.stringify(snapshot)) throw new Error('read-back mismatch')
       }
       if (useStore.getState().saveFailed) useStore.setState({ saveFailed: false })
+      for (const fn of savedListeners) {
+        try {
+          fn()
+        } catch {
+          /* a listener never fails the save */
+        }
+      }
       return { ok: true }
     } catch (error) {
       // Never log the data itself (personal/financial) — only that it failed.
