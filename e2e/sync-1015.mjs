@@ -98,7 +98,7 @@ log('home offers it after reopen:', await page.getByRole('button', { name: /Sinc
 await page.goto(base + '/ajustes/dados?importar=1')
 await page.waitForTimeout(1500)
 await page.getByLabel('JSON para importar').fill(syncText)
-await page.getByRole('button', { name: 'Ver prévia', exact: true }).click()
+await page.getByRole('button', { name: 'Validar e ver prévia', exact: true }).click()
 await page.waitForTimeout(1200)
 log('again:', await page.getByTestId('changes-line').innerText())
 log('again button:', await page.getByRole('button', { name: /Confirmar|Nada a gravar/ }).first().innerText())

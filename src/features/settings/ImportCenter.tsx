@@ -5,7 +5,6 @@
  * Nothing is written while previewing. Deletes and conflict overwrites need a per-item yes (off by default).
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ClipboardPaste } from 'lucide-react'
 import { toast } from '@/app/ui-store'
 import { Button, Card, TextArea } from '@/components/ui'
 import { undoBatch } from '@/data/briefing/apply'
@@ -16,7 +15,6 @@ import { looksLikeChanges, parseChanges, type ChangesDoc, type ValidationIssue }
 import { countPlan, planChanges, planLine, willWrite, type ItemAction, type PlanItem } from '@/data/changes/plan'
 import { getDB, persist, useDB } from '@/data/store'
 import { useLockState } from '@/app/lock-store'
-import { readClipboard } from '@/lib/clipboard'
 import { cn } from '@/lib/cn'
 import { haptic } from '@/lib/haptics'
 import { uid } from '@/lib/id'
@@ -204,6 +202,8 @@ export function ImportCenter({ initialText, focus }: { initialText?: string; foc
     setError(undefined)
     setPreview(undefined)
     if (!t.trim()) return
+    const syntax = jsonSyntaxError(t)
+    if (syntax) return setError(syntax)
     if (looksLikeChanges(t)) {
       const r = parseChanges(t)
       if (!r.ok) return setError(r.error)
@@ -222,12 +222,6 @@ export function ImportCenter({ initialText, focus }: { initialText?: string; foc
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const paste = async () => {
-    const t = await readClipboard()
-    if (!t) return toast('Não consegui ler a área de transferência — cola no campo (toque e segure → Colar).')
-    setText(t)
-    read(t)
-  }
   const done = (line: string, batchId?: string) => {
     setResult({ line, batchId })
     setPreview(undefined)
@@ -244,19 +238,27 @@ export function ImportCenter({ initialText, focus }: { initialText?: string; foc
       <Card className="space-y-3">
         {!preview && (
           <>
-            <p className="text-[14px] text-ink-2 leading-snug">Cola aqui o JSON do ChatGPT (marina-os/changes@1) ou do Daily Briefing. Eu mostro tudo antes — nada é gravado sem o seu ok.</p>
-            <TextArea rows={4} value={text} onChange={(e) => setText(e.target.value)} placeholder='{"schemaVersion":"marina-os/changes@1", …}' aria-label="JSON para importar" />
+            <p className="text-[14px] text-ink-2 leading-snug">Cole aqui o JSON gerado pelo ChatGPT ou pelo Daily Briefing. Você revisa tudo antes de salvar.</p>
+            <TextArea
+              rows={10}
+              value={text}
+              onChange={(e) => {
+                setText(e.target.value)
+                setError(undefined)
+              }}
+              placeholder="Toque aqui e escolha Colar"
+              aria-label="JSON para importar"
+              spellCheck={false}
+              autoCapitalize="off"
+              autoCorrect="off"
+              className="font-mono text-[13px] leading-[1.45] min-h-[220px] max-h-[50vh] overflow-auto"
+            />
           </>
         )}
         {!preview && (
-          <div className="flex gap-2">
-            <Button size="sm" variant="primary" icon={<ClipboardPaste size={16} />} onClick={() => void paste()}>
-              Colar e ver prévia
-            </Button>
-            <Button size="sm" variant="soft" onClick={() => read(text)} disabled={!text.trim()}>
-              Ver prévia
-            </Button>
-          </div>
+          <Button variant="primary" className="w-full" onClick={() => read(text)} disabled={!text.trim()}>
+            Validar e ver prévia
+          </Button>
         )}
         {error && (
           <p className="text-[13.5px] text-accent" role="alert">
@@ -278,4 +280,20 @@ export function ImportCenter({ initialText, focus }: { initialText?: string; foc
       </Card>
     </div>
   )
+}
+
+/** A JSON with a syntax error says where (line), so she can fix it without losing what she pasted. */
+function jsonSyntaxError(t: string): string | undefined {
+  const s = t.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
+  const start = s.search(/[{[]/)
+  if (start < 0) return 'Não achei um JSON nesse texto — ele começa com { .'
+  try {
+    JSON.parse(s.slice(start))
+    return undefined
+  } catch (e) {
+    const m = /position (\d+)/.exec(e instanceof Error ? e.message : '')
+    if (!m) return 'Não consegui validar o JSON. Confira se ele foi copiado inteiro (do { inicial ao } final).'
+    const line = s.slice(0, start + Number(m[1])).split('\n').length
+    return `Não consegui validar o JSON. Verifique a estrutura perto da linha ${line}.`
+  }
 }

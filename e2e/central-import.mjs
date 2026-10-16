@@ -1,5 +1,5 @@
 // Central de importação + ChatGPT round trip (iPhone 13, real browser, real IndexedDB):
-// Dados → copiar contexto → "ChatGPT" edita usando os ids → Home "Colar e importar JSON" → prévia (nada gravado)
+// Dados → copiar contexto → "ChatGPT" edita usando os ids → Home "Importar JSON" → colar no campo → "Validar e ver prévia" → prévia (nada gravado)
 // → confirmar → reabrir o app (persistiu) → mesmo JSON de novo = nada muda → cópia automática listada.
 // Pré-requisito: npm run build && npx vite preview --port 4314 --strictPort
 import { createRequire } from 'module'
@@ -79,7 +79,10 @@ await page.goto(base + '/')
 await page.waitForTimeout(1500)
 const before = await stored(page)
 const diffKeys = (x, y) => Object.keys(x).filter((k) => JSON.stringify(x[k]) !== JSON.stringify(y[k]))
-await page.getByRole('button', { name: 'Colar e importar JSON' }).click()
+await page.getByRole('button', { name: 'Importar JSON' }).click()
+await page.waitForTimeout(800)
+await page.getByLabel('JSON para importar').fill(replyText)
+await page.getByRole('button', { name: 'Validar e ver prévia' }).click()
 await page.waitForTimeout(1500)
 log('url after tap:', page.url().replace(base, ''))
 const line = await page.getByTestId('changes-line').innerText()
@@ -118,7 +121,10 @@ log('home shows the new task:', hoje.includes('Revisar orçamento do mês (e2e)'
 
 // 6. Same JSON again → nothing to write.
 await page.evaluate((t) => navigator.clipboard.writeText(t), replyText)
-await page.getByRole('button', { name: 'Colar e importar JSON' }).click()
+await page.getByRole('button', { name: 'Importar JSON' }).click()
+await page.waitForTimeout(800)
+await page.getByLabel('JSON para importar').fill(replyText)
+await page.getByRole('button', { name: 'Validar e ver prévia' }).click()
 await page.waitForTimeout(1500)
 log('again:', await page.getByTestId('changes-line').innerText())
 log('again button:', await page.getByRole('button', { name: /Confirmar|Nada a gravar/ }).first().innerText())

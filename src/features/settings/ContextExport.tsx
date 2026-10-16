@@ -60,7 +60,7 @@ export function ContextExport() {
         </ul>
       </div>
       <button type="button" onClick={() => setShow((v) => !v)} className="text-[13px] text-ink-2 underline underline-offset-2">
-        {show ? 'Esconder prévia' : `Ver prévia (${(ctx.text.length / 1024).toFixed(1)} KB)`}
+        {show ? 'Esconder o que vai' : `Ver o que vai pro ChatGPT (${(ctx.text.length / 1024).toFixed(1)} KB)`}
       </button>
       {show && <pre className="max-h-64 overflow-auto rounded-2xl bg-surface-2 p-3 text-[11px] leading-snug whitespace-pre-wrap break-all">{ctx.text.slice(0, 6000)}{ctx.text.length > 6000 ? '\n…' : ''}</pre>}
       <div className="grid grid-cols-1 gap-2">
