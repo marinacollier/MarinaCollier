@@ -45,6 +45,12 @@ export interface SyncMeta {
   migratedAt?: string
   /** Set by adopt(): the next merge lets the cloud win every record this device never synced. */
   adopt?: boolean
+  /**
+   * Set by adopt() on a fresh install (the device had nothing stored): records that exist only here and
+   * were not touched after this moment are the fresh seed / bundled imports, not her data — they are
+   * dropped instead of pushed, so every wipe of the device does not add another copy to the cloud.
+   */
+  replaceBefore?: string
 }
 export interface MetaStore {
   load(): Promise<SyncMeta | null>
@@ -279,6 +285,27 @@ export function createSyncEngine(deps: SyncDeps) {
     return { next: next as unknown as DB, conflicts: conflicts.length }
   }
 
+  /** Fresh install adopting the cloud: drop the local-only records nobody touched since the seed. */
+  function dropFreshSeed(m: SyncMeta, db: DB, rows: RemoteRow[], before: string): DB {
+    const inCloud = new Set(rows.map((r) => recordKey(r.collection, r.id)))
+    const raw = db as unknown as Record<string, unknown>
+    let next: Record<string, unknown> | null = null
+    for (const c of syncCollections(db)) {
+      const list = raw[c] as Record<string, unknown>[]
+      const kept = list.filter((it) => {
+        if (!it || typeof it.id !== 'string') return true
+        const key = recordKey(c, it.id)
+        if (inCloud.has(key)) return true
+        const touched = String(it.updatedAt ?? it.createdAt ?? '')
+        if (touched && touched > before) return true // she changed it after the seed: hers, keep
+        delete m.outbox[key]
+        return false
+      })
+      if (kept.length !== list.length) (next ??= { ...raw })[c] = kept
+    }
+    return next ? (next as unknown as DB) : db
+  }
+
   async function pushOutbox(m: SyncMeta): Promise<{ pushed: number; skipped: string[] }> {
     const locals = localRecords(deps.getDB())
     diff(m, locals)
@@ -333,10 +360,14 @@ export function createSyncEngine(deps: SyncDeps) {
         // Read the DB and merge with no await in between, so an edit made meanwhile is never overwritten.
         const db = deps.getDB()
         diff(m, localRecords(db))
-        const { next, conflicts } = merge(m, db, rows)
+        const merged = merge(m, db, rows)
+        const conflicts = merged.conflicts
+        let next = merged.next
+        if (m.adopt && m.replaceBefore) next = dropFreshSeed(m, next, rows, m.replaceBefore)
         if (next !== db) await deps.commitDB(next)
         for (const r of rows) if (r.seq !== undefined && r.seq > m.cursor) m.cursor = r.seq
         delete m.adopt
+        delete m.replaceBefore
         await deps.meta.save(m)
         const { pushed, skipped } = await pushOutbox(m)
         m.lastSyncedAt = new Date(now()).toISOString()
@@ -350,9 +381,10 @@ export function createSyncEngine(deps: SyncDeps) {
      * yet, so the next sync pulls everything and lets the cloud win every record (local-only records are
      * then pushed; differing local edits are kept as conflicts). The caller snapshots the DB first.
      */
-    adopt(): Promise<void> {
+    adopt(opts: { replaceBefore?: string } = {}): Promise<void> {
       return serial(async () => {
         meta = { cursor: 0, base: {}, outbox: {}, migratedAt: new Date(now()).toISOString(), adopt: true }
+        if (opts.replaceBefore) meta.replaceBefore = opts.replaceBefore
         await deps.meta.save(meta)
       })
     },

@@ -8,7 +8,7 @@
  *   (a briefing from weeks ago is not news); re-running is a no-op anyway (sourceKeys);
  * - "Desfazer importação" is respected: the date stays recorded, so it is never re-applied.
  */
-import { actions, getDB, hydrate, persist } from '../store'
+import { actions, getDB, hydrate, markFreshSeed, persist } from '../store'
 import type { StorageAdapter } from '../storage'
 import type { DateKey, DB } from '../types'
 import type { ChangesDoc } from '../changes/contract'
@@ -60,8 +60,23 @@ export function markSyncApplied(id: string): void {
   if (!done.includes(id)) actions.setProfile({ syncsApplied: [...done, id] })
 }
 
+let bootDone: () => void = () => {}
+/** Resolves once boot (load + bundled briefings) finished: the cloud's first merge waits for it. */
+export const bootFinished = new Promise<void>((r) => (bootDone = r))
+
 /** Boot: load + migrate the device's DB, then run the bundled briefings through the importer and save. */
 export async function bootWithBriefings(storage?: StorageAdapter, today: DateKey = todayKey()): Promise<void> {
+  try {
+    await bootSteps(storage, today)
+  } finally {
+    bootDone()
+  }
+}
+
+async function bootSteps(storage: StorageAdapter | undefined, today: DateKey): Promise<void> {
   await hydrate(storage)
-  if (applyBundledBriefings(today).length) await persist()
+  if (applyBundledBriefings(today).length) {
+    markFreshSeed()
+    await persist()
+  }
 }

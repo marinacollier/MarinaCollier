@@ -221,10 +221,16 @@ export function createArtifactTransport(o: ArtifactTransportOptions): ArtifactTr
  *    seed never overwrites her data); records only here are sent on the following sync.
  * Returns how many records were too big to upload. Throws when the upload did not verify.
  */
-export async function claudeFirstRun(engine: SyncEngine, transport: ArtifactTransport, beforeMerge: () => Promise<unknown>): Promise<number> {
+export async function claudeFirstRun(
+  engine: SyncEngine,
+  transport: ArtifactTransport,
+  beforeMerge: () => Promise<unknown>,
+  freshSeedAt: string | null = null,
+): Promise<number> {
   await beforeMerge()
   if (!(await transport.isEmpty())) {
-    await engine.adopt()
+    // A wiped device (fresh seed) takes the cloud as it is: its own seed copies are not pushed as new.
+    await engine.adopt(freshSeedAt ? { replaceBefore: freshSeedAt } : {})
     return 0
   }
   const report = await engine.uploadAll()

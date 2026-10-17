@@ -172,6 +172,14 @@ let unsubscribe: (() => void) | undefined
  * things "came back" as before.
  */
 let dirty = false
+/** When this page load started from an empty device (seeded), the moment the seed was last added to. */
+let freshSeedAt: string | null = null
+/** Set when the device had nothing stored at boot: the ISO time up to which the DB is only seed. */
+export const freshInstallAt = (): string | null => freshSeedAt
+/** Boot steps that add seed-like records (bundled briefings) move the fresh-seed mark forward. */
+export function markFreshSeed(): void {
+  if (freshSeedAt) freshSeedAt = new Date().toISOString()
+}
 
 /** Saves run one after the other, so an older snapshot never lands after a newer one. */
 let queue: Promise<unknown> = Promise.resolve()
@@ -247,6 +255,7 @@ export async function hydrate(storage: StorageAdapter = createIndexedDBAdapter()
   const migrated = raw ? migrate(raw) : null
   const db = migrateUgc(applySpiritualSeed(migrated ? applyLifeSeed(migrated, todayKey()) : applyUgcCrmSeed(buildSeed(todayKey()))))
   dirty = false
+  freshSeedAt = !raw && !loadFailed ? new Date().toISOString() : null
   if (loadFailed) {
     // Her data may still be on the device: never write the seed over it. This session runs from memory
     // with the "não salvou" banner; the next start reads the device again.

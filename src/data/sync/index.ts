@@ -10,7 +10,8 @@
  */
 import { createStore, del, get, set } from 'idb-keyval'
 import { create } from 'zustand'
-import { actions, flushNow, getDB, hasStorage, onSaved, useStore } from '../store'
+import { actions, flushNow, freshInstallAt, getDB, hasStorage, onSaved, useStore } from '../store'
+import { bootFinished } from '../briefing/bundled'
 import { takeSnapshot } from '../snapshots'
 import { accessToken, authAvailable, authBaseUrl, useAuth } from '@/integrations/auth'
 import { getArtifactDb, type ArtifactDB } from '@/integrations/artifact-db'
@@ -202,6 +203,8 @@ async function syncOnce(): Promise<void> {
 }
 
 async function firstRunClaude(e: SyncEngine): Promise<number> {
+  // A wiped device must finish seeding before the merge decides what is seed and what is hers.
+  if (freshInstallAt()) await Promise.race([bootFinished, new Promise((r) => setTimeout(r, 3000))])
   return claudeFirstRun(e, artifact!.transport, async () => {
     try {
       await flushNow()
@@ -209,7 +212,7 @@ async function firstRunClaude(e: SyncEngine): Promise<number> {
       /* the device store is failing: the cloud copy is what protects her now */
     }
     await takeSnapshot('Antes da primeira sincronização com o Claude')
-  })
+  }, freshInstallAt())
 }
 
 /** Ajustes → Dados → "Enviar meus dados para a nuvem". Turns sync on only when the comparison is clean. */
