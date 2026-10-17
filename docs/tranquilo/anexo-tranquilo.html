@@ -4,89 +4,78 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
-<title>Tranquilo — Anexo Técnico-Estratégico</title>
+<title>Tranquilo — Plano Detalhado</title>
+<link rel="icon" type="image/png" href="img/brand-mark.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Serif+Display:ital@0;1&display=swap">
 <style>
-/* Layout: documento A4 em coluna única (folha centralizada na tela, páginas A4 na impressão). Mesmo sistema visual da apresentação; tabelas com largura fixa e quebra de texto, sem rolagem lateral. */
+/* Layout: documento A4 em coluna única, versão clara da identidade do Tranquilo (preto e branco, títulos serifados, destaques das praças). Tabelas com largura fixa e quebra de texto, sem rolagem lateral. */
 :root{
   color-scheme:light;
-  --paper:#EEF0EA; --sheet:#FFFFFF; --ink:#15201C; --muted:#56625D; --line:#D3D8CF; --soft:#F5F6F2;
-  --cobalt:#2B45C2; --cobalt-soft:#E1E6FA; --night:#121A3B; --sun:#F2B33D;
-  --t-fato:#2F6B3A; --t-fato-bg:#E0EEDB; --t-int:#2B45C2; --t-int-bg:#E1E6FA;
-  --t-hip:#875800; --t-hip-bg:#F8EBCB; --t-rec:#5E3F91; --t-rec-bg:#ECE3F5;
-  --f-display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
-  --f-body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
-  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --paper:#ECEAE4; --sheet:#FFFFFF; --ink:#0B0B0B; --muted:#5F5C57; --line:#DEDBD4; --soft:#F6F5F1;
+  --violet:#5B63E0; --violet-bg:#E9EAFF; --sun:#8A5A00; --sun-bg:#FFF1D2; --pink-bg:#FBE6EC; --pink:#9C3E5B; --green:#2F6B3A; --green-bg:#E3F2E2;
+  --serif:"DM Serif Display",Georgia,serif;
+  --sans:"DM Sans","Segoe UI",system-ui,sans-serif;
 }
 *{box-sizing:border-box}
 html{background:var(--paper)}
-body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;padding-inline:16px;padding-block:24px}
-.doc{max-width:860px;margin:0 auto;background:var(--sheet);padding:56px 60px;border-radius:4px;box-shadow:0 1px 3px rgba(20,30,25,.12)}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.55;padding-inline:16px;padding-block:24px}
+.doc{max-width:860px;margin:0 auto;background:var(--sheet);padding:56px 60px;border-radius:6px}
 @media (max-width:640px){.doc{padding:28px 20px}}
-h1,h2,h3,h4{font-family:var(--f-display);margin:0;text-wrap:balance;line-height:1.15}
-h1{font-size:2.5em;font-weight:800;letter-spacing:-.02em}
-h2{font-size:1.65em;font-weight:700;letter-spacing:-.01em}
-h3{font-size:1.12em;font-weight:700}
-h4{font-family:var(--f-mono);font-size:.74em;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+h1,h2,h3{margin:0;text-wrap:balance}
+h1{font-family:var(--serif);font-weight:400;font-size:2.7em;line-height:1.02;letter-spacing:-.02em}
+h1 em{font-style:italic;color:var(--violet)}
+h2{font-family:var(--serif);font-weight:400;font-size:1.8em;line-height:1.1;letter-spacing:-.01em}
+h3{font-size:1.05em;font-weight:700}
+h4{margin:0;font-size:.7em;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
 p{margin:0;max-width:72ch}
-.sec{display:flex;flex-direction:column;gap:14px;padding-top:34px;margin-top:34px;border-top:2px dashed var(--line)}
-.sec>.num{font-family:var(--f-mono);font-size:.78em;letter-spacing:.09em;text-transform:uppercase;color:var(--cobalt)}
-.sub{display:flex;flex-direction:column;gap:10px;margin-top:8px}
-.muted{color:var(--muted)}.small{font-size:.88em}
+a{color:var(--violet)}
+.sec{display:flex;flex-direction:column;gap:14px;padding-top:30px;margin-top:30px;border-top:1px solid var(--line)}
+.num{font-size:.72em;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--violet)}
+.small{font-size:.9em}.muted{color:var(--muted)}
 .grid{display:grid;gap:12px;grid-template-columns:1fr 1fr}
-.grid3{display:grid;gap:12px;grid-template-columns:repeat(3,1fr)}
-.grid>*,.grid3>*{min-width:0}
-@media (max-width:640px){.grid,.grid3{grid-template-columns:1fr}}
-.box{border:1px solid var(--line);border-radius:5px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;break-inside:avoid}
-.box.hl{border:2px solid var(--cobalt)}
-.box.soft{background:var(--soft)}
+.grid>*{min-width:0}
+@media (max-width:640px){.grid{grid-template-columns:1fr}}
+.box{border:1px solid var(--line);border-radius:12px;padding:13px 15px;display:flex;flex-direction:column;gap:6px;break-inside:avoid}
+.box.dark{background:var(--ink);color:#F5F3EF;border-color:var(--ink)}
+.box.dark h4{color:#AAA7A1}
+.box.s{background:var(--sun-bg);border-color:transparent}
 ul,ol{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:4px}
 li{max-width:72ch}
-.tag{display:inline-block;font-family:var(--f-mono);font-size:.68em;font-weight:500;letter-spacing:.04em;text-transform:uppercase;padding:1px 6px;border-radius:3px;vertical-align:.12em;white-space:nowrap}
-.fato{background:var(--t-fato-bg);color:var(--t-fato)}.int{background:var(--t-int-bg);color:var(--t-int)}.hip{background:var(--t-hip-bg);color:var(--t-hip)}.rec{background:var(--t-rec-bg);color:var(--t-rec)}
+.tag{display:inline-block;font-size:.64em;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:2px 7px;border-radius:999px;vertical-align:.14em;white-space:nowrap}
+.fato{background:var(--green-bg);color:var(--green)}.int{background:var(--violet-bg);color:var(--violet)}.hip{background:var(--sun-bg);color:var(--sun)}.rec{background:var(--pink-bg);color:var(--pink)}
 .legend{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:.88em}
-.note{background:var(--t-hip-bg);border-radius:5px;padding:10px 14px;font-size:.9em;color:#3F2E00}
-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:.84em;line-height:1.4}
-th,td{text-align:left;vertical-align:top;padding:6px 7px;border-bottom:1px solid var(--line);overflow-wrap:anywhere;hyphens:auto}
-th{font-family:var(--f-mono);font-size:.82em;font-weight:500;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);background:var(--soft)}
+table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:.85em;line-height:1.42}
+th,td{text-align:left;vertical-align:top;padding:7px 8px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+th{font-size:.76em;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);background:var(--soft)}
 thead{display:table-header-group}
 tr{break-inside:avoid}
-tr.grp td{background:var(--cobalt-soft);font-family:var(--f-mono);font-size:.82em;letter-spacing:.05em;text-transform:uppercase;color:var(--cobalt);padding:5px 7px}
-td.c{text-align:center}
-.cover{display:flex;flex-direction:column;gap:14px}
-.cover .k{font-family:var(--f-mono);font-size:.8em;letter-spacing:.09em;text-transform:uppercase;color:var(--cobalt)}
-.toc{columns:2;column-gap:28px;font-size:.92em;padding-left:1.4em}
+.cover{display:flex;flex-direction:column;gap:16px}
+.lockup{display:flex;align-items:center;gap:10px}
+.lockup img{width:36px;height:36px;border-radius:10px}
+.lockup span{font-family:var(--serif);font-size:1.15em;letter-spacing:.05em}
+.lockup span b{font-weight:400;color:var(--violet)}
+.toc{columns:2;column-gap:28px;font-size:.92em;padding-left:1.4em;display:block}
 .toc li{break-inside:avoid;margin-bottom:3px}
-/* camadas */
-.layers{display:flex;flex-direction:column;gap:6px;break-inside:avoid}
-.layer{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center}
-.layer .lbl{font-family:var(--f-mono);font-size:.72em;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-.layer .row{display:flex;flex-wrap:wrap;gap:5px;border:1px solid var(--line);border-radius:5px;padding:7px}
-.pill{font-size:.82em;padding:2px 8px;border-radius:3px;background:var(--soft);border:1px solid var(--line)}
-.pill.dom{background:var(--cobalt-soft);border-color:transparent;font-weight:500}
-.pill.ex{border-color:var(--t-fato);color:var(--t-fato)}
-@media (max-width:640px){.layer{grid-template-columns:1fr}}
-/* ondas */
-.waves{display:grid;grid-template-columns:repeat(4,1fr);gap:0;break-inside:avoid}
-.wave{border-top:4px solid var(--line);padding:10px 12px 4px 0;display:flex;flex-direction:column;gap:6px}
-.wave.now{border-top-color:var(--cobalt)}
-.wave .w{font-family:var(--f-mono);font-size:.72em;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-.wave ul{font-size:.88em}
-@media (max-width:640px){.waves{grid-template-columns:1fr 1fr;gap:12px}}
-.endnote{margin-top:34px;padding-top:16px;border-top:1px solid var(--line);font-size:.85em;color:var(--muted)}
+.fronts{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.fronts>div{border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:4px}
+.fronts b{font-family:var(--serif);font-weight:400;font-size:1.25em;line-height:1.1}
+@media (max-width:640px){.fronts{grid-template-columns:1fr}}
+.endnote{margin-top:30px;padding-top:14px;border-top:1px solid var(--line);font-size:.85em;color:var(--muted)}
 @media print{
   @page{size:A4;margin:15mm 15mm 17mm;
-    @bottom-left{content:"Tranquilo · Anexo técnico-estratégico";font-family:"IBM Plex Mono",monospace;font-size:7.5pt;color:#56625D}
-    @bottom-right{content:counter(page) " / " counter(pages);font-family:"IBM Plex Mono",monospace;font-size:7.5pt;color:#56625D}}
+    @bottom-left{content:"TRANQUILO. · Plano detalhado de implementação";font-family:"DM Sans",sans-serif;font-size:7.5pt;color:#5F5C57}
+    @bottom-right{content:counter(page) " / " counter(pages);font-family:"DM Sans",sans-serif;font-size:7.5pt;color:#5F5C57}}
   html,body{background:none;padding:0}
-  body{font-size:9.4pt}
-  .sec{padding-top:18px;margin-top:20px}
-  .doc{max-width:none;padding:0;box-shadow:none;border-radius:0}
-  .sec.pb{break-before:page;border-top:0;margin-top:0;padding-top:0}
+  body{font-size:9.5pt}
+  .doc{max-width:none;padding:0;border-radius:0}
+  .sec{padding-top:16px;margin-top:18px}
   h2,h3,h4{break-after:avoid}
-  .box,.layers,.waves{break-inside:avoid}
+  .sec{display:block}
+  .sec>*+*{margin-top:10px}
+  .num{display:block;break-after:avoid;page-break-after:avoid}
+  .num+h2{break-before:avoid}
 }
 </style>
 </head>
@@ -94,481 +83,212 @@ td.c{text-align:center}
 <article class="doc">
 
 <header class="cover">
-  <span class="k">Tranquilo · Discovery Estratégico de Produto, Tecnologia, IA &amp; Dados</span>
-  <h1>Anexo técnico-estratégico</h1>
-  <p class="muted" style="font-size:1.1em">Complementa a apresentação executiva com o diagnóstico completo, o detalhamento das frentes, a matriz de aderência, os entregáveis, os riscos e o roadmap. Marina Collier · outubro de 2026 · documento para discussão, sem valores, prazos ou esforço.</p>
+  <div class="lockup"><img src="img/brand-mark.png" alt=""><span>TRANQUILO<b>.</b></span></div>
+  <h1>Plano detalhado: <em>a máquina dos 80 eventos</em></h1>
+  <p class="muted" style="font-size:1.08em">Complementa a apresentação com o detalhe de cada frente, o cronograma semana a semana, a medição, os riscos e o que fica para depois. Marina Collier · outubro de 2026 · esboço feito sem acesso ao Notion, sem valores.</p>
+  <div class="fronts">
+    <div style="background:#C9CCFF"><span class="small" style="font-weight:700">Frente 1</span><b>Área do franqueado no ar</b></div>
+    <div style="background:#F5C4D2"><span class="small" style="font-weight:700">Frente 2</span><b>Envios do Bruno no automático</b></div>
+    <div style="background:#FFD98F"><span class="small" style="font-weight:700">Frente 3</span><b>Automatizar o resto que der</b></div>
+  </div>
   <ol class="toc">
-    <li>Como ler este anexo</li><li>Diagnóstico executivo</li><li>Estado atual dos ativos</li><li>Problemas econômicos e operacionais</li><li>Prioridade A · Inteligência de curadoria</li><li>Prioridade B · Central do franqueado</li><li>Prioridade C · Agenda e match</li><li>Segunda onda de automações</li><li>Ecossistema e fundação de dados</li><li>Priorização, quick wins e roadmap</li><li>O Discovery: escopo e entregáveis</li><li>Matriz de aderência</li><li>Indicadores e baseline</li><li>Riscos e decisões</li><li>Papéis e liderança</li>
+    <li>Como ler este plano</li><li>O pedido</li><li>O que já existe e vamos reaproveitar</li><li>Frente 1 · Área do franqueado</li><li>Frente 2 · Envios do Bruno</li><li>Frente 3 · Fila de automações</li><li>Semana a semana</li><li>Como vamos medir</li><li>Riscos e como lido com eles</li><li>Fora deste plano</li><li>Premissas e o que eu preciso</li>
   </ol>
 </header>
 
 <section class="sec">
   <span class="num">01</span>
-  <h2>Como ler este anexo</h2>
+  <h2>Como ler este plano</h2>
   <div class="legend">
-    <span><span class="tag fato">fato</span> está nos registros do briefing ou foi dito pelo fundador</span>
+    <span><span class="tag fato">fato</span> dito pelo Thales ou registrado no briefing</span>
     <span><span class="tag int">interpretação</span> leitura minha a partir dos fatos</span>
-    <span><span class="tag hip">hipótese</span> precisa ser validada no Discovery</span>
-    <span><span class="tag rec">recomendação</span> proposta de caminho</span>
+    <span><span class="tag hip">hipótese</span> a confirmar com acesso aos dados</span>
+    <span><span class="tag rec">recomendação</span> caminho que proponho</span>
   </div>
-  <div class="box soft"><h4>Fontes e limitações</h4>
-    <ul class="small">
-      <li>Base principal: briefing de Inteligência &amp; Dados do Tranquilo, com registros concentrados em 2026, e as prioridades do Thales como me foram repassadas.</li>
-      <li>Não tive acesso direto ao Notion, às planilhas, às ferramentas nem ao site público. Os estados descritos refletem o que está registrado, não uma verificação feita por mim.</li>
-      <li>Nenhum número de resultado, meta ou retorno foi estimado. Os únicos números citados vêm dos registros.</li>
-    </ul></div>
+  <div class="box" style="background:var(--soft)"><h4>Fontes e limites</h4><ul class="small">
+    <li>O áudio do Thales sobre os próximos dois meses, o briefing de Inteligência &amp; Dados (registros de 2026) e o protótipo da Central do Franqueado.</li>
+    <li>Ainda não tive acesso ao Notion, às planilhas nem às ferramentas. Tudo aqui é um esboço. A certeza do que dá para automatizar, e de como, vem na semana 1.</li>
+    <li>Não estimei resultados, metas ou valores. A meta de 50 a 80 eventos é a ambição dita pelo Thales.</li></ul></div>
 </section>
 
 <section class="sec">
   <span class="num">02</span>
-  <h2>Diagnóstico executivo</h2>
-  <p>O Tranquilo está trocando o modelo de produtora pelo de rede: o centro guarda curadoria, demanda, método, marca e acesso a artistas, e os parceiros locais executam. <span class="tag fato">fato</span> A ambição apresentada é passar de cerca de 12 eventos para 50, 100 e eventualmente 400, começando por SP e interior, MG e Sul. São estágios desejados, não resultados. <span class="tag fato">fato</span></p>
-  <div class="grid">
-    <div class="box"><h3>Pontos fortes</h3><ul class="small">
-      <li><span class="tag fato">fato</span> Método, curadoria e marca já existem e são o que o fundador quer entregar à rede.</li>
-      <li><span class="tag fato">fato</span> A área de Inteligência &amp; Dados se define como produto interno, mede esforço de uso (CES) e tem não-escopo explícito.</li>
-      <li><span class="tag fato">fato</span> Primeiras capacidades sistematizadas: importação da Ingresse, leitura de frequência de compra, Mailchimp–Notion, UTMs, automações Meta e Chartmetric em MVP.</li>
-      <li><span class="tag int">interpretação</span> Uma equipe pequena e rápida é vantagem para testar e ajustar.</li></ul></div>
-    <div class="box"><h3>Ativos estratégicos</h3><ul class="small">
-      <li><span class="tag fato">fato</span> Lógica própria de curadoria que busca corrigir distorções do streaming.</li>
-      <li><span class="tag fato">fato</span> Base de público com histórico de compra. Em BH: 76 pessoas com seis ou mais compras e 153 com três ou mais, em dois anos.</li>
-      <li><span class="tag fato">fato</span> Conhecimento operacional registrado no Notion.</li>
-      <li><span class="tag hip">hipótese</span> Artistas como principal canal de aquisição. A leitura de cerca de 70% do público vindo dos artistas foi registrada com ressalvas de atribuição.</li></ul></div>
-    <div class="box"><h3>Gargalos</h3><ul class="small">
-      <li><span class="tag fato">fato</span> Importação de bilheteria manual, sem API da Ingresse, com histórico a migrar.</li>
-      <li><span class="tag fato">fato</span> Bases históricas de compradores incompletas e parcialmente fora do Notion.</li>
-      <li><span class="tag fato">fato</span> Divergências entre planilhas e DREs e custos não reconciliados em parte dos eventos.</li>
-      <li><span class="tag fato">fato</span> Retrospectiva de agosto registrou níveis de esforço de uso entre 3,5 e 7 nos produtos internos.</li>
-      <li><span class="tag int">interpretação</span> Ofertas e decisões de curadoria passam por poucas pessoas e tendem a virar gargalo com 50 eventos ou mais.</li></ul></div>
-    <div class="box"><h3>Riscos</h3><ul class="small">
-      <li><span class="tag int">interpretação</span> Expor ao franqueado uma estimativa não validada como se fosse previsão.</li>
-      <li><span class="tag fato">fato</span> Ferramentas de mensageria sobrepostas (Meta, ManyChat, NextTags) e integrações sem escopo claro (2Sync).</li>
-      <li><span class="tag int">interpretação</span> Escalar disparos com base duplicada e consentimento a verificar.</li>
-      <li><span class="tag fato">fato</span> Custo de API do Chartmetric já limita a consulta ao catálogo inteiro.</li>
-      <li><span class="tag int">interpretação</span> Conhecimento técnico concentrado em poucas pessoas.</li></ul></div>
-    <div class="box"><h3>Oportunidades</h3><ul class="small">
-      <li><span class="tag hip">hipótese</span> Registrar previsões antes de cada evento cria, a custo baixo, a base para validar a curadoria.</li>
-      <li><span class="tag hip">hipótese</span> Uma agenda de eventos confiável serve ao mesmo tempo a central do franqueado, o atendimento ao público e o site.</li>
-      <li><span class="tag hip">hipótese</span> O Notion pode seguir como fonte de autoria, com outra camada entregando o conteúdo ao parceiro.</li>
-      <li><span class="tag hip">hipótese</span> A prestação de contas do parceiro, padronizada, pode alimentar o fechamento financeiro.</li></ul></div>
-    <div class="box"><h3>Hipóteses de vantagem competitiva</h3><ul class="small">
-      <li><span class="tag hip">hipótese</span> Aprendizado em rede: cada evento melhora a previsão para todas as praças.</li>
-      <li><span class="tag hip">hipótese</span> O método vira produto: o parceiro adere a uma forma de operar, não só a uma marca.</li>
-      <li><span class="tag hip">hipótese</span> Curadoria com demanda local medida é difícil de copiar sem o histórico.</li></ul></div>
-  </div>
-  <div class="box hl"><h3>Decisões que cabem ao fundador</h3><ol class="small">
-    <li>O que da curadoria o franqueado vê e o que fica exclusivo da equipe interna.</li>
-    <li>Qual margem de erro é aceitável para usar a estimativa numa contratação.</li>
-    <li>Quais aprovações comerciais continuam humanas, e com quem.</li>
-    <li>Qual papel o Notion deve ter: fonte de autoria, sistema operacional ou ambos.</li>
-    <li>Até onde construir sob medida e onde aceitar ferramenta pronta.</li>
-    <li>Quem é dono dos dados de público gerados nas praças e como fica o consentimento.</li>
-    <li>Qual ritmo de investimento cabe na situação financeira em cada estágio de expansão.</li>
-    <li>Como garantir continuidade técnica se houver mudança de equipe.</li></ol></div>
+  <h2>O pedido</h2>
+  <ul>
+    <li><span class="tag fato">fato</span> Nos próximos dois meses, o foco é implementação, não análise estratégica.</li>
+    <li><span class="tag fato">fato</span> Fazer os processos existirem e rodarem de forma automatizada, para desafogar o time.</li>
+    <li><span class="tag fato">fato</span> Três pontos citados: área do franqueado funcionando, envios de relatório do Bruno automatizados e "automatizar tudo que der".</li>
+    <li><span class="tag fato">fato</span> A prova buscada: um time curtíssimo entregando de 50 a 80 eventos sem crescer.</li>
+    <li><span class="tag fato">fato</span> A estratégia para ir de 80 a 160 eventos é outro trabalho, depois.</li>
+    <li><span class="tag int">interpretação</span> O critério de sucesso não é a quantidade de ferramenta entregue, e sim quanto trabalho manual sai do caminho por evento.</li>
+  </ul>
 </section>
 
 <section class="sec">
   <span class="num">03</span>
-  <h2>Estado atual dos ativos</h2>
-  <p class="small muted">Classificação preliminar, feita a partir dos registros. Cada linha será confirmada no Discovery com quem construiu. Nada é dado como concluído só por ter sido planejado.</p>
+  <h2>O que já existe e vamos reaproveitar</h2>
   <table>
-    <colgroup><col style="width:27%"><col style="width:17%"><col style="width:44%"><col style="width:12%"></colgroup>
-    <thead><tr><th>Capacidade</th><th>Estado</th><th>O que os registros mostram</th><th>Base</th></tr></thead>
+    <colgroup><col style="width:28%"><col style="width:40%"><col style="width:32%"></colgroup>
+    <thead><tr><th>Ativo</th><th>Como está</th><th>Uso no plano</th></tr></thead>
     <tbody>
-    <tr><td>Notion como núcleo operacional e de conhecimento</td><td>Existe, precisa evoluir</td><td>Centraliza áreas, praças, artistas, processos e playbooks; parte do site é atualizada a partir dele. O uso por parceiros externos, com permissões, não foi avaliado.</td><td><span class="tag fato">fato</span></td></tr>
-    <tr><td>Importação Ingresse e frequência de compra</td><td>Registrado como funcional</td><td>Descrito como completo e funcional em maio; alimentação manual, sem API, com histórico a migrar.</td><td><span class="tag fato">fato</span></td></tr>
-    <tr><td>Integração Mailchimp–Notion</td><td>Concluída, com ressalvas</td><td>Listas atualizadas para as áreas; duplicidades e descadastros ainda tratados à mão.</td><td><span class="tag fato">fato</span></td></tr>
-    <tr><td>Segmentação NextTags + Mailchimp; OTP de WhatsApp no Descubra</td><td>Parcial</td><td>Disparos segmentados possíveis; relatos de instabilidade de integração e de roteamento humano a melhorar.</td><td><span class="tag fato">fato</span></td></tr>
-    <tr><td>Ferramenta de UTM e leitura de canais</td><td>Existe, precisa evoluir</td><td>Gerou a leitura de que boa parte do público vem dos artistas; UTMs ainda não consideradas confiáveis e problemas de origem apontados em setembro e outubro.</td><td><span class="tag fato">fato</span></td></tr>
-    <tr><td>Automações Meta (comentário → DM, palavras-chave)</td><td>Registrado como finalizado em Curitiba</td><td>Procedimentos documentados para revisar e testar por praça. Cobertura nas demais praças não verificada.</td><td><span class="tag fato">fato</span></td></tr>
-    <tr><td>ManyChat, Meta Business Suite e NextTags</td><td>Coexistência a esclarecer</td><td>Os registros mostram experimentação e uso paralelo, sem substituição clara de uma pela outra.</td><td><span class="tag fato">fato</span></td></tr>
-    <tr><td>WhatsApp com respostas automáticas e atendimento humano</td><td>Previsto</td><td>Meta de sprint em julho, com testes e validações pendentes. Não é entrega comprovada.</td><td><span class="tag fato">fato</span></td></tr>
-    <tr><td>Enriquecimento de artistas via Chartmetric</td><td>MVP</td><td>Consulta por artista por causa do custo da API; lacunas de cidades de audiência para alguns artistas.</td><td><span class="tag fato">fato</span></td></tr>
-    <tr><td>Lógica de curadoria e estimativa de público</td><td>A entender</td><td>A lógica existe. Não encontrei registro de comparação sistemática com o público real; em agosto, previsão por artista ainda era apontada como lacuna.</td><td><span class="tag int">interpretação</span></td></tr>
-    <tr><td>Central de Artistas e jornada Descubra</td><td>Existe, com melhorias recentes</td><td>Cadastro e páginas de artistas, com melhorias de estabilidade, navegação e divulgação.</td><td><span class="tag fato">fato</span></td></tr>
-    <tr><td>CRM de artistas (“O que aconteceu?”)</td><td>Protótipo</td><td>Desenho simples de atualização; adoção não comprovada.</td><td><span class="tag fato">fato</span></td></tr>
-    <tr><td>Modelo financeiro por evento</td><td>Existe, precisa evoluir</td><td>Receita, custos variáveis, contribuição, margem, projeção e break-even; fontes com divergências a reconciliar.</td><td><span class="tag fato">fato</span></td></tr>
-    <tr><td>Criação automática de cards no Notion</td><td>Registrado como funcional</td><td>Cerca de 90–100 cards em 30–40 minutos por semana, em trabalho compartilhado com Marketing e Conteúdo.</td><td><span class="tag fato">fato</span></td></tr>
-    <tr><td>IA generativa em campanhas</td><td>Em uso</td><td>Apoio a copies, grades de posts e roteiros, aplicando os padrões definidos pelo fundador.</td><td><span class="tag fato">fato</span></td></tr>
-    <tr><td>Zapier e 2Sync</td><td>A verificar</td><td>Zapier descrito como ponte temporária de MVP; 2Sync sem escopo e destino de sincronização definidos.</td><td><span class="tag fato">fato</span></td></tr>
-    <tr><td>Automação contratual</td><td>A verificar</td><td>Há indícios de automação existente; o que funciona será levantado antes de propor algo novo.</td><td><span class="tag fato">fato</span></td></tr>
-    <tr><td>Central do franqueado com acesso por praça</td><td>Não encontrada</td><td>O conhecimento existe no Notion; não há canal estruturado de distribuição para parceiros nos registros.</td><td><span class="tag int">interpretação</span></td></tr>
-    <tr><td>Agenda de disponibilidade e fluxo de oferta</td><td>Não encontrada</td><td>Nenhum calendário estruturado entre parceiros e centro aparece nos registros.</td><td><span class="tag int">interpretação</span></td></tr>
+    <tr><td>Notion</td><td>Núcleo operacional com praças, artistas, processos e playbooks <span class="tag fato">fato</span></td><td>Fonte do conteúdo da área do franqueado</td></tr>
+    <tr><td>Protótipo da Central do Franqueado</td><td>Navegável, com dados fictícios e código organizado para integração</td><td>Base da Frente 1</td></tr>
+    <tr><td>Importação da Ingresse</td><td>Funcional, com alimentação manual e sem API <span class="tag fato">fato</span></td><td>Candidata da Frente 3</td></tr>
+    <tr><td>Criação automática de cards no Notion</td><td>Cerca de 90–100 cards em 30–40 min por semana <span class="tag fato">fato</span></td><td>Modelo de automação que já deu certo</td></tr>
+    <tr><td>Mailchimp, NextTags, ManyChat, Meta</td><td>Integrações e automações em níveis diferentes, com instabilidades relatadas <span class="tag fato">fato</span></td><td>Canais dos envios automáticos e do atendimento</td></tr>
+    <tr><td>Zapier e 2Sync</td><td>Zapier como ponte de MVP; 2Sync sem escopo definido <span class="tag fato">fato</span></td><td>Possíveis motores das automações</td></tr>
+    <tr><td>Modelo financeiro por evento</td><td>Planilha com margem e break-even; fontes que não batem <span class="tag fato">fato</span></td><td>Base do fechamento automatizado</td></tr>
+    <tr><td>Kit de marca e templates</td><td>Kit público no site; templates no Canva</td><td>Materiais dentro da área do franqueado</td></tr>
     </tbody>
   </table>
 </section>
 
 <section class="sec">
   <span class="num">04</span>
-  <h2>Problemas econômicos e operacionais</h2>
-  <p>Com equipe enxuta e restrição financeira, os problemas que mais pesam são os que consomem tempo de poucas pessoas e os que levam a investir no lugar errado. <span class="tag int">interpretação</span> O tamanho real de cada um é medido no Discovery.</p>
+  <h2>Frente 1 · Área do franqueado</h2>
+  <p>O protótipo já mostra a jornada: o franqueado vê o evento da praça, sabe quem cuida de cada tarefa, abre o playbook, pega o material de marketing e gera o briefing. O trabalho agora é trocar o fictício pelo real, começando por uma praça. <span class="tag rec">recomendação</span> <a href="https://marinacollier.github.io/MarinaCollier/hub/">Abrir o protótipo</a></p>
   <table>
-    <colgroup><col style="width:22%"><col style="width:38%"><col style="width:40%"></colgroup>
-    <thead><tr><th>Problema</th><th>Onde custa hoje</th><th>O que o Discovery responde</th></tr></thead>
+    <colgroup><col style="width:20%"><col style="width:27%"><col style="width:33%"><col style="width:20%"></colgroup>
+    <thead><tr><th>Tela</th><th>No protótipo hoje</th><th>Na versão real</th><th>Fonte do dado</th></tr></thead>
     <tbody>
-    <tr><td><strong>Escala operacional</strong></td><td>Cada evento novo exige horas da equipe central em suporte, conferência e conversa.</td><td>Quais decisões repetitivas podem sair do centro e quanto tempo de suporte por evento existe hoje.</td></tr>
-    <tr><td><strong>Conhecimento concentrado</strong></td><td>A experiência do Thales e dos especialistas não está disponível para o parceiro na hora da dúvida.</td><td>Que parte do método já está registrada, o que falta e como entregá-la por papel e etapa.</td></tr>
-    <tr><td><strong>Curadoria artesanal</strong></td><td>Contratar com base em sinais brutos pode levar a casa vazia ou margem negativa.</td><td>Como a lógica funciona, se é possível validá-la e o que pode ser mostrado ao parceiro.</td></tr>
-    <tr><td><strong>Dependência dos parceiros</strong></td><td>Dúvidas e ofertas chegam por mensagem e dependem de quem está disponível.</td><td>O recorte mínimo da central e da agenda que gera autonomia real.</td></tr>
-    <tr><td><strong>Ferramentas fragmentadas</strong></td><td>Licenças sobrepostas, integrações frágeis e dados sem identificador comum.</td><td>Papel de cada ferramenta, o que integrar, o que manter e o que pode ser desligado.</td></tr>
-    <tr><td><strong>Dados incompletos</strong></td><td>Previsão, atribuição e resultado econômico com lacunas e divergências.</td><td>Mapa de cobertura e o mínimo de correção para as três prioridades funcionarem.</td></tr>
-    <tr><td><strong>Demanda e recorrência</strong></td><td>A base de contatos é pouco ativada para recompra.</td><td>Condições para ativar a base com segurança (identidade, consentimento) e o retorno esperado.</td></tr>
-    <tr><td><strong>Economia da expansão</strong></td><td>Mais eventos sem queda do custo central por evento não melhoram a margem.</td><td>Indicadores de custo e margem por evento e um investimento escalonado por ondas.</td></tr>
+    <tr><td>Visão da praça</td><td>Evento, tarefas e indicadores fictícios</td><td>Eventos confirmados da praça, tarefas reais e progresso</td><td>Notion <span class="tag hip">hipótese</span></td></tr>
+    <tr><td>Preparar evento</td><td>Checklist de quatro etapas, salvo no navegador</td><td>Checklist oficial por etapa, salvo para a equipe toda</td><td>Notion <span class="tag hip">hipótese</span></td></tr>
+    <tr><td>Conhecimento</td><td>Playbooks de exemplo, com busca</td><td>Playbooks e checklists oficiais, separados por papel do tripé</td><td>Notion</td></tr>
+    <tr><td>Marketing</td><td>Prévias e link geral do Canva</td><td>Templates oficiais por campanha</td><td>Canva e kit de marca</td></tr>
+    <tr><td>Briefing</td><td>Gerador por regras fixas, sem IA</td><td>Briefing com o modelo do Bruno e os dados do evento (ver Frente 2)</td><td>Notion e Bruno</td></tr>
+    <tr><td>Vendas</td><td>Score e semáforo fictícios</td><td>Vendas reais vs. esperado, se a bilheteria puder alimentar</td><td>Ingresse <span class="tag hip">hipótese</span></td></tr>
     </tbody>
   </table>
+  <div class="grid">
+    <div class="box"><h3>Pronto quando</h3><ul class="small">
+      <li>Uma praça piloto prepara um evento real pela área, do início ao briefing.</li>
+      <li>Cada praça vê só o que é dela.</li>
+      <li>Atualizar um playbook no Notion muda o que o franqueado vê, sem retrabalho.</li>
+      <li>O franqueado piloto diz que precisou pedir menos coisas por mensagem.</li></ul></div>
+    <div class="box"><h3>Decisões da semana 1</h3><ul class="small">
+      <li>O Notion aguenta ser a fonte do conteúdo, ou o conteúdo precisa ser copiado para outro lugar?</li>
+      <li>Como o franqueado entra: login próprio, link por praça ou acesso pelo próprio Notion?</li>
+      <li>Qual praça e qual evento serão o piloto?</li>
+      <li>Vendas entra agora ou depois da Frente 3?</li></ul></div>
+  </div>
 </section>
 
 <section class="sec">
   <span class="num">05</span>
-  <h2>Prioridade A · Inteligência de curadoria</h2>
-  <p>Pedido do fundador: consultar “Artista X em São Paulo, BH, Florianópolis, Recife: público estimado”, com uma lógica própria que corrige concentração em uma música, viralização pontual, consumo puxado por DJs ou conteúdos externos e diferenças entre cidades. Franqueados veriam os artistas em negociação relevantes para sua praça e manifestariam interesse pelo sistema. <span class="tag fato">fato</span></p>
-  <div class="grid3">
-    <div class="box"><h4>Camada 1</h4><h3>Enriquecimento de dados</h3><p class="small">Audiência por cidade, tendência, histórico de bilheteria. Hoje: Chartmetric em MVP e Ingresse. <span class="tag fato">fato</span></p></div>
-    <div class="box"><h4>Camada 2</h4><h3>Regras de curadoria</h3><p class="small">Correções aplicadas pelo Tranquilo aos sinais brutos. Onde e como estão implementadas, a entender. <span class="tag int">interpretação</span></p></div>
-    <div class="box"><h4>Camada 3</h4><h3>Modelo validado</h3><p class="small">Faixa de público e confiança, medidas contra o público real. Não encontrado nos registros. <span class="tag int">interpretação</span></p></div>
-  </div>
-  <p><span class="tag rec">recomendação</span> Tratar as três camadas separadamente. Mostrar ao franqueado uma regra como se fosse um modelo validado é o maior risco comercial desta frente.</p>
+  <h2>Frente 2 · Envios do Bruno</h2>
+  <p>Hoje, parte do que as praças precisam passa pelo Bruno, que junta dados, materiais e prazos e monta cada envio um a um. <span class="tag int">interpretação</span> A meta é o envio sair sozinho a partir do evento cadastrado, com o Bruno revisando só as exceções. <span class="tag rec">recomendação</span></p>
   <div class="grid">
-    <div class="box"><h3>Perguntas do Discovery</h3><ul class="small">
-      <li>Como o algoritmo atual funciona e onde suas regras estão implementadas?</li>
-      <li>Quais sinais alimentam o cálculo e quais fontes são confiáveis?</li>
-      <li>Existem estimativas anteriores registradas para comparar com o realizado?</li>
-      <li>Qual margem de erro é aceitável para decidir uma contratação?</li>
-      <li>Como tratar artistas e praças com pouca cobertura?</li>
-      <li>Que nível de explicação o franqueado precisa para confiar?</li>
-      <li>O que o franqueado vê e o que fica interno?</li>
-      <li>Qual a dependência e o custo de escala do Chartmetric?</li></ul></div>
-    <div class="box"><h3>Oportunidades a investigar <span class="tag hip">hipótese</span></h3><ul class="small">
-      <li>Faixa estimada em vez de número único</li>
-      <li>Indicador de confiança por previsão</li>
-      <li>Recomendação de artistas por praça</li>
-      <li>Potencial de ocupação e retorno, considerando custo e risco</li>
-      <li>Comparação entre artistas para a mesma data</li>
-      <li>Aprendizado contínuo com cada evento realizado</li></ul></div>
+    <div class="box s"><h3>O que eu preciso descobrir com o Bruno</h3><ul class="small">
+      <li>Quais relatórios e briefings ele envia, e para quem</li>
+      <li>De onde vem cada informação: Notion, planilha, bilheteria, conversa</li>
+      <li>Com que frequência e em que momento do evento</li>
+      <li>Quanto tempo cada um toma hoje</li>
+      <li>O que exige julgamento dele e o que é só juntar dados</li></ul></div>
+    <div class="box"><h3>Desenho alvo <span class="tag hip">hipótese</span></h3><ol class="small">
+      <li>O evento é cadastrado uma vez, no lugar certo.</li>
+      <li>Um modelo por tipo de envio, aprovado pelo Bruno.</li>
+      <li>O sistema monta o pacote com os dados e os materiais.</li>
+      <li>O envio sai na data combinada, por e-mail, WhatsApp ou pela área do franqueado.</li>
+      <li>O que foge do padrão vai para a fila de revisão do Bruno.</li></ol></div>
   </div>
-  <div class="grid">
-    <div class="box hl"><h4>Primeiro recorte <span class="tag hip">hipótese</span></h4><p class="small">Artistas em negociação com faixa de público e confiança para poucas praças prioritárias. Uso interno primeiro; exposição ao parceiro depois de comparar com resultados reais.</p></div>
-    <div class="box"><h4>Depende de · fica para depois</h4><p class="small"><strong>Depende de:</strong> entender a lógica atual, histórico de eventos com público real e custo do Chartmetric. <strong>Depois:</strong> recomendação automática e retorno econômico.</p></div>
-  </div>
+  <div class="box"><h3>Pronto quando</h3><p class="small">O primeiro tipo de envio sai automático para todas as praças por duas semanas seguidas, sem o Bruno refazer manualmente, e o tempo dele nesse envio cai em relação à semana 1.</p></div>
 </section>
 
 <section class="sec">
   <span class="num">06</span>
-  <h2>Prioridade B · Central do franqueado</h2>
-  <p>Pedido do fundador: transformar o conhecimento do Notion e de outros ambientes num sistema de distribuição e execução do método, não numa biblioteca de PDFs. Inclui produção do evento, padrões da experiência, anfitrião, marca, marketing, templates, funções, contratação, comunidade local e o tripé social. <span class="tag fato">fato</span></p>
+  <h2>Frente 3 · Fila de automações</h2>
+  <p>"Automatizar tudo que der", com uma regra para não dispersar: entra primeiro o que devolve mais horas por evento com menos esforço, reaproveitando o que vocês já pagam. <span class="tag rec">recomendação</span></p>
   <table>
-    <colgroup><col style="width:22%"><col style="width:52%"><col style="width:26%"></colgroup>
-    <thead><tr><th>Momento do parceiro</th><th>O que a central oferece <span class="tag hip">hipótese</span></th><th>Papel do tripé</th></tr></thead>
+    <colgroup><col style="width:19%"><col style="width:27%"><col style="width:30%"><col style="width:24%"></colgroup>
+    <thead><tr><th>Rotina</th><th>Hoje</th><th>Automação possível</th><th>Depende de</th></tr></thead>
     <tbody>
-    <tr><td>Abrir a praça</td><td>Funções, perfis de contratação, construção de comunidade local</td><td>Liderança local monta o time</td></tr>
-    <tr><td>Receber oportunidade</td><td>Artistas em negociação para a praça, público estimado, manifestação de interesse</td><td>Liderança local decide</td></tr>
-    <tr><td>Preparar o evento</td><td>Checklist por etapa, método de produção, padrões de experiência, contrato</td><td>Liderança e anfitrião</td></tr>
-    <tr><td>Gerar demanda</td><td>Playbooks de marketing, templates de conteúdo, diretrizes de marca</td><td>Social media</td></tr>
-    <tr><td>Executar a noite</td><td>Briefing do anfitrião, orientações de palco, comportamento esperado</td><td>Anfitrião</td></tr>
-    <tr><td>Fechar e aprender</td><td>Vendas vs. projeção, prestação de contas, registro de aprendizados</td><td>Liderança local</td></tr>
+    <tr><td>Importação da bilheteria</td><td>Funcional, alimentação manual, sem API <span class="tag fato">fato</span></td><td>Rotina agendada que dispensa digitação</td><td>Formato de exportação da Ingresse</td></tr>
+    <tr><td>Fechamento por evento</td><td>Planilha com margem e break-even; fontes que não batem <span class="tag fato">fato</span></td><td>Prestação de contas padrão da praça alimentando o fechamento</td><td>Regras de custo e rateio</td></tr>
+    <tr><td>Atendimento no WhatsApp</td><td>Meta de sprint com testes pendentes <span class="tag fato">fato</span></td><td>Respostas sobre agenda por cidade e encaminhamento humano</td><td>Agenda de eventos confiável; regras do WhatsApp Business</td></tr>
+    <tr><td>Contratos</td><td>Indícios de automação existente <span class="tag fato">fato</span></td><td>Gerar a partir do evento cadastrado e mandar para assinatura</td><td>Levantar o que já funciona</td></tr>
+    <tr><td>Alertas de vendas</td><td>Não existe <span class="tag int">interpretação</span></td><td>Aviso quando a venda fica abaixo do esperado</td><td>Bilheteria frequente</td></tr>
+    <tr><td>Base de contatos</td><td>Mailchimp–Notion com duplicidades tratadas à mão <span class="tag fato">fato</span></td><td>Deduplicação e descadastro automáticos</td><td>Regras de consentimento</td></tr>
     </tbody>
   </table>
-  <div class="sub">
-    <h3>Conhecimento com IA: busca organizada ou assistente</h3>
-    <p class="small">Exemplos do fundador: “Quero contratar uma social media para minha operação. Qual perfil devo procurar, o que é fundamental e o que evitar?” e “Como montar o briefing do anfitrião?” <span class="tag fato">fato</span></p>
-    <table>
-      <colgroup><col style="width:22%"><col style="width:39%"><col style="width:39%"></colgroup>
-      <thead><tr><th></th><th>Busca organizada</th><th>Assistente com fontes autorizadas</th></tr></thead>
-      <tbody>
-      <tr><td>Como funciona</td><td>Conteúdo estruturado por etapa, papel e tema, com busca e navegação</td><td>Recupera trechos dos playbooks oficiais e redige a resposta, citando as fontes</td></tr>
-      <tr><td>Pré-requisito</td><td>Conteúdo revisado e organizado</td><td>O mesmo, mais perguntas de teste e acompanhamento de qualidade</td></tr>
-      <tr><td>Risco</td><td>Parceiro não encontra o que precisa</td><td>Resposta errada com aparência confiável</td></tr>
-      <tr><td>Custo recorrente</td><td>Baixo</td><td>Uso do modelo, avaliação e curadoria das respostas</td></tr>
-      <tr><td>Controles</td><td>Permissão por papel e praça</td><td>Permissão, recusa fora do escopo, encaminhamento humano, registro das perguntas</td></tr>
-      </tbody>
-    </table>
-    <p class="small"><span class="tag rec">recomendação</span> Estruturar o conteúdo já pensando em recuperação por IA, lançar com busca organizada e acrescentar o assistente quando houver volume de dúvidas e perguntas reais para medir qualidade.</p>
-  </div>
-  <div class="grid">
-    <div class="box hl"><h4>Primeiro recorte <span class="tag hip">hipótese</span></h4><p class="small">Acesso por parceiro e praça, método de produção e tripé social estruturados a partir do Notion, busca organizada.</p></div>
-    <div class="box"><h4>Depende de · fica para depois</h4><p class="small"><strong>Depende de:</strong> revisão do conteúdo, modelo de permissões e decisão sobre o papel do Notion. <strong>Depois:</strong> assistente generativo, relatórios financeiros e campanhas.</p></div>
-  </div>
+  <p class="small muted">A ordem final sai do mapa de horas da semana 1. Cada automação entra só quando a anterior está rodando sozinha.</p>
 </section>
 
 <section class="sec">
   <span class="num">07</span>
-  <h2>Prioridade C · Agenda e match</h2>
-  <p>Pedido do fundador: o franqueado informa disponibilidade; o centro identifica oportunidades de artistas nas cidades; o sistema cruza artista, cidade, data, público previsto e restrições comerciais; o parceiro recebe a proposta, de preferência no WhatsApp, e manifesta interesse ou inicia a negociação. <span class="tag fato">fato</span></p>
-  <p class="small"><strong>Fluxo:</strong> oportunidade identificada → cruzamento com praça e agenda → oferta → manifestação de interesse → negociação → confirmação. Hoje esse fluxo acontece por conversa. <span class="tag int">interpretação</span></p>
-  <div class="grid">
-    <div class="box"><h3>Perguntas do Discovery</h3><ul class="small">
-      <li>Quem disponibiliza quais datas: parceiro, casa ou curadoria?</li>
-      <li>Como funcionam casas e operadores e como as praças estão modeladas?</li>
-      <li>Qual é o fluxo atual de negociação?</li>
-      <li>Como tratar reservas, bloqueios e confirmações?</li>
-      <li>Quais permissões são necessárias?</li>
-      <li>Quais eventos disparam notificação, dentro das regras do WhatsApp Business?</li>
-      <li>Quais aprovações comerciais continuam humanas?</li>
-      <li>Como tratar dois parceiros interessados na mesma oportunidade?</li></ul></div>
-    <div class="box"><h3>Ligação com A e B</h3><p class="small">A agenda é onde a curadoria encontra o parceiro. Sem previsão confiável, a oferta é só uma lista; sem a central, o parceiro não tem onde responder nem como se preparar. Por isso as três prioridades são avaliadas juntas, mesmo que não entrem no mesmo primeiro recorte. <span class="tag int">interpretação</span></p></div>
-  </div>
-  <div class="grid">
-    <div class="box hl"><h4>Primeiro recorte <span class="tag hip">hipótese</span></h4><p class="small">Disponibilidade declarada pelo parceiro, oferta enviada pelo centro, manifestação de interesse e notificação. A negociação continua humana.</p></div>
-    <div class="box"><h4>Depende de · fica para depois</h4><p class="small"><strong>Depende de:</strong> modelo de praças e casas, regras de bloqueio e regras do WhatsApp Business. <strong>Depois:</strong> matching automático e reservas complexas.</p></div>
-  </div>
+  <h2>Semana a semana</h2>
+  <table>
+    <colgroup><col style="width:10%"><col style="width:30%"><col style="width:32%"><col style="width:28%"></colgroup>
+    <thead><tr><th>Sem.</th><th>Foco</th><th>Algo visível no fim da semana</th><th>Pronto quando</th></tr></thead>
+    <tbody>
+    <tr><td>1</td><td>Acesso, mapa de processos e horas; conversa com o Bruno; ponto de partida</td><td>Mapa dos envios e rotinas com horas por evento; fila priorizada</td><td>Thales valida a fila e a praça piloto</td></tr>
+    <tr><td>2</td><td>Conteúdo real do Notion na área do franqueado</td><td>Playbooks e checklists oficiais aparecendo na área</td><td>Conteúdo bate com o Notion</td></tr>
+    <tr><td>3</td><td>Piloto com uma praça; primeiro modelo de envio do Bruno</td><td>Franqueado piloto usando a área num evento real</td><td>Evento preparado pela área</td></tr>
+    <tr><td>4</td><td>Ajustes do piloto; primeira automação da fila</td><td>Primeira rotina manual rodando sozinha</td><td>Uma semana sem intervenção manual</td></tr>
+    <tr><td>5</td><td>Primeiros envios do Bruno automáticos</td><td>Envio saindo sozinho para as praças</td><td>Bruno só revisa exceções</td></tr>
+    <tr><td>6</td><td>Área aberta para todas as praças; segunda automação</td><td>Todas as praças com acesso</td><td>Cada praça vê só o que é dela</td></tr>
+    <tr><td>7</td><td>Novos envios automáticos; terceira automação</td><td>Mais um envio e mais uma rotina no automático</td><td>Sem retrabalho manual</td></tr>
+    <tr><td>8</td><td>Medição e decisão</td><td>Comparação com a semana 1 e proposta da próxima fase</td><td>Thales decide os próximos passos com números</td></tr>
+    </tbody>
+  </table>
+  <p class="small muted">Sequência de referência. As datas e o tamanho de cada entrega se ajustam depois da semana 1. <span class="tag hip">hipótese</span></p>
 </section>
 
 <section class="sec">
   <span class="num">08</span>
-  <h2>Segunda onda de automações</h2>
-  <p>Pedidos do fundador que entram no Discovery como avaliação estruturada, sem competir com A, B e C. Uma automação simples e de alto retorno pode ser antecipada se não tirar o foco da primeira onda. <span class="tag rec">recomendação</span></p>
-  <table>
-    <colgroup><col style="width:17%"><col style="width:25%"><col style="width:35%"><col style="width:23%"></colgroup>
-    <thead><tr><th>Frente</th><th>O que existe</th><th>O que investigar</th><th>Observação</th></tr></thead>
-    <tbody>
-    <tr><td><strong>Atendimento WhatsApp e Instagram</strong></td><td>Automações Meta, ManyChat, NextTags, OTP no Descubra <span class="tag fato">fato</span></td><td>APIs e custo por conversa, regras de opt-in, fonte de eventos por cidade, encaminhamento humano, papel de cada ferramenta</td><td>Depende de uma agenda de eventos confiável e consultável</td></tr>
-    <tr><td><strong>Ativação da base</strong></td><td>Mailchimp–Notion, segmentação, leitura de recorrência <span class="tag fato">fato</span></td><td>Identidade única, duplicidades, consentimentos e bases legais, histórico de compras, preferências, comunicação transacional vs. promocional</td><td>Medir por recompra, conversão, receita e retenção</td></tr>
-    <tr><td><strong>Contratos</strong></td><td>Indícios de automação existente <span class="tag fato">fato</span></td><td>Geração, preenchimento, revisão, aprovação, assinatura, armazenamento, consulta, aditivos e exceções</td><td>Verificar o que funciona antes de propor algo novo</td></tr>
-    <tr><td><strong>Fechamento financeiro</strong></td><td>Modelo por evento com margem e break-even <span class="tag fato">fato</span></td><td>Receitas e custos por evento, bilheteria, pagamentos, conciliação, previsto vs. realizado, prestação de contas do parceiro, aprovações e exceções</td><td>Visto como simples pelo fundador; as divergências entre fontes sugerem que o difícil é a reconciliação <span class="tag int">interpretação</span></td></tr>
-    </tbody>
-  </table>
+  <h2>Como vamos medir</h2>
+  <div class="grid">
+    <div class="box"><h3>Indicadores</h3><ul class="small">
+      <li>Horas manuais do time central por evento</li>
+      <li>Pedidos individuais ao Bruno por evento</li>
+      <li>Tempo para a praça preparar um evento</li>
+      <li>Tarefas concluídas pelo franqueado sem acionar o centro</li>
+      <li>Rotinas que rodam sem intervenção</li></ul></div>
+    <div class="box"><h3>Método</h3><ul class="small">
+      <li>Semana 1: medir o ponto de partida com o time, mesmo que de forma simples.</li>
+      <li>Semana 8: medir de novo, do mesmo jeito.</li>
+      <li>Comparar e projetar quantos eventos o time atual aguenta. Projeção, não promessa.</li></ul></div>
+  </div>
 </section>
 
 <section class="sec">
   <span class="num">09</span>
-  <h2>Ecossistema e fundação de dados</h2>
-  <p>Arquitetura conceitual, não especificação. Os seis domínios abaixo organizam o raciocínio; não são seis sistemas a construir. O Discovery indica o que integrar, o que reaproveitar, o que comprar e o que justifica desenvolvimento próprio. <span class="tag rec">recomendação</span></p>
-  <div class="layers" role="img" aria-label="Camadas do ecossistema, de quem usa até dados e governança">
-    <div class="layer"><span class="lbl">Quem usa</span><div class="row"><span class="pill">Thales e curadoria</span><span class="pill">Comercial e artístico</span><span class="pill">Marketing</span><span class="pill">Operações</span><span class="pill">Franqueado e tripé</span><span class="pill">Artistas</span><span class="pill">Público</span></div></div>
-    <div class="layer"><span class="lbl">Experiência</span><div class="row"><span class="pill ex">Site</span><span class="pill ex">Jornada de artistas</span><span class="pill">Central do franqueado</span><span class="pill">Interfaces internas</span><span class="pill ex">WhatsApp e Instagram</span></div></div>
-    <div class="layer"><span class="lbl">Domínios</span><div class="row"><span class="pill dom">Curadoria e previsão</span><span class="pill dom">Operação do franqueado</span><span class="pill dom">Conhecimento</span><span class="pill dom">Público e CRM</span><span class="pill dom">Desempenho e financeiro</span><span class="pill dom">Jornada do artista</span></div></div>
-    <div class="layer"><span class="lbl">Inteligência</span><div class="row"><span class="pill">Regras de curadoria</span><span class="pill">Previsão</span><span class="pill">Audiência</span><span class="pill">Recomendação</span><span class="pill">Assistentes</span><span class="pill">Alertas</span></div></div>
-    <div class="layer"><span class="lbl">Integração</span><div class="row"><span class="pill ex">Notion</span><span class="pill ex">Ingresse</span><span class="pill ex">Chartmetric</span><span class="pill ex">Mailchimp</span><span class="pill ex">NextTags</span><span class="pill ex">ManyChat e Meta</span><span class="pill ex">Zapier</span><span class="pill ex">Planilhas</span><span class="pill">Assinatura de contratos</span></div></div>
-    <div class="layer"><span class="lbl">Dados</span><div class="row"><span class="pill">Artista</span><span class="pill">Praça</span><span class="pill">Parceiro</span><span class="pill">Evento</span><span class="pill">Cliente</span><span class="pill">Transação</span><span class="pill">Previsto vs. realizado</span><span class="pill">Permissões</span><span class="pill">Qualidade</span></div></div>
-  </div>
-  <p class="small muted">Em verde, o que já existe. Os nomes dos domínios correspondem, na proposta original, a Intelligence, Partner OS, Knowledge AI, Audience &amp; Growth, Operations Intelligence e Artist Hub.</p>
-  <div class="grid3">
-    <div class="box"><h3>Entidades antes de telas</h3><p class="small">Artista, praça, parceiro, evento, cliente e transação com identificador comum. É o que permite cruzar previsão, agenda e resultado. <span class="tag rec">recomendação</span></p></div>
-    <div class="box"><h3>O papel certo para o Notion</h3><p class="small">Bom para autoria e operação interna. Precisa ser avaliado para permissões por parceiro, dados transacionais e volume. <span class="tag hip">hipótese</span></p></div>
-    <div class="box"><h3>Previsão como dado</h3><p class="small">Toda estimativa registrada com data, versão da regra e resultado posterior. Sem isso, não há validação. <span class="tag rec">recomendação</span></p></div>
-  </div>
+  <h2>Riscos e como lido com eles</h2>
   <table>
-    <colgroup><col style="width:28%"><col style="width:36%"><col style="width:36%"></colgroup>
-    <thead><tr><th>Abordagem</th><th>Tende a ganhar quando</th><th>Cuidado</th></tr></thead>
+    <colgroup><col style="width:34%"><col style="width:66%"></colgroup>
+    <thead><tr><th>Risco</th><th>Como lido</th></tr></thead>
     <tbody>
-    <tr><td>Estender o stack atual</td><td>É preciso validar um fluxo rápido e com pouco investimento</td><td>Permissões, segregação por parceiro, automações frágeis</td></tr>
-    <tr><td>Plataforma pronta</td><td>A capacidade é genérica: conteúdo, treinamento, contratos, mensageria</td><td>Encaixe com o modelo de praças, custo por usuário, dependência de fornecedor</td></tr>
-    <tr><td>Desenvolvimento próprio</td><td>A capacidade é diferencial: curadoria, previsão, matching</td><td>Custo de construir e manter, dependência de quem construiu</td></tr>
-    <tr><td>Híbrido</td><td>Compra-se o genérico, constrói-se o diferencial e integra-se por entidades comuns</td><td>Exige padrão de integração e um dono claro da arquitetura</td></tr>
+    <tr><td>Acesso ao Notion e às ferramentas atrasar</td><td>A semana 1 depende disso. Sem acesso, o cronograma anda junto.</td></tr>
+    <tr><td>O Notion não sustentar permissões por praça</td><td>Manter o Notion como fonte e entregar o conteúdo por outra camada, como já prevê o protótipo.</td></tr>
+    <tr><td>Instabilidade de ferramentas (ex.: NextTags)</td><td>Escolher o canal mais estável para cada envio e sempre deixar uma saída manual.</td></tr>
+    <tr><td>Regras do WhatsApp e LGPD</td><td>Só enviar para quem consentiu, usar mensagens aprovadas e validar com jurídico o que for necessário.</td></tr>
+    <tr><td>Franqueados não adotarem</td><td>Piloto com uma praça e ajuste antes de abrir para todas.</td></tr>
+    <tr><td>Capacidade de execução</td><td>Definir na semana 1 quem constrói o quê: o que eu faço direto e o que precisa de desenvolvimento.</td></tr>
+    <tr><td>Escopo crescer no meio do caminho</td><td>Toda ideia nova entra na fila e é priorizada pela mesma regra de horas economizadas.</td></tr>
     </tbody>
   </table>
-  <p class="small muted">Nenhuma tecnologia específica é dada como decidida. Banco de dados, hospedagem, ferramenta de automação e fornecedor de IA são escolhidos depois da avaliação, com o custo de operação na conta.</p>
 </section>
 
 <section class="sec">
   <span class="num">10</span>
-  <h2>Priorização, quick wins e roadmap</h2>
-  <div class="waves">
-    <div class="wave now"><span class="w">Onda 0 · Discovery</span><h3>Diagnóstico e validação</h3><ul><li>Operação e jornadas</li><li>Lógica de curadoria</li><li>Ativos, dados e dependências</li><li>Riscos e quick wins</li></ul></div>
-    <div class="wave"><span class="w">Onda 1</span><h3>Núcleo de escala</h3><ul><li>A · Curadoria acionável</li><li>B · Central essencial</li><li>C · Agenda e oportunidades</li></ul></div>
-    <div class="wave"><span class="w">Onda 2</span><h3>Automação e autonomia</h3><ul><li>Assistente sobre os playbooks</li><li>CRM e ativação da base</li><li>Atendimento WhatsApp</li><li>Contratos e fechamento</li><li>Alertas operacionais</li></ul></div>
-    <div class="wave"><span class="w">Onda 3</span><h3>Inteligência avançada</h3><ul><li>Recomendação econômica</li><li>Refinamento do modelo</li><li>Copiloto operacional</li><li>Gestão por exceção</li><li>Aprendizado entre cidades</li></ul></div>
-  </div>
-  <p class="small"><span class="tag hip">tese futura</span> Avaliar, só como oportunidade de longo prazo, se o motor de curadoria interessaria a casas e produtores fora da rede. Não se confunde com o objetivo atual de franquias nem sugere mudar o modelo de negócio agora.</p>
-  <h3 style="margin-top:6px">Matriz de priorização</h3>
-  <table>
-    <colgroup><col style="width:28%"><col style="width:9%"><col style="width:10%"><col style="width:15%"><col style="width:12%"><col style="width:26%"></colgroup>
-    <thead><tr><th>Problema → solução potencial</th><th>Impacto</th><th>Complex.</th><th>Maturidade</th><th>Onda</th><th>Justificativa</th></tr></thead>
-    <tbody>
-    <tr><td>Curadoria artesanal → previsão por artista e cidade com faixa e confiança</td><td>Alto</td><td>Alta</td><td>MVP de dados</td><td>1 · A</td><td>Ativo mais diferenciador; pedido nº 1</td></tr>
-    <tr><td>Sem base de validação → registro de previsões antes de cada evento</td><td>Alto</td><td>Baixa</td><td>Não existe</td><td>Quick win</td><td>Barato e destrava a validação</td></tr>
-    <tr><td>Parceiro depende do centro → central essencial com método e tripé</td><td>Alto</td><td>Média</td><td>Conteúdo existe</td><td>1 · B</td><td>Reduz dúvidas repetitivas e tempo de ativação de praça</td></tr>
-    <tr><td>Negociação por mensagem → disponibilidade, oferta e interesse</td><td>Alto</td><td>Média</td><td>Não existe</td><td>1 · C</td><td>Conecta curadoria e rede</td></tr>
-    <tr><td>Oferta chega tarde → aviso por WhatsApp</td><td>Médio</td><td>Média</td><td>Previsto</td><td>1 · C</td><td>Parte do pedido; pode começar simples</td></tr>
-    <tr><td>Dados fragmentados → entidades e identificadores comuns</td><td>Alto</td><td>Média</td><td>Parcial</td><td>1 · base</td><td>Pré-requisito de A, B e C</td></tr>
-    <tr><td>Atribuição pouco confiável → padrão de UTM</td><td>Médio</td><td>Baixa</td><td>Ferramenta existe</td><td>Quick win</td><td>Mede o canal “artista”, que alimenta a curadoria</td></tr>
-    <tr><td>Dúvidas operacionais → assistente sobre os playbooks</td><td>Médio</td><td>Média</td><td>Não existe</td><td>2</td><td>Depende de conteúdo organizado</td></tr>
-    <tr><td>Atendimento ao público → consulta de eventos por cidade</td><td>Médio</td><td>Média</td><td>Parcial</td><td>2</td><td>O gargalo é a fonte de eventos</td></tr>
-    <tr><td>Base pouco ativada → CRM unificado e reativação</td><td>Alto</td><td>Média</td><td>Integrações existem</td><td>2</td><td>Exige limpar a base antes de escalar</td></tr>
-    <tr><td>Contratos manuais → geração e assinatura automatizadas</td><td>Médio</td><td>Baixa a média</td><td>A verificar</td><td>2 ou quick win</td><td>Antecipar se já houver algo quase pronto</td></tr>
-    <tr><td>Fechamento lento → fechamento por evento</td><td>Alto</td><td>A confirmar</td><td>Modelo existe</td><td>2</td><td>Complexidade real a testar</td></tr>
-    <tr><td>Eventos em risco → semáforo de vendas vs. projeção</td><td>Médio</td><td>Média</td><td>Não existe</td><td>2</td><td>Depende de previsão e bilheteria frequente</td></tr>
-    <tr><td>Jornada do artista → agenda, propostas e histórico</td><td>Médio</td><td>Média</td><td>Central existe</td><td>2–3</td><td>Extensão natural depois da agenda</td></tr>
-    <tr><td>Escolha pelo retorno → recomendação econômica</td><td>Alto</td><td>Alta</td><td>Não existe</td><td>3</td><td>Precisa de previsão e margem confiáveis</td></tr>
-    </tbody>
-  </table>
-  <p class="small muted">Impacto e complexidade são estimativas relativas <span class="tag int">interpretação</span> e serão revistas com dados no Discovery.</p>
-  <div class="grid">
-    <div class="box"><h3>Por que adiar o que fica para depois</h3><ul class="small">
-      <li><strong>Assistente de IA:</strong> responde tão bem quanto o conteúdo que recebe. Organizar o método vem primeiro e já gera valor.</li>
-      <li><strong>Atendimento e ativação da base:</strong> dependem de agenda confiável e de base limpa e consentida.</li>
-      <li><strong>Recomendação econômica:</strong> exige previsão validada e financeiro reconciliado.</li>
-      <li><strong>Matching automático:</strong> automatizar a escolha antes de entender as regras humanas engessa a negociação.</li></ul></div>
-    <div class="box" style="background:var(--t-hip-bg);border-color:transparent"><h3>Hipóteses de quick win</h3><p class="small"><strong>Não fazem parte do escopo contratado.</strong> O Discovery avalia; a execução só acontece com aprovação do Thales, pela equipe atual ou numa etapa seguinte.</p><ol class="small">
-      <li><strong>Registrar cada previsão antes do evento</strong> (Notion ou planilha). Sinal: previsões registradas para todos os eventos seguintes.</li>
-      <li><strong>Padrão único de UTM por artista, cidade e evento.</strong> Sinal: origem identificável na maior parte das vendas.</li>
-      <li><strong>Testar disponibilidade e interesse com formulário e WhatsApp.</strong> Sinal: parceiros respondem às ofertas sem conversa paralela.</li></ol></div>
-  </div>
+  <h2>Fora deste plano</h2>
+  <p>Ficam para a fase seguinte, quando a máquina estiver rodando e houver dado real acumulado: previsão de público por artista e cidade, curadoria como produto, matching automático de agenda e oportunidades artísticas, assistente de IA sobre os playbooks e a estratégia para ir de 80 a 160 eventos. <span class="tag rec">recomendação</span></p>
 </section>
 
 <section class="sec">
   <span class="num">11</span>
-  <h2>O Discovery: escopo e entregáveis</h2>
-  <p><strong>Objetivo:</strong> entender a operação real, validar as hipóteses de maior impacto e dar ao Thales base para decidir o que construir, reaproveitar, comprar e adiar. A profundidade é a necessária para decidir, não para construir. <span class="tag rec">recomendação</span></p>
-  <table>
-    <colgroup><col style="width:16%"><col style="width:12%"><col style="width:72%"></colgroup>
-    <thead><tr><th>Movimento</th><th>Etapa</th><th>O que investiga</th></tr></thead>
-    <tbody>
-    <tr><td rowspan="2"><strong>Entender</strong></td><td>1</td><td><strong>Negócio e operação:</strong> modelo de franquias, proposta de valor, receitas e custos, processos centrais, papéis, gargalos e dependências humanas.</td></tr>
-    <tr><td>2</td><td><strong>Jornadas:</strong> franqueado e tripé, artista, curador, marketing e equipe central; momentos de decisão.</td></tr>
-    <tr><td><strong>Avaliar</strong></td><td>3</td><td><strong>Dados, IA e tecnologia, de forma dirigida:</strong> stack, integrações, qualidade de dados, lógica de curadoria, automações, segurança, custos e limites, com profundidade maior no que afeta A, B e C.</td></tr>
-    <tr><td rowspan="2"><strong>Desenhar</strong></td><td>4</td><td><strong>Solução e recorte:</strong> ecossistema, arquitetura de referência, primeiro recorte da Onda 1, alternativas, dependências, critérios de validação e adoção.</td></tr>
-    <tr><td>5</td><td><strong>Roadmap e recomendações:</strong> priorização, ondas, riscos e trade-offs, pré-requisitos, papéis, governança e próximas decisões.</td></tr>
-    </tbody>
-  </table>
-  <h3 style="margin-top:6px">Entregáveis e profundidade</h3>
-  <table>
-    <colgroup><col style="width:24%"><col style="width:40%"><col style="width:36%"></colgroup>
-    <thead><tr><th>Entregável</th><th>O que inclui</th><th>O que não inclui</th></tr></thead>
-    <tbody>
-    <tr><td><strong>E1 · Diagnóstico executivo</strong><br><span class="muted small">Etapas 1 e 3</span></td><td>Leitura do negócio e da operação; inventário com estado confirmado de cada ativo; principais gargalos</td><td>Auditoria de código, testes de segurança, revisão de todos os fluxos existentes</td></tr>
-    <tr><td><strong>E2 · Parecer sobre a curadoria</strong><br><span class="muted small">Etapa 3</span></td><td>Como a lógica funciona, que sinais usa, se há histórico para validar, o que pode ser exposto e como validar</td><td>Construção ou treino do modelo; teste exploratório só se os dados existirem</td></tr>
-    <tr><td><strong>E3 · Jornadas prioritárias</strong><br><span class="muted small">Etapa 2</span></td><td>Fluxos atuais e desejados do franqueado e do tripé, da curadoria e da agenda; pontos de decisão humana</td><td>Protótipos navegáveis e telas finais</td></tr>
-    <tr><td><strong>E4 · Recorte da Onda 1 e blueprint</strong><br><span class="muted small">Etapa 4</span></td><td>Definição funcional (o quê, para quem, regras principais), dependências, critérios de validação, arquitetura de referência, build vs. buy</td><td>Backlog, histórias de usuário, especificação técnica de integrações, cotação de fornecedores</td></tr>
-    <tr><td><strong>E5 · Parecer sobre a segunda onda</strong><br><span class="muted small">Etapas 3 e 5</span></td><td>Para atendimento, base, contratos e financeiro: o que existe, o que falta, pré-requisitos, retorno esperado e quando fazer</td><td>Desenho detalhado e configuração das automações</td></tr>
-    <tr><td><strong>E6 · Roadmap e recomendações</strong><br><span class="muted small">Etapa 5</span></td><td>Ondas, indicadores com baseline, riscos, papéis e governança, próximas decisões</td><td>Cronograma e orçamento de implementação</td></tr>
-    </tbody>
-  </table>
+  <h2>Premissas e o que eu preciso</h2>
   <div class="grid">
-    <div class="box"><h3>Premissas e dependências</h3><ul class="small">
-      <li>Acesso de leitura ao Notion, às planilhas, às integrações e às ferramentas</li>
-      <li>Disponibilidade do Thales para as sessões de decisão</li>
-      <li>Entrevistas com comercial e artístico, marketing, operações, Inteligência &amp; Dados e alguns parceiros</li>
-      <li>Histórico de eventos com público real, mesmo incompleto</li>
-      <li>Um interlocutor do Tranquilo para agenda e acessos</li></ul></div>
-    <div class="box"><h3>Fica para uma possível implementação</h3><ul class="small">
-      <li>Desenvolvimento, configuração e integração de sistemas</li>
-      <li>Especificação detalhada para desenvolvimento</li>
-      <li>Construção e operação do modelo preditivo</li>
-      <li>Migração e limpeza de bases</li>
-      <li>Produção e revisão do conteúdo dos playbooks</li>
-      <li>Licenças e contratação de ferramentas</li>
-      <li>Parecer jurídico sobre LGPD e contratos</li></ul></div>
+    <div class="box dark"><h4>Para a semana 1</h4><ul class="small">
+      <li>Acesso de leitura ao Notion, às planilhas e às ferramentas</li>
+      <li>Uma conversa com o Bruno sobre os envios</li>
+      <li>Uma praça e um franqueado para o piloto</li>
+      <li>Contato com a frente de Inteligência &amp; Dados</li></ul></div>
+    <div class="box"><h4>Premissas</h4><ul class="small">
+      <li>Lidero o produto e executo direto a configuração e as automações nas ferramentas atuais.</li>
+      <li>O que exigir desenvolvimento entra com a equipe técnica disponível; o protótipo foi pensado para dois desenvolvedores. A confirmar.</li>
+      <li>Formato, dedicação e acompanhamento combinados à parte.</li></ul></div>
   </div>
-  <div class="box hl"><h3>Critérios de aceite</h3><ul class="small">
-    <li>Cada pedido da matriz de aderência tem destino definido: estudado, definido funcionalmente ou adiado com motivo.</li>
-    <li>O recorte da Onda 1 está descrito com dependências e critérios de validação.</li>
-    <li>O estado de cada ativo está confirmado com evidência, junto com quem o construiu.</li>
-    <li>Há recomendação clara sobre o que da curadoria pode ser mostrado ao franqueado.</li>
-    <li>As alternativas técnicas trazem trade-offs e custo de operação em ordem de grandeza.</li>
-    <li>O Thales consegue tomar as próximas decisões de implementação com base no material.</li></ul></div>
-</section>
-
-<section class="sec pb">
-  <span class="num">12</span>
-  <h2>Matriz de aderência</h2>
-  <p class="small">Cada pedido do fundador ligado a frente, etapa, prioridade, entregável e ao que precisa ser validado. <strong>Destino:</strong> nada é implementado no Discovery. <em>Definido</em> = recebe definição funcional no recorte da Onda 1; <em>Estudado</em> = recebe diagnóstico e recomendação.</p>
-  <table>
-    <colgroup><col style="width:4%"><col style="width:19%"><col style="width:18%"><col style="width:8%"><col style="width:10%"><col style="width:8%"><col style="width:21%"><col style="width:12%"></colgroup>
-    <thead><tr><th>#</th><th>Pedido</th><th>Problema</th><th>Etapa</th><th>Onda</th><th>Entreg.</th><th>O que validar</th><th>Destino</th></tr></thead>
-    <tbody>
-    <tr class="grp"><td colspan="8">A · Inteligência de curadoria</td></tr>
-    <tr><td>1</td><td>Previsão de público por artista e cidade</td><td>Contratar com menos risco</td><td>3, 4</td><td>1</td><td>E2, E4</td><td>Erro aceitável, histórico disponível</td><td>Definido</td></tr>
-    <tr><td>2</td><td>Industrialização da curadoria</td><td>Curadoria dependente de pessoas</td><td>1, 3</td><td>1</td><td>E2</td><td>O que é regra explícita e o que é julgamento</td><td>Definido</td></tr>
-    <tr><td>3</td><td>Artistas em negociação visíveis</td><td>Oferta chega por conversa</td><td>2, 4</td><td>1</td><td>E3, E4</td><td>O que o parceiro pode ver</td><td>Definido</td></tr>
-    <tr class="grp"><td colspan="8">B · Central do franqueado</td></tr>
-    <tr><td>4</td><td>Central de conhecimento</td><td>Método preso no Notion</td><td>2, 3, 4</td><td>1</td><td>E3, E4</td><td>Papel do Notion</td><td>Definido</td></tr>
-    <tr><td>5</td><td>Método de produção de eventos</td><td>Qualidade irregular entre praças</td><td>2</td><td>1</td><td>E3</td><td>Completude do método</td><td>Definido</td></tr>
-    <tr><td>6</td><td>Playbooks de marketing</td><td>Demanda depende do centro</td><td>2</td><td>1</td><td>E3</td><td>Uso real pelos parceiros</td><td>Definido</td></tr>
-    <tr><td>7</td><td>Orientações do anfitrião</td><td>Experiência sem padrão</td><td>2</td><td>1</td><td>E3</td><td>O que é fixo e o que é local</td><td>Definido</td></tr>
-    <tr><td>8</td><td>Liderança local</td><td>Praça sem dono claro</td><td>1, 2</td><td>1</td><td>E3</td><td>Perfil e autonomia esperada</td><td>Definido</td></tr>
-    <tr><td>9</td><td>Social media</td><td>Comunicação local irregular</td><td>2</td><td>1</td><td>E3</td><td>Competências essenciais</td><td>Definido</td></tr>
-    <tr><td>10</td><td>Tripé social</td><td>Comunidade não se forma sozinha</td><td>1, 2</td><td>1</td><td>E3</td><td>Como o tripé funciona nas praças atuais</td><td>Definido</td></tr>
-    <tr><td>11</td><td>Busca inteligente nos playbooks</td><td>Parceiro não acha a resposta</td><td>3, 4</td><td>1</td><td>E4</td><td>Dúvidas reais dos parceiros</td><td>Definido (busca)</td></tr>
-    <tr><td>12</td><td>Assistente de IA</td><td>Dúvidas repetitivas no centro</td><td>3, 4</td><td>2</td><td>E4, E5</td><td>Volume de dúvidas e qualidade do conteúdo</td><td>Estudado</td></tr>
-    <tr class="grp"><td colspan="8">C · Agenda e match</td></tr>
-    <tr><td>13</td><td>Manifestação de interesse</td><td>Interações artesanais</td><td>2, 4</td><td>1</td><td>E3, E4</td><td>Conflito entre parceiros</td><td>Definido</td></tr>
-    <tr><td>14</td><td>Agenda de disponibilidade</td><td>Datas sem estrutura</td><td>2, 3</td><td>1</td><td>E3, E4</td><td>Quem cadastra e quem confirma</td><td>Definido</td></tr>
-    <tr><td>15</td><td>Cruzamento artista × cidade × data</td><td>Oportunidades perdidas</td><td>3, 4</td><td>1 simples; 3 automático</td><td>E4</td><td>Restrições comerciais</td><td>Definido (simples)</td></tr>
-    <tr><td>16</td><td>Notificações por WhatsApp</td><td>Oferta lenta</td><td>3, 4</td><td>1</td><td>E4</td><td>Regras e custo do WhatsApp Business</td><td>Definido</td></tr>
-    <tr class="grp"><td colspan="8">Segunda onda</td></tr>
-    <tr><td>17</td><td>Atendimento ao público</td><td>Pessoas não acham eventos</td><td>3</td><td>2</td><td>E5</td><td>Fonte de eventos por cidade</td><td>Estudado</td></tr>
-    <tr><td>18</td><td>WhatsApp e Instagram</td><td>Atendimento manual</td><td>3</td><td>2</td><td>E5</td><td>Custos e regras das plataformas</td><td>Estudado</td></tr>
-    <tr><td>19</td><td>Ativação da base de contatos</td><td>Recompra baixa</td><td>3</td><td>2</td><td>E5</td><td>Duplicidade e consentimento</td><td>Estudado</td></tr>
-    <tr><td>20</td><td>Automação de contratos</td><td>Tempo e erro manual</td><td>3</td><td>2 ou quick win</td><td>E5</td><td>O que já está automatizado</td><td>Estudado</td></tr>
-    <tr><td>21</td><td>Fechamento financeiro</td><td>Fechamento lento e divergente</td><td>1, 3</td><td>2</td><td>E5</td><td>Se é de fato simples</td><td>Estudado</td></tr>
-    <tr class="grp"><td colspan="8">Transversais</td></tr>
-    <tr><td>22</td><td>Reutilização do Notion</td><td>Evitar retrabalho</td><td>3, 4</td><td>—</td><td>E1, E4</td><td>Limites de permissão e volume</td><td>Definido</td></tr>
-    <tr><td>23</td><td>Preservação dos investimentos feitos</td><td>Não jogar trabalho fora</td><td>3</td><td>—</td><td>E1</td><td>O que funciona de fato</td><td>Estudado</td></tr>
-    <tr><td>24</td><td>Evolução da jornada de artistas</td><td>Artista fora do fluxo de oferta</td><td>2</td><td>2–3</td><td>E3, E6</td><td>Interesse dos artistas</td><td>Estudado</td></tr>
-    <tr><td>25</td><td>Indicadores de desempenho</td><td>Decisões sem baseline</td><td>4, 5</td><td>—</td><td>E6</td><td>Dados disponíveis por métrica</td><td>Definido</td></tr>
-    <tr><td>26</td><td>Escalabilidade das franquias</td><td>Crescer sem inchar o centro</td><td>1, 5</td><td>—</td><td>E6</td><td>Capacidade do centro por estágio</td><td>Estudado</td></tr>
-    </tbody>
-  </table>
-  <p class="small muted">Os 26 pedidos estão cobertos; nenhum fica sem etapa, entregável ou destino.</p>
-</section>
-
-<section class="sec">
-  <span class="num">13</span>
-  <h2>Indicadores e baseline</h2>
-  <p>O sucesso é medido por autonomia, previsibilidade e escala, não pelo número de funcionalidades entregues. Nenhuma meta é definida antes de existir o ponto de partida. <span class="tag rec">recomendação</span></p>
-  <div class="grid3">
-    <div class="box"><h3>Escala</h3><ul class="small"><li>Horas de suporte central por evento</li><li>Eventos por pessoa do centro</li><li>Tempo para ativar uma praça</li><li>Intervenções manuais por evento</li></ul></div>
-    <div class="box"><h3>Franqueados</h3><ul class="small"><li>Adoção da central</li><li>Tempo para concluir tarefas</li><li>Processos feitos sem acionar o centro</li><li>Dúvidas recorrentes</li><li>Customer Effort Score</li></ul></div>
-    <div class="box"><h3>Curadoria</h3><ul class="small"><li>Cobertura de artistas e praças</li><li>Erro de previsão</li><li>Confiabilidade dos dados</li><li>Tempo de decisão</li><li>Conversão de ofertas em eventos</li></ul></div>
-    <div class="box"><h3>Operação e economia</h3><ul class="small"><li>Margem de contribuição por evento</li><li>Previsto vs. realizado</li><li>Tempo de fechamento</li><li>Exceções por evento</li><li>Custo operacional por evento</li></ul></div>
-    <div class="box"><h3>Marketing e público</h3><ul class="small"><li>Conversão de campanhas</li><li>Recompra e recorrência</li><li>Qualidade de atribuição</li><li>Receita por segmento</li></ul></div>
-    <div class="box"><h3>IA e automação</h3><ul class="small"><li>Taxa de resolução</li><li>Encaminhamentos para pessoas</li><li>Tempo economizado</li><li>Erros e retrabalho</li><li>Custo de operação</li></ul></div>
-  </div>
-  <div class="box soft"><h3>Método de baseline</h3><ul class="small">
-    <li><strong>Medir antes de mudar:</strong> levantar o valor atual de cada indicador ou registrar que ele não é mensurável hoje, o que já é um achado.</li>
-    <li><strong>Definição única:</strong> fórmula, fonte e responsável por métrica, aproveitando a carta de Inteligência &amp; Dados.</li>
-    <li><strong>Poucos por onda:</strong> três a cinco indicadores ligados ao objetivo de cada onda.</li>
-    <li><strong>Metas depois:</strong> metas e retorno só depois do ponto de partida medido.</li>
-    <li><strong>Esforço de uso:</strong> manter o CES, que a área já adota, como teste de adoção.</li></ul></div>
-</section>
-
-<section class="sec">
-  <span class="num">14</span>
-  <h2>Riscos e decisões</h2>
-  <table>
-    <colgroup><col style="width:34%"><col style="width:66%"></colgroup>
-    <thead><tr><th>Risco</th><th>Como o Discovery trata</th></tr></thead>
-    <tbody>
-    <tr><td>Modelo preditivo ainda não validado</td><td>Entender a lógica, testar com eventos passados quando houver dados, recomendar o que pode ser exposto</td></tr>
-    <tr><td>Lacunas de cobertura e qualidade</td><td>Mapa de cobertura por artista e praça e plano mínimo de correção</td></tr>
-    <tr><td>Dependência de ferramentas terceirizadas</td><td>Inventário de dependências críticas, com alternativa para cada uma</td></tr>
-    <tr><td>Custos de API em escala</td><td>Custo por evento e por praça nos estágios de 50, 100 e 400 eventos, em ordem de grandeza</td></tr>
-    <tr><td>Limites do Notion</td><td>Teste para permissões, uso externo e volume; recomendação de papel</td></tr>
-    <tr><td>Segregação de dados por parceiro</td><td>Modelo de permissões por papel e praça na arquitetura de referência</td></tr>
-    <tr><td>LGPD e regras dos canais</td><td>Mapa de consentimentos e bases legais, pontos para validação jurídica, regras de opt-in</td></tr>
-    <tr><td>Respostas erradas de assistentes de IA</td><td>Respostas presas às fontes, perguntas de teste, encaminhamento humano, critério de qualidade antes de lançar</td></tr>
-    <tr><td>Governança da curadoria</td><td>Definição de quais decisões ficam humanas e com quem</td></tr>
-    <tr><td>Adoção real pelos parceiros</td><td>Entrevistas com parceiros e recorte desenhado a partir do trabalho real deles</td></tr>
-    <tr><td>Dispersão de foco</td><td>Priorização por ondas e regra explícita para aceitar quick wins</td></tr>
-    <tr><td>Sustentabilidade financeira da expansão</td><td>Leitura de custo e margem por estágio e investimento escalonado</td></tr>
-    <tr><td>Conhecimento técnico concentrado</td><td>Documentação mínima dos sistemas críticos e responsáveis definidos</td></tr>
-    <tr><td>Continuidade em mudanças de equipe</td><td>Inventário com donos, acessos e procedimentos de cada integração</td></tr>
-    </tbody>
-  </table>
-</section>
-
-<section class="sec">
-  <span class="num">15</span>
-  <h2>Papéis e liderança</h2>
-  <p>A equipe atual já constrói e mantém produtos de dados e automações, e boa parte do que existe veio desse trabalho. <span class="tag fato">fato</span> O que proponho é um papel complementar: decidir o portfólio, a sequência e a arquitetura que conecta as peças, para que cada entrega some na mesma plataforma. <span class="tag rec">recomendação</span></p>
-  <table>
-    <colgroup><col style="width:24%"><col style="width:76%"></colgroup>
-    <thead><tr><th>Papel</th><th>Responsabilidade</th></tr></thead>
-    <tbody>
-    <tr><td><strong>Thales</strong></td><td>Ambição, identidade, curadoria e decisões de negócio; aprova o que é estratégico</td></tr>
-    <tr><td><strong>Liderança de Produto, Tecnologia, IA &amp; Dados</strong></td><td>Traduz a visão em escolhas de produto, prioriza, define padrões de arquitetura, decide build vs. buy, conecta áreas e mede resultado</td></tr>
-    <tr><td><strong>Inteligência &amp; Dados</strong></td><td>Constrói e mantém dados, integrações e automações; parceira direta na avaliação dos ativos</td></tr>
-    <tr><td><strong>Marketing, comercial e operações</strong></td><td>Usam, validam e dizem o que funciona na rotina</td></tr>
-    <tr><td><strong>Fornecedores</strong></td><td>Entram em capacidades genéricas, quando comprar for melhor que construir</td></tr>
-    </tbody>
-  </table>
-  <div class="grid">
-    <div class="box"><h3>Por que não contratar só execução</h3><p class="small">Um desenvolvedor, um especialista em automação, um analista de dados, uma agência ou uma consultoria de chatbot resolvem bem a sua parte. O risco é contratá-los antes de alguém decidir o que cada um deve construir e como as partes se conectam. <span class="tag int">interpretação</span></p></div>
-    <div class="box"><h3>Trajetória</h3><p class="small">Accenture, Banco BV e Involt Holding: produtos e plataformas em fintech, crédito e pagamentos. Hoje, consultoria de Produto em soluções financeiras e liderança de Produto e Tecnologia em produto digital com IA. Não tenho trajetória no mercado musical.</p></div>
-  </div>
-  <p class="small">O Discovery é uma etapa contratual independente. Se fizer sentido para os dois lados, pode embasar uma atuação contínua ao lado do Thales, em formato a definir juntos.</p>
-  <p class="endnote">Marina Collier · Anexo técnico-estratégico da proposta de Discovery para o Tranquilo · Documento para discussão. Não contém valores, prazos, esforço nem compromissos de entrega.</p>
+  <p class="endnote">Marina Collier · Plano detalhado de implementação para o Tranquilo · Esboço para conversa, feito sem acesso ao Notion. Não contém valores nem compromissos de resultado.</p>
 </section>
 
 </article>
