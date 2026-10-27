@@ -1509,6 +1509,54 @@ export interface Trip extends Entity {
   links: Link[]
   status: 'sonhando' | 'planejando' | 'confirmada' | 'em_andamento' | 'concluida'
   order: number
+  /** Expedição: day-by-day trip manager (school, budget in local currency, safety). Optional. */
+  expedition?: TripExpedition
+}
+
+/** How sure an item is. Shown as CONFIRMADO / ESTIMADO / DEPENDE DO CLIMA / PENDENTE. */
+export type TripCertainty = 'confirmado' | 'estimado' | 'clima' | 'pendente'
+
+/** Reservation pipeline (kept next to `status`/`paymentStatus`, which stay the source for older screens). */
+export type TripBooking =
+  | 'nao_pesquisado'
+  | 'cotacao_solicitada'
+  | 'aguardando'
+  | 'confirmado'
+  | 'pago'
+  | 'concluido'
+  | 'cancelado'
+
+export type TripCurrency = 'ZAR' | 'BRL'
+
+export type TripChecklistKind = 'trilha' | 'corrida' | 'natacao' | 'surf' | 'bike' | 'scuba' | 'safari' | 'voo' | 'voluntariado'
+
+export interface TripSchool {
+  name: string
+  address?: string
+  /** First and last class day. */
+  from: DateKey
+  until: DateKey
+  /** Class hours per weekday (local time of the trip). */
+  days: { weekday: Weekday; start: TimeHM; end: TimeHM }[]
+}
+
+/** Trip-level settings of an Expedição. Every value is hers to edit; nothing here is fetched live. */
+export interface TripExpedition {
+  /** IANA zone of the activities' local times ('Africa/Johannesburg'). */
+  timeZone: string
+  currency: TripCurrency
+  /** BRL for 1 unit of `currency`, as she typed it. No live rate. Missing = BRL not shown. */
+  rateToBRL?: number
+  /** Safety margin on the totals, in percent (15). */
+  marginPct: number
+  residence?: { name: string; address: string }
+  school?: TripSchool
+  emergencyContacts: Person[]
+  /** Who receives the itinerary. */
+  trustedContact?: Person
+  /** Point for the optional forecast card (Open-Meteo, no key). */
+  weather?: { lat: number; lon: number; label: string }
+  safetyNotes?: string
 }
 
 export type TripSection =
@@ -1545,6 +1593,58 @@ export interface TripItem extends Entity {
   endDate?: DateKey
   /** Payment is tracked separately from the plan; never inferred from an itinerary. */
   paymentStatus?: 'a_confirmar' | 'pendente' | 'pago' | 'nao_se_aplica'
+
+  // ── Expedição (all optional: items from before stay valid as they are) ──
+  /** Missing = derived from `status` (confirmado/feito → confirmado, else pendente). */
+  certainty?: TripCertainty
+  /** Missing = derived from `status`/`paymentStatus` when they say enough. */
+  booking?: TripBooking
+  endTime?: TimeHM
+  wakeTime?: TimeHM
+  prepTime?: TimeHM
+  leaveTime?: TimeHM
+  returnTime?: TimeHM
+  address?: string
+  /** Route / transport notes ("Uber até Kloof Nek", "transfer do operador"). */
+  route?: string
+  travelMinutes?: number
+  /** Currency of the cost fields below. Missing = the trip's currency. */
+  currency?: TripCurrency
+  estimatedCents?: number
+  quotedCents?: number
+  paidCents?: number
+  /** Uber/táxi, always apart from the activity cost. */
+  uberCents?: number
+  outfit?: string
+  checklistKind?: TripChecklistKind
+  /** Checklist lines she ticked (by text). */
+  checked?: string[]
+  contact?: string
+  voucherUrl?: string
+  supplier?: string
+  cancellationPolicy?: string
+  /** Pickup point/time as known ("estimado 05:30–06:30"). */
+  pickup?: string
+  needsPickup?: boolean
+  pickupConfirmed?: boolean
+  risk?: string
+  planB?: string
+  /** What it does to the class day: part of it or the whole day. */
+  schoolImpact?: 'parcial' | 'dia'
+  /** The class missed because of this item was made up. */
+  schoolMadeUp?: boolean
+  /** Medical clearance (bungee, mergulho). Missing = not needed. */
+  clearance?: 'pendente' | 'liberada' | 'nao_liberada'
+  /** Extra outside the base plan (shown with its opportunity cost, never as done without confirmation). */
+  optional?: boolean
+  opportunityCost?: string
+  /** Can move to another day/time (replanning only suggests these). */
+  flexible?: boolean
+  indoor?: boolean
+  /** Why it was cancelled; weather reasons bring replanning suggestions. */
+  cancelReason?: 'vento' | 'chuva' | 'mar' | 'outro'
+  /** Community activity: educational visit vs. volunteer work. */
+  volunteer?: 'visita_educativa' | 'voluntariado'
 }
 
 // ─── Content / UGC ──────────────────────────────────────────────────────────
