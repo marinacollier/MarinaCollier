@@ -72,6 +72,8 @@ export const COLLECTION_LABELS: Partial<Record<CollectionKey, string>> = {
   spiritualStudies: 'Estudos guiados (Lumos)',
   spiritualJournal: 'Caderno espiritual',
   spiritualPrayers: 'Diário de oração',
+  universeItems: 'Meu Universo (coleção e desejos)',
+  scentLogs: 'Diário olfativo',
   importBatches: 'Importações do briefing',
   occurrences: 'Check-ins de rotinas',
   priorities: 'Prioridades do dia',

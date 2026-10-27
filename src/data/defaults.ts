@@ -214,6 +214,8 @@ export function emptyDB(): DB {
     spiritualStudies: [],
     spiritualJournal: [],
     spiritualPrayers: [],
+    universeItems: [],
+    scentLogs: [],
   }
 }
 

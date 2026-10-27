@@ -36,6 +36,8 @@ export const ROUTES = {
   biblePrayers: '/biblia/oracoes',
   bibleMarkRead: '/biblia/marcar',
   trips: '/viagens',
+  /** Meu Universo · Beauty & Fragrance (fragrâncias by default; other shelves as filters). */
+  universe: '/universo',
   trip: (id: string) => `/viagens/${id}`,
   weeklyReview: '/revisao',
   weekPlanner: '/semana',
@@ -91,6 +93,7 @@ export const routeTable: { path: string; Component: React.LazyExoticComponent<Re
   { path: '/biblia/oracoes', Component: lazy(() => import('@/features/spiritual/PrayersPage')) },
   { path: '/biblia/importar', Component: lazy(() => import('@/features/spiritual/ImportStudyPage')) },
   { path: '/biblia/marcar', Component: lazy(() => import('@/features/spiritual/MarkReadPage')) },
+  { path: '/universo', Component: lazy(() => import('@/features/universe/UniversePage')) },
   { path: '/viagens', Component: lazy(() => import('@/features/travel/TripsPage')) },
   { path: '/viagens/:id', Component: lazy(() => import('@/features/travel/TripPage')) },
   { path: '/semana', Component: lazy(() => import('@/features/planner/WeekPlannerPage')) },
