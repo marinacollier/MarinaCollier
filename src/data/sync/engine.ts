@@ -13,6 +13,7 @@
  * Pure of app wiring (deps injected); the cloud is a SyncTransport (Supabase PostgREST or the Claude
  * Artifact db), each with an in-memory fake for tests.
  */
+import { isPrivateCollection } from '../private-collections'
 import { isSeedRecordId } from '../seed/ids'
 import type { DB, SyncConflict, UserProfile } from '../types'
 import { hashData } from './hash'
@@ -114,9 +115,9 @@ export function emptyMeta(): SyncMeta {
   return { cursor: 0, base: {}, outbox: {} }
 }
 
-/** DB keys holding entity arrays (everything but schemaVersion/profile). */
+/** DB keys holding entity arrays (everything but schemaVersion/profile), minus the device-only private writing. */
 export function syncCollections(db: DB): string[] {
-  return Object.keys(db).filter((k) => Array.isArray((db as unknown as Record<string, unknown>)[k]))
+  return Object.keys(db).filter((k) => Array.isArray((db as unknown as Record<string, unknown>)[k]) && !isPrivateCollection(k))
 }
 
 export function profileForCloud(p: UserProfile): Record<string, unknown> {
