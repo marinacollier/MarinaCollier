@@ -125,6 +125,7 @@ export const COLLECTION_LABELS: Partial<Record<CollectionKey, string>> = {
   contracts: 'Contratos',
   opportunities: 'Oportunidades',
   contacts: 'Contatos profissionais',
+  execPosts: 'Posts do LinkedIn',
 }
 
 export interface BackupPreview {

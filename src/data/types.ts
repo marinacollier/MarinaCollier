@@ -416,6 +416,11 @@ export interface UserProfile {
   cloudSyncSince?: ISODateTime
   /** Both this device and another edited the same record: the newer version was kept, the other is here for review. Device-only. */
   syncConflicts?: SyncConflict[]
+  /**
+   * Words a LinkedIn post can never contain (confidential clients, internal project names). Lives only on this
+   * device — never in the seed or the code.
+   */
+  execBlockedTerms?: string[]
 }
 
 export interface SyncConflict {
@@ -1335,6 +1340,55 @@ export interface ProfessionalContact extends Entity {
   interactions?: { date: DateKey; note?: string }[]
 }
 
+// ─── Executive brand: LinkedIn posts (Modo A — no LinkedIn API, no scraping) ─
+
+/** ideia → rascunho → revisao → aprovado → publicado. Any body edit after approval drops back to rascunho. */
+export type ExecPostStatus = 'ideia' | 'rascunho' | 'revisao' | 'aprovado' | 'publicado' | 'arquivado'
+
+/**
+ * A LinkedIn post. Marina approves the exact text (snapshot + SHA-256); only an approved, unchanged text can be
+ * copied for publishing. The app never talks to LinkedIn: she pastes the text there and pastes the URL back.
+ */
+export interface ExecPost extends Entity {
+  title: string
+  status: ExecPostStatus
+  body: string
+  language: 'en' | 'pt' | 'en+pt'
+  /** Editorial pillar (free text, e.g. "IA em finanças reguladas"). */
+  pillar?: string
+  /** Day she means to publish (São Paulo). */
+  plannedDate?: DateKey
+  /** Wins this post was drafted from. */
+  sourceWinIds?: ID[]
+  /** Marina's own checks before review. */
+  checks: { ndaOk: boolean; claimsVerified: boolean }
+  approval?: { approvedAt: ISODateTime; bodyHash: string; bodySnapshot: string }
+  publication?: {
+    publishedOn: DateKey
+    url: string
+    /** urn:li:activity:… / urn:li:share:… when the URL carries it. */
+    urn?: string
+    /** She confirmed she published exactly the approved text. */
+    matchesApproved: boolean
+    /** If she changed it on LinkedIn, the text that went out. */
+    finalBody?: string
+  }
+  /** Numbers she reads in LinkedIn analytics (manual or, later, XLSX import). */
+  metrics?: ExecPostMetric[]
+  notes?: string
+  order: number
+}
+
+export interface ExecPostMetric {
+  capturedOn: DateKey
+  source: 'manual' | 'xlsx'
+  impressions?: number
+  membersReached?: number
+  reactions?: number
+  comments?: number
+  reposts?: number
+}
+
 export type WorkInboxKind =
   | 'responder'
   | 'pedido'
@@ -2074,6 +2128,7 @@ export interface DB {
   contracts: FinancialContract[]
   opportunities: Opportunity[]
   contacts: ProfessionalContact[]
+  execPosts: ExecPost[]
   backlogItems: BacklogItem[]
   importBatches: ImportBatch[]
   brands: Brand[]

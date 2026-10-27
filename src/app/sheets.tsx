@@ -25,6 +25,7 @@ export const SHEETS: Record<SheetName, AnySheet> = {
   opportunity: lazy(() => import('@/features/career/sheets').then((m) => ({ default: m.OpportunitySheet }))),
   contact: lazy(() => import('@/features/career/sheets').then((m) => ({ default: m.ContactSheet }))),
   evidence: lazy(() => import('@/features/career/sheets').then((m) => ({ default: m.EvidenceSheet }))),
+  execPost: lazy(() => import('@/features/career/PostSheet').then((m) => ({ default: m.PostSheet }))),
   mealDetail: lazy(() => import('@/features/nutrition/MealDetailSheet')),
   myFood: lazy(() => import('@/features/nutrition/MyFoodSheet')),
   workout: lazy(() => import('@/features/body/WorkoutSheet')),

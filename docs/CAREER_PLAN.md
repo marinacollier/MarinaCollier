@@ -159,3 +159,20 @@ Etapas 1–7: **médio**. São cerca de 3 coleções novas, 3 extensões de tipo
 - **Responsividade:** screenshots a 390 px, claro e escuro.
 - **Regressão:** a suíte inteira (≈800 testes) mais `tsc` e o build.
 - **Login/logout e isolamento entre usuários:** **não aplicável** até existir backend com autenticação. Fica registrado como pendência explícita, não como "passou".
+
+## 10. Posts do LinkedIn — Modo A (implementado)
+
+`/carreira/posts` (link em Carreira 2027 → Esta semana). Coleção `execPosts`; lógica em `src/data/career/posts.ts`.
+
+- **Fluxo:**
+  1. ideia → rascunho → revisão → **aprovação da Marina**;
+  2. "Copiar texto e abrir LinkedIn";
+  3. ela publica à mão;
+  4. cola o link do post → publicado.
+- **Gate:** aprovar grava o texto normalizado + SHA-256. Qualquer mudança no texto tira a aprovação e volta pra rascunho. Só texto aprovado e intacto pode ser copiado ou registrado.
+- **Revisão:** não vai pra revisão (nem é aprovado) com texto vazio, mais de 3.000 caracteres, termo bloqueado, ou sem as duas checagens dela (sem confidencial; cargos e números reais).
+- **Termos bloqueados:** nomes de clientes e projetos internos ficam só no aparelho (`profile.execBlockedTerms`), nunca no código ou no seed.
+- **Registro:** registrar a publicação conta 1 "Conteúdo profissional" na semana (mesma meta 2×/semana do planner) e tem Desfazer.
+- **Métricas:** manuais por post (impressões, alcance, reações, comentários, reposts). A importação do XLSX do Analytics fica para depois de um arquivo real (layout não documentado).
+- **Sem LinkedIn API, sem scraping, sem automação do site logado.** Publicação via API oficial (`w_member_social`) é o Modo B, só arquitetado.
+- **e2e:** `e2e/linkedin-posts.mjs`.

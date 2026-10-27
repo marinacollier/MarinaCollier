@@ -21,7 +21,7 @@ import type { RemoteRow, SyncTransport } from './transport'
 export const PROFILE_COLLECTION = '_profile'
 export const PROFILE_ID = 'me'
 /** Profile fields that never leave this device (PIN hash / passkey id, sync state). */
-const DEVICE_ONLY: (keyof UserProfile)[] = ['privacyLock', 'cloudSync', 'cloudSyncSince', 'syncConflicts']
+const DEVICE_ONLY: (keyof UserProfile)[] = ['privacyLock', 'cloudSync', 'cloudSyncSince', 'syncConflicts', 'execBlockedTerms']
 
 export interface BaseEntry {
   v: number
