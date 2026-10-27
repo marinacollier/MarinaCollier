@@ -362,7 +362,7 @@ function markWorkoutDone(id: string, title: string, now: Now, facts: ReturnType<
   return runLogged(() => updateUndoable('workouts', id, patch), [eventDraft(now, { kind: 'done', title: `Treinou: ${title}${extra ? ` (${extra})` : ''}`, area: 'esportes', ref: { type: 'workout', id } })])
 }
 
-const DONE = /^(?:ja\s+)?(?:acabei de fazer|acabei de|terminei agora|fiz agora|terminei|fiz|conclui|finalizei|acabei|mandei|enviei|resolvi|entreguei|treinei|registra)\b\s*(?:de\s+)?(?:o |a |os |as |meu |minha )?(.*)$/
+const DONE = /^(?:(?:hoje|ontem)\s+)?(?:ja\s+)?(?:acabei de fazer|acabei de|terminei agora|fiz agora|terminei|fiz|conclui|finalizei|acabei|mandei|enviei|resolvi|entreguei|treinei|registra)\b\s*(?:de\s+)?(?:o |a |os |as |meu |minha )?(.*)$/
 
 function done(input: HandlerInput): LumosReply | undefined {
   const { db, n, now } = input

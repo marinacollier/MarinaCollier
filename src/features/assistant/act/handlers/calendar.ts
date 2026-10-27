@@ -95,7 +95,7 @@ function calendar(input: HandlerInput): LumosReply | undefined {
     }
     return calendarReply(input, d, SAVE.test(n) && draftComplete(d))
   }
-  if (!n || SKIP.test(n) || !looksLikeEvent(text)) return undefined
+  if (!n || SKIP.test(n) || !looksLikeEvent(text, now.date)) return undefined
   // Trainings belong to the training planner ("adiciona yoga sábado").
   if (lex(db, text, now.date).mods.length) return undefined
   const d = eventDraftFromText(text, now.date)

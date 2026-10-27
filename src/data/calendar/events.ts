@@ -185,10 +185,14 @@ export function readTime(text: string): { start?: TimeHM; end?: TimeHM } {
   return { start: `${pad(h)}:${min}` }
 }
 
-const EVENT_NOUN = /\b(aniversario|niver|festa|jantar|almoco|cafe da manha com|reuniao|consulta|casamento|show|exame|dentista|medico|medica|happy hour|churrasco|evento|palestra|workshop|call|entrevista|batizado|cha de|formatura|encontro|confraternizacao|apresentacao|peca|cinema|teatro)\b/
+const EVENT_NOUN = /\b(aniversario|niver|festa|jantar|almoco|cafe da manha com|reuniao|consulta|casamento|show|exame|dentista|medico|medica|happy hour|churrasco|evento|palestra|workshop|call|entrevista|batizado|cha de|formatura|encontro|confraternizacao|apresentacao|peca|cinema|teatro|papo|bate-papo|bate papo|conversa|mentoria|meeting|sync|alinhamento|compromisso|terapia|sessao de terapia|visita|videochamada|ligacao)\b/
+/** "hoje às 16h tenho X": a day + a time + "tenho" (not "tenho que/de", which is a task) is an appointment. */
+const HAVE_AT = /\b(?:tenho|vou ter|terei)\b(?!\s+(?:que|de)\b)/
 
-export function looksLikeEvent(text: string): boolean {
-  return EVENT_NOUN.test(fold(text))
+export function looksLikeEvent(text: string, today?: DateKey): boolean {
+  const n = fold(text)
+  if (EVENT_NOUN.test(n)) return true
+  return !!today && HAVE_AT.test(n) && !!readTime(text).start && !!readDate(text, today).date
 }
 
 /** Location after "no/na/em/local:" — her own words, never inferred. */
@@ -215,8 +219,10 @@ export function readTitle(text: string): string | undefined {
     .replace(re('<B>(?:dia\\s+)?\\d{1,2}\\/\\d{1,2}(?:\\/\\d{2,4})?<E>'), ' ')
     .replace(re('<B>(?:dia\\s+)?\\d{1,2}\\s*(?:de\\s+)?(?:janeiro|fevereiro|março|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)<E>(?:\\s+de\\s+\\d{4})?'), ' ')
     .replace(re('<B>dia\\s+\\d{1,2}<E>'), ' ')
-    .replace(re('<B>(?:às|as|a partir das)\\s+(?:\\d{1,2}(?::\\d{2}|h\\d{0,2})?|uma|duas|três|tres|quatro|cinco|seis|sete|oito|nove|dez|onze|doze)<E>(?:\\s+e\\s+(?:meia|quinze))?(?:\\s+(?:da noite|de noite|da tarde|da manhã|da manha))?'), ' ')
+    .replace(re('<B>(?:às|as|a partir das)\\s+(?:\\d{1,2}(?::\\d{2}|h\\d{0,2})?|uma|duas|três|tres|quatro|cinco|seis|sete|oito|nove|dez|onze|doze)<E>(?:\\s*horas?<E>)?(?:\\s+e\\s+(?:meia|quinze))?(?:\\s+(?:da noite|de noite|da tarde|da manhã|da manha))?'), ' ')
     .replace(re('<B>\\d{1,2}(?::\\d{2}|h\\d{0,2})(?:\\s*(?:-|–|às|as|até|ate)\\s*\\d{1,2}(?::\\d{2}|h\\d{0,2})?)?'), ' ')
+    .replace(re('<B>\\d{1,2}\\s*horas?<E>(?:\\s+(?:da noite|de noite|da tarde|da manhã|da manha))?'), ' ')
+    .replace(re('<B>(?:eu\\s+)?(?:tenho|vou ter|terei)<E>(?:\\s+(?:um|uma)<E>)?'), ' ')
     .replace(re('(?:<B>local\\s*:|<B>endereço\\s*:|<B>(?:no|na|em)\\s+(?=\\p{Lu}))[^,.\\n]*'), ' ')
     .replace(/[,.;:·•|]+/g, ' ')
     .replace(/\s+/g, ' ')

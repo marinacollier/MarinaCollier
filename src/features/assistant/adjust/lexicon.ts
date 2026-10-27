@@ -23,6 +23,8 @@ export const MODALITY_WORDS: Record<string, string[]> = {
   surf: ['surf', 'surfe', 'surfar', 'onda', 'ondas'],
   caminhada: ['caminhada', 'caminhar'],
   recuperacao: ['recuperacao', 'regenerativo'],
+  // "Outra atividade": its label words are in LABEL_STOP, so name it by the activity itself.
+  outro: ['atividade', 'atividades'],
 }
 
 /** Words of a modality label that are too generic to identify it. */
