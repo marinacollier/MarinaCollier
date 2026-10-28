@@ -39,6 +39,8 @@ export const ROUTES = {
   atelie: '/atelie',
   atelieWork: (id: string) => `/atelie/obra/${encodeURIComponent(id)}`,
   trips: '/viagens',
+  /** Meu Universo · Beauty & Fragrance (fragrâncias by default; other shelves as filters). */
+  universe: '/universo',
   trip: (id: string) => `/viagens/${id}`,
   weeklyReview: '/revisao',
   weekPlanner: '/semana',
@@ -96,6 +98,7 @@ export const routeTable: { path: string; Component: React.LazyExoticComponent<Re
   { path: '/biblia/marcar', Component: lazy(() => import('@/features/spiritual/MarkReadPage')) },
   { path: '/atelie', Component: lazy(() => import('@/features/atelie/AteliePage')) },
   { path: '/atelie/obra/:id', Component: lazy(() => import('@/features/atelie/WorkPage')) },
+  { path: '/universo', Component: lazy(() => import('@/features/universe/UniversePage')) },
   { path: '/viagens', Component: lazy(() => import('@/features/travel/TripsPage')) },
   { path: '/viagens/:id', Component: lazy(() => import('@/features/travel/TripPage')) },
   { path: '/semana', Component: lazy(() => import('@/features/planner/WeekPlannerPage')) },

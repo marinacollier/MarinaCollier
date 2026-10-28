@@ -400,6 +400,8 @@ export interface UserProfile {
   spiritualUpdatesApplied?: string[]
   /** "Importar estudo" history (what came in, when, which fields she kept). */
   spiritualImports?: SpiritualImportLog[]
+  /** Meu Universo: olfactory profile + makeup style (editable; seeded once when missing). */
+  scentProfile?: ScentProfile
   /** Lumos may apply small meal adjustments without asking (off by default; always undoable). */
   lumosAutoApplySmall?: boolean
   /** Last time Marina talked to Lumos / opened Home — ChangeFeed baseline ("o que mudou?"). */
@@ -2142,6 +2144,148 @@ export interface LiteraryAuthorProfile extends Entity {
   /** Development points she chose not to see as suggestions. */
   dismissedTips?: string[]
   source: 'seed' | 'marina'
+// ─── Meu Universo (biblioteca pessoal: perfumes primeiro) ───────────────────
+
+/** Shelves of her personal library. 'fragrancia' = a fragrance whose type (perfume, splash, hidratante…) is still to confirm. */
+export type UniverseCategory =
+  | 'perfume'
+  | 'body_splash'
+  | 'hidratante'
+  | 'oleo_corporal'
+  | 'fragrancia'
+  | 'maquiagem'
+  | 'skincare'
+  | 'cabelo'
+  | 'roupa'
+  | 'acessorio'
+  | 'marca'
+  | 'lugar'
+  | 'cafe'
+  | 'restaurante'
+  | 'equipamento'
+  | 'outro'
+
+/**
+ * Where the item stands in HER life — never an opinion. Owned = 'tenho' | 'em_uso' | 'comprado'.
+ * 'testado' / 'quero_testar' / 'desejo' are never shown as hers.
+ */
+export type UniverseOwnership = 'tenho' | 'em_uso' | 'comprado' | 'acabou' | 'nao_recomprar' | 'testado' | 'quero_testar' | 'desejo'
+
+/** What she thinks — separate from owning (loving it doesn't mean she has it). */
+export type UniverseOpinion = 'amei' | 'gostei' | 'indiferente' | 'nao_gostei'
+
+/** Where the notes come from: the product's documented notes, her own impression, or still to confirm. */
+export type UniverseNotesSource = 'documentado' | 'impressao' | 'a_confirmar'
+
+/** Usual occasions (habits, not restrictions). */
+export type UniverseOccasion =
+  | 'dia'
+  | 'noite'
+  | 'frio'
+  | 'calor'
+  | 'trabalho'
+  | 'reuniao'
+  | 'cotidiano'
+  | 'encontro'
+  | 'romance'
+  | 'lazer'
+  | 'praia'
+  | 'viagem'
+  | 'social'
+  | 'elegante'
+
+export interface UniverseItem extends Entity {
+  category: UniverseCategory
+  name: string
+  brand?: string
+  /** Version / concentration ("EDP", "Intense"). */
+  version?: string
+  ownership: UniverseOwnership
+  opinion?: UniverseOpinion
+  /** Only she marks a favorite. */
+  favorite?: boolean
+  /** Profile / olfactory families as she described them ("floral âmbar"). */
+  families?: string[]
+  notes?: string[]
+  notesSource?: UniverseNotesSource
+  /** Characteristics in her words ("Floral cremoso e envolvente"). */
+  description?: string
+  occasions?: UniverseOccasion[]
+  /** Occasion in her words ("Lazer em dias frios, encontros, noites elegantes"). */
+  occasionText?: string
+  /** Integer cents in `currency`. */
+  priceCents?: number
+  /** ISO 4217 ('BRL', 'ZAR', 'USD', 'EUR'). */
+  currency?: string
+  sizeMl?: number
+  country?: string
+  city?: string
+  store?: string
+  /** First time she tried it. */
+  experiencedOn?: DateKey
+  acquiredOn?: DateKey
+  remaining?: 'cheio' | 'mais_da_metade' | 'metade' | 'pouco' | 'vazio'
+  rebuy?: 'sim' | 'talvez' | 'nao'
+  /** Wishlist order inside its group (1 = first). */
+  wishPriority?: number
+  wishGroup?: string
+  /** Small JPEG data URL (optional). */
+  photo?: string
+  observations?: string
+  source: 'seed' | 'marina' | 'lumos'
+  /** false = something about it still needs her confirmation (see needsConfirmation). */
+  confirmed: boolean
+  /** Which fields to confirm: 'versao' | 'categoria' | 'marca' | 'notas' | 'volume' | 'duracao' | 'data'… */
+  needsConfirmation?: string[]
+  order: number
+}
+
+export type ScentLogStatus = 'quero_testar' | 'testado' | 'wishlist' | 'comprado' | 'em_uso' | 'terminado' | 'nao_recomprar'
+
+/** One olfactory experience (diário olfativo). Everything but the item and the date is optional. */
+export interface ScentLog extends Entity {
+  itemId: ID
+  date: DateKey
+  city?: string
+  country?: string
+  concentration?: string
+  testedOn?: 'papel' | 'pele'
+  firstImpression?: string
+  after30min?: string
+  after2h?: string
+  after6h?: string
+  /** 1–5 each. */
+  sweetness?: number
+  freshness?: number
+  creaminess?: number
+  intensity?: number
+  comfort?: number
+  projection?: string
+  duration?: string
+  idealOccasion?: string
+  /** 0–10. */
+  score?: number
+  verdict?: UniverseOpinion
+  wouldBuy?: 'sim' | 'talvez' | 'nao'
+  priceCents?: number
+  currency?: string
+  sizeMl?: number
+  status?: ScentLogStatus
+  notes?: string
+  source: 'seed' | 'marina' | 'lumos'
+  confirmed: boolean
+  needsConfirmation?: string[]
+}
+
+/** Her olfactory profile and beauty taste (editable in Meu Universo → DNA). */
+export interface ScentProfile {
+  summary?: string
+  familiesLiked: string[]
+  familiesLess: string[]
+  notesOfInterest: string[]
+  /** "Não são regras absolutas…" */
+  remarks?: string
+  makeupStyle?: string
 }
 
 // ─── Database shape ─────────────────────────────────────────────────────────
@@ -2234,6 +2378,8 @@ export interface DB {
   literaryVersions: LiteraryVersion[]
   literaryCollections: LiteraryCollection[]
   literaryProfile: LiteraryAuthorProfile[]
+  universeItems: UniverseItem[]
+  scentLogs: ScentLog[]
 }
 
 /** Keys of DB that hold arrays of entities. */
@@ -2283,6 +2429,8 @@ export type EntityType =
   | 'contact'
   | 'contract'
   | 'spiritualSession'
+  | 'universeItem'
+  | 'scentLog'
 
 export const ENTITY_COLLECTION: Record<EntityType, CollectionKey> = {
   brand: 'brands',
@@ -2318,6 +2466,8 @@ export const ENTITY_COLLECTION: Record<EntityType, CollectionKey> = {
   contact: 'contacts',
   contract: 'contracts',
   spiritualSession: 'spiritualSessions',
+  universeItem: 'universeItems',
+  scentLog: 'scentLogs',
 }
 
 // ─── Aliases from the product brief (no duplicated structures) ──────────────

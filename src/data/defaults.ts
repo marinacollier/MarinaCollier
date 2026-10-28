@@ -218,6 +218,8 @@ export function emptyDB(): DB {
     literaryVersions: [],
     literaryCollections: [],
     literaryProfile: [],
+    universeItems: [],
+    scentLogs: [],
   }
 }
 
