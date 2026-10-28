@@ -26,6 +26,7 @@ import {
 } from '@/lib/date'
 import { formatBRL } from '@/lib/money'
 import { normalize } from '@/lib/text'
+import { CATEGORY_LABEL as UNIVERSE_CATEGORY_LABEL, OPINION_LABEL as UNIVERSE_OPINION_LABEL, OWNERSHIP_LABEL as UNIVERSE_OWNERSHIP_LABEL } from '@/data/universe/model'
 import { routeAction, sheetAction, type ResultAction } from './actions'
 
 // ─── Public types ───────────────────────────────────────────────────────────
@@ -53,6 +54,7 @@ export type SearchDomain =
   | 'routine'
   | 'planning'
   | 'nutrition'
+  | 'universe'
 
 export interface SearchResult {
   /** Unique across domains: `${domain}:${entityId}`. */
@@ -115,6 +117,7 @@ export const DOMAIN_META: Record<SearchDomain, { label: string; emoji: string }>
   routine: { label: 'Rotinas', emoji: '☀️' },
   planning: { label: 'Planejamento', emoji: '🧭' },
   nutrition: { label: 'Nutrição', emoji: '🥗' },
+  universe: { label: 'Meu Universo', emoji: '🌸' },
 }
 
 /** Words that make a workout findable by the way Marina talks about it. */
@@ -538,6 +541,21 @@ function buildDocs(db: DB, today: DateKey): Doc[] {
       primary: field(b.title),
       secondary: field(b.author, b.category, b.notes),
       action: routeAction(ROUTES.book(b.id)),
+    })
+  }
+
+  // Meu Universo: what she has, tried or wants (the subtitle always says which — never confused).
+  for (const i of db.universeItems ?? []) {
+    docs.push({
+      domain: 'universe',
+      id: i.id,
+      title: [i.brand, i.name, i.version].filter(Boolean).join(' '),
+      emoji: '🌸',
+      subtitle: join(UNIVERSE_CATEGORY_LABEL[i.category], UNIVERSE_OWNERSHIP_LABEL[i.ownership].toLowerCase(), i.opinion ? UNIVERSE_OPINION_LABEL[i.opinion].toLowerCase() : undefined),
+      primary: field(i.name, i.brand),
+      secondary: field(i.families?.join(' '), i.notes?.join(' '), i.description, i.occasionText, i.country, i.city, i.observations),
+      inactive: i.ownership === 'acabou' || i.ownership === 'nao_recomprar',
+      action: routeAction(`${ROUTES.universe}?item=${encodeURIComponent(i.id)}`),
     })
   }
 

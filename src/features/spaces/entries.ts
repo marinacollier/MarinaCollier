@@ -11,6 +11,7 @@ import { isTaskOpen, modalityOf, petTasksDue, readingNow, studyingNow, upcomingT
 import type { DateKey, DB, ModuleId, Tone } from '@/data/types'
 import { addDays, diffDays } from '@/lib/date'
 import { nextSession } from '@/data/spiritual/model'
+import { collection, FRAGRANCE_CATEGORIES } from '@/data/universe/model'
 
 export interface SpaceEntry {
   key: string
@@ -124,6 +125,11 @@ function vida(db: DB, today: DateKey): SpaceEntry[] {
   if (db.spiritualPlans.length) {
     const next = nextSession(db)
     out.push({ key: 'biblia', label: 'Bíblia, Graça & Liberdade', emoji: '🕊️', to: ROUTES.bible, tone: 'plum', hint: next ? `próximo: ${next.scriptureReference}` : undefined })
+  }
+  const universe = db.universeItems ?? []
+  if (universe.length) {
+    const fragrances = collection(db, FRAGRANCE_CATEGORIES).length
+    out.push({ key: 'universo', label: 'Meu Universo', emoji: '🌸', to: ROUTES.universe, tone: 'plum', hint: fragrances ? plural(fragrances, 'fragrância na coleção', 'fragrâncias na coleção') : 'beauty & fragrance' })
   }
   const admin = db.tasks.filter((t) => t.context === 'vida_real' && isTaskOpen(t))
   if (admin.length) out.push({ key: 'casa', label: 'Casa & admin', emoji: '🏡', to: ROUTES.lifeAdmin, tone: 'sand', module: 'vida_real', hint: plural(admin.length, 'coisa aberta', 'coisas abertas') })
