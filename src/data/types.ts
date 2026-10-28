@@ -2144,6 +2144,8 @@ export interface LiteraryAuthorProfile extends Entity {
   /** Development points she chose not to see as suggestions. */
   dismissedTips?: string[]
   source: 'seed' | 'marina'
+}
+
 // ─── Meu Universo (biblioteca pessoal: perfumes primeiro) ───────────────────
 
 /** Shelves of her personal library. 'fragrancia' = a fragrance whose type (perfume, splash, hidratante…) is still to confirm. */
