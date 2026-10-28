@@ -15,6 +15,7 @@ import { emptyDB, migrate } from './defaults'
 import { buildSeed } from './seed'
 import { applyLifeSeed } from './seed/migrate'
 import { applySpiritualSeed } from './seed/spiritual'
+import { applyAtelieSeed } from './seed/atelie'
 import { applyUgcCrmSeed } from './seed/ugc-crm'
 import { migrateUgc } from './ugc/migrate'
 import { createIndexedDBAdapter, type StorageAdapter } from './storage'
@@ -253,7 +254,7 @@ export async function hydrate(storage: StorageAdapter = createIndexedDBAdapter()
     }
   }
   const migrated = raw ? migrate(raw) : null
-  const db = migrateUgc(applySpiritualSeed(migrated ? applyLifeSeed(migrated, todayKey()) : applyUgcCrmSeed(buildSeed(todayKey()))))
+  const db = applyAtelieSeed(migrateUgc(applySpiritualSeed(migrated ? applyLifeSeed(migrated, todayKey()) : applyUgcCrmSeed(buildSeed(todayKey())))))
   dirty = false
   freshSeedAt = !raw && !loadFailed ? new Date().toISOString() : null
   if (loadFailed) {

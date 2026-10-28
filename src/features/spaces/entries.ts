@@ -6,6 +6,7 @@
  * real project from the data; names are never hardcoded. Modules Marina hid in Design stay hidden.
  */
 import { ROUTES } from '@/app/routes'
+import { areaLocked } from '@/app/lock-store'
 import { contextWorkouts } from '@/data/fuel'
 import { isTaskOpen, modalityOf, petTasksDue, readingNow, studyingNow, upcomingTrips, waitingFor } from '@/data/selectors'
 import type { DateKey, DB, ModuleId, Tone } from '@/data/types'
@@ -101,6 +102,13 @@ function aprender(db: DB): SpaceEntry[] {
   }
   const refs = db.studyItems.filter((s) => s.reference || s.kind === 'newsletter')
   if (refs.length) out.push({ key: 'salvos', label: 'Conteúdos salvos', emoji: '🔖', to: ROUTES.saved, tone: 'sand', module: 'estudos', hint: refs.map((r) => r.source || r.title).slice(0, 2).join(' · ') })
+  // Ateliê Literário: private writing. The hint is a count only (never a title or a line of text); nothing when locked.
+  const works = db.literaryWorks ?? []
+  if (works.length || db.literaryProfile?.length) {
+    const lapidacao = works.filter((w) => w.status === 'lapidacao').length
+    const hint = areaLocked(db.profile.privacyLock, 'atelie') ? undefined : lapidacao ? `${plural(lapidacao, 'escrita', 'escritas')} em lapidação` : works.length ? plural(works.length, 'obra', 'obras') : undefined
+    out.push({ key: 'atelie', label: 'Ateliê Literário', emoji: '🖋️', to: ROUTES.atelie, tone: 'plum', hint })
+  }
   return out
 }
 

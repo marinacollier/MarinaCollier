@@ -7,7 +7,7 @@ import type { LockArea } from '@/data/types'
 import { biometricAvailable, verifyBiometric, verifyPin } from '@/lib/lock'
 import { haptic } from '@/lib/haptics'
 
-const AREA_LABEL: Record<LockArea, string> = { dinheiro: 'Dinheiro', carreira: 'Carreira' }
+const AREA_LABEL: Record<LockArea, string> = { dinheiro: 'Dinheiro', carreira: 'Carreira', atelie: 'Ateliê Literário' }
 
 export function LockGate({ area, children, compact }: { area: LockArea; children: ReactNode; compact?: boolean }) {
   const lock = useDB((db) => db.profile.privacyLock)

@@ -126,6 +126,10 @@ export const COLLECTION_LABELS: Partial<Record<CollectionKey, string>> = {
   opportunities: 'Oportunidades',
   contacts: 'Contatos profissionais',
   execPosts: 'Posts do LinkedIn',
+  literaryWorks: 'Ateliê: obras',
+  literaryVersions: 'Ateliê: versões dos textos',
+  literaryCollections: 'Ateliê: coleções',
+  literaryProfile: 'Ateliê: perfil de autora',
 }
 
 export interface BackupPreview {

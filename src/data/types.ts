@@ -345,7 +345,7 @@ export interface FeatureFlags {
 
 export type ThemePref = 'light' | 'dark' | 'system'
 
-export type LockArea = 'dinheiro' | 'carreira'
+export type LockArea = 'dinheiro' | 'carreira' | 'atelie'
 
 export interface PrivacyLock {
   enabled: boolean
@@ -2054,6 +2054,96 @@ export interface SpiritualPrayer extends Entity {
   category: SpiritualPrayerCategory
 }
 
+// ─── Ateliê Literário (private: never synced, always in her backup) ────────
+
+/** Editorial state. "Versão final aprovada" only after SHE approves a version in the app. */
+export type LiteraryStatus = 'ideia' | 'rascunho' | 'lapidacao' | 'final_aprovada' | 'publicado' | 'arquivado'
+/**
+ * A version that exists OUTSIDE the app and was identified, but whose approval she has not confirmed here.
+ * Never the same thing as `final_aprovada`.
+ */
+export type LiteraryProvenance = 'versao_anterior' | 'versao_final_anterior' | 'versao_trabalhada'
+/** How a piece started. 'acervo' = registered from her existing work. */
+export type LiteraryOrigin = 'livre' | 'fragmento' | 'imagem' | 'experiencia' | 'tema' | 'exercicio' | 'acervo'
+
+export interface LiteraryWork extends Entity {
+  title: string
+  /** "título provisório". */
+  provisionalTitle?: boolean
+  subtitle?: string
+  /** What she knows about when it was written, in her words ("jul/2026 (dia a confirmar)", "data a confirmar"). */
+  dateLabel?: string
+  /** Only when the exact day is known. */
+  date?: DateKey
+  /** Partial reference when only the month is known ('2026-07'). */
+  month?: string
+  genre?: string
+  status: LiteraryStatus
+  /** Her original words for the status when registering the work ("em desenvolvimento"). */
+  statusNote?: string
+  provenance?: LiteraryProvenance
+  provenanceNote?: string
+  themes: string[]
+  /** Recurring images and symbols (tags she controls). */
+  symbols: string[]
+  /** A sentence about the central image, when there is one. */
+  centralImage?: string
+  /** The idea / concept behind the piece (not the text). */
+  concept?: string
+  collectionIds: ID[]
+  authorNotes?: string
+  creationContext?: string
+  publishedAt?: DateKey
+  publishedLink?: string
+  /** No full text in the app yet (only a record). Never filled by reconstructing from excerpts. */
+  textPending: boolean
+  /** Short known passages, kept as excerpts — never as the text. */
+  excerpts: string[]
+  favoriteVersionId?: ID
+  approvedVersionId?: ID
+  origin?: LiteraryOrigin
+  /** Laboratório: which exercise started it, and what she learned. */
+  exerciseId?: string
+  learned?: string
+  /** Last time the text itself changed. */
+  lastEditedAt?: ISODateTime
+  source: 'seed' | 'marina'
+}
+
+/** One recoverable state of a text. Approved versions are frozen (never edited, never removed by the app). */
+export interface LiteraryVersion extends Entity {
+  workId: ID
+  body: string
+  note?: string
+  wordCount: number
+  source: 'marina'
+  favorite?: boolean
+  /** The working draft autosave may keep updating. A checkpoint (save / leaving the editor) clears it. */
+  draft?: boolean
+  approvedAt?: ISODateTime
+  restoredFromId?: ID
+}
+
+export interface LiteraryCollection extends Entity {
+  name: string
+  description?: string
+  themes: string[]
+  /** Ordered. */
+  workIds: ID[]
+  source: 'seed' | 'marina'
+}
+
+/** Her author profile (editable). Development points feed one optional suggestion — never a task. */
+export interface LiteraryAuthorProfile extends Entity {
+  identity: string
+  strengths: string[]
+  developmentPoints: string[]
+  goal: string
+  /** Development points she chose not to see as suggestions. */
+  dismissedTips?: string[]
+  source: 'seed' | 'marina'
+}
+
 // ─── Database shape ─────────────────────────────────────────────────────────
 
 export interface DB {
@@ -2140,6 +2230,10 @@ export interface DB {
   spiritualStudies: SpiritualStudy[]
   spiritualJournal: SpiritualJournalEntry[]
   spiritualPrayers: SpiritualPrayer[]
+  literaryWorks: LiteraryWork[]
+  literaryVersions: LiteraryVersion[]
+  literaryCollections: LiteraryCollection[]
+  literaryProfile: LiteraryAuthorProfile[]
 }
 
 /** Keys of DB that hold arrays of entities. */

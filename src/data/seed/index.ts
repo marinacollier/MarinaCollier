@@ -23,6 +23,7 @@ import { seedMemory } from './memory'
 import { seedCareer } from '@/features/career/seed'
 import { seedBacklog } from './backlog'
 import { seedSpiritual } from './spiritual'
+import { seedAtelie } from './atelie'
 
 const FEATURE_SEEDS: FeatureSeed[] = [
   seedProfile,
@@ -43,6 +44,7 @@ const FEATURE_SEEDS: FeatureSeed[] = [
   seedMemory,
   seedBacklog,
   seedSpiritual,
+  seedAtelie,
 ]
 
 export function buildSeed(today: DateKey): DB {

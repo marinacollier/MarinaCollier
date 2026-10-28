@@ -11,6 +11,7 @@ import { cn } from '@/lib/cn'
 const AREAS: { id: LockArea; label: string }[] = [
   { id: 'dinheiro', label: 'Dinheiro e contratos' },
   { id: 'carreira', label: 'Carreira' },
+  { id: 'atelie', label: 'Ateliê Literário' },
 ]
 
 const PinInput = ({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) => (

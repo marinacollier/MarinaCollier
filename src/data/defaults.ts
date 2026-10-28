@@ -214,6 +214,10 @@ export function emptyDB(): DB {
     spiritualStudies: [],
     spiritualJournal: [],
     spiritualPrayers: [],
+    literaryWorks: [],
+    literaryVersions: [],
+    literaryCollections: [],
+    literaryProfile: [],
   }
 }
 

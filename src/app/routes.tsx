@@ -35,6 +35,9 @@ export const ROUTES = {
   bibleSession: (id: string) => `/biblia/estudo/${encodeURIComponent(id)}`,
   biblePrayers: '/biblia/oracoes',
   bibleMarkRead: '/biblia/marcar',
+  /** Ateliê Literário (private writing; lockable). */
+  atelie: '/atelie',
+  atelieWork: (id: string) => `/atelie/obra/${encodeURIComponent(id)}`,
   trips: '/viagens',
   trip: (id: string) => `/viagens/${id}`,
   weeklyReview: '/revisao',
@@ -91,6 +94,8 @@ export const routeTable: { path: string; Component: React.LazyExoticComponent<Re
   { path: '/biblia/oracoes', Component: lazy(() => import('@/features/spiritual/PrayersPage')) },
   { path: '/biblia/importar', Component: lazy(() => import('@/features/spiritual/ImportStudyPage')) },
   { path: '/biblia/marcar', Component: lazy(() => import('@/features/spiritual/MarkReadPage')) },
+  { path: '/atelie', Component: lazy(() => import('@/features/atelie/AteliePage')) },
+  { path: '/atelie/obra/:id', Component: lazy(() => import('@/features/atelie/WorkPage')) },
   { path: '/viagens', Component: lazy(() => import('@/features/travel/TripsPage')) },
   { path: '/viagens/:id', Component: lazy(() => import('@/features/travel/TripPage')) },
   { path: '/semana', Component: lazy(() => import('@/features/planner/WeekPlannerPage')) },
