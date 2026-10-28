@@ -48,8 +48,8 @@ expansões, **todas aditivas**, e com uma regra nova de privacidade antes de qua
   ainda não confirmou, `confirmed: false`. A interface mostra "a confirmar". A Lumos nunca promove sozinha.
 - **Possuir ≠ gostar ≠ desejar.** Em Meu Universo, posse (`tenho`, `acabou`, `desejo`…) e opinião (`amei`, `gostei`…)
   são campos separados.
-- **Privacidade por coleção.** `PRIVATE_COLLECTIONS` (Ateliê e, depois, Diário) não sobem para nenhuma nuvem a menos
-  que ela ligue isso; entram no backup só quando ela marca "incluir escrita privada".
+- **Privacidade por coleção.** `PRIVATE_COLLECTIONS` (Ateliê e, depois, Diário) nunca sobem para a nuvem; ficam no
+  aparelho e no arquivo de backup dela (a cópia dela), para uma restauração nunca perder um texto.
 - **Sem inventar.** Nada de preço ao vivo, clima, disponibilidade, notas olfativas não confirmadas ou texto
   literário reconstruído. Campo vazio + "pendente" é melhor do que um valor inventado.
 - **Código convencional primeiro.** Cadastro, filtros, busca, totais, conflitos e exportação sem IA. IA só onde
@@ -64,7 +64,7 @@ expansões, **todas aditivas**, e com uma regra nova de privacidade antes de qua
 | 0 | Esta auditoria + P0 da Lumos | feito |
 | 1a | **Expedição África do Sul** sobre a viagem existente | em construção |
 | 1b | **Meu Universo · Beauty & Fragrance** | em construção |
-| 1c | **Ateliê Literário** (biblioteca, editor, versões, acervo inicial, coleções, painel com dados reais) | em construção |
+| 1c | **Ateliê Literário** (biblioteca, editor, versões, acervo inicial, coleções, painel com dados reais) | feito 28/10 |
 | 2 | Learning Engine (Skill, Evidence, revisão espaçada) sobre Estudos e Livros | depois da validação dela |
 | 3 | English Coach (correção, error log, revisão espaçada; tradutor só com API configurada) | idem |
 | 4 | Meu Universo: outras estantes (maquiagem, skincare, lugares) | idem |
