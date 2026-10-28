@@ -21,6 +21,8 @@ import {
   type ItemStatus,
   type PaymentStatus,
 } from './selectors'
+import { ExpeditionFields, cleanDraft, draftOf, type ExpeditionDraft } from './expedition/ExpeditionFields'
+import { bookingPatch } from './expedition/logic'
 
 export default function TripItemSheet({ id, tripId, section: sectionProp, group: groupProp }: SheetProps<'tripItem'>) {
   const trips = useDB((db) => db.trips)
@@ -42,9 +44,13 @@ export default function TripItemSheet({ id, tripId, section: sectionProp, group:
   const [url, setUrl] = useState(existing?.url ?? '')
   const [amountCents, setAmountCents] = useState(existing?.amountCents)
   const [code, setCode] = useState(existing?.confirmationCode ?? '')
+  const [x, setX] = useState<ExpeditionDraft>(() => draftOf(existing))
+  const patchX = (p: ExpeditionDraft) => setX((d) => ({ ...d, ...p }))
 
   const groups = useMemo(() => (trip ? groupsOfTrip(itemsOfTrip(allItems, trip)) : []), [allItems, trip])
   const showTripPicker = !existing && !tripId && trips.length > 1
+  const tripRec = trips.find((t) => t.id === trip)
+  const showExpedition = !!tripRec?.expedition || Object.keys(draftOf(existing)).length > 0
 
   const save = () => {
     const t = title.trim()
@@ -64,6 +70,7 @@ export default function TripItemSheet({ id, tripId, section: sectionProp, group:
       url: u ? (/^https?:\/\//i.test(u) ? u : `https://${u}`) : undefined,
       amountCents,
       confirmationCode: code.trim() || undefined,
+      ...(showExpedition ? cleanDraft(x) : {}),
     } satisfies Partial<TripItem>
     if (existing) {
       actions.update('tripItems', existing.id, patch)
@@ -182,7 +189,7 @@ export default function TripItemSheet({ id, tripId, section: sectionProp, group:
         </div>
       )}
 
-      <MoreOptions defaultOpen={!!(existing && (existing.date || existing.notes || existing.url || existing.amountCents != null || existing.confirmationCode))}>
+      <MoreOptions defaultOpen={!!(existing && (existing.date || existing.notes || existing.url || existing.amountCents != null || existing.confirmationCode)) || (!!tripRec?.expedition && !existing)}>
         <div className="grid grid-cols-2 gap-2.5">
           <Field label="Data">
             <DateInput value={date} onChange={setDate} />
@@ -211,6 +218,27 @@ export default function TripItemSheet({ id, tripId, section: sectionProp, group:
           </Field>
         </div>
       </MoreOptions>
+
+      {showExpedition && tripRec && (
+        <section className="pt-1">
+          <div className="eyebrow mb-2.5 px-0.5">expedição</div>
+          <ExpeditionFields
+            trip={tripRec}
+            draft={x}
+            set={patchX}
+            when={{ date, endDate, time: date ? time : undefined, section }}
+            status={status}
+            onBooking={(b) => {
+              patchX({ booking: b })
+              if (!b) return
+              const bp = bookingPatch(b)
+              setStatus(bp.status!)
+              setStatusTouched(true)
+              if (bp.paymentStatus) setPayment(bp.paymentStatus)
+            }}
+          />
+        </section>
+      )}
     </SheetLayout>
   )
 }

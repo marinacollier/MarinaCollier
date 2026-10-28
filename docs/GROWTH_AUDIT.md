@@ -62,8 +62,8 @@ expansões, **todas aditivas**, e com uma regra nova de privacidade antes de qua
 | Etapa | Entrega | Situação |
 |---|---|---|
 | 0 | Esta auditoria + P0 da Lumos | feito |
-| 1a | **Expedição África do Sul** sobre a viagem existente | em construção |
-| 1b | **Meu Universo · Beauty & Fragrance** | em construção |
+| 1a | **Expedição África do Sul** sobre a viagem existente | feito 28/10 |
+| 1b | **Meu Universo · Beauty & Fragrance** | feito 28/10 |
 | 1c | **Ateliê Literário** (biblioteca, editor, versões, acervo inicial, coleções, painel com dados reais) | feito 28/10 |
 | 2 | Learning Engine (Skill, Evidence, revisão espaçada) sobre Estudos e Livros | depois da validação dela |
 | 3 | English Coach (correção, error log, revisão espaçada; tradutor só com API configurada) | idem |

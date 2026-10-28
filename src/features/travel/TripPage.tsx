@@ -13,6 +13,8 @@ import { formatBRL } from '@/lib/money'
 import { formatShortDate } from '@/lib/date'
 import { Postcard, toneVars } from './Postcard'
 import { ReviewItems, SectionItems } from './TripItems'
+import { EXPEDITION_TABS, ExpeditionView, type ExpeditionTab } from './expedition/Views'
+import { pendencies } from './expedition/logic'
 import {
   TRIP_STATUS_LABEL,
   TRIP_TABS,
@@ -29,17 +31,21 @@ import {
   tripCountdown,
   tripDatesLabel,
   tripExpenses,
+  tripPhase,
   type TripTab,
 } from './selectors'
 
 /** Three tabs on top; the trip's sections inside each are chips (?s= still names the section). */
-type TripGroup = 'geral' | 'itens' | 'mais'
+type TripGroup = 'expedicao' | 'geral' | 'itens' | 'mais'
 const TRIP_GROUPS: { value: TripGroup; label: string; sections: TripTab[] }[] = [
   { value: 'geral', label: 'Geral', sections: ['visao', 'revisar', 'antes_de_ir'] },
   { value: 'itens', label: 'Itens', sections: ['roteiro', 'voo', 'hospedagem', 'transporte', 'reserva', 'quero_ir', 'comida', 'esporte', 'mala', 'comprar', 'documento'] },
   { value: 'mais', label: 'Gastos e notas', sections: ['orcamento', 'gastos', 'notas', 'links', 'emergencia'] },
 ]
-const groupOfTab = (t: TripTab) => TRIP_GROUPS.find((g) => g.sections.includes(t)) ?? TRIP_GROUPS[0]
+/** Trips with Expedição settings get a first tab with the day-by-day manager. */
+const EXPEDITION_GROUP: (typeof TRIP_GROUPS)[number] = { value: 'expedicao', label: 'Expedição', sections: EXPEDITION_TABS as TripTab[] }
+const groupsOf = (trip?: Trip) => (trip?.expedition ? [EXPEDITION_GROUP, ...TRIP_GROUPS] : TRIP_GROUPS)
+const isExpeditionTab = (t: TripTab): t is ExpeditionTab => (EXPEDITION_TABS as TripTab[]).includes(t)
 
 export default function TripPage() {
   const { id } = useParams()
@@ -53,9 +59,14 @@ export default function TripPage() {
   const counts = useMemo(() => sectionCounts(items), [items])
   const progress = useMemo(() => checklistProgress(items), [items])
   const [params, setParams] = useSearchParams()
-  const tab = (TRIP_TABS.some((t) => t.id === params.get('s')) ? params.get('s') : 'visao') as TripTab
+  const groups = groupsOf(trip)
+  // During an Expedição the trip opens on "Hoje"; otherwise on the overview.
+  const home: TripTab = trip?.expedition && tripPhase(trip, today) === 'em_viagem' ? 'hoje' : 'visao'
+  const asked = params.get('s') as TripTab | null
+  const tab = (asked && TRIP_TABS.some((t) => t.id === asked) && groups.some((g) => g.sections.includes(asked)) ? asked : home) as TripTab
   const group = params.get('g') ?? undefined
-  const setTab = (t: TripTab, g?: string) => setParams(t === 'visao' ? {} : g ? { s: t, g } : { s: t }, { replace: true })
+  const setTab = (t: TripTab, g?: string) => setParams(t === home ? {} : g ? { s: t, g } : { s: t }, { replace: true })
+  const pend = useMemo(() => (trip?.expedition ? pendencies(trip, items, today).total : 0), [trip, items, today])
   const setGroup = (g?: string) => setTab(tab, g)
   const toReview = useMemo(() => reviewItems(items).length, [items])
   const isNext = useMemo(() => tripBuckets(trips, today).next?.id === id, [trips, today, id])
@@ -81,7 +92,7 @@ export default function TripPage() {
   }
 
   const meta = tabMeta(tab)
-  const tabGroup = groupOfTab(tab)
+  const tabGroup = groups.find((g) => g.sections.includes(tab)) ?? groups[0]
 
   return (
     <Page>
@@ -118,10 +129,10 @@ export default function TripPage() {
 
       {/* Section navigation: 3 tabs, then the sections of the current tab as chips */}
       <div className="sticky top-0 z-20 -mx-4 mt-4 bg-bg/92 backdrop-blur-md">
-        <Segmented variant="tabs" className="px-4" value={tabGroup.value} onChange={(g) => setTab(TRIP_GROUPS.find((x) => x.value === g)!.sections[0])} options={TRIP_GROUPS} />
+        <Segmented variant="tabs" className="px-4" value={tabGroup.value} onChange={(g) => setTab(groups.find((x) => x.value === g)!.sections[0])} options={groups} />
         <div ref={navRef} className="flex gap-2 overflow-x-auto no-scrollbar px-4 py-2.5" aria-label="Seções da viagem">
           {TRIP_TABS.filter((t) => tabGroup.sections.includes(t.id)).map((t) => {
-            const c = t.items ? counts[t.id as TripSection] : t.id === 'revisar' ? { total: toReview } : undefined
+            const c = t.items ? counts[t.id as TripSection] : t.id === 'revisar' ? { total: toReview } : t.id === 'pendencias' ? { total: pend } : undefined
             const active = t.id === tab
             return (
               <button
@@ -145,7 +156,9 @@ export default function TripPage() {
       </div>
 
       <motion.div key={tab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22 }} className="mt-3">
-        {meta.items ? (
+        {isExpeditionTab(tab) && trip.expedition ? (
+          <ExpeditionView tab={tab} trip={trip as Trip & { expedition: NonNullable<Trip['expedition']> }} items={items} expenses={expenses} onGo={setTab} />
+        ) : meta.items ? (
           <SectionItems trip={trip} section={tab as TripSection} items={items} group={group} onGroup={setGroup} />
         ) : tab === 'revisar' ? (
           <ReviewItems items={items} group={group} onGroup={setGroup} />
