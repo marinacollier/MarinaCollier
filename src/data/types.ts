@@ -416,6 +416,8 @@ export interface UserProfile {
   cloudSync?: boolean
   /** When the first upload was verified on this device. Device-only. */
   cloudSyncSince?: ISODateTime
+  /** Ateliê/private writing also goes to her owner-only Claude store (default on: the app's device storage gets wiped). */
+  privateWritingCloud?: boolean
   /** Both this device and another edited the same record: the newer version was kept, the other is here for review. Device-only. */
   syncConflicts?: SyncConflict[]
   /**

@@ -66,6 +66,8 @@ export interface SyncDeps {
   commitDB(db: DB): Promise<void>
   now?(): number
   newId?(): string
+  /** Also sync the private writing collections (only to her own owner-only store; never Supabase). */
+  includePrivate?(): boolean
 }
 
 export interface SyncResult {
@@ -116,8 +118,8 @@ export function emptyMeta(): SyncMeta {
 }
 
 /** DB keys holding entity arrays (everything but schemaVersion/profile), minus the device-only private writing. */
-export function syncCollections(db: DB): string[] {
-  return Object.keys(db).filter((k) => Array.isArray((db as unknown as Record<string, unknown>)[k]) && !isPrivateCollection(k))
+export function syncCollections(db: DB, includePrivate = false): string[] {
+  return Object.keys(db).filter((k) => Array.isArray((db as unknown as Record<string, unknown>)[k]) && (includePrivate || !isPrivateCollection(k)))
 }
 
 export function profileForCloud(p: UserProfile): Record<string, unknown> {
@@ -126,10 +128,10 @@ export function profileForCloud(p: UserProfile): Record<string, unknown> {
   return out
 }
 
-function localRecords(db: DB): Map<string, LocalRec> {
+function localRecords(db: DB, includePrivate = false): Map<string, LocalRec> {
   const map = new Map<string, LocalRec>()
   const raw = db as unknown as Record<string, unknown>
-  for (const c of syncCollections(db)) {
+  for (const c of syncCollections(db, includePrivate)) {
     for (const it of raw[c] as Record<string, unknown>[]) {
       if (!it || typeof it.id !== 'string') continue
       map.set(recordKey(c, it.id), { collection: c, id: it.id, data: it, h: hashData(it) })
@@ -142,6 +144,7 @@ function localRecords(db: DB): Map<string, LocalRec> {
 
 export function createSyncEngine(deps: SyncDeps) {
   const now = deps.now ?? Date.now
+  const priv = () => deps.includePrivate?.() ?? false
   const newId = deps.newId ?? (() => Math.random().toString(36).slice(2) + now().toString(36))
   let meta: SyncMeta | null = null
   let chain: Promise<unknown> = Promise.resolve()
@@ -207,8 +210,8 @@ export function createSyncEngine(deps: SyncDeps) {
   }
 
   function merge(m: SyncMeta, db: DB, rows: RemoteRow[]): { next: DB; conflicts: number } {
-    const known = new Set(syncCollections(db))
-    const locals = localRecords(db)
+    const known = new Set(syncCollections(db, priv()))
+    const locals = localRecords(db, priv())
     const changes = new Map<string, Map<string, Record<string, unknown> | null>>()
     let profile: Record<string, unknown> | undefined
     const conflicts: SyncConflict[] = []
@@ -291,7 +294,7 @@ export function createSyncEngine(deps: SyncDeps) {
     const inCloud = new Set(rows.map((r) => recordKey(r.collection, r.id)))
     const raw = db as unknown as Record<string, unknown>
     let next: Record<string, unknown> | null = null
-    for (const c of syncCollections(db)) {
+    for (const c of syncCollections(db, priv())) {
       const list = raw[c] as Record<string, unknown>[]
       const kept = list.filter((it) => {
         if (!it || typeof it.id !== 'string') return true
@@ -308,7 +311,7 @@ export function createSyncEngine(deps: SyncDeps) {
   }
 
   async function pushOutbox(m: SyncMeta): Promise<{ pushed: number; skipped: string[] }> {
-    const locals = localRecords(deps.getDB())
+    const locals = localRecords(deps.getDB(), priv())
     diff(m, locals)
     const entries = Object.values(m.outbox)
     const BATCH = 200
@@ -338,7 +341,7 @@ export function createSyncEngine(deps: SyncDeps) {
     refreshOutbox(): Promise<number> {
       return serial(async () => {
         const m = await loadMeta()
-        if (m.migratedAt && diff(m, localRecords(deps.getDB()))) await deps.meta.save(m)
+        if (m.migratedAt && diff(m, localRecords(deps.getDB(), priv()))) await deps.meta.save(m)
         return Object.keys(m.outbox).length
       })
     },
@@ -360,7 +363,7 @@ export function createSyncEngine(deps: SyncDeps) {
         const rows = await deps.api.pull(m.cursor)
         // Read the DB and merge with no await in between, so an edit made meanwhile is never overwritten.
         const db = deps.getDB()
-        diff(m, localRecords(db))
+        diff(m, localRecords(db, priv()))
         const merged = merge(m, db, rows)
         const conflicts = merged.conflicts
         let next = merged.next
@@ -397,7 +400,7 @@ export function createSyncEngine(deps: SyncDeps) {
      */
     uploadAll(): Promise<MigrationReport> {
       return serial(async () => {
-        const locals = localRecords(deps.getDB())
+        const locals = localRecords(deps.getDB(), priv())
         const sent = new Map<string, number>()
         const rows: RemoteRow[] = []
         for (const [key, l] of locals) {
@@ -437,7 +440,7 @@ export function createSyncEngine(deps: SyncDeps) {
         if (ok) {
           // Cursor 0: the first sync re-reads everything once and brings in what only the cloud had.
           meta = { cursor: 0, base, outbox: {}, migratedAt: new Date(now()).toISOString() }
-          diff(meta, localRecords(deps.getDB()))
+          diff(meta, localRecords(deps.getDB(), priv()))
           await deps.meta.save(meta)
         }
         return { ok, uploaded: rows.length - tooBig.size, matched, collections: [...counts.values()].sort((a, b) => a.collection.localeCompare(b.collection)), issues, onlyInCloud }

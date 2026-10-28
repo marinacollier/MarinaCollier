@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react'
 import { Cloud, CloudOff, RefreshCw } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { ROUTES } from '@/app/routes'
-import { Button, Card, SectionTitle } from '@/components/ui'
+import { Button, Card, Checkbox, SectionTitle } from '@/components/ui'
 import { actions, useDB } from '@/data/store'
 import type { CollectionKey, ItemOf, SyncConflict } from '@/data/types'
 import { artifactActive, cloudLabel, cloudReady, hasMigrated, migrateToCloud, pauseCloudSync, resumeCloudSync, syncNow, useCloudSync } from '@/data/sync'
@@ -53,6 +53,7 @@ export function CloudErrorDot() {
 function ClaudeCloudCard() {
   const s = useCloudSync()
   const [busy, setBusy] = useState(false)
+  const privateCloud = useDB((db) => db.profile.privateWritingCloud !== false)
   return (
     <>
       <SectionTitle>Nuvem</SectionTitle>
@@ -63,6 +64,16 @@ function ClaudeCloudCard() {
         <p className="text-[14px] text-ink-2 mt-2 leading-snug">
           Seus dados ficam salvos no armazenamento do Claude, só para você, e neste aparelho. Sincroniza sozinho, entre aparelhos, sem login.
         </p>
+        <Checkbox
+          className="mt-3"
+          size="sm"
+          checked={privateCloud}
+          onChange={(on) => {
+            actions.setProfile({ privateWritingCloud: on })
+            void syncNow()
+          }}
+          label="Incluir os textos do Ateliê (só você lê; sem isso, eles somem se o app do Claude limpar o aparelho)"
+        />
         {s.warning && (
           <p className="text-[13px] text-accent mt-2" role="status">
             {s.warning}

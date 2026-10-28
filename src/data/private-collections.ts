@@ -1,7 +1,8 @@
 /**
- * Collections that hold intimate writing (Ateliê Literário, later the private journal). They live only on this
- * device: the cloud sync never uploads them and never applies remote rows to them. They stay in her backup file
- * (her own copy) so a restore never loses a text.
+ * Collections that hold intimate writing (Ateliê Literário, later the private journal). They never go to the
+ * Supabase sync. Inside the Claude Artifact they DO sync to her owner-only store by default (the Claude app wipes
+ * the device storage; without it her texts would be lost) — she can turn that off (profile.privateWritingCloud).
+ * They also stay in her backup file.
  */
 export const PRIVATE_COLLECTIONS: ReadonlySet<string> = new Set(['literaryWorks', 'literaryVersions', 'literaryCollections', 'literaryProfile'])
 

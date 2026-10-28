@@ -337,6 +337,8 @@ function startArtifact(db: ArtifactDB) {
     api: transport,
     meta,
     getDB,
+    // Her texts must survive the Claude app wiping the device; the store is readable only by her.
+    includePrivate: () => getDB().profile.privateWritingCloud !== false,
     commitDB: async (next) => {
       applyingRemote = true
       useStore.setState({ db: next })
