@@ -21,7 +21,10 @@ const Welcome = lazy(() => import('@/features/settings/Welcome'))
 
 function ScrollToTop() {
   const { pathname } = useLocation()
-  useEffect(() => window.scrollTo(0, 0), [pathname])
+  // Braces matter: newer Chromium returns a Promise from scrollTo, and React would call it as the cleanup.
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [pathname])
   return null
 }
 
