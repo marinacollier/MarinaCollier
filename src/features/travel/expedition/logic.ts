@@ -45,13 +45,15 @@ export const BOOKING_META: Record<TripBooking, { label: string }> = {
 export const BOOKING_ORDER: TripBooking[] = ['nao_pesquisado', 'cotacao_solicitada', 'aguardando', 'confirmado', 'pago', 'concluido', 'cancelado']
 export const PENDING_BOOKINGS: TripBooking[] = ['nao_pesquisado', 'cotacao_solicitada', 'aguardando']
 
-/** Booking state as stored, or read from the older fields when they say enough. */
+/**
+ * Booking state as stored, or read from the older fields when they say enough. A later tick on the older
+ * screens (swipe to confirm, cancel) wins over a stored pending state, so both views always agree.
+ */
 export function bookingOf(i: TripItem): TripBooking | undefined {
-  if (i.booking) return i.booking
   if (i.status === 'cancelado') return 'cancelado'
-  if (i.status === 'feito') return 'concluido'
-  if (i.status === 'confirmado') return i.paymentStatus === 'pago' ? 'pago' : 'confirmado'
-  return undefined
+  if (i.status === 'feito' && i.booking !== 'cancelado') return 'concluido'
+  if (i.status === 'confirmado' && (!i.booking || PENDING_BOOKINGS.includes(i.booking))) return i.paymentStatus === 'pago' ? 'pago' : 'confirmado'
+  return i.booking
 }
 
 /** Picking a booking state keeps `status`/`paymentStatus` in step, so Home, Agenda and Revisar agree. */
@@ -65,7 +67,9 @@ export function bookingPatch(b: TripBooking): Partial<TripItem> {
  * still waits for a reservation or a medical clearance.
  */
 export function certaintyOf(i: TripItem): TripCertainty {
-  const base: TripCertainty = i.certainty ?? (i.status === 'confirmado' || i.status === 'feito' ? 'confirmado' : 'pendente')
+  const done = i.status === 'confirmado' || i.status === 'feito'
+  // Her confirmation (status) settles "pendente"; weather still decides on the day.
+  const base: TripCertainty = i.certainty && !(i.certainty === 'pendente' && done) ? i.certainty : done ? 'confirmado' : 'pendente'
   if (base !== 'confirmado') return base
   if (i.clearance === 'pendente' || i.clearance === 'nao_liberada') return 'pendente'
   const b = bookingOf(i)
@@ -307,7 +311,9 @@ export function pendencies(trip: Trip, items: TripItem[], today: DateKey): Pende
   const conflicts = findConflicts(trip, items).filter((c) => c.date >= today)
   const weather = base.filter((i) => certaintyOf(i) === 'clima')
   const clearance = ahead.filter((i) => i.clearance === 'pendente' || i.clearance === 'nao_liberada')
+  // Each item shows up once: weather and clearance say more than "a confirmar".
   const bookings = base.filter((i) => {
+    if (weather.includes(i) || clearance.includes(i)) return false
     const b = bookingOf(i)
     if (b) return PENDING_BOOKINGS.includes(b)
     return i.status === 'a_confirmar' && RESERVABLE.includes(i.section)

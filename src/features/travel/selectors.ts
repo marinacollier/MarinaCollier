@@ -9,6 +9,14 @@ import { normalize } from '@/lib/text'
 
 export type TripTab =
   | 'visao'
+  // Expedição (trips with `expedition` settings)
+  | 'hoje'
+  | 'dias'
+  | 'pendencias'
+  | 'custos'
+  | 'escola'
+  | 'checklists'
+  | 'seguranca'
   | 'revisar'
   | TripSection
   | 'orcamento'
@@ -33,6 +41,13 @@ export interface TabMeta {
 export const TRIP_TABS: TabMeta[] = [
   { id: 'visao', label: 'Visão geral', emoji: '🗺️', items: false },
   { id: 'revisar', label: 'Revisar', emoji: '🔎', items: false },
+  { id: 'hoje', label: 'Hoje', emoji: '☀️', items: false },
+  { id: 'dias', label: 'Dias', emoji: '🗓️', items: false },
+  { id: 'pendencias', label: 'Pendências', emoji: '📋', items: false },
+  { id: 'custos', label: 'Custos', emoji: '💱', items: false },
+  { id: 'escola', label: 'Escola', emoji: '📚', items: false },
+  { id: 'checklists', label: 'Checklists', emoji: '☑️', items: false },
+  { id: 'seguranca', label: 'Segurança', emoji: '🛟', items: false },
   { id: 'antes_de_ir', label: 'Antes de ir', emoji: '✅', items: true, checkable: true, empty: 'Nada pendente antes de ir.', placeholder: 'Ex.: renovar passaporte' },
   { id: 'voo', label: 'Voos', emoji: '✈️', items: true, empty: 'Nenhum voo por aqui ainda.', placeholder: 'Ex.: voo de ida' },
   { id: 'hospedagem', label: 'Hospedagem', emoji: '🛏️', items: true, empty: 'Onde você vai dormir? Sem pressa.', placeholder: 'Ex.: hostel perto da praia' },
