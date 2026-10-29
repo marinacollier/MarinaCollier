@@ -345,20 +345,31 @@ describe('Claude db sync — engine over the Artifact store', () => {
 describe('Claude db sync — a wiped device does not duplicate its seed', () => {
   it('drops the fresh seed copies (random ids) and keeps what she did after the seed', async () => {
     const fake = createFakeArtifactDb()
-    const phone = device(fake, 'phone', { ...emptyDB(), tasks: [task('uuid-1', 'Priorizar Fashion Finder')] })
+    const phone = device(fake, 'phone', { ...emptyDB(), tasks: [task('11111111-1111-4111-8111-111111111111', 'Priorizar Fashion Finder')] })
     await phone.run()
     tick()
     // The app wipes the device: next open seeds again, with a new random id for the same briefing task.
-    const wiped = device(fake, 'phone-2', { ...emptyDB(), tasks: [task('uuid-2', 'Priorizar Fashion Finder')] })
+    const wiped = device(fake, 'phone-2', { ...emptyDB(), tasks: [task('22222222-2222-4222-8222-222222222222', 'Priorizar Fashion Finder')] })
     const seededAt = iso()
     tick()
-    wiped.addTask(task('uuid-3', 'Cobrar Vitor')) // she typed this after the seed, before the cloud answered
+    wiped.addTask(task('33333333-3333-4333-8333-333333333333', 'Cobrar Vitor')) // she typed this after the seed, before the cloud answered
     const r = await wiped.run(seededAt)
     expect(r.status).toBe('ok')
     expect(titles(wiped.db)).toEqual(['Cobrar Vitor', 'Priorizar Fashion Finder'])
-    expect(wiped.db.tasks.map((t) => t.id).sort()).toEqual(['uuid-1', 'uuid-3'])
-    expect(cloudDoc(fake, 'tasks', 'uuid-2')).toBeUndefined()
-    expect(cloudDoc(fake, 'tasks', 'uuid-3')).toBeDefined()
+    expect(wiped.db.tasks.map((t) => t.id).sort()).toEqual(['11111111-1111-4111-8111-111111111111', '33333333-3333-4333-8333-333333333333'])
+    expect(cloudDoc(fake, 'tasks', '22222222-2222-4222-8222-222222222222')).toBeUndefined()
+    expect(cloudDoc(fake, 'tasks', '33333333-3333-4333-8333-333333333333')).toBeDefined()
+  })
+
+  it('keeps stable seed ids from a module the cloud does not have yet and sends them', async () => {
+    const fake = createFakeArtifactDb()
+    await device(fake, 'phone', { ...emptyDB(), tasks: [task('t1', 'Antiga')] }).run()
+    const wiped = device(fake, 'phone-2', { ...emptyDB(), tasks: [task('seed:sa:act:lions-head', "Lion's Head")] })
+    const seededAt = iso()
+    tick()
+    await wiped.run(seededAt)
+    expect(titles(wiped.db)).toEqual(['Antiga', "Lion's Head"])
+    expect(cloudDoc(fake, 'tasks', 'seed:sa:act:lions-head')).toBeDefined()
   })
 
   it('a device that had data stored keeps its local-only records (no fresh mark)', async () => {

@@ -68,6 +68,8 @@ export interface SyncDeps {
   newId?(): string
   /** Also sync the private writing collections (only to her own owner-only store; never Supabase). */
   includePrivate?(): boolean
+  /** After adopting the cloud on a device: re-apply the app's own module seeds (idempotent, tombstone-aware). */
+  reseed?(db: DB): DB
 }
 
 export interface SyncResult {
@@ -110,6 +112,8 @@ interface LocalRec {
   data: Record<string, unknown>
   h: string
 }
+
+const RANDOM_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export const recordKey = (collection: string, id: string) => `${collection}/${id}`
 
@@ -300,6 +304,9 @@ export function createSyncEngine(deps: SyncDeps) {
         if (!it || typeof it.id !== 'string') return true
         const key = recordKey(c, it.id)
         if (inCloud.has(key)) return true
+        // Only random ids duplicate (a re-seed creates new ones). Stable seed ids are the same record
+        // everywhere, so new modules' seeds still reach the cloud.
+        if (!RANDOM_ID.test(it.id)) return true
         const touched = String(it.updatedAt ?? it.createdAt ?? '')
         if (touched && touched > before) return true // she changed it after the seed: hers, keep
         delete m.outbox[key]
@@ -368,6 +375,7 @@ export function createSyncEngine(deps: SyncDeps) {
         const conflicts = merged.conflicts
         let next = merged.next
         if (m.adopt && m.replaceBefore) next = dropFreshSeed(m, next, rows, m.replaceBefore)
+        if (m.adopt && deps.reseed) next = deps.reseed(next)
         if (next !== db) await deps.commitDB(next)
         for (const r of rows) if (r.seq !== undefined && r.seq > m.cursor) m.cursor = r.seq
         delete m.adopt

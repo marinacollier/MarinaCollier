@@ -239,6 +239,11 @@ function flush() {
  * Load from storage (or seed on first run) and start auto-saving.
  * Call once at boot; tests pass a memory adapter.
  */
+/** The module seeds every boot applies (idempotent; respect her edits and removedSeedIds). */
+export function applyModuleSeeds(db: DB): DB {
+  return applyAtelieSeed(migrateUgc(applyExpeditionSeed(applyUniverseSeed(applySpiritualSeed(db)))))
+}
+
 export async function hydrate(storage: StorageAdapter = createIndexedDBAdapter()): Promise<void> {
   adapter = storage
   unsubscribe?.()
@@ -256,7 +261,7 @@ export async function hydrate(storage: StorageAdapter = createIndexedDBAdapter()
     }
   }
   const migrated = raw ? migrate(raw) : null
-  const db = applyAtelieSeed(migrateUgc(applyExpeditionSeed(applyUniverseSeed(applySpiritualSeed(migrated ? applyLifeSeed(migrated, todayKey()) : applyUgcCrmSeed(buildSeed(todayKey())))))))
+  const db = applyModuleSeeds(migrated ? applyLifeSeed(migrated, todayKey()) : applyUgcCrmSeed(buildSeed(todayKey())))
   dirty = false
   freshSeedAt = !raw && !loadFailed ? new Date().toISOString() : null
   if (loadFailed) {

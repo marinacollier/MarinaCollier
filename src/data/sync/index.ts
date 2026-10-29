@@ -10,7 +10,7 @@
  */
 import { createStore, del, get, set } from 'idb-keyval'
 import { create } from 'zustand'
-import { actions, flushNow, freshInstallAt, getDB, hasStorage, onSaved, useStore } from '../store'
+import { actions, applyModuleSeeds, flushNow, freshInstallAt, getDB, hasStorage, onSaved, useStore } from '../store'
 import { bootFinished } from '../briefing/bundled'
 import { takeSnapshot } from '../snapshots'
 import { accessToken, authAvailable, authBaseUrl, useAuth } from '@/integrations/auth'
@@ -339,6 +339,8 @@ function startArtifact(db: ArtifactDB) {
     getDB,
     // Her texts must survive the Claude app wiping the device; the store is readable only by her.
     includePrivate: () => getDB().profile.privateWritingCloud !== false,
+    // The adopted cloud may predate a module (Expedição, Universo, Ateliê): its seeds come back right away.
+    reseed: applyModuleSeeds,
     commitDB: async (next) => {
       applyingRemote = true
       useStore.setState({ db: next })
