@@ -15,6 +15,7 @@ import { Postcard, toneVars } from './Postcard'
 import { ReviewItems, SectionItems } from './TripItems'
 import { EXPEDITION_TABS, ExpeditionView, type ExpeditionTab } from './expedition/Views'
 import { pendencies } from './expedition/logic'
+import { TravelModeLine } from './TravelModeLine'
 import {
   TRIP_STATUS_LABEL,
   TRIP_TABS,
@@ -114,6 +115,8 @@ export default function TripPage() {
         countdown={tripCountdown(trip, today)}
         footer={<HeroFooter progress={progress} toReview={toReview} onReview={() => setTab('revisar')} onChecklist={() => setTab('antes_de_ir')} tone={trip.tone} />}
       />
+
+      <TravelModeLine trip={trip} />
 
       {following && (
         <button

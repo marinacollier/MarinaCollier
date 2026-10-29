@@ -27,6 +27,7 @@ import type {
 import { addDays, hmToMinutes, minutesToHM, weekday, weekDays } from '@/lib/date'
 import { occursOn } from '@/lib/recurrence'
 import { DEFAULT_MODALITIES } from './defaults'
+import { isTravelDay } from './travel-mode'
 
 // ─── Basics ─────────────────────────────────────────────────────────────────
 
@@ -81,13 +82,15 @@ export function workOverride(db: DB, date: DateKey): ScheduleOverride | undefine
 
 /**
  * Work mode of a day: the per-day override (when `src` is the DB) wins over the weekly BASE.
- * A cancelled 'work' override means no work that day ('off').
+ * A cancelled 'work' override means no work that day ('off'). On a trip day (modo viagem, see
+ * travel-mode.ts) the São Paulo work week doesn't apply: 'off' — no commute, no "dia presencial".
  */
 export function workMode(src: WorkSource, date: DateKey): WorkDayMode {
   if (isDB(src)) {
     const o = workOverride(src, date)
     if (o?.workMode) return o.workMode
     if (o?.cancelled) return 'off'
+    if (isTravelDay(src, date)) return 'off'
   }
   return profileOf(src).work?.days?.[weekday(date)] ?? 'remoto'
 }
@@ -458,6 +461,8 @@ export function suggestWindows(db: DB, opts: SuggestOptions): WindowSuggestion[]
 
   for (const date of weekDays(opts.from)) {
     if (date < opts.from) continue
+    // Trip days: the trip's own activities are the training — no São Paulo windows.
+    if (isTravelDay(db, date)) continue
     if (m?.heavyLogistics && dur >= 90 && isPresencial(db, date)) continue
     const dayWorkouts = activeWorkouts(db, date)
     if (dayWorkouts.some((w) => w.modality === opts.modality)) continue
@@ -505,7 +510,7 @@ export interface TemplateProposal {
 }
 
 /**
- * Expands the weekly template for the week of `anyDayOfWeek`.
+ * Expands the weekly template for the week of `anyDayOfWeek` (never on trip days — travel-mode.ts).
  * Skips template lines already materialized that week — on ANY day: a session she moved (seg → ter) or
  * skipped still came from that line, so the base never brings it back to the original day.
  */
@@ -520,6 +525,8 @@ export function proposeWeekFromTemplate(db: DB, anyDayOfWeek: DateKey): Template
   for (const t of items) {
     const date = days.find((d) => weekday(d) === t.weekday)!
     if (inWeek.has(t.id)) continue
+    // Modo viagem: the São Paulo base proposes nothing on trip days (resumes by itself after the trip).
+    if (isTravelDay(db, date)) continue
     if (t.choice === 'fixed' && t.modalities[0]) {
       const i = loose.findIndex((w) => w.modality === t.modalities[0])
       if (i >= 0) {

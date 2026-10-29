@@ -26,6 +26,7 @@ import { diffDays, endOfMonth, endOfWeek, hmToMinutes, startOfMonth, startOfWeek
 import { isDue, lastDoneDate, occurrenceFor, occursOn } from '@/lib/recurrence'
 import { DEFAULT_MODALITIES } from './defaults'
 import { eventOccursOn, PERIOD_LABEL, PERIOD_RANGES, workBlocks } from './planning'
+import { eventPausedOn, isTravelDay, routinePausedOn, travelClassOn } from './travel-mode'
 
 const byOrder = <T extends { order: number }>(a: T, b: T) => a.order - b.order
 
@@ -81,7 +82,9 @@ export function prioritiesFor(db: DB, date: DateKey, domain?: DayPriority['domai
 
 // ─── Routines ───────────────────────────────────────────────────────────────
 
+/** Items of a routine on a day. Home routines are paused (empty) on trip days — see travel-mode.ts. */
 export function routineItemsFor(db: DB, routineId: ID, date: DateKey): RoutineItem[] {
+  if (routinePausedOn(db, routineId, date)) return []
   return db.routineItems
     .filter((i) => i.routineId === routineId && i.active && occursOn(i.recurrence, date))
     .sort(byOrder)
@@ -103,7 +106,7 @@ export function eventsFor(db: DB, date: DateKey): CalendarEvent[] {
   return db.events
     .filter((e) => {
       if (db.calendarSources.length && !enabled.has(e.sourceId)) return false
-      return eventOccursOn(e, date)
+      return eventOccursOn(e, date) && !eventPausedOn(db, e, date)
     })
     .sort((a, b) => (a.startTime ?? (a.period ? PERIOD_RANGES[a.period][0] : '00:00')).localeCompare(b.startTime ?? (b.period ? PERIOD_RANGES[b.period][0] : '00:00')))
 }
@@ -128,7 +131,7 @@ export interface AgendaEntry {
   approx?: boolean
   planType?: PlanType
   /** For kind 'block': 'work' | 'commute'. */
-  blockKind?: 'work' | 'commute'
+  blockKind?: 'work' | 'commute' | 'school'
 }
 
 export function workoutsOn(db: DB, date: DateKey): Workout[] {
@@ -186,6 +189,11 @@ export function agendaFor(db: DB, date: DateKey, opts: { includeBlocks?: boolean
         planType: 'base',
         blockKind: b.kind,
       })
+    }
+    // Modo viagem: the expedition's class takes the place of the São Paulo work hours.
+    const cls = travelClassOn(db, date)
+    if (cls) {
+      out.push({ kind: 'block', id: `block:school:${date}:${cls.start}`, title: `Aula · ${cls.name}`, emoji: '🏫', date, time: cls.start, endTime: cls.end, allDay: false, done: false, tone: 'ink', planType: 'fixo', blockKind: 'school' })
     }
   }
   for (const w of workoutsOn(db, date)) {
@@ -322,6 +330,8 @@ export function projectTasks(db: DB, projectId: ID): Task[] {
 
 /** Pet tasks due on `date` (recurring due or one-off due on/before date), not yet done that day. */
 export function petTasksDue(db: DB, date: DateKey) {
+  // Luna stays in Brazil: her tasks pause on trip days (back the day after).
+  if (isTravelDay(db, date)) return []
   return db.petTasks
     .filter((p) => p.active)
     .filter((p) => {

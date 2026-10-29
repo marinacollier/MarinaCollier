@@ -31,7 +31,7 @@ function presencial(ctx: AgentContext): AnswerBlock[] {
   const date = targetDay(ctx)
   const label = date === today ? 'hoje' : 'amanhã'
   const work = db.profile.work
-  const mode = workMode(db.profile, date)
+  const mode = workMode(db, date)
   const workouts = db.workouts
     .filter((w) => w.date === date && w.status !== 'pulado' && w.status !== 'descanso')
     .sort((a, b) => (a.time ?? '99').localeCompare(b.time ?? '99'))
@@ -74,7 +74,7 @@ function presencial(ctx: AgentContext): AnswerBlock[] {
   blocks.push({ kind: 'headline', text: `Não — ${label} é ${MODE_WORD[mode]}${has(ctx.q, 'levar', 'mochila', 'bolsa') ? ', nada de mochila de escritório' : ''}.` })
   let next: DateKey | undefined
   for (let d = addDays(date, 1); d <= addDays(date, 7); d = addDays(d, 1)) {
-    if (workMode(db.profile, d) === 'presencial') {
+    if (workMode(db, d) === 'presencial') {
       next = d
       break
     }

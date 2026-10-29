@@ -6,6 +6,7 @@
  *
  * "Amanhã vou presencial": the meal prep engine's KIT (src/data/mealprep via ../mealprep-adapter).
  */
+import { isTravelDay } from '@/data/travel-mode'
 import { workBlocks } from '@/data/planning'
 import { dayTimeline, isAnytime, startMin } from '@/data/timeline'
 import type { DateKey, DB, TimeHM } from '@/data/types'
@@ -35,7 +36,9 @@ export function foodChecklist(db: DB, date: DateKey): ChecklistLine[] {
 
 /** When she is out of home that day (BASE work + commute). Presencial days use the real blocks. */
 export function awayWindow(db: DB, date: DateKey): { start: TimeHM; end: TimeHM } | undefined {
-  const blocks = workBlocks(db.profile, date)
+  // Modo viagem: no São Paulo work day to be away for.
+  if (isTravelDay(db, date)) return undefined
+  const blocks = workBlocks(db, date)
   if (blocks.length && blocks.some((b) => b.mode === 'presencial')) return { start: blocks[0].start, end: blocks[blocks.length - 1].end }
   const w = db.profile.work
   if (!w) return undefined

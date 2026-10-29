@@ -67,7 +67,7 @@ export default function WorkoutSheet({ id, date, defaults }: SheetProps<'workout
     () => (draft.date && draft.modality && !isRest ? draftConflicts(db, { ...draft, date: draft.date, modality: draft.modality }, existing?.id) : []),
     [db, draft, isRest, existing?.id],
   )
-  const presencial = draft.date ? isPresencial(db.profile, draft.date) : false
+  const presencial = draft.date ? isPresencial(db, draft.date) : false
 
   if (id && !existing) {
     return (

@@ -214,7 +214,7 @@ export interface DayGroup {
 
 /** Monday..Sunday of the week containing `anyDate`, each with its entries (empty days kept). */
 export function weekAgenda(db: DB, anyDate: DateKey): DayGroup[] {
-  return weekDays(anyDate).map((date) => ({ date, entries: dayEntries(db, date), mode: workMode(db.profile, date) }))
+  return weekDays(anyDate).map((date) => ({ date, entries: dayEntries(db, date), mode: workMode(db, date) }))
 }
 
 /**
@@ -232,7 +232,7 @@ export function upcomingAgenda(db: DB, today: DateKey, days = 30): DayGroup[] {
       seenMulti.add(e.id)
       return true
     })
-    if (entries.length) out.push({ date, entries, mode: workMode(db.profile, date) })
+    if (entries.length) out.push({ date, entries, mode: workMode(db, date) })
   }
   return out
 }

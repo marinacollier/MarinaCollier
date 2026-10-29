@@ -59,7 +59,7 @@ export function homeContext(db: DB, today: DateKey, minutes: number): HomeContex
   const energy = checkinFor(db, today)?.energia
   const weekend = wd === 0 || wd === 6
   const fridayEvening = wd === 5 && part === 'noite'
-  const sundayOff = wd === 0 && workMode(db.profile, today) === 'off'
+  const sundayOff = wd === 0 && workMode(db, today) === 'off'
   const trip = nextTrip(db, today)
   const days = trip?.startDate ? diffDays(today, trip.startDate) : undefined
   const tripSoon = trip && days !== undefined && days <= TRIP_SOON_DAYS ? { trip, days: Math.max(days, 0) } : undefined
@@ -71,7 +71,7 @@ export function homeContext(db: DB, today: DateKey, minutes: number): HomeContex
     weekend,
     fridayEvening,
     sundayOff,
-    tomorrowPresencial: isPresencial(db.profile, addDays(today, 1)),
+    tomorrowPresencial: isPresencial(db, addDays(today, 1)),
     hasWorkoutToday: workoutsOn(db, today).some((w) => w.status !== 'descanso' && w.status !== 'pulado'),
     tripSoon,
     busyWorkWeek: workDeadlinesAhead(db, today) >= BUSY_DEADLINES,
@@ -176,7 +176,7 @@ export interface SummaryBit {
 /** "📍 Trabalho presencial · Interlagos · 🏊 Natação 07:00 · 💻 projeto prioritário". */
 export function daySummary(db: DB, today: DateKey): SummaryBit[] {
   const out: SummaryBit[] = []
-  const mode = workMode(db.profile, today)
+  const mode = workMode(db, today)
   const place = db.profile.work?.location?.split(',')[0]?.trim()
   if (mode === 'presencial') out.push({ key: 'work', emoji: '📍', text: `Trabalho presencial${place ? ` · ${place}` : ''}` })
   else if (mode === 'remoto') out.push({ key: 'work', emoji: '💻', text: 'Trabalho remoto' })

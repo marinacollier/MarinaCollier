@@ -14,6 +14,7 @@ import { addDays, formatDayMonth, hmToMinutes } from '@/lib/date'
 import { billPeriod, billsDueOn } from '../finance/bills'
 import { actionTitle, ugcDayActions } from '../ugc/model'
 import { homeSpiritualSessions } from '../spiritual/model'
+import { travelClassOn, travelTripOn } from '../travel-mode'
 
 /** Filter chips: Tudo · Trabalho · Corpo · Vida. Career, study and content count as Trabalho. */
 export type FrontGroup = 'trabalho' | 'corpo' | 'vida'
@@ -295,9 +296,16 @@ export function dayItems(db: DB, date: DateKey, today: DateKey, opts: ItemOption
     push(marked(db, { key: `contact:${c.id}`, source: 'contact', refType: 'contact', refId: c.id, date, title: careerHidden ? 'Follow-up de networking' : `Follow-up com ${c.name}${c.company ? ` (${c.company})` : ''}`, front: { label: 'CARREIRA', group: 'trabalho' }, important: true }))
   }
 
-  // Trip to-dos on that day.
+  // Modo viagem: the expedition's class is the day's "work" block (the São Paulo work week is paused).
+  const travel = travelTripOn(db, date)
+  const cls = travelClassOn(db, date)
+  if (travel && cls) {
+    push({ key: `school:${travel.id}:${date}`, source: 'tripItem', refType: 'trip', refId: travel.id, date, start: cls.start, end: cls.end, title: `Aula · ${cls.name}`, sub: `até ${cls.end}`, emoji: '🏫', front: { label: `VIAGEM · ${up(travel.name)}`, group: 'vida' }, status: 'pending', check: 'none', important: true })
+  }
+  // Trip to-dos on that day (on a trip day, the confirmed activities too: they ARE the day).
   for (const ti of db.tripItems) {
-    if (ti.date !== date || (ti.status !== 'a_fazer' && ti.status !== 'a_confirmar' && ti.status !== 'feito')) continue
+    const shown = ti.status === 'a_fazer' || ti.status === 'a_confirmar' || ti.status === 'feito' || (ti.status === 'confirmado' && travel?.id === ti.tripId)
+    if (ti.date !== date || !shown) continue
     const trip = db.trips.find((x) => x.id === ti.tripId)
     push({ key: `tripItem:${ti.id}`, source: 'tripItem', refType: 'tripItem', refId: ti.id, date, start: ti.time, title: ti.status === 'a_confirmar' ? `Confirmar: ${ti.title}` : ti.title, front: { label: trip ? `VIAGEM · ${up(trip.name)}` : 'VIAGEM', group: 'vida' }, status: ti.status === 'feito' ? 'done' : 'pending', check: 'toggle', important: !!ti.time })
   }

@@ -88,7 +88,7 @@ export function Timeline({ date, today, entries, blocks = [], nowMinutes, freeSl
             <span aria-hidden className={cn('absolute left-0 top-0 bottom-0 w-[2px] rounded-full', commute ? 'bg-line' : 'bg-ink/15')} />
             <span className="absolute left-2.5 right-2 top-1.5 text-[10.5px] text-muted leading-none whitespace-nowrap truncate">
               {b.emoji} {b.title}
-              <span className="opacity-70"> · {commute ? `${b.time}–${b.endTime}` : 'base'}</span>
+              <span className="opacity-70"> · {commute || b.blockKind === 'school' ? `${b.time}–${b.endTime}` : 'base'}</span>
             </span>
           </div>
         )

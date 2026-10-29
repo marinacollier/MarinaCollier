@@ -14,6 +14,7 @@ import { create } from 'zustand'
 import { emptyDB, migrate } from './defaults'
 import { buildSeed } from './seed'
 import { applyLifeSeed } from './seed/migrate'
+import { pruneTravelWorkouts } from './travel-mode'
 import { applySpiritualSeed } from './seed/spiritual'
 import { applyAtelieSeed } from './seed/atelie'
 import { applyUniverseSeed } from './seed/universe'
@@ -239,9 +240,12 @@ function flush() {
  * Load from storage (or seed on first run) and start auto-saving.
  * Call once at boot; tests pass a memory adapter.
  */
-/** The module seeds every boot applies (idempotent; respect her edits and removedSeedIds). */
+/**
+ * The module seeds every boot applies (idempotent; respect her edits and removedSeedIds).
+ * Last: modo viagem drops untouched template workouts on trip days (see travel-mode.ts).
+ */
 export function applyModuleSeeds(db: DB): DB {
-  return applyAtelieSeed(migrateUgc(applyExpeditionSeed(applyUniverseSeed(applySpiritualSeed(db)))))
+  return pruneTravelWorkouts(applyAtelieSeed(migrateUgc(applyExpeditionSeed(applyUniverseSeed(applySpiritualSeed(db))))))
 }
 
 export async function hydrate(storage: StorageAdapter = createIndexedDBAdapter()): Promise<void> {

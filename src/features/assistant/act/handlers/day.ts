@@ -29,6 +29,9 @@ import { lex } from '../../adjust/lexicon'
 import { getDB } from '@/data/store'
 import { uid } from '@/lib/id'
 import type { Handler, HandlerInput, LumosReply, ReplyLine, ReplySection, Undo } from '../types'
+import { shortDM } from '@/data/travel-mode'
+import { formatMoney, localNow } from '@/features/travel/expedition/logic'
+import { schoolLine, tripDayOf, tripDayRows, type TripDay } from '@/features/travel/trip-day'
 
 const RELEVANT = new Set<TimelineEntry['kind']>(['workout', 'event', 'work', 'task'])
 const NUM_FEM = ['nenhuma', 'uma', 'duas', 'três']
@@ -67,11 +70,62 @@ function rowOf(e: TimelineEntry): ReplyLine {
 
 const TODAY = /\bo que (?:eu )?(?:tenho|tem|rola)(?: pra)? (hoje|amanha|agora)\b|\bcomo (?:e|esta|ta|vai ser|fica) (?:o )?meu dia\b|\bminha agenda (?:de |pra )?(hoje|amanha)\b|\bo que tem no meu dia\b/
 
+// ─── Modo viagem: the trip day instead of the São Paulo routine ──────────────
+
+/** The trip day as of now (local clock of the trip for "próxima saída"). */
+export function tripDayNow(db: DB, date: DateKey, now: Now): TripDay | undefined {
+  const d = tripDayOf(db, date)
+  const tz = d?.trip.expedition?.timeZone
+  if (!d || !tz || date !== now.date) return d
+  // São Paulo has no DST (UTC−3) — enough to place "now" when the caller has no instant.
+  const at = now.iso ? new Date(now.iso) : new Date(`${date}T${minutesToHM(now.minutes)}:00-03:00`)
+  const local = localNow(tz, at)
+  return tripDayOf(db, date, local.date === date ? local.minutes : local.date > date ? 24 * 60 : 0) ?? d
+}
+
+function tripDayReply(db: DB, d: TripDay, label: string, fromMin: number): LumosReply {
+  // Trip items are in the trip's local time: "from now" uses that clock.
+  const local = label === 'Hoje' ? d.minutes : 0
+  const rows = tripDayRows(d).filter((r) => !r.time || hmToMinutes(r.end ?? r.time) >= local - 30)
+  // One-off things of hers that still happen that day (events, timed tasks) — never the SP routine.
+  const extra = relevantEntries(db, d.date, fromMin).filter((e) => e.kind !== 'work')
+  const named = [...rows.map((r) => (r.school ? `aula ${r.time}–${r.end}` : `${r.text}${r.time ? ` às ${r.time}` : ''}`)), ...extra.map((e) => `${e.title} ${when(e)}`)]
+  const head = `${label} é o dia ${d.dayNumber} de ${d.totalDays} da ${d.trip.name}`
+  const body = named.length ? `: ${listJoin(named.slice(0, 4))}${named.length > 4 ? ` e mais ${named.length - 4}` : ''}.` : ' — dia livre por aí ✨'
+  const lines: ReplyLine[] = []
+  const cls = schoolLine(d)
+  if (cls && d.school?.impact === 'dia') lines.push({ emoji: '🏫', text: cls })
+  for (const r of rows) lines.push({ emoji: r.emoji, text: r.text, sub: r.time ? `Às ${r.time}${r.sport ? ' · treino do dia' : ''}` : r.sport ? 'Treino do dia' : undefined })
+  for (const e of extra) lines.push(rowOf(e))
+  if (d.next && d.next.date === d.date && label === 'Hoje') lines.push({ emoji: '🚪', text: `Próxima saída ${d.next.at}`, sub: d.next.item.title })
+  if (d.spentCents != null) lines.push({ emoji: '💸', text: `Gasto ${label === 'Hoje' ? 'hoje' : 'no dia'}: ${formatMoney(d.spentCents, d.currency)}` })
+  const end = d.trip.endDate ?? d.trip.startDate
+  return {
+    area: 'viagem',
+    text: `${head}${body}`,
+    sub: end ? `Rotina de SP (treinos, trabalho, Milagre da Manhã) pausada até ${shortDM(end)}.` : undefined,
+    lines,
+    ref: { type: 'trip', id: d.trip.id },
+    link: { label: 'Abrir a viagem', to: ROUTES.trip(d.trip.id) },
+  }
+}
+
+/** "Bom dia. Dia 6 da viagem: aula 09:00–15:10 e Lion's Head às 16:25." */
+export function composeTripBrief(d: TripDay, now: Now): string {
+  const bits = tripDayRows(d)
+    .filter((r) => !r.time || hmToMinutes(r.end ?? r.time) >= d.minutes - 30)
+    .map((r) => (r.school ? `aula ${r.time}–${r.end}` : `${r.text}${r.time ? ` às ${r.time}` : ''}`))
+  const body = bits.length ? ` Hoje: ${listJoin(bits.slice(0, 3))}.` : ' Hoje está livre por aí.'
+  return `${greeting(now.minutes)}. Dia ${d.dayNumber} de ${d.totalDays} da ${d.trip.name}.${body}`
+}
+
 function today(input: HandlerInput): LumosReply | undefined {
   const { db, n, now } = input
   if (!TODAY.test(n)) return undefined
   const date = /\bamanha\b/.test(n) ? addDays(now.date, 1) : now.date
   const from = date === now.date ? now.minutes : 0
+  const trip = tripDayNow(db, date, now)
+  if (trip) return tripDayReply(db, trip, date === now.date ? 'Hoje' : 'Amanhã', from)
   const entries = relevantEntries(db, date, from)
   const label = date === now.date ? 'Hoje' : 'Amanhã'
   const mode = workModeOn(db, date)
@@ -119,6 +173,8 @@ export function composeBrief(db: DB, now: Now): string {
 function brief(input: HandlerInput): LumosReply | undefined {
   const { db, n, now } = input
   if (!BRIEF.test(n)) return undefined
+  const trip = tripDayNow(db, now.date, now)
+  if (trip) return { area: 'viagem', text: composeTripBrief(trip, now), sub: 'Rotina de SP pausada enquanto você viaja.', options: [{ label: 'O que tenho hoje?', ask: 'o que eu tenho hoje?' }], link: { label: 'Abrir a viagem', to: ROUTES.trip(trip.trip.id) } }
   const engine = briefFor(db, now)
   const text = engine ? `${greeting(now.minutes)}. ${engine}` : composeBrief(db, now)
   return { area: 'seu dia', text, sub: 'Quer organizar comigo?', options: [{ label: 'Organiza meu dia', ask: 'organiza meu dia' }, { label: 'O que precisa de mim?', ask: 'o que realmente precisa de mim?' }] }

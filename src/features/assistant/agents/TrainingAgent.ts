@@ -26,7 +26,7 @@ function fit({ db, today, minutes, q }: AgentContext): AnswerBlock[] {
 
   const items: AnswerItem[] = res.windows.map((w) => {
     const day = dayName(w.date, today)
-    const presencial = workMode(db.profile, w.date) === 'presencial'
+    const presencial = workMode(db, w.date) === 'presencial'
     return {
       id: `fit:${w.date}:${w.start}`,
       emoji: m.emoji,

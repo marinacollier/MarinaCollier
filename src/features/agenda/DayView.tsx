@@ -28,7 +28,7 @@ export function DayView({ date, today, nowMinutes, autoScroll }: DayViewProps) {
   const timed = useMemo(() => [...timedOnly(entries), ...lifeEntries(db, date)], [entries, db, date])
   const blocks = useMemo(() => blocksOnly(entries), [entries])
   const conflicts = useMemo(() => conflictsOn(db, date), [db, date])
-  const mode = workMode(db.profile, date)
+  const mode = workMode(db, date)
   const hasTimeline = timed.length > 0 || blocks.length > 0
   const allDay = useMemo(() => allDayOnly(entries), [entries])
   const loose = useMemo(() => looseItemsFor(db, date), [db, date])

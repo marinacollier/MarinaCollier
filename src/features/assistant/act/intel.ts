@@ -184,7 +184,7 @@ export const MODE_TEXT: Record<WorkDayMode, string> = { presencial: 'presencial'
 /** Work mode of a day honouring a per-day override (the engine may already do it in planning.workMode). */
 export function workModeOn(db: DB, date: DateKey): WorkDayMode {
   const o = db.scheduleOverrides.find((x) => x.refType === 'work' && x.refId === date && x.workMode)
-  return o?.workMode ?? workMode(db.profile, date)
+  return o?.workMode ?? workMode(db, date)
 }
 
 /** A DB where `date`'s weekday has `mode` — only to PREVIEW kits/menus for a one-day change. */

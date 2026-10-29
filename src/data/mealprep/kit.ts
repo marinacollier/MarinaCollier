@@ -5,6 +5,7 @@
  */
 import type { DateKey, DB, MealPrepPlan, TimeHM } from '@/data/types'
 import { contextWorkouts } from '@/data/fuel'
+import { isTravelDay } from '@/data/travel-mode'
 import { isPresencial } from '@/data/planning'
 import { addDays, hmToMinutes, minutesToHM, startOfWeek, weekday, WEEKDAY_LONG } from '@/lib/date'
 import type { KitIcon } from './catalog'
@@ -170,6 +171,8 @@ export function presencialKit(db: DB, date: DateKey, plan: MealPrepPlan | undefi
  * prep exists for that week, and intra-workout reminders (separar na véspera · pegar antes do treino).
  */
 export function prepChecklistFor(db: DB, date: DateKey): PrepItem[] {
+  // Meal prep / kit / freezer are home logistics: paused on trip days (modo viagem).
+  if (isTravelDay(db, date)) return []
   const out = new Map<string, PrepItem>()
   const add = (i: PrepItem) => i.date === date && !out.has(i.key) && out.set(i.key, i)
 

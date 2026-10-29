@@ -96,7 +96,7 @@ export function essentialSuggestion(db: DB, routine: Routine, date: DateKey): st
   if (!routine.hasEssential || modeChosen(db, routine, date)) return undefined
   const early = workoutsOn(db, date).find((w) => w.status === 'planejado' && w.time && hmToMinutes(w.time) <= 7 * 60 + 30)
   if (early) return `Treino às ${shortTime(early.time!)} — que tal a versão curta hoje?`
-  if (isPresencial(db.profile, date)) return 'Dia presencial — que tal a versão curta hoje?'
+  if (isPresencial(db, date)) return 'Dia presencial — que tal a versão curta hoje?'
   return undefined
 }
 

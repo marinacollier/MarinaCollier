@@ -107,7 +107,7 @@ export function planningInsights(db: DB, today: DateKey, minutes: number): Insig
   const out: Insight[] = []
   const tomorrow = addDays(today, 1)
 
-  if (minutes >= db.profile.dayParts.eveningStart * 60 && isPresencial(db.profile, tomorrow))
+  if (minutes >= db.profile.dayParts.eveningStart * 60 && isPresencial(db, tomorrow))
     out.push({ id: 'presencial-tomorrow', emoji: '👜', tone: 'sand', text: 'Amanhã é presencial. Quer preparar as coisas hoje?', ask: 'O que levar amanhã?' })
 
   const checkin = conflictsBetween(db, today, endOfWeek(today)).find((c) => c.kind === 'checkin_limit')

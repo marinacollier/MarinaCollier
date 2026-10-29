@@ -1515,6 +1515,11 @@ export interface Trip extends Entity {
   order: number
   /** Expedição: day-by-day trip manager (school, budget in local currency, safety). Optional. */
   expedition?: TripExpedition
+  /**
+   * Modo viagem: on the trip's dates the São Paulo routine (training template, work, morning/evening
+   * routines, meal plan, Luna, recurring local events) is paused. Default on; false = she turned it off.
+   */
+  pauseHomeRoutine?: boolean
 }
 
 /** How sure an item is. Shown as CONFIRMADO / ESTIMADO / DEPENDE DO CLIMA / PENDENTE. */

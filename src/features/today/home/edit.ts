@@ -228,6 +228,8 @@ export function editSpec(db: DB, item: ActionItem): EditSpec {
       if (!b) return {}
       return { day: { set: (d) => promoteBacklog(b.id, d) }, timeNote: 'Ganha hora depois de ter um dia.', notes: notesOf('backlogItems', b.id, b.notes) }
     }
+    case 'trip':
+      return { dayNote: 'Aula da escola da viagem.', timeNote: 'Horário da escola — muda na página da viagem.', notesNote: 'Detalhes na página da viagem.' }
     case 'spiritualSession':
       return { dayNote: 'Estudo sem dia fixo — aparece quando der.', timeNote: 'Sem hora.', notesNote: 'Anotações dentro do estudo (“Abrir completo”).' }
   }

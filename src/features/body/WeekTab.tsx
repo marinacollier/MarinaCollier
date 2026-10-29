@@ -335,7 +335,7 @@ function DayRow({
   const { setNodeRef, isOver } = useDroppable({ id: date })
   const isToday = date === today
   const past = date < today
-  const presencial = isPresencial(db.profile, date)
+  const presencial = isPresencial(db, date)
   const location = db.profile.work?.location
   const ghosts = proposals.filter((p) => p.choice === 'fixed' || p.choice === 'rest' || p.choice === 'optional')
   const choices = proposals.filter((p) => p.choice === 'one_of')

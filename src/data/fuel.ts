@@ -21,6 +21,7 @@ import type {
 } from './types'
 import { addDays, hmToMinutes, weekday, weekDays } from '@/lib/date'
 import { modalityGroup } from './planning'
+import { isTravelDay } from './travel-mode'
 
 const ACTIVE = (w: Workout) => w.status !== 'pulado' && w.status !== 'descanso'
 
@@ -37,6 +38,8 @@ export function workoutsOnDay(db: DB, date: DateKey): Workout[] {
  */
 export function contextWorkouts(db: DB, date: DateKey): Workout[] {
   if (db.workouts.some((w) => w.date === date)) return workoutsOnDay(db, date).map((w) => withDayOverride(db, date, 'workout', w.id, w))
+  // Modo viagem: no São Paulo template lines standing in on trip days.
+  if (isTravelDay(db, date)) return []
   // A template line already materialized somewhere this week (e.g. the long run moved to Saturday)
   // belongs to that workout now — it must not reappear on its original weekday.
   const week = new Set(weekDays(date))
@@ -144,6 +147,8 @@ export function dayTrainingContext(db: DB, date: DateKey): DayTrainingContext {
 
 /** The prescribed day plan for a date: same day type, preferring the weekday it was written for. */
 export function dayPlanFor(db: DB, date: DateKey): NutritionDayPlan | undefined {
+  // The weekday meal plan is São Paulo life: paused on trip days (modo viagem).
+  if (isTravelDay(db, date)) return undefined
   const { dayType } = dayTrainingContext(db, date)
   const wd = weekday(date)
   const candidates = db.nutritionDayPlans.filter((p) => p.active && p.dayType === dayType)

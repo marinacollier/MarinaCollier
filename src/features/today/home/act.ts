@@ -205,6 +205,8 @@ export function openItem(item: ActionItem, today: DateKey, navigate: (to: string
       return openSheet('contact', { id: item.refId })
     case 'tripItem':
       return openSheet('tripItem', { id: item.refId })
+    case 'trip':
+      return navigate(ROUTES.trip(item.refId))
     case 'content':
       return openSheet('content', { id: item.refId })
     case 'partnership':

@@ -113,10 +113,10 @@ export function modalityLabel(db: DB, id: string): { emoji: string; label: strin
 export function gatherFixed(db: DB, weekStart: DateKey): FixedDay[] {
   const proposals = proposeWeekFromTemplate(db, weekStart)
   return weekDays(weekStart).map((date) => {
-    const mode = workMode(db.profile, date)
+    const mode = workMode(db, date)
     const entries: FixedEntry[] = []
     if (mode === 'presencial') {
-      const work = workBlocks(db.profile, date).find((b) => b.kind === 'work')
+      const work = workBlocks(db, date).find((b) => b.kind === 'work')
       const commute = db.profile.work.commuteBeforeMin + db.profile.work.commuteAfterMin > 0
       entries.push({
         key: `work:${date}`,

@@ -32,6 +32,10 @@ import { composerPlaceholder } from './home/day'
 import { LumosBox } from './home/LumosBox'
 import { LumosSheet, lumosHref, type LumosRequest } from './home/lumos'
 import { useMarkSeenOnLeave } from './home/seen'
+import { TripDayCard } from './home/TripDayCard'
+import { tripDayOf } from '@/features/travel/trip-day'
+import { localNow } from '@/features/travel/expedition/logic'
+import { travelTripOn } from '@/data/travel-mode'
 
 /** A trip shows on Home only when it's really close. */
 const TRIP_LINE_DAYS = 30
@@ -67,6 +71,11 @@ export default function TodayPage() {
   const radar = useMemo(() => radarItems(db, today), [db, today])
   const loose = useMemo(() => loosePriorities(prioritiesOf(db, today).slice(0, MAX_PRIORITIES), items), [db, today, items])
   const progress = useMemo(() => dayProgress(lists, loose), [lists, loose])
+  // Modo viagem: the expedition day replaces the São Paulo routine (derived from the trip's dates).
+  const tripDay = useMemo(() => {
+    const tz = travelTripOn(db, today)?.expedition?.timeZone
+    return tripDayOf(db, today, tz ? localNow(tz, clock).minutes : minutes)
+  }, [db, today, clock, minutes])
 
   const trip = useMemo(() => {
     if (life.nextTrip) return life.nextTrip.daysLeft <= TRIP_LINE_DAYS ? life.nextTrip : undefined
@@ -120,6 +129,12 @@ export default function TodayPage() {
         <Suspense fallback={null}>
           <LumosSheet request={lumos} />
         </Suspense>
+      )}
+
+      {tripDay && (
+        <motion.div {...rise(2)} className="mt-5">
+          <TripDayCard day={tripDay} />
+        </motion.div>
       )}
 
       {hasStrip && (
