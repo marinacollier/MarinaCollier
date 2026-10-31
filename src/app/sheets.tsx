@@ -37,6 +37,7 @@ export const SHEETS: Record<SheetName, AnySheet> = {
   book: lazy(() => import('@/features/learning/BookSheet')),
   trip: lazy(() => import('@/features/travel/TripSheet')),
   tripItem: lazy(() => import('@/features/travel/TripItemSheet')),
+  place: lazy(() => import('@/features/travel/places/PlaceSheet')),
   event: lazy(() => import('@/features/agenda/EventSheet')),
   project: lazy(() => import('@/features/work/ProjectSheet')),
   win: lazy(() => import('@/features/work/WinSheet')),

@@ -19,7 +19,7 @@ import type {
   MealSlot,
   StudyItem,
   Task,
-  TripSection, FoodItem } from '@/data/types'
+  TripSection, FoodItem, Place } from '@/data/types'
 
 export interface SheetPropsMap {
   /** Global + menu (owner: app shell). */
@@ -77,6 +77,8 @@ export interface SheetPropsMap {
   trip: { id?: ID }
   /** Trip item (owner: features/travel). */
   tripItem: { id?: ID; tripId?: ID; section?: TripSection; group?: string }
+  /** A place in "Lugares que conheci" (owner: features/travel/places). `fromTripId`: offered by a trip that ended. */
+  place: { id?: ID; defaults?: Partial<Place>; fromTripId?: ID }
   /** Calendar event (owner: features/agenda). */
   event: { id?: ID; date?: DateKey; time?: TimeHM; defaults?: Partial<CalendarEvent> }
   /** Project (owner: features/work). */

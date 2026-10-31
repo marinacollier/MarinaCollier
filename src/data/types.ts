@@ -1526,6 +1526,35 @@ export interface Trip extends Entity {
   pauseHomeRoutine?: boolean
 }
 
+// ─── Lugares que conheci ───────────────────────────────────────────────────
+
+export type PlaceKind = 'pais' | 'estado' | 'cidade' | 'regiao' | 'ilha' | 'parque'
+/** 'quero_ir' is a wish: it never counts as a place she knows. */
+export type PlaceStatus = 'visitei' | 'moro' | 'quero_ir'
+
+/**
+ * A place she has been to, lives in or wants to know. Visiting a city/region implies its state (uf) and its
+ * country count as visited — derived in data/places/model.ts, never stored twice.
+ */
+export interface Place extends Entity {
+  name: string
+  kind: PlaceKind
+  /** ISO 3166-1 alpha-2 ('BR', 'PA', 'ZA'). */
+  country: string
+  /** Brazilian state code (incl. 'DF') when the place is in Brazil. */
+  uf?: string
+  /** The broader place it sits in (Salvador → Bahia), when she has it. */
+  parentId?: ID
+  status: PlaceStatus
+  /** Free text ("2019", "jul/2023") or a DateKey. Never invented. */
+  firstVisit?: string
+  tripIds?: ID[]
+  notes?: string
+  favorite?: boolean
+  source: 'marina' | 'seed' | 'lumos'
+  order: number
+}
+
 /** How sure an item is. Shown as CONFIRMADO / ESTIMADO / DEPENDE DO CLIMA / PENDENTE. */
 export type TripCertainty = 'confirmado' | 'estimado' | 'clima' | 'pendente'
 
@@ -2494,6 +2523,7 @@ export interface DB {
 
   trips: Trip[]
   tripItems: TripItem[]
+  places: Place[]
 
   contentItems: ContentItem[]
   partnerships: BrandPartnership[]
@@ -2584,6 +2614,7 @@ export type EntityType =
   | 'book'
   | 'trip'
   | 'tripItem'
+  | 'place'
   | 'content'
   | 'partnership'
   | 'note'
@@ -2621,6 +2652,7 @@ export const ENTITY_COLLECTION: Record<EntityType, CollectionKey> = {
   book: 'books',
   trip: 'trips',
   tripItem: 'tripItems',
+  place: 'places',
   content: 'contentItems',
   partnership: 'partnerships',
   note: 'notes',

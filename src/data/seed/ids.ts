@@ -31,7 +31,10 @@ export const SEED_IDS = {
 
 const STABLE_SEED_IDS = new Set<string>([...Object.values(SEED_IDS), 'goal-africa-pronta'])
 
-/** Ids only the seed produces: 'seed:<area>:<slug>' and the named SEED_IDS (+ default categories). */
+/**
+ * Ids only the seed produces: 'seed:<area>:<slug>', the named SEED_IDS (+ default categories) and her own lists
+ * applied as data ('marina:place:<slug>', Lugares que conheci) — deleting one is remembered in removedSeedIds.
+ */
 export function isSeedRecordId(id: string): boolean {
-  return id.startsWith('seed:') || STABLE_SEED_IDS.has(id)
+  return id.startsWith('seed:') || id.startsWith('marina:place:') || STABLE_SEED_IDS.has(id)
 }

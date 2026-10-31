@@ -10,6 +10,7 @@ import { Button, EmptyState, IconButton, Page, PageHeader, SectionTitle } from '
 import { cn } from '@/lib/cn'
 import type { Trip, TripItem } from '@/data/types'
 import { Postcard, toneVars } from './Postcard'
+import { PlacesEntry } from './places/PlacesEntry'
 import { checklistProgress, itemsOfTrip, nextChecklistItem, reviewItems, tripBuckets, tripCountdown, tripDatesLabel } from './selectors'
 
 function HeroFooter({ trip, items }: { trip: Trip; items: TripItem[] }) {
@@ -152,6 +153,9 @@ export default function TripsPage() {
           )}
         </>
       )}
+
+      <SectionTitle>Por onde andei</SectionTitle>
+      <PlacesEntry />
 
       {b.past.length > 0 && (
         <>

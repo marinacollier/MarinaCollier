@@ -175,6 +175,7 @@ export function emptyDB(): DB {
     books: [],
     trips: [],
     tripItems: [],
+    places: [],
     contentItems: [],
     partnerships: [],
     notes: [],

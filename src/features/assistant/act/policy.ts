@@ -36,6 +36,8 @@ export type ActionKind =
   | 'finance_record'
   /** Career data: activity logged, opportunity/contact/case updated. */
   | 'career_update'
+  /** Lugares que conheci: a place she has been to (direct + Desfazer). */
+  | 'place_record'
 
 const SENSITIVE: ReadonlySet<ActionKind> = new Set<ActionKind>([
   'plan_week',
