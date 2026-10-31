@@ -30,6 +30,13 @@ export { isSeedRecordId }
 const DATED_SEED_COLLECTIONS = new Set<CollectionKey>(['workouts'])
 
 /**
+ * Records of the boot-time module seeds (Expedição, Atualização mestre 31/10) are not the life seed's:
+ * a life-seed bump never retires them (the one-time update would never bring them back).
+ */
+const MODULE_SEED_PREFIXES = ['seed:za1031:', 'seed:travel:za-']
+const isModuleSeedId = (id: string) => MODULE_SEED_PREFIXES.some((p) => id.startsWith(p))
+
+/**
  * A seed addition Marina already has under her own id (she added the book herself, Lumos already
  * learned that key) is skipped instead of duplicated.
  */
@@ -108,7 +115,7 @@ export function applyLifeSeed(db: DB, today: DateKey): DB {
         // A seed record (stable id) Marina never edited → refreshed with corrected seed data
         // (e.g. a trip date she later corrected in the brief). Edited records are never touched.
         kept.push(upgraded)
-      } else if (!upgraded && r.createdAt === r.updatedAt && isSeedRecordId(r.id) && !DATED_SEED_COLLECTIONS.has(k)) {
+      } else if (!upgraded && r.createdAt === r.updatedAt && isSeedRecordId(r.id) && !isModuleSeedId(r.id) && !DATED_SEED_COLLECTIONS.has(k)) {
         // A seed record the life seed dropped (e.g. "Temas de IA para aprofundar"), never edited → retired.
       } else kept.push(r)
     }

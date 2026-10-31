@@ -308,6 +308,17 @@ export function expeditionNewItems(): NewItem<'tripItems'>[] {
 
 export const EXPEDITION_UPGRADE_IDS = UPGRADES.map((u) => u.id)
 
+/**
+ * What this seed wrote into each record (upgrades + new items), by id. A later update may replace a field
+ * only while it still holds this value — anything she changed stays hers.
+ */
+export function expeditionSeedValues(): Map<string, Partial<TripItem>> {
+  const out = new Map<string, Partial<TripItem>>()
+  for (const u of UPGRADES) out.set(u.id, { ...u.next, ...u.enrich })
+  for (const n of expeditionNewItems()) out.set(n.id!, n as Partial<TripItem>)
+  return out
+}
+
 const untouched = (r: { createdAt: string; updatedAt: string }) => r.createdAt === r.updatedAt
 
 /**
@@ -338,6 +349,8 @@ export function applyExpeditionSeed(db: DB, now: string = nowISO()): DB {
       const next: TripItem = { ...r, ...u.next, id: r.id, tripId: r.tripId, order: r.order, createdAt: r.createdAt, updatedAt: now }
       return next
     }
+    // After the Atualização mestre 31/10 a missing field means it was taken out on purpose — no refill.
+    if (db.profile.tripUpdatesApplied?.length) return r
     const fill: Partial<TripItem> = {}
     for (const [k, v] of Object.entries(u.enrich) as [keyof TripItem, unknown][]) if (r[k] === undefined) (fill as Record<string, unknown>)[k] = v
     if (!Object.keys(fill).length) return r

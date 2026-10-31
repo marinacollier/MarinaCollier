@@ -47,12 +47,12 @@ check(/(Aula|Dia livre|próxima saída)/i.test(body), 'classes / departures list
 await page.screenshot({ path: shots + 'expedicao-hoje.png', fullPage: true })
 
 for (const [name, file, re] of [
-  ['Dias', 'dias', /semana 1/i],
-  ['Pendências', 'pendencias', /liberação médica|conflitos/i],
-  ['Custos', 'custos', /margem de 15%/i],
-  ['Escola', 'escola', /preservadas/i],
-  ['Checklists', 'checklists', /trilha|surf|voo|safári/i],
-  ['Segurança', 'seguranca', /contatos de emergência/i],
+  ['Calendário', 'dias', /semana 1/i],
+  ['Reservas e pagamentos', 'reservas', /margem de 15%/i],
+  ['Treinos, estudos e trabalho', 'rotina', /preservadas/i],
+  ['Compras e bagagem', 'compras', /por pessoa/i],
+  ['Segurança e documentos', 'seguranca', /contatos de emergência/i],
+  ['Pendências', 'pendencias', /liberação médica|conflitos|nada pendente/i],
 ]) {
   await chip(page, name).click()
   await page.waitForTimeout(700)
@@ -64,7 +64,7 @@ const hasHScroll = await page.evaluate(() => document.documentElement.scrollWidt
 check(!hasHScroll, 'no horizontal scroll')
 
 // Edit Lion's Head from the Dias timeline: address + uber.
-await chip(page, 'Dias').click()
+await chip(page, 'Calendário').click()
 await page.waitForTimeout(700)
 await page.getByRole('button', { name: /Lion's Head/ }).first().click()
 await page.waitForTimeout(700)
@@ -81,7 +81,7 @@ await page.waitForTimeout(1200)
 await ctx.close()
 
 ;({ ctx, page } = await open())
-await chip(page, 'Dias').click()
+await chip(page, 'Calendário').click()
 await page.waitForTimeout(700)
 const after = await page.locator('body').innerText()
 check(after.includes('Uber ZAR 85') || /Uber\s+ZAR\s*85/.test(after), 'Uber value persisted after restart')

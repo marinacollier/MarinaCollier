@@ -13,7 +13,7 @@ import { formatBRL } from '@/lib/money'
 import { formatShortDate } from '@/lib/date'
 import { Postcard, toneVars } from './Postcard'
 import { ReviewItems, SectionItems } from './TripItems'
-import { EXPEDITION_TABS, ExpeditionView, type ExpeditionTab } from './expedition/Views'
+import { EXPEDITION_TABS, EXPEDITION_TAB_ALIAS, ExpeditionView, type ExpeditionTab } from './expedition/Views'
 import { pendencies } from './expedition/logic'
 import { TravelModeLine } from './TravelModeLine'
 import {
@@ -63,7 +63,8 @@ export default function TripPage() {
   const groups = groupsOf(trip)
   // During an Expedição the trip opens on "Hoje"; otherwise on the overview.
   const home: TripTab = trip?.expedition && tripPhase(trip, today) === 'em_viagem' ? 'hoje' : 'visao'
-  const asked = params.get('s') as TripTab | null
+  const askedRaw = params.get('s') as TripTab | null
+  const asked = (askedRaw && EXPEDITION_TAB_ALIAS[askedRaw as ExpeditionTab]) || askedRaw
   const tab = (asked && TRIP_TABS.some((t) => t.id === asked) && groups.some((g) => g.sections.includes(asked)) ? asked : home) as TripTab
   const group = params.get('g') ?? undefined
   const setTab = (t: TripTab, g?: string) => setParams(t === home ? {} : g ? { s: t, g } : { s: t }, { replace: true })

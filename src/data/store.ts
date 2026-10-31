@@ -19,6 +19,7 @@ import { applySpiritualSeed } from './seed/spiritual'
 import { applyAtelieSeed } from './seed/atelie'
 import { applyUniverseSeed } from './seed/universe'
 import { applyExpeditionSeed } from './seed/expedition'
+import { applyMaster1031 } from './seed/master-1031'
 import { applyUgcCrmSeed } from './seed/ugc-crm'
 import { migrateUgc } from './ugc/migrate'
 import { createIndexedDBAdapter, type StorageAdapter } from './storage'
@@ -244,8 +245,9 @@ function flush() {
  * The module seeds every boot applies (idempotent; respect her edits and removedSeedIds).
  * Last: modo viagem drops untouched template workouts on trip days (see travel-mode.ts).
  */
-export function applyModuleSeeds(db: DB): DB {
-  return pruneTravelWorkouts(applyAtelieSeed(migrateUgc(applyExpeditionSeed(applyUniverseSeed(applySpiritualSeed(db))))))
+export function applyModuleSeeds(db: DB, today: string = todayKey()): DB {
+  // The one-time Atualização mestre 31/10 runs right after the Expedição seed it builds on.
+  return pruneTravelWorkouts(applyAtelieSeed(migrateUgc(applyMaster1031(applyExpeditionSeed(applyUniverseSeed(applySpiritualSeed(db))), today))))
 }
 
 export async function hydrate(storage: StorageAdapter = createIndexedDBAdapter()): Promise<void> {

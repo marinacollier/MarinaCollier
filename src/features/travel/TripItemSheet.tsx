@@ -21,8 +21,8 @@ import {
   type ItemStatus,
   type PaymentStatus,
 } from './selectors'
-import { ExpeditionFields, cleanDraft, draftOf, type ExpeditionDraft } from './expedition/ExpeditionFields'
-import { bookingPatch } from './expedition/logic'
+import { ExpeditionFields, cleanDraft, draftOf, missingProof, type ExpeditionDraft } from './expedition/ExpeditionFields'
+import { bookingStatusOf, bookingStatusPatch } from './expedition/command'
 
 export default function TripItemSheet({ id, tripId, section: sectionProp, group: groupProp }: SheetProps<'tripItem'>) {
   const trips = useDB((db) => db.trips)
@@ -44,7 +44,11 @@ export default function TripItemSheet({ id, tripId, section: sectionProp, group:
   const [url, setUrl] = useState(existing?.url ?? '')
   const [amountCents, setAmountCents] = useState(existing?.amountCents)
   const [code, setCode] = useState(existing?.confirmationCode ?? '')
-  const [x, setX] = useState<ExpeditionDraft>(() => draftOf(existing))
+  // Her status vocabulary starts from what the item reads today (stored or derived).
+  const [x, setX] = useState<ExpeditionDraft>(() => {
+    const d = draftOf(existing)
+    return existing && trips.find((t) => t.id === existing.tripId)?.expedition ? { ...d, bookingStatus: bookingStatusOf(existing) } : d
+  })
   const patchX = (p: ExpeditionDraft) => setX((d) => ({ ...d, ...p }))
 
   const groups = useMemo(() => (trip ? groupsOfTrip(itemsOfTrip(allItems, trip)) : []), [allItems, trip])
@@ -52,9 +56,10 @@ export default function TripItemSheet({ id, tripId, section: sectionProp, group:
   const tripRec = trips.find((t) => t.id === trip)
   const showExpedition = !!tripRec?.expedition || Object.keys(draftOf(existing)).length > 0
 
+  const needsProof = showExpedition && missingProof(x, code)
   const save = () => {
     const t = title.trim()
-    if (!t || !trip) return
+    if (!t || !trip || needsProof) return
     const u = url.trim()
     const patch = {
       tripId: trip,
@@ -94,7 +99,7 @@ export default function TripItemSheet({ id, tripId, section: sectionProp, group:
     <SheetLayout
       eyebrow={existing ? 'editar item' : 'novo item'}
       onClose={closeSheet}
-      primary={{ label: existing ? 'Salvar' : 'Adicionar', onClick: save, disabled: !title.trim() || !trip }}
+      primary={{ label: existing ? 'Salvar' : 'Adicionar', onClick: save, disabled: !title.trim() || !trip || needsProof }}
       onDelete={
         existing
           ? () => {
@@ -148,6 +153,7 @@ export default function TripItemSheet({ id, tripId, section: sectionProp, group:
         </div>
       )}
 
+      {!tripRec?.expedition && (
       <div>
         <div className="text-[13px] font-medium text-ink-2 mb-1.5 px-0.5">Status</div>
         <div className="flex flex-wrap gap-1.5">
@@ -168,6 +174,7 @@ export default function TripItemSheet({ id, tripId, section: sectionProp, group:
         </div>
         {status === 'a_confirmar' && <p className="text-[12px] text-muted mt-1.5 px-0.5">Fica “a confirmar” até você ter certeza — nada é dado como garantido.</p>}
       </div>
+      )}
 
       {(PAYABLE_SECTIONS.includes(section) || payment) && (
         <div>
@@ -228,13 +235,13 @@ export default function TripItemSheet({ id, tripId, section: sectionProp, group:
             set={patchX}
             when={{ date, endDate, time: date ? time : undefined, section }}
             status={status}
+            confirmationCode={code}
             onBooking={(b) => {
-              patchX({ booking: b })
-              if (!b) return
-              const bp = bookingPatch(b)
-              setStatus(bp.status!)
+              if (!b) return patchX({ bookingStatus: undefined })
+              const { status: st, ...rest } = bookingStatusPatch(b)
+              patchX(rest)
+              setStatus(st!)
               setStatusTouched(true)
-              if (bp.paymentStatus) setPayment(bp.paymentStatus)
             }}
           />
         </section>

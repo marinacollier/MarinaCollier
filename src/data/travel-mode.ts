@@ -73,6 +73,7 @@ export function travelModeLine(t: Trip): string {
 export function classBlockOn(t: Trip, date: DateKey): { start: string; end: string; name: string } | undefined {
   const s = t.expedition?.school
   if (!s || date < s.from || date > s.until) return undefined
+  if (s.holidays?.some((h) => h.date === date)) return undefined
   const d = s.days.find((x) => x.weekday === weekday(date))
   return d ? { start: d.start, end: d.end, name: s.name } : undefined
 }

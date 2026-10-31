@@ -3,9 +3,10 @@
  * the next departure and what she spent — instead of the São Paulo routine.
  * Pure: reads the DB, never writes. Built on the expedition logic (classOn / schoolDays / nextDeparture).
  */
-import type { DateKey, DB, Trip, TripCurrency, TripItem } from '@/data/types'
+import type { DateKey, DB, Trip, TripCurrency, TripItem, Workout } from '@/data/types'
 import { travelTripOn } from '@/data/travel-mode'
 import { diffDays, hmToMinutes } from '@/lib/date'
+import { tripDashboard, type TripDashboard } from './expedition/command'
 import { classOn, convert, isActive, itemsOnDay, nextDeparture, schoolDays, type ClassBlock, type Departure } from './expedition/logic'
 
 const SPORT_KINDS = new Set(['trilha', 'corrida', 'natacao', 'surf', 'bike', 'scuba'])
@@ -33,6 +34,10 @@ export interface TripDay {
   currency: TripCurrency
   /** Paid that day (activities, food, Uber), in the trip currency. Undefined when nothing logged. */
   spentCents?: number
+  /** The trip's planned workouts that day (trip plan; the SP template stays paused). */
+  workouts: Workout[]
+  /** The command-center strip (next commitment, priorities, bookings, answers, spend, days to the flight). */
+  dashboard: TripDashboard
 }
 
 /** The trip day for `date` when modo viagem covers it. `minutes` = local clock for "próxima saída". */
@@ -71,6 +76,8 @@ export function tripDayOf(db: DB, date: DateKey, minutes = 0): TripDay | undefin
     next: nextDeparture(all, { date, minutes }),
     currency,
     spentCents: any ? spent : undefined,
+    workouts: db.workouts.filter((w) => w.date === date && w.status !== 'pulado'),
+    dashboard: tripDashboard(trip, all, db.tasks, { date, minutes }),
   }
 }
 

@@ -398,6 +398,8 @@ export interface UserProfile {
   syncsApplied?: string[]
   /** Bíblia reconciliations (by id, e.g. '2026-10-15') she reviewed and applied — never twice. */
   spiritualUpdatesApplied?: string[]
+  /** One-time trip updates (by id, e.g. 'za-2026-10-31' = Atualização mestre 31/10) already applied — never twice. */
+  tripUpdatesApplied?: string[]
   /** "Importar estudo" history (what came in, when, which fields she kept). */
   spiritualImports?: SpiritualImportLog[]
   /** Meu Universo: olfactory profile + makeup style (editable; seeded once when missing). */
@@ -1537,6 +1539,37 @@ export type TripBooking =
 
 export type TripCurrency = 'ZAR' | 'BRL'
 
+/**
+ * Her status vocabulary (Atualização mestre 31/10) + PLANEJADO for activities without a voucher.
+ * RESERVADO only with a voucher, proof or the supplier's confirmation (`voucherUrl`, `confirmationCode` or `proof`).
+ * Kept in step with `status`/`booking` (see expedition/command.ts `bookingStatusPatch`).
+ */
+export type TripBookingStatus =
+  | 'concluido'
+  | 'reservado'
+  | 'aguardando_resposta'
+  | 'a_cotar'
+  | 'a_reservar'
+  | 'opcional'
+  | 'cancelado'
+  | 'planejado'
+
+export type TripPriority = 'P0' | 'P1' | 'P2'
+
+/** Budget categories (section 13 of her master update). Missing = derived from the section. */
+export type TripBudgetCategory =
+  | 'hospedagem'
+  | 'safari'
+  | 'transfers'
+  | 'tours'
+  | 'alimentacao'
+  | 'uber'
+  | 'treinos'
+  | 'compras'
+  | 'presentes'
+  | 'bagagem'
+  | 'emergencia'
+
 export type TripChecklistKind = 'trilha' | 'corrida' | 'natacao' | 'surf' | 'bike' | 'scuba' | 'safari' | 'voo' | 'voluntariado'
 
 export interface TripSchool {
@@ -1547,6 +1580,12 @@ export interface TripSchool {
   until: DateKey
   /** Class hours per weekday (local time of the trip). */
   days: { weekday: Weekday; start: TimeHM; end: TimeHM }[]
+  /** Days without class for everyone (holiday) — not an absence. */
+  holidays?: { date: DateKey; label: string }[]
+  /** Daily review she wants, as she wrote it ("15–20 minutos"). */
+  reviewMinutes?: string
+  /** What to practise (conversação, pronúncia…). */
+  focus?: string[]
 }
 
 /** Trip-level settings of an Expedição. Every value is hers to edit; nothing here is fetched live. */
@@ -1654,6 +1693,23 @@ export interface TripItem extends Entity {
   cancelReason?: 'vento' | 'chuva' | 'mar' | 'outro'
   /** Community activity: educational visit vs. volunteer work. */
   volunteer?: 'visita_educativa' | 'voluntariado'
+
+  // ── Command center (Atualização mestre 31/10) ──
+  /** Her status vocabulary. Missing = derived from status/booking (expedition/command.ts `bookingStatusOf`). */
+  bookingStatus?: TripBookingStatus
+  priority?: TripPriority
+  category?: TripBudgetCategory
+  nextAction?: string
+  /** Deadline to resolve it. */
+  deadline?: DateKey
+  /** Supplier's confirmation in words ("e-mail da Cape Velo de 02/11") when there is no voucher link. */
+  proof?: string
+  /** Caveat shown next to the status ("sujeito à conferência do bilhete"). */
+  caveat?: string
+  /** Shopping: who it is for. */
+  person?: string
+  /** No class that day and she has not said whether it was an absence (shown "a confirmar"). */
+  schoolToConfirm?: boolean
 }
 
 // ─── Content / UGC ──────────────────────────────────────────────────────────

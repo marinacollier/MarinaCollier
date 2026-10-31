@@ -13,7 +13,7 @@ import { schoolLine, type TripDay } from '@/features/travel/trip-day'
 
 export function TripDayCard({ day }: { day: TripDay }) {
   const nav = useNavigate()
-  const { trip, next, sports, school } = day
+  const { trip, next, sports, school, dashboard: dash } = day
   const place = trip.expedition?.weather?.label ?? trip.place?.split(/[·(]/)[0]?.trim() ?? trip.name
   const cls = schoolLine(day)
   const end = trip.endDate ?? trip.startDate
@@ -40,10 +40,24 @@ export function TripDayCard({ day }: { day: TripDay }) {
             </span>
           </li>
         )}
-        {sports.length > 0 && (
+        {(sports.length > 0 || day.workouts.length > 0) && (
           <li className="flex gap-2.5">
             <span aria-hidden className="w-5 shrink-0 text-center">🏄‍♀️</span>
-            <span>Treino do dia: {sports.map((s) => s.title).join(' · ')}</span>
+            <span>Treino do dia: {[...sports.map((s) => s.title), ...day.workouts.map((w) => `${w.title ?? w.modality}${w.status === 'feito' ? ' ✓' : ''}`)].join(' · ')}</span>
+          </li>
+        )}
+        {dash.priorities.length > 0 && (
+          <li className="flex gap-2.5">
+            <span aria-hidden className="w-5 shrink-0 text-center">🎯</span>
+            <span>Prioridades: {dash.priorities.map((p) => p.title).join(' · ')}</span>
+          </li>
+        )}
+        {(dash.pendingBookings.length > 0 || dash.awaiting.length > 0) && (
+          <li className="flex gap-2.5">
+            <span aria-hidden className="w-5 shrink-0 text-center">🎟️</span>
+            <span>
+              {dash.pendingBookings.length} {dash.pendingBookings.length === 1 ? 'reserva pendente' : 'reservas pendentes'} · {dash.awaiting.length} {dash.awaiting.length === 1 ? 'resposta aguardada' : 'respostas aguardadas'}
+            </span>
           </li>
         )}
         {day.spentCents != null && (
@@ -53,7 +67,11 @@ export function TripDayCard({ day }: { day: TripDay }) {
           </li>
         )}
       </ul>
-      {end && <p className="text-[12.5px] text-muted mt-3">Rotina de SP pausada até {shortDM(end)} — volta sozinha depois.</p>}
+      <p className="text-[12.5px] text-ink-2 mt-3">
+        Gasto confirmado {formatMoney(dash.spentCents, dash.currency)}
+        {dash.daysToFlight != null && dash.daysToFlight >= 0 ? ` · ${dash.daysToFlight === 0 ? 'voo de volta hoje' : `${dash.daysToFlight} ${dash.daysToFlight === 1 ? 'dia' : 'dias'} até o voo`}` : ''}
+      </p>
+      {end && <p className="text-[12.5px] text-muted mt-1">Rotina de SP pausada até {shortDM(end)} — volta sozinha depois.</p>}
     </Card>
   )
 }

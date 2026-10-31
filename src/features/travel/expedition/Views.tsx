@@ -40,9 +40,16 @@ import {
 } from './logic'
 import { useForecast } from './weather'
 import { CertaintyBadge, DayItem, ItemChecklist, MapLinks, MoneyPair } from './ui'
+import { AlertList, Compras, DashboardStrip, DayExtras, Reservas, RotinaTop, SegurancaTop } from './Command'
 
-export type ExpeditionTab = 'hoje' | 'dias' | 'pendencias' | 'custos' | 'escola' | 'checklists' | 'seguranca'
-export const EXPEDITION_TABS: ExpeditionTab[] = ['hoje', 'dias', 'pendencias', 'custos', 'escola', 'checklists', 'seguranca']
+export type ExpeditionTab = 'hoje' | 'dias' | 'reservas' | 'rotina' | 'compras' | 'seguranca' | 'pendencias' | 'custos' | 'escola' | 'checklists'
+/**
+ * The five views of her command center (+ Painel on top and Pendências): 1 Calendário, 2 Reservas e pagamentos,
+ * 3 Treinos/estudos/trabalho, 4 Compras e bagagem, 5 Segurança e documentos. Older links (?s=custos/escola/
+ * checklists) open the view that now holds them.
+ */
+export const EXPEDITION_TABS: ExpeditionTab[] = ['hoje', 'dias', 'reservas', 'rotina', 'compras', 'seguranca', 'pendencias']
+export const EXPEDITION_TAB_ALIAS: Partial<Record<ExpeditionTab, ExpeditionTab>> = { custos: 'reservas', escola: 'rotina', checklists: 'seguranca' }
 
 interface ViewProps {
   trip: Trip & { expedition: TripExpedition }
@@ -57,6 +64,22 @@ export function ExpeditionView({ tab, ...p }: ViewProps & { tab: ExpeditionTab }
       return <Hoje {...p} />
     case 'dias':
       return <Dias {...p} />
+    case 'reservas':
+      return (
+        <div className="space-y-6">
+          <Reservas trip={p.trip} items={p.items} />
+          <Custos {...p} />
+        </div>
+      )
+    case 'rotina':
+      return (
+        <div className="space-y-4">
+          <RotinaTop trip={p.trip} />
+          <Escola {...p} />
+        </div>
+      )
+    case 'compras':
+      return <Compras trip={p.trip} items={p.items} />
     case 'pendencias':
       return <Pendencias {...p} />
     case 'custos':
@@ -66,7 +89,14 @@ export function ExpeditionView({ tab, ...p }: ViewProps & { tab: ExpeditionTab }
     case 'checklists':
       return <Checklists {...p} />
     case 'seguranca':
-      return <Seguranca {...p} />
+      return (
+        <div className="space-y-6">
+          <SegurancaTop trip={p.trip} items={p.items} />
+          <Seguranca {...p} />
+          <h3 className="eyebrow px-1">checklists das atividades</h3>
+          <Checklists {...p} />
+        </div>
+      )
   }
 }
 
@@ -107,6 +137,10 @@ function Hoje({ trip, items, onGo }: ViewProps) {
           </p>
         )}
       </div>
+
+      <DashboardStrip trip={trip} items={items} />
+
+      <AlertList trip={trip} limit={4} />
 
       <WeatherCard trip={trip} day={day} />
 
@@ -423,6 +457,7 @@ function DayCard({ trip, items, date, today, conflicts }: { trip: ViewProps['tri
         </div>
       ))}
       <DayTimeline trip={trip} items={items} date={date} />
+      <DayExtras trip={trip} date={date} />
       <div className="text-right">
         <button type="button" className="text-[12.5px] text-muted h-8 px-1" onClick={() => openSheet('tripItem', { tripId: trip.id, section: 'roteiro' })}>
           + atividade
@@ -723,7 +758,7 @@ function Escola({ trip, items }: ViewProps) {
       </div>
     )
   }
-  const affected = days.filter((d) => d.impact !== 'nenhum' || d.conflicts.length)
+  const affected = days.filter((d) => d.impact !== 'nenhum' || d.conflicts.length || d.toConfirm.length)
   return (
     <div className="space-y-4">
       <Card>
@@ -734,6 +769,12 @@ function Escola({ trip, items }: ViewProps) {
           <Count n={s.lost} label="perdidas" />
           <Count n={s.madeUp} label="repostas" />
         </div>
+        {(s.toConfirm > 0 || (school.holidays?.length ?? 0) > 0) && (
+          <p className="text-[12.5px] text-ink-2 mt-2">
+            {s.toConfirm > 0 && `${s.toConfirm} ${s.toConfirm === 1 ? 'dia sem aula a confirmar' : 'dias sem aula a confirmar'} (falta ou não houve aula?). `}
+            {school.holidays?.map((h) => `${formatShortDate(h.date)}: ${h.label}`).join(' · ')}
+          </p>
+        )}
         <p className="text-[12.5px] text-muted mt-3">
           {s.total} dias de aula de {formatShortDate(school.from)} a {formatShortDate(school.until)}.
           {s.uncertain > 0 && ` ${s.uncertain} ${s.uncertain === 1 ? 'ausência depende' : 'ausências dependem'} de reserva, clima ou liberação.`}
@@ -768,6 +809,11 @@ function Escola({ trip, items }: ViewProps) {
                       reposta
                     </label>
                   </div>
+                ))}
+                {d.toConfirm.map((i) => (
+                  <button key={i.id} type="button" onClick={() => openSheet('tripItem', { id: i.id })} className="mt-1.5 w-full text-left text-[12.5px] rounded-lg bg-surface-2 px-2.5 py-1.5 text-ink-2">
+                    Sem aula · {i.title} — a confirmar se foi falta.
+                  </button>
                 ))}
                 {d.conflicts.map((i) => (
                   <button key={i.id} type="button" onClick={() => openSheet('tripItem', { id: i.id })} className="mt-1.5 w-full text-left text-[12.5px] rounded-lg bg-sand-soft px-2.5 py-1.5 text-ink-2">

@@ -15,7 +15,7 @@ const NOW: Now = { date: DAY, minutes: 7 * 60, iso: `${DAY}T07:00:00.000-03:00` 
 const reply = () => useConversation.getState().exchanges.at(-1)!.lumos!.reply
 
 beforeEach(() => {
-  useStore.setState({ db: applyModuleSeeds(buildSeed(DAY)), hydrated: true })
+  useStore.setState({ db: applyModuleSeeds(buildSeed(DAY), DAY), hydrated: true })
   clearConversation()
 })
 

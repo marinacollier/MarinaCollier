@@ -4,11 +4,12 @@
  */
 import type { ReactNode } from 'react'
 import { AlertTriangle } from 'lucide-react'
-import type { Trip, TripBooking, TripCertainty, TripChecklistKind, TripItem } from '@/data/types'
-import { Checkbox, Field, MoreOptions, NumberInput, Select, TextArea, TextInput, TimeInput } from '@/components/ui'
+import type { Trip, TripBookingStatus, TripBudgetCategory, TripCertainty, TripChecklistKind, TripItem, TripPriority } from '@/data/types'
+import { Checkbox, DateInput, Field, MoreOptions, NumberInput, Select, TextArea, TextInput, TimeInput } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { formatLongDate } from '@/lib/date'
-import { BOOKING_META, BOOKING_ORDER, CANCEL_REASON_LABEL, CERTAINTY_META, CERTAINTY_ORDER, CHECKLIST_LABEL, classClash } from './logic'
+import { CANCEL_REASON_LABEL, CERTAINTY_META, CERTAINTY_ORDER, CHECKLIST_LABEL, classClash } from './logic'
+import { BOOKING_STATUS_META, BOOKING_STATUS_ORDER, CATEGORY_META, CATEGORY_ORDER, PRIORITIES, hasProof } from './command'
 import { CentsInput, MapLinks } from './ui'
 
 /** The expedition part of a TripItem (what this component edits). */
@@ -49,13 +50,23 @@ export type ExpeditionDraft = Pick<
   | 'opportunityCost'
   | 'cancelReason'
   | 'volunteer'
+  | 'bookingStatus'
+  | 'priority'
+  | 'category'
+  | 'nextAction'
+  | 'deadline'
+  | 'proof'
+  | 'caveat'
+  | 'person'
+  | 'schoolToConfirm'
 >
 
 export const DRAFT_KEYS: (keyof ExpeditionDraft)[] = [
   'certainty', 'booking', 'endTime', 'wakeTime', 'prepTime', 'leaveTime', 'returnTime', 'address', 'route', 'travelMinutes', 'currency',
   'estimatedCents', 'quotedCents', 'paidCents', 'uberCents', 'outfit', 'checklistKind', 'contact', 'voucherUrl', 'supplier', 'cancellationPolicy',
   'pickup', 'needsPickup', 'pickupConfirmed', 'risk', 'planB', 'schoolImpact', 'schoolMadeUp', 'clearance', 'optional', 'flexible', 'indoor',
-  'opportunityCost', 'cancelReason', 'volunteer',
+  'opportunityCost', 'cancelReason', 'volunteer', 'bookingStatus', 'priority', 'category', 'nextAction', 'deadline', 'proof', 'caveat', 'person',
+  'schoolToConfirm',
 ]
 
 export function draftOf(i?: TripItem): ExpeditionDraft {
@@ -63,6 +74,11 @@ export function draftOf(i?: TripItem): ExpeditionDraft {
   if (!i) return d
   for (const k of DRAFT_KEYS) if (i[k] !== undefined) (d as Record<string, unknown>)[k] = i[k]
   return d
+}
+
+/** RESERVADO without voucher, code or the supplier's confirmation: the sheet asks for one before saving. */
+export function missingProof(d: ExpeditionDraft, confirmationCode?: string): boolean {
+  return d.bookingStatus === 'reservado' && !hasProof({ voucherUrl: d.voucherUrl, proof: d.proof, confirmationCode })
 }
 
 /** Empty strings/false become undefined so an untouched field never lands in the record. */
@@ -113,6 +129,7 @@ export function ExpeditionFields({
   when,
   status,
   onBooking,
+  confirmationCode,
 }: {
   trip: Trip
   draft: ExpeditionDraft
@@ -120,8 +137,10 @@ export function ExpeditionFields({
   /** Date/time being edited in the sheet (for the class warning). */
   when: Pick<TripItem, 'date' | 'endDate' | 'time' | 'section'>
   status: TripItem['status']
-  /** Booking picked → the sheet keeps status/payment in step. */
-  onBooking: (b: TripBooking | undefined) => void
+  /** Status picked → the sheet keeps status/booking/payment in step. */
+  onBooking: (b: TripBookingStatus | undefined) => void
+  /** The sheet's booking code (counts as proof for RESERVADO). */
+  confirmationCode?: string
 }) {
   const cur = draft.currency ?? trip.expedition?.currency ?? 'BRL'
   const clash = trip.expedition ? classClash(trip, { ...when, ...draft }) : undefined
@@ -143,10 +162,56 @@ export function ExpeditionFields({
       </div>
 
       <div>
-        <div className="text-[13px] font-medium text-ink-2 mb-1.5 px-0.5">Reserva</div>
-        <Chips label="Reserva" value={draft.booking} onPick={(v) => onBooking(v as TripBooking | undefined)} options={BOOKING_ORDER.map((b) => ({ value: b, label: BOOKING_META[b].label }))} />
-        {draft.optional && (draft.booking === 'concluido' || status === 'feito') && <p className="text-[12px] text-muted mt-1.5 px-0.5">Extra marcado como feito — só se você confirmou que rolou.</p>}
+        <div className="text-[13px] font-medium text-ink-2 mb-1.5 px-0.5">Status da reserva</div>
+        <Chips
+          label="Status da reserva"
+          value={draft.bookingStatus}
+          onPick={(v) => onBooking(v as TripBookingStatus | undefined)}
+          options={BOOKING_STATUS_ORDER.map((b) => ({ value: b, label: BOOKING_STATUS_META[b].label, cls: BOOKING_STATUS_META[b].cls }))}
+        />
+        {draft.optional && (draft.bookingStatus === 'concluido' || status === 'feito') && <p className="text-[12px] text-muted mt-1.5 px-0.5">Extra marcado como feito — só se você confirmou que rolou.</p>}
+        {draft.bookingStatus === 'planejado' && <p className="text-[12px] text-muted mt-1.5 px-0.5">Sem voucher fica PLANEJADO — não reservado.</p>}
       </div>
+
+      {draft.bookingStatus === 'reservado' && (
+        <div className={cn('rounded-xl px-3 py-3 space-y-2.5', missingProof(draft, confirmationCode) ? 'bg-sand-soft' : 'bg-sage-soft')} role="group" aria-label="Comprovante da reserva">
+          <p className="text-[13px] text-ink-2">
+            {missingProof(draft, confirmationCode)
+              ? 'RESERVADO só com voucher, comprovante ou confirmação do fornecedor. Cole o link do voucher ou descreva a confirmação.'
+              : 'Reserva com comprovante ✓'}
+          </p>
+          <Field label="Voucher / comprovante (link)">
+            <TextInput inputMode="url" placeholder="https://…" value={draft.voucherUrl ?? ''} onChange={(e) => set({ voucherUrl: e.target.value })} />
+          </Field>
+          <Field label="Confirmação do fornecedor">
+            <TextInput placeholder="ex.: e-mail da Cape Velo de 02/11" value={draft.proof ?? ''} onChange={(e) => set({ proof: e.target.value })} />
+          </Field>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-2.5">
+        <div>
+          <div className="text-[13px] font-medium text-ink-2 mb-1.5 px-0.5">Prioridade</div>
+          <Chips label="Prioridade" value={draft.priority} onPick={(v) => set({ priority: v as TripPriority | undefined })} options={PRIORITIES.map((p) => ({ value: p, label: p }))} />
+        </div>
+        <Field label="Categoria">
+          <Select<TripBudgetCategory> value={draft.category} placeholder="Pela seção" onChange={(v) => set({ category: v })} options={CATEGORY_ORDER.map((c) => ({ value: c, label: `${CATEGORY_META[c].emoji} ${CATEGORY_META[c].label}` }))} />
+        </Field>
+      </div>
+      <Field label="Próxima ação">
+        <TextInput placeholder="O que destrava isto" value={draft.nextAction ?? ''} onChange={(e) => set({ nextAction: e.target.value })} />
+      </Field>
+      <div className="grid grid-cols-2 gap-2.5">
+        <Field label="Prazo para resolver">
+          <DateInput value={draft.deadline} onChange={(v) => set({ deadline: v })} />
+        </Field>
+        <Field label="Para quem">
+          <TextInput placeholder="compras/presentes" value={draft.person ?? ''} onChange={(e) => set({ person: e.target.value })} />
+        </Field>
+      </div>
+      <Field label="Ressalva">
+        <TextInput placeholder="ex.: sujeito à conferência do bilhete" value={draft.caveat ?? ''} onChange={(e) => set({ caveat: e.target.value })} />
+      </Field>
 
       {status === 'cancelado' && (
         <div>
@@ -264,6 +329,11 @@ export function ExpeditionFields({
           <div className="text-[13px] font-medium text-ink-2 mb-1.5 px-0.5">Impacto na escola</div>
           <Chips label="Impacto na escola" value={draft.schoolImpact} onPick={(v) => set({ schoolImpact: v })} options={[{ value: 'parcial', label: 'Perde parte da aula' }, { value: 'dia', label: 'Sem aula no dia' }]} />
         </div>
+        {!draft.schoolImpact && (
+          <Toggle checked={draft.schoolToConfirm} onChange={(v) => set({ schoolToConfirm: v || undefined })}>
+            Sem aula — falta a confirmar
+          </Toggle>
+        )}
         {draft.schoolImpact && (
           <Toggle checked={draft.schoolMadeUp} onChange={(v) => set({ schoolMadeUp: v })}>
             Aula reposta

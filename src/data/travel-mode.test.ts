@@ -49,7 +49,7 @@ function herDB(patch: (db: DB) => DB = (d) => d): DB {
   return patch(db)
 }
 
-const ready = (patch?: (db: DB) => DB) => applyModuleSeeds(herDB(patch))
+const ready = (patch?: (db: DB) => DB) => applyModuleSeeds(herDB(patch), TODAY)
 const trip = (db: DB) => db.trips.find((t) => t.id === TRIP)!
 const withTrip = (db: DB, p: Partial<Trip>): DB => ({ ...db, trips: db.trips.map((t) => (t.id === TRIP ? { ...t, ...p } : t)) })
 
@@ -90,7 +90,7 @@ describe('treinos', () => {
   it('is idempotent and deterministic', () => {
     const once = ready()
     expect(pruneTravelWorkouts(once)).toBe(once)
-    expect(applyModuleSeeds(once)).toBe(once)
+    expect(applyModuleSeeds(once, TODAY)).toBe(once)
     expect(ready().workouts.map((w) => w.id)).toEqual(once.workouts.map((w) => w.id))
   })
 

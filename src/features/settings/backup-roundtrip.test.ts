@@ -4,10 +4,9 @@
  */
 import 'fake-indexeddb/auto'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { actions, flushNow, getDB, hydrate } from '@/data/store'
+import { actions, applyModuleSeeds, flushNow, getDB, hydrate } from '@/data/store'
 import { createMemoryAdapter } from '@/data/storage'
 import { buildSeed } from '@/data/seed'
-import { applyExpeditionSeed } from '@/data/seed/expedition'
 import type { DB } from '@/data/types'
 import { checksumOf, makeBackup, parseBackupText, validateBackup, type BackupPreview } from './backup'
 import { daysSinceBackup, restoreBackup } from './backup-io'
@@ -68,7 +67,7 @@ const counts = (db: DB) =>
 beforeEach(async () => {
   await hydrate(createMemoryAdapter())
   // A device that has booted at least once (boot-time seeds such as the Expedição already applied).
-  actions.replaceDB(applyExpeditionSeed(buildSeed(TODAY)))
+  actions.replaceDB(applyModuleSeeds(buildSeed(TODAY)))
 })
 
 describe('backup → restore round trip', () => {

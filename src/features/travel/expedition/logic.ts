@@ -118,8 +118,14 @@ export interface ClassBlock {
 export function classOn(exp: TripExpedition | undefined, date: DateKey): ClassBlock | undefined {
   const s = exp?.school
   if (!s || date < s.from || date > s.until) return undefined
+  if (s.holidays?.some((h) => h.date === date)) return undefined
   const d = s.days.find((x) => x.weekday === weekday(date))
   return d ? { start: d.start, end: d.end } : undefined
+}
+
+/** The school's holiday on that day (no class for anyone — never an absence). */
+export function schoolHolidayOn(exp: TripExpedition | undefined, date: DateKey): { date: DateKey; label: string } | undefined {
+  return exp?.school?.holidays?.find((h) => h.date === date)
 }
 
 /** Items that touch a day (multi-day items on every day of their span). */
@@ -167,6 +173,8 @@ export interface SchoolDay {
   absences: TripItem[]
   /** Timed items over class hours that did not declare an impact. */
   conflicts: TripItem[]
+  /** No class that day and she has not said whether it was an absence. */
+  toConfirm: TripItem[]
 }
 
 export function schoolDays(trip: Trip, items: TripItem[]): SchoolDay[] {
@@ -184,7 +192,8 @@ export function schoolDays(trip: Trip, items: TripItem[]): SchoolDay[] {
       const w = busyWindow(i, d)
       return !!w && overlaps(w, cw)
     })())
-    out.push({ date: d, block, impact, madeUp: absences.length > 0 && absences.every((i) => i.schoolMadeUp), absences, conflicts })
+    const toConfirm = absences.length ? [] : day.filter((i) => i.schoolToConfirm && i.date === d)
+    out.push({ date: d, block, impact, madeUp: absences.length > 0 && absences.every((i) => i.schoolMadeUp), absences, conflicts, toConfirm })
   }
   return out
 }
@@ -197,12 +206,15 @@ export interface SchoolSummary {
   madeUp: number
   /** Absences that still depend on something (booking, weather, clearance). */
   uncertain: number
+  /** Days without class that she has not classified yet (absence or no class?). */
+  toConfirm: number
 }
 
 export function schoolSummary(days: SchoolDay[]): SchoolSummary {
-  const s: SchoolSummary = { total: days.length, preserved: 0, partial: 0, lost: 0, madeUp: 0, uncertain: 0 }
+  const s: SchoolSummary = { total: days.length, preserved: 0, partial: 0, lost: 0, madeUp: 0, uncertain: 0, toConfirm: 0 }
   for (const d of days) {
-    if (d.impact === 'nenhum') s.preserved++
+    if (d.impact === 'nenhum' && d.toConfirm.length) s.toConfirm++
+    else if (d.impact === 'nenhum') s.preserved++
     else if (d.madeUp) s.madeUp++
     else if (d.impact === 'dia') s.lost++
     else s.partial++

@@ -9,7 +9,8 @@ import { Checkbox } from '@/components/ui'
 import { actions } from '@/data/store'
 import { cn } from '@/lib/cn'
 import { centsToInput, parseBRL } from '@/lib/money'
-import { BOOKING_META, CERTAINTY_META, CHECKLIST_LABEL, bookingOf, certaintyOf, checklistOf, convert, directionsUrl, formatMoney, toggleChecked } from './logic'
+import { BOOKING_STATUS_META, bookingStatusOf } from './command'
+import { CERTAINTY_META, CHECKLIST_LABEL, certaintyOf, checklistOf, convert, directionsUrl, formatMoney, toggleChecked } from './logic'
 
 export function CertaintyBadge({ item, className }: { item: TripItem; className?: string }) {
   const c = certaintyOf(item)
@@ -20,10 +21,14 @@ export function CertaintyBadge({ item, className }: { item: TripItem; className?
   )
 }
 
-export function BookingBadge({ item }: { item: TripItem }) {
-  const b = bookingOf(item)
-  if (!b || b === 'confirmado' || b === 'cancelado') return null
-  return <span className="inline-flex items-center h-6 px-2 rounded-full text-[11.5px] border border-line text-ink-2 whitespace-nowrap shrink-0">{BOOKING_META[b].label}</span>
+/** Her status vocabulary (CONCLUÍDO, RESERVADO, AGUARDANDO RESPOSTA…), derived when not stored. */
+export function StatusBadge({ item, className }: { item: TripItem; className?: string }) {
+  const s = bookingStatusOf(item)
+  return (
+    <span className={cn('inline-flex items-center h-6 px-2 rounded-full font-sport text-[10.5px] tracking-[0.1em] whitespace-nowrap shrink-0', BOOKING_STATUS_META[s].cls, className)}>
+      {BOOKING_STATUS_META[s].label}
+    </span>
+  )
 }
 
 /** "ZAR 1.200 · R$ 360" — BRL only with her rate. */
@@ -142,9 +147,12 @@ export function DayItem({ trip, item, date, children }: { trip: Trip; item: Trip
           <div className="mt-1 space-y-1">
             <TimesLine item={item} />
             {meta.length > 0 && <div className="text-[12.5px] text-muted leading-snug">{meta.join(' · ')}</div>}
-            {(item.optional || bookingOf(item) || item.clearance || item.schoolImpact) && !cancelled && (
+            {item.caveat && <div className="text-[12px] text-muted italic leading-snug">{item.caveat}</div>}
+            {item.nextAction && !cancelled && item.status !== 'feito' && <div className="text-[12.5px] text-ink-2 leading-snug">→ {item.nextAction}{item.deadline ? ` · até ${item.deadline.slice(8)}/${item.deadline.slice(5, 7)}` : ''}</div>}
+            {!cancelled && (
               <div className="flex flex-wrap gap-1.5">
-                <BookingBadge item={item} />
+                <StatusBadge item={item} />
+                {item.priority && <span className="inline-flex items-center h-6 px-2 rounded-full text-[11.5px] font-semibold border border-line text-ink-2">{item.priority}</span>}
                 {item.optional && <span className="inline-flex items-center h-6 px-2 rounded-full text-[11.5px] bg-plum-soft text-ink-2">extra</span>}
                 {item.clearance && item.clearance !== 'liberada' && <span className="inline-flex items-center h-6 px-2 rounded-full text-[11.5px] bg-sand-soft text-ink-2">liberação médica {item.clearance === 'pendente' ? 'pendente' : 'negada'}</span>}
                 {item.schoolImpact && <span className="inline-flex items-center h-6 px-2 rounded-full text-[11.5px] bg-surface-2 text-ink-2">{item.schoolImpact === 'dia' ? 'sem aula no dia' : 'perde parte da aula'}{item.schoolMadeUp ? ' · reposta' : ''}</span>}
