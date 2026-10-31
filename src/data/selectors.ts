@@ -255,8 +255,9 @@ export function mealsOn(db: DB, date: DateKey) {
 // ─── Money ──────────────────────────────────────────────────────────────────
 
 export function paidExpenses(db: DB): Expense[] {
-  // Spending only — income never enters a sum of expenses, whatever its status.
-  return db.expenses.filter((e) => e.type !== 'income' && e.status === 'paid' && !!e.date)
+  // Spending only — income never enters a sum of expenses, whatever its status. Reais only: trip lines in
+  // another currency (ZAR statement) live in the trip's budget, never in a BRL total.
+  return db.expenses.filter((e) => e.type !== 'income' && e.status === 'paid' && !!e.date && (e.currency ?? 'BRL') === 'BRL')
 }
 
 export function expensesBetween(db: DB, from: DateKey, to: DateKey): Expense[] {

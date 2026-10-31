@@ -414,7 +414,7 @@ export function expeditionBudget(trip: Trip, items: TripItem[], expenses: Expens
     if (bestOf(i) == null && i.date && COSTLY.includes(i.section) && i.status !== 'feito') b.withoutValue.push(i)
   }
   b.totalWithMargin = withMargin(b.projected + b.uber, exp.marginPct)
-  b.realBRL = expenses.filter((e) => e.tripId === trip.id && e.type !== 'income' && e.status === 'paid').reduce((s, e) => s + e.amountCents, 0)
+  b.realBRL = expenses.filter((e) => e.tripId === trip.id && e.type !== 'income' && e.status === 'paid' && (e.currency ?? 'BRL') === 'BRL').reduce((s, e) => s + e.amountCents, 0)
   b.realInTripCurrency = convert(b.realBRL, 'BRL', cur, exp)
   return b
 }

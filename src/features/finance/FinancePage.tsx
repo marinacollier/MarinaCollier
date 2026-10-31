@@ -38,7 +38,9 @@ export default function FinancePageGuarded() {
 }
 
 function FinancePage() {
-  const expenses = useDB((db) => db.expenses)
+  const all = useDB((db) => db.expenses)
+  // Reais only: trip statement lines in another currency (ZAR) are shown in the trip, not summed here.
+  const expenses = useMemo(() => all.filter((e) => (e.currency ?? 'BRL') === 'BRL'), [all])
   const categories = useDB((db) => db.financialCategories)
   const trips = useDB((db) => db.trips)
   const accounts = useDB((db) => db.financialAccounts)

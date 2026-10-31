@@ -1161,7 +1161,9 @@ export interface Expense extends Entity {
   expectedAmountCents?: number
   receivedAt?: ISODateTime
   receivedAmountCents?: number
-  currency?: 'BRL' | 'USD' | 'EUR'
+  currency?: 'BRL' | 'USD' | 'EUR' | 'ZAR'
+  /** Trip spending (bank statement line): the trip budget category it counts under. */
+  tripCategory?: TripBudgetCategory
   /** Who created it: a contract's monthly expectation, Marina by hand, Lumos, an integration. */
   source?: 'contrato' | 'manual' | 'lumos' | 'organizze'
   /** UGC deal this money belongs to (expected when closed → received when paid). */

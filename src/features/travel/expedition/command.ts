@@ -10,6 +10,7 @@
  */
 import type {
   DateKey,
+  Expense,
   Task,
   Trip,
   TripBookingStatus,
@@ -137,11 +138,19 @@ const tripCur = (trip: Trip) => trip.expedition?.currency ?? 'BRL'
 const inTrip = (trip: Trip, cents: number | undefined, from: TripItem['currency']) =>
   cents == null ? 0 : trip.expedition ? convert(cents, from ?? tripCur(trip), tripCur(trip), trip.expedition) ?? 0 : cents
 
+/** Real spending lines (bank statement) of this trip, in the trip currency. */
+export const tripLedger = (trip: Trip, expenses: Expense[] = []) =>
+  expenses.filter((e) => e.tripId === trip.id && e.type !== 'income' && e.status === 'paid' && !!e.date)
+const ledgerCents = (trip: Trip, e: Expense) => inTrip(trip, e.amountCents, (e.currency ?? 'BRL') as TripItem['currency'])
+/** Days the statement covers: there the statement is the truth and the items' paid/uber are not counted again. */
+export const ledgerDays = (trip: Trip, expenses: Expense[] = []) => new Set(tripLedger(trip, expenses).map((e) => e.date!))
+
 /** Confirmed spend: what was actually paid (paid values + Uber of what she did), in the trip currency. */
-export function confirmedSpend(trip: Trip, items: TripItem[]): number {
-  let s = 0
+export function confirmedSpend(trip: Trip, items: TripItem[], expenses: Expense[] = []): number {
+  const covered = ledgerDays(trip, expenses)
+  let s = tripLedger(trip, expenses).reduce((t, e) => t + ledgerCents(trip, e), 0)
   for (const i of items) {
-    if (!isActive(i)) continue
+    if (!isActive(i) || (i.date && covered.has(i.date))) continue
     s += inTrip(trip, i.paidCents, i.currency)
     if (i.status === 'feito') s += inTrip(trip, i.uberCents, i.currency)
   }
@@ -157,10 +166,22 @@ export interface CategoryRow {
 }
 
 /** Estimated vs quoted vs paid per category (trip currency; extras left out). Uber is its own row. */
-export function budgetByCategory(trip: Trip, items: TripItem[]): CategoryRow[] {
+export function budgetByCategory(trip: Trip, items: TripItem[], expenses: Expense[] = []): CategoryRow[] {
   const rows = new Map<TripBudgetCategory, CategoryRow>(CATEGORY_ORDER.map((c) => [c, { category: c, estimated: 0, quoted: 0, paid: 0, items: [] }]))
+  const covered = ledgerDays(trip, expenses)
+  for (const e of tripLedger(trip, expenses)) rows.get(e.tripCategory ?? 'compras')!.paid += ledgerCents(trip, e)
   for (const i of items) {
     if (!isActive(i) || i.optional) continue
+    if (i.date && covered.has(i.date)) {
+      // The statement already holds that day's real money: keep only the plan values.
+      const c = categoryOf(i)
+      if (c) {
+        const r = rows.get(c)!
+        r.estimated += inTrip(trip, i.estimatedCents, i.currency)
+        r.quoted += inTrip(trip, i.quotedCents, i.currency)
+      }
+      continue
+    }
     const c = categoryOf(i)
     if (c) {
       const r = rows.get(c)!
@@ -300,7 +321,7 @@ export function dayPriorities(trip: Trip, items: TripItem[], tasks: Task[], toda
   return out.sort((a, b) => rankOf(a.priority) - rankOf(b.priority) || (a.due ?? '9999').localeCompare(b.due ?? '9999')).slice(0, limit)
 }
 
-export function tripDashboard(trip: Trip, items: TripItem[], tasks: Task[], now: { date: DateKey; minutes: number }): TripDashboard {
+export function tripDashboard(trip: Trip, items: TripItem[], tasks: Task[], now: { date: DateKey; minutes: number }, expenses: Expense[] = []): TripDashboard {
   const active = items.filter(isActive)
   const statusOf = new Map(active.map((i) => [i.id, bookingStatusOf(i)]))
   const byDeadline = (a: TripItem, b: TripItem) => rankOf(a.priority) - rankOf(b.priority) || (a.deadline ?? a.date ?? '9999').localeCompare(b.deadline ?? b.date ?? '9999')
@@ -311,7 +332,7 @@ export function tripDashboard(trip: Trip, items: TripItem[], tasks: Task[], now:
     priorities: dayPriorities(trip, items, tasks, now.date),
     pendingBookings: active.filter((i) => PENDING_STATUSES.includes(statusOf.get(i.id)!) && ahead(i)).sort(byDeadline),
     awaiting: active.filter((i) => statusOf.get(i.id) === 'aguardando_resposta' && ahead(i)).sort(byDeadline),
-    spentCents: confirmedSpend(trip, items),
+    spentCents: confirmedSpend(trip, items, expenses),
     currency: tripCur(trip),
     flight,
     daysToFlight: flight?.date ? diffDays(now.date, flight.date) : trip.endDate ? diffDays(now.date, trip.endDate) : undefined,

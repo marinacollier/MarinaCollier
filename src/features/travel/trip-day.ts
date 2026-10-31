@@ -77,7 +77,7 @@ export function tripDayOf(db: DB, date: DateKey, minutes = 0): TripDay | undefin
     currency,
     spentCents: any ? spent : undefined,
     workouts: db.workouts.filter((w) => w.date === date && w.status !== 'pulado'),
-    dashboard: tripDashboard(trip, all, db.tasks, { date, minutes }),
+    dashboard: tripDashboard(trip, all, db.tasks, { date, minutes }, db.expenses),
   }
 }
 

@@ -17,6 +17,7 @@ import {
   CATEGORY_META,
   bookingStatusOf,
   budgetByCategory,
+  tripLedger,
   daysLabel,
   inTripDates,
   isShopping,
@@ -43,9 +44,10 @@ function useTripTasks(trip: Trip) {
 /** Top of the trip: next commitment, 3 priorities, pending bookings, awaited answers, spend, days to the flight. */
 export function DashboardStrip({ trip, items }: { trip: ExpTrip; items: TripItem[] }) {
   const tasks = useDB((db) => db.tasks)
+  const expenses = useDB((db) => db.expenses)
   const { now } = useNow()
   const local = localNow(trip.expedition.timeZone, now)
-  const d = useMemo(() => tripDashboard(trip, items, tasks, local), [trip, items, tasks, local])
+  const d = useMemo(() => tripDashboard(trip, items, tasks, local, expenses), [trip, items, tasks, local, expenses])
   const open = (p: { kind: 'task' | 'tripItem'; id: string }) => (p.kind === 'task' ? openSheet('task', { id: p.id }) : openSheet('tripItem', { id: p.id }))
   return (
     <section className="space-y-2.5" aria-label="Painel da viagem">
@@ -178,7 +180,9 @@ const GROUPS: { title: string; hint: string; match: (s: ReturnType<typeof bookin
 
 export function Reservas({ trip, items }: { trip: ExpTrip; items: TripItem[] }) {
   const rows = useMemo(() => items.filter((i) => isActive(i) && !i.optional && i.status !== 'feito'), [items])
-  const categories = useMemo(() => budgetByCategory(trip, items).filter((r) => r.estimated || r.quoted || r.paid), [trip, items])
+  const expenses = useDB((db) => db.expenses)
+  const categories = useMemo(() => budgetByCategory(trip, items, expenses).filter((r) => r.estimated || r.quoted || r.paid), [trip, items, expenses])
+  const ledger = useMemo(() => tripLedger(trip, expenses).sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '')), [trip, expenses])
   const cur = trip.expedition.currency
   return (
     <div className="space-y-5">
@@ -237,6 +241,25 @@ export function Reservas({ trip, items }: { trip: ExpTrip; items: TripItem[] }) 
           Previsto ≠ cotação recebida ≠ pagamento confirmado. Valores publicados não garantem disponibilidade. Reserva de emergência = a margem de {trip.expedition.marginPct}% abaixo. Em reais só com a sua cotação.
         </p>
       </section>
+      {ledger.length > 0 && (
+        <section>
+          <div className="flex items-baseline justify-between px-1 mb-2">
+            <h3 className="eyebrow">gastos reais · extrato</h3>
+            <span className="text-[12px] text-muted tabular-nums">{formatMoney(ledger.reduce((t, e) => t + e.amountCents, 0), cur)}</span>
+          </div>
+          <div className="card divide-y divide-line/70">
+            {ledger.map((e) => (
+              <button key={e.id} type="button" onClick={() => openSheet('expense', { id: e.id })} className="w-full text-left px-4 py-2.5 flex items-baseline gap-3">
+                <span className="text-[12px] text-muted tabular-nums w-11 shrink-0">{e.date!.slice(8, 10)}/{e.date!.slice(5, 7)}</span>
+                <span className="flex-1 min-w-0 text-[14px] leading-snug truncate">{e.title}</span>
+                {e.tripCategory && <span className="text-[11.5px] text-muted shrink-0">{CATEGORY_META[e.tripCategory].label}</span>}
+                <span className="text-[13px] tabular-nums shrink-0">{formatMoney(e.amountCents, (e.currency ?? cur) as typeof cur)}</span>
+              </button>
+            ))}
+          </div>
+          <p className="text-[12px] text-muted px-1 mt-2">Nos dias que o extrato cobre, ele é o valor real: o pago dos passeios desses dias não é somado de novo.</p>
+        </section>
+      )}
     </div>
   )
 }
