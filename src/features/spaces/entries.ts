@@ -165,6 +165,8 @@ export function rituals(db: DB): { key: string; label: string; to: string }[] {
     { key: 'tarefas', label: 'Tarefas', to: ROUTES.tasks },
     { key: 'revisao', label: 'Revisão da semana', to: ROUTES.weeklyReview },
     { key: 'mes', label: 'Meu mês', to: ROUTES.monthlyReview },
+    // Cuidar de Mim: one discreet line here, never on Início (no hint, no count).
+    { key: 'cuidar', label: 'Cuidar de Mim', to: ROUTES.care },
   ]
   if (db.goals.length) out.splice(2, 0, { key: 'metas', label: 'Metas', to: ROUTES.goals })
   return out

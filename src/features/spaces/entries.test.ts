@@ -66,7 +66,7 @@ describe('Espaços', () => {
   })
 
   it('rituals stay reachable; Metas only with goals', () => {
-    expect(rituals({ ...seed, goals: [] }).map((r) => r.to)).toEqual([ROUTES.weekPlanner, ROUTES.tasks, ROUTES.weeklyReview, ROUTES.monthlyReview])
+    expect(rituals({ ...seed, goals: [] }).map((r) => r.to)).toEqual([ROUTES.weekPlanner, ROUTES.tasks, ROUTES.weeklyReview, ROUTES.monthlyReview, ROUTES.care])
   })
 
   it('search suggestions come from her data, not a fixed list', () => {

@@ -12,7 +12,7 @@ export type Channel = 'text' | 'audio' | 'attachment'
 
 export interface Capability {
   id: string
-  domain: 'tasks' | 'workouts' | 'nutrition' | 'calendar' | 'books' | 'finance' | 'career' | 'routine' | 'work' | 'travel' | 'memory' | 'backup'
+  domain: 'tasks' | 'workouts' | 'nutrition' | 'calendar' | 'books' | 'finance' | 'career' | 'routine' | 'work' | 'travel' | 'memory' | 'backup' | 'care'
   verb: string
   /** A sentence that triggers it (her words). */
   example: string
@@ -79,6 +79,11 @@ export const CAPABILITIES: Capability[] = [
   { id: 'travel.query', domain: 'travel', verb: 'o que falta', example: 'o que falta pra viagem?', handler: 'travel', channels: TA },
   // memory & backup
   { id: 'memory.remember', domain: 'memory', verb: 'lembrar', example: 'lembra que eu não como glúten', handler: 'memory', channels: TA },
+  // Cuidar de Mim (read-only; a crisis signal goes to human help before any other handler)
+  { id: 'care.calm', domain: 'care', verb: 'sugerir técnicas para se acalmar', example: 'preciso me acalmar', handler: 'care', channels: TA },
+  { id: 'care.grounding', domain: 'care', verb: 'guiar o 5-4-3-2-1', example: 'faz o 5-4-3-2-1', handler: 'care', channels: TA },
+  { id: 'care.pause', domain: 'care', verb: 'abrir o Modo Pausa', example: 'preciso de uma mensagem para minha mãe pedindo tempo para pensar', handler: 'care', channels: TA },
+  { id: 'care.favorites', domain: 'care', verb: 'listar técnicas favoritas', example: 'quais técnicas favoritei?', handler: 'care', channels: TA },
   { id: 'backup.export', domain: 'backup', verb: 'gerar backup', example: 'gera meu backup', handler: 'backup', channels: TA },
 ]
 

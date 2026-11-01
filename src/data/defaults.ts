@@ -221,6 +221,9 @@ export function emptyDB(): DB {
     literaryProfile: [],
     universeItems: [],
     scentLogs: [],
+    careTechniquePrefs: [],
+    carePauseDrafts: [],
+    careSupportPlan: [],
   }
 }
 

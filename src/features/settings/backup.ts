@@ -133,6 +133,9 @@ export const COLLECTION_LABELS: Partial<Record<CollectionKey, string>> = {
   literaryVersions: 'Ateliê: versões dos textos',
   literaryCollections: 'Ateliê: coleções',
   literaryProfile: 'Ateliê: perfil de autora',
+  careTechniquePrefs: 'Cuidar de Mim: técnicas favoritas',
+  carePauseDrafts: 'Cuidar de Mim: rascunhos de pausa',
+  careSupportPlan: 'Cuidar de Mim: plano de apoio',
 }
 
 export interface BackupPreview {

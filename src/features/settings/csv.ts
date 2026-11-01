@@ -2,7 +2,7 @@ import { toDateKey } from '@/lib/date'
 /**
  * CSV export. Pure. Comma separated, CRLF lines, UTF-8 BOM so Excel opens accents correctly.
  */
-import type { DB } from '@/data/types'
+import type { CollectionKey, DB } from '@/data/types'
 import { modalityOf } from '@/data/selectors'
 import { formatFullDate } from '@/lib/date'
 
@@ -35,6 +35,19 @@ export const CSV_DATASETS: { id: CsvDatasetId; label: string; emoji: string }[] 
   { id: 'estudos', label: 'Estudos', emoji: '📚' },
   { id: 'wins', label: 'Wins', emoji: '✨' },
 ]
+
+/**
+ * What each CSV reads. Private collections (Ateliê, Cuidar de Mim) are never a source: they only travel in
+ * her full backup file (tested in care.test.ts).
+ */
+export const CSV_DATASET_SOURCES: Record<CsvDatasetId, CollectionKey[]> = {
+  gastos: ['expenses', 'financialCategories'],
+  tarefas: ['tasks', 'projects'],
+  treinos: ['workouts'],
+  livros: ['books'],
+  estudos: ['studyItems', 'studyTracks'],
+  wins: ['wins', 'projects'],
+}
 
 export function buildDataset(db: DB, id: CsvDatasetId): { headers: string[]; rows: Cell[][] } {
   switch (id) {

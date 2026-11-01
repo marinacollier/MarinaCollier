@@ -2489,6 +2489,46 @@ export interface ScentProfile {
   makeupStyle?: string
 }
 
+// ─── Cuidar de Mim (private: never Supabase; owner-only store like the Ateliê; in her backup) ───
+
+/** How a technique sits with her. No scores, no ratings. */
+export type CarePreference = 'ajuda' | 'às vezes' | 'não pra mim'
+
+/** One per technique (id = `care-pref:<techniqueId>`). The techniques themselves are static content. */
+export interface CareTechniquePref extends Entity {
+  techniqueId: string
+  favorite: boolean
+  preference?: CarePreference
+  /** Only when she taps "registrar que usei" (never automatic). ISO timestamps, newest last. */
+  usedAt: ISODateTime[]
+}
+
+export type PauseContext = 'pessoal' | 'relacionamento' | 'amizade' | 'familia' | 'profissional' | 'whatsapp' | 'instagram' | 'email'
+export type PauseIntent = 'tempo' | 'nao_consigo_agora' | 'retomar_amanha' | 'falar_com_calma' | 'limite' | 'nao_decidir_agora' | 'pedir_apoio'
+export type PauseTone = 'delicado' | 'neutro' | 'objetivo' | 'profissional'
+
+/** A pause message she chose to keep. Nothing is ever sent by the app. */
+export interface CarePauseDraft extends Entity {
+  context: PauseContext
+  intent: PauseIntent
+  tone: PauseTone
+  text: string
+}
+
+export interface CareSupportContact {
+  name: string
+  phone?: string
+  note?: string
+}
+
+/** Her voluntary support plan (singleton, id = `care-support-plan`). Every field optional. */
+export interface CareSupportPlan extends Entity {
+  contacts: CareSupportContact[]
+  warningSigns?: string
+  whatHelps?: string
+  safePlaces?: string
+}
+
 // ─── Database shape ─────────────────────────────────────────────────────────
 
 export interface DB {
@@ -2582,6 +2622,9 @@ export interface DB {
   literaryProfile: LiteraryAuthorProfile[]
   universeItems: UniverseItem[]
   scentLogs: ScentLog[]
+  careTechniquePrefs: CareTechniquePref[]
+  carePauseDrafts: CarePauseDraft[]
+  careSupportPlan: CareSupportPlan[]
 }
 
 /** Keys of DB that hold arrays of entities. */

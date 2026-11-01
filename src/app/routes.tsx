@@ -38,6 +38,9 @@ export const ROUTES = {
   /** Ateliê Literário (private writing; lockable). */
   atelie: '/atelie',
   atelieWork: (id: string) => `/atelie/obra/${encodeURIComponent(id)}`,
+  /** Cuidar de Mim (kit de autocuidado emocional; entrada discreta em Espaços, nunca na Home). Tabs em ?v=. */
+  care: '/cuidar',
+  careTab: (v: 'acalmar' | 'tecnicas' | 'pausa' | 'decidir' | 'apoio') => `/cuidar?v=${v}`,
   trips: '/viagens',
   /** Lugares que conheci (países, estados do Brasil, cidades; entry on the Trips page). */
   places: '/viagens/lugares',
@@ -100,6 +103,7 @@ export const routeTable: { path: string; Component: React.LazyExoticComponent<Re
   { path: '/biblia/marcar', Component: lazy(() => import('@/features/spiritual/MarkReadPage')) },
   { path: '/atelie', Component: lazy(() => import('@/features/atelie/AteliePage')) },
   { path: '/atelie/obra/:id', Component: lazy(() => import('@/features/atelie/WorkPage')) },
+  { path: '/cuidar', Component: lazy(() => import('@/features/care/CarePage')) },
   { path: '/universo', Component: lazy(() => import('@/features/universe/UniversePage')) },
   { path: '/viagens', Component: lazy(() => import('@/features/travel/TripsPage')) },
   { path: '/viagens/lugares', Component: lazy(() => import('@/features/travel/places/PlacesPage')) },

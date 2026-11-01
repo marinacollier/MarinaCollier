@@ -21,7 +21,9 @@ import { planChecklist, planPresencial } from './day/checklist'
 import { planDay, planWake, WOKE_UP } from './day/plan'
 import { cleanFoodText, foodIntentOf, looksLikeFood, type FoodIntent } from './food/intent'
 import { mealPrepIntentOf, type MealPrepIntent } from './food/mealprep'
+import { crisisReply } from './act/handlers/care'
 import { respond } from './act/respond'
+import { hasCrisisSignal } from '@/features/care/support'
 import type { LumosReply, TurnContext } from './act/types'
 import type { AttachmentReading } from './attach/types'
 import { firstRoutineStart } from './day/wake'
@@ -51,6 +53,8 @@ export function wakeMinutes(db: DB, n: string, today: DateKey, nowMinutes: numbe
 export function understand(db: DB, text: string, today: DateKey, nowMinutes: number, ctx: TurnContext = {}, attachment?: AttachmentReading): LumosTurn {
   const t = text.trim()
   const n = normalize(t).replace(/[?!.]+$/g, '').trim()
+  // Crisis signals: human help first, before any other reading of the sentence.
+  if (hasCrisisSignal(t)) return { kind: 'reply', reply: crisisReply() }
   // A print/PDF + (maybe) a sentence: the reading gives the data, the sentence the intent — one turn.
   if (attachment) {
     const reply = respond(db, t, { date: today, minutes: nowMinutes }, ctx, attachment)
@@ -106,6 +110,8 @@ function actionable(t: LumosTurn): boolean {
 export function clausesOf(db: DB, text: string, today: DateKey, nowMinutes: number, ctx: TurnContext = {}): string[] {
   // A pasted briefing / JSON block is one thing, never split into sentences.
   if (looksLikeBriefing(text)) return [text]
+  // A crisis sentence is answered whole (human help first), never split.
+  if (hasCrisisSignal(text)) return [text]
   const n = normalize(text)
   const cuts: number[] = []
   const re = new RegExp(JOIN.source, 'g')
