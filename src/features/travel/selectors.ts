@@ -11,6 +11,7 @@ export type TripTab =
   | 'visao'
   // Expedição (trips with `expedition` settings)
   | 'hoje'
+  | 'briefing'
   | 'dias'
   | 'reservas'
   | 'rotina'
@@ -45,6 +46,7 @@ export const TRIP_TABS: TabMeta[] = [
   { id: 'visao', label: 'Visão geral', emoji: '🗺️', items: false },
   { id: 'revisar', label: 'Revisar', emoji: '🔎', items: false },
   { id: 'hoje', label: 'Painel', emoji: '☀️', items: false },
+  { id: 'briefing', label: 'Briefing e revisão', emoji: '🌅', items: false },
   { id: 'dias', label: 'Calendário', emoji: '🗓️', items: false },
   { id: 'reservas', label: 'Reservas e pagamentos', emoji: '🎟️', items: false },
   { id: 'rotina', label: 'Treinos, estudos e trabalho', emoji: '🏋️‍♀️', items: false },

@@ -17,6 +17,7 @@ import type {
   TripCurrency,
   TripExpedition,
   TripItem,
+  Workout,
 } from '@/data/types'
 import { addDays, diffDays, hmToMinutes, minutesToHM, weekday } from '@/lib/date'
 import { wallTimeToInstant } from '@/integrations/tz'
@@ -250,7 +251,24 @@ export interface Conflict {
 /** Hours without flying after a recreational dive (DAN general guidance; the instructor has the last word). */
 export const NO_FLY_AFTER_DIVE_HOURS = 18
 
-export function findConflicts(trip: Trip, items: TripItem[]): Conflict[] {
+/**
+ * Two things that only have a start time (no end) closer than this are treated as the same time window:
+ * nothing says the first one is over when the second begins.
+ */
+export const POINT_GAP_MIN = 60
+
+/** Workouts of the trip's days with a time, as busy windows (planned duration, else 60 min). */
+const workoutWindow = (w: Pick<Workout, 'time' | 'plannedDurationMin' | 'durationMin'>) => {
+  const s = hmToMinutes(w.time!)
+  return { start: s, end: Math.min(24 * 60, s + (w.durationMin ?? w.plannedDurationMin ?? 60)) }
+}
+
+/**
+ * Everything that can't happen as planned: an item over class hours, two items in the same time window
+ * ("nunca duas atividades incompatíveis no mesmo horário"), something touching a flight, flying too soon
+ * after a dive and — with `workouts` — a timed trip workout over a timed item.
+ */
+export function findConflicts(trip: Trip, items: TripItem[], workouts: Workout[] = []): Conflict[] {
   const out: Conflict[] = []
   const active = items.filter(isActive)
   for (const d of schoolDays(trip, items)) {
@@ -259,7 +277,8 @@ export function findConflicts(trip: Trip, items: TripItem[]): Conflict[] {
   const days = new Set(active.flatMap((i) => (i.date ? spanDays(i) : [])))
   for (const date of [...days].sort()) {
     const timed = itemsOnDay(active, date)
-      .filter((i) => i.section !== 'hospedagem')
+      // What she already did can't clash with anything anymore.
+      .filter((i) => i.section !== 'hospedagem' && i.status !== 'feito')
       .map((i) => ({ i, w: busyWindow(i, date) }))
       .filter((x): x is { i: TripItem; w: { start: number; end: number } } => !!x.w)
     for (let a = 0; a < timed.length; a++) {
@@ -267,8 +286,9 @@ export function findConflicts(trip: Trip, items: TripItem[]): Conflict[] {
         const A = timed[a]
         const B = timed[b]
         // A multi-day item (safari) and something on its own days, or two items at the same time.
-        if (!overlaps(A.w, B.w)) continue
-        if (A.w.start === A.w.end && B.w.start === B.w.end && A.w.start !== B.w.start) continue
+        // Two start-only items clash when they start within POINT_GAP_MIN of each other.
+        const points = A.w.start === A.w.end && B.w.start === B.w.end
+        if (points ? Math.abs(A.w.start - B.w.start) >= POINT_GAP_MIN : !overlaps(A.w, B.w)) continue
         const flight = isFlight(A.i) ? A.i : isFlight(B.i) ? B.i : undefined
         const other = flight === A.i ? B.i : A.i
         out.push(
@@ -277,6 +297,18 @@ export function findConflicts(trip: Trip, items: TripItem[]): Conflict[] {
             : { key: `sob:${A.i.id}:${B.i.id}:${date}`, kind: 'sobreposicao', date, items: [A.i, B.i], text: `${A.i.title} e ${B.i.title} no mesmo horário.` },
         )
       }
+    }
+  }
+  // A timed trip workout over a timed item (the trip's own plan; untimed workouts can't clash).
+  for (const w of workouts) {
+    if (!w.time || !w.date || w.status === 'pulado' || w.status === 'descanso' || !trip.startDate || w.date < trip.startDate || w.date > (trip.endDate ?? trip.startDate)) continue
+    const ww = workoutWindow(w)
+    for (const i of itemsOnDay(active, w.date)) {
+      if (i.section === 'hospedagem' || i.status === 'feito') continue
+      const iw = busyWindow(i, w.date)
+      if (!iw) continue
+      const clash = iw.start === iw.end ? iw.start >= ww.start - POINT_GAP_MIN + 1 && iw.start < ww.end : overlaps(ww, iw)
+      if (clash) out.push({ key: `treino:${w.id}:${i.id}:${w.date}`, kind: 'sobreposicao', date: w.date, items: [i], text: `Treino ${w.title ?? w.modality} (${w.time}) e ${i.title} no mesmo horário.` })
     }
   }
   // Diving then flying too soon.
@@ -316,11 +348,11 @@ export interface Pendencies {
 }
 
 /** The executive panel: what still needs her, from today on (past days drop off). */
-export function pendencies(trip: Trip, items: TripItem[], today: DateKey): Pendencies {
+export function pendencies(trip: Trip, items: TripItem[], today: DateKey, workouts: Workout[] = []): Pendencies {
   const over = !!trip.endDate && today > trip.endDate
   const ahead = items.filter((i) => isOpen(i) && (i.date ? (i.endDate ?? i.date) >= today : !over))
   const base = ahead.filter((i) => !i.optional)
-  const conflicts = findConflicts(trip, items).filter((c) => c.date >= today)
+  const conflicts = findConflicts(trip, items, workouts).filter((c) => c.date >= today)
   const weather = base.filter((i) => certaintyOf(i) === 'clima')
   const clearance = ahead.filter((i) => i.clearance === 'pendente' || i.clearance === 'nao_liberada')
   // Each item shows up once: weather and clearance say more than "a confirmar".

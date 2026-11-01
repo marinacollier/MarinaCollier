@@ -20,6 +20,7 @@ import { applyAtelieSeed } from './seed/atelie'
 import { applyUniverseSeed } from './seed/universe'
 import { applyExpeditionSeed } from './seed/expedition'
 import { applyMaster1031 } from './seed/master-1031'
+import { applyOps1101 } from './seed/ops-1101'
 import { applyUgcCrmSeed } from './seed/ugc-crm'
 import { applyPlacesSeed } from './seed/places'
 import { migrateUgc } from './ugc/migrate'
@@ -249,7 +250,7 @@ function flush() {
 export function applyModuleSeeds(db: DB, today: string = todayKey()): DB {
   // The one-time Atualização mestre 31/10 runs right after the Expedição seed it builds on.
   // Lugares que conheci: her list, once (applyPlacesSeed).
-  return pruneTravelWorkouts(applyPlacesSeed(applyAtelieSeed(migrateUgc(applyMaster1031(applyExpeditionSeed(applyUniverseSeed(applySpiritualSeed(db))), today)))))
+  return pruneTravelWorkouts(applyPlacesSeed(applyAtelieSeed(migrateUgc(applyOps1101(applyMaster1031(applyExpeditionSeed(applyUniverseSeed(applySpiritualSeed(db))), today), today)))))
 }
 
 export async function hydrate(storage: StorageAdapter = createIndexedDBAdapter()): Promise<void> {

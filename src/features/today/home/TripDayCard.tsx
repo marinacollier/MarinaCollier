@@ -1,6 +1,7 @@
 /**
  * Modo viagem on Home: the expedition day (class, activities, the trip's training, next departure,
- * what she spent in the trip currency) in place of the São Paulo routine. Tap → the trip page.
+ * what she spent in the trip currency) in place of the São Paulo routine, plus the day's mandatory blocks
+ * (trabalho, inglês, treino, alimentação, revisão) with ticks. Tap the summary → the trip page.
  */
 import { useNavigate } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
@@ -10,6 +11,7 @@ import { shortDM } from '@/data/travel-mode'
 import { formatShortDate } from '@/lib/date'
 import { formatMoney } from '@/features/travel/expedition/logic'
 import { schoolLine, type TripDay } from '@/features/travel/trip-day'
+import { DailyBlocksList } from '@/features/travel/expedition/DailyBlocks'
 
 export function TripDayCard({ day }: { day: TripDay }) {
   const nav = useNavigate()
@@ -17,61 +19,72 @@ export function TripDayCard({ day }: { day: TripDay }) {
   const place = trip.expedition?.weather?.label ?? trip.place?.split(/[·(]/)[0]?.trim() ?? trip.name
   const cls = schoolLine(day)
   const end = trip.endDate ?? trip.startDate
+  const open = () => nav(ROUTES.trip(trip.id))
   return (
-    <Card onPress={() => nav(ROUTES.trip(trip.id))} aria-label={`Dia da viagem: ${trip.name}`}>
-      <div className="flex items-center justify-between gap-3">
-        <div className="eyebrow">
-          {trip.flag} modo viagem · dia {day.dayNumber} de {day.totalDays} · {place}
+    <Card aria-label={`Dia da viagem: ${trip.name}`}>
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label={`Abrir a viagem: ${trip.name}`}
+        onClick={open}
+        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), open())}
+        className="cursor-pointer transition active:scale-[0.99]"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="eyebrow">
+            {trip.flag} modo viagem · dia {day.dayNumber} de {day.totalDays} · {place}
+          </div>
+          <ChevronRight size={16} className="text-muted shrink-0" aria-hidden />
         </div>
-        <ChevronRight size={16} className="text-muted shrink-0" aria-hidden />
+        <ul className="mt-2.5 space-y-1.5 text-[14.5px] text-ink-2">
+          {cls && (
+            <li className="flex gap-2.5">
+              <span aria-hidden className="w-5 shrink-0 text-center">🏫</span>
+              <span className={school?.impact === 'dia' ? 'text-muted' : undefined}>{cls}</span>
+            </li>
+          )}
+          {next && (
+            <li className="flex gap-2.5">
+              <span aria-hidden className="w-5 shrink-0 text-center">🚪</span>
+              <span>
+                Próxima saída{next.date !== day.date ? ` ${formatShortDate(next.date)}` : ''} <b className="font-sport text-ink">{next.at}</b> · {next.item.title}
+              </span>
+            </li>
+          )}
+          {(sports.length > 0 || day.workouts.length > 0) && (
+            <li className="flex gap-2.5">
+              <span aria-hidden className="w-5 shrink-0 text-center">🏄‍♀️</span>
+              <span>Treino do dia: {[...sports.map((s) => s.title), ...day.workouts.map((w) => `${w.title ?? w.modality}${w.status === 'feito' ? ' ✓' : ''}`)].join(' · ')}</span>
+            </li>
+          )}
+          {dash.priorities.length > 0 && (
+            <li className="flex gap-2.5">
+              <span aria-hidden className="w-5 shrink-0 text-center">🎯</span>
+              <span>Prioridades: {dash.priorities.map((p) => p.title).join(' · ')}</span>
+            </li>
+          )}
+          {(dash.pendingBookings.length > 0 || dash.awaiting.length > 0) && (
+            <li className="flex gap-2.5">
+              <span aria-hidden className="w-5 shrink-0 text-center">🎟️</span>
+              <span>
+                {dash.pendingBookings.length} {dash.pendingBookings.length === 1 ? 'reserva pendente' : 'reservas pendentes'} · {dash.awaiting.length} {dash.awaiting.length === 1 ? 'resposta aguardada' : 'respostas aguardadas'}
+              </span>
+            </li>
+          )}
+          {day.spentCents != null && (
+            <li className="flex gap-2.5">
+              <span aria-hidden className="w-5 shrink-0 text-center">💸</span>
+              <span>Gasto hoje: {formatMoney(day.spentCents, day.currency)}</span>
+            </li>
+          )}
+        </ul>
+        <p className="text-[12.5px] text-ink-2 mt-3">
+          Gasto confirmado {formatMoney(dash.spentCents, dash.currency)}
+          {dash.daysToFlight != null && dash.daysToFlight >= 0 ? ` · ${dash.daysToFlight === 0 ? 'voo de volta hoje' : `${dash.daysToFlight} ${dash.daysToFlight === 1 ? 'dia' : 'dias'} até o voo`}` : ''}
+        </p>
+        {end && <p className="text-[12.5px] text-muted mt-1">Rotina de SP pausada até {shortDM(end)} — volta sozinha depois.</p>}
       </div>
-      <ul className="mt-2.5 space-y-1.5 text-[14.5px] text-ink-2">
-        {cls && (
-          <li className="flex gap-2.5">
-            <span aria-hidden className="w-5 shrink-0 text-center">🏫</span>
-            <span className={school?.impact === 'dia' ? 'text-muted' : undefined}>{cls}</span>
-          </li>
-        )}
-        {next && (
-          <li className="flex gap-2.5">
-            <span aria-hidden className="w-5 shrink-0 text-center">🚪</span>
-            <span>
-              Próxima saída{next.date !== day.date ? ` ${formatShortDate(next.date)}` : ''} <b className="font-sport text-ink">{next.at}</b> · {next.item.title}
-            </span>
-          </li>
-        )}
-        {(sports.length > 0 || day.workouts.length > 0) && (
-          <li className="flex gap-2.5">
-            <span aria-hidden className="w-5 shrink-0 text-center">🏄‍♀️</span>
-            <span>Treino do dia: {[...sports.map((s) => s.title), ...day.workouts.map((w) => `${w.title ?? w.modality}${w.status === 'feito' ? ' ✓' : ''}`)].join(' · ')}</span>
-          </li>
-        )}
-        {dash.priorities.length > 0 && (
-          <li className="flex gap-2.5">
-            <span aria-hidden className="w-5 shrink-0 text-center">🎯</span>
-            <span>Prioridades: {dash.priorities.map((p) => p.title).join(' · ')}</span>
-          </li>
-        )}
-        {(dash.pendingBookings.length > 0 || dash.awaiting.length > 0) && (
-          <li className="flex gap-2.5">
-            <span aria-hidden className="w-5 shrink-0 text-center">🎟️</span>
-            <span>
-              {dash.pendingBookings.length} {dash.pendingBookings.length === 1 ? 'reserva pendente' : 'reservas pendentes'} · {dash.awaiting.length} {dash.awaiting.length === 1 ? 'resposta aguardada' : 'respostas aguardadas'}
-            </span>
-          </li>
-        )}
-        {day.spentCents != null && (
-          <li className="flex gap-2.5">
-            <span aria-hidden className="w-5 shrink-0 text-center">💸</span>
-            <span>Gasto hoje: {formatMoney(day.spentCents, day.currency)}</span>
-          </li>
-        )}
-      </ul>
-      <p className="text-[12.5px] text-ink-2 mt-3">
-        Gasto confirmado {formatMoney(dash.spentCents, dash.currency)}
-        {dash.daysToFlight != null && dash.daysToFlight >= 0 ? ` · ${dash.daysToFlight === 0 ? 'voo de volta hoje' : `${dash.daysToFlight} ${dash.daysToFlight === 1 ? 'dia' : 'dias'} até o voo`}` : ''}
-      </p>
-      {end && <p className="text-[12.5px] text-muted mt-1">Rotina de SP pausada até {shortDM(end)} — volta sozinha depois.</p>}
+      {day.plan && <DailyBlocksList trip={trip} plan={day.plan} bare className="mt-3 border-t border-line/70" />}
     </Card>
   )
 }

@@ -4,8 +4,8 @@
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AlertTriangle, CalendarArrowDown, ChevronRight, CloudSun, FileDown, Phone, Plus, Printer, Share2, Trash2, Wind } from 'lucide-react'
-import type { DateKey, Expense, Person, Trip, TripExpedition, TripItem, Weekday } from '@/data/types'
-import { actions } from '@/data/store'
+import type { DateKey, Expense, Person, Trip, TripExpedition, TripItem, Weekday, Workout } from '@/data/types'
+import { actions, useDB } from '@/data/store'
 import { openSheet, toast } from '@/app/ui-store'
 import { Button, Card, Checkbox, DateInput, EmptyState, Field, Segmented, TextArea, TextInput, TimeInput } from '@/components/ui'
 import { useNow } from '@/hooks/useToday'
@@ -41,14 +41,16 @@ import {
 import { useForecast } from './weather'
 import { CertaintyBadge, DayItem, ItemChecklist, MapLinks, MoneyPair } from './ui'
 import { AlertList, Compras, DashboardStrip, DayExtras, Reservas, RotinaTop, SegurancaTop } from './Command'
+import { BriefingView, FinancialCloseCard } from './Briefing'
+import { DailyBlocksList, useDailyPlan } from './DailyBlocks'
 
-export type ExpeditionTab = 'hoje' | 'dias' | 'reservas' | 'rotina' | 'compras' | 'seguranca' | 'pendencias' | 'custos' | 'escola' | 'checklists'
+export type ExpeditionTab = 'hoje' | 'briefing' | 'dias' | 'reservas' | 'rotina' | 'compras' | 'seguranca' | 'pendencias' | 'custos' | 'escola' | 'checklists'
 /**
  * The five views of her command center (+ Painel on top and Pendências): 1 Calendário, 2 Reservas e pagamentos,
  * 3 Treinos/estudos/trabalho, 4 Compras e bagagem, 5 Segurança e documentos. Older links (?s=custos/escola/
  * checklists) open the view that now holds them.
  */
-export const EXPEDITION_TABS: ExpeditionTab[] = ['hoje', 'dias', 'reservas', 'rotina', 'compras', 'seguranca', 'pendencias']
+export const EXPEDITION_TABS: ExpeditionTab[] = ['hoje', 'briefing', 'dias', 'reservas', 'rotina', 'compras', 'seguranca', 'pendencias']
 export const EXPEDITION_TAB_ALIAS: Partial<Record<ExpeditionTab, ExpeditionTab>> = { custos: 'reservas', escola: 'rotina', checklists: 'seguranca' }
 
 interface ViewProps {
@@ -62,6 +64,8 @@ export function ExpeditionView({ tab, ...p }: ViewProps & { tab: ExpeditionTab }
   switch (tab) {
     case 'hoje':
       return <Hoje {...p} />
+    case 'briefing':
+      return <BriefingView {...p} />
     case 'dias':
       return <Dias {...p} />
     case 'reservas':
@@ -120,10 +124,11 @@ function Hoje({ trip, items, onGo }: ViewProps) {
   const spTime = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }).format(now)
   const next = useMemo(() => nextDeparture(items, isToday ? local : { date: day, minutes: 0 }), [items, local, day, isToday])
   const tomorrow = addDays(day, 1)
-  const alerts = useMemo(() => dayAlerts(trip, items, day), [trip, items, day])
+  const workouts = useDB((db) => db.workouts)
+  const alerts = useMemo(() => dayAlerts(trip, items, day, workouts), [trip, items, day, workouts])
   const today = useMemo(() => itemsOnDay(items, day), [items, day])
   const cost = useMemo(() => dayCost(trip, items, day), [trip, items, day])
-  const pend = useMemo(() => pendencies(trip, items, day), [trip, items, day])
+  const pend = useMemo(() => pendencies(trip, items, day, workouts), [trip, items, day, workouts])
   const withChecklist = today.filter((i) => isActive(i) && i.checklistKind && i.date === day)
 
   return (
@@ -236,11 +241,11 @@ interface DayAlert {
 }
 
 /** Today's and tomorrow's things that need attention (conflicts, weather, clearance, pickup, booking). */
-function dayAlerts(trip: Trip, items: TripItem[], day: DateKey): DayAlert[] {
+function dayAlerts(trip: Trip, items: TripItem[], day: DateKey, workouts: Workout[] = []): DayAlert[] {
   const out: DayAlert[] = []
   const days = [day, addDays(day, 1)]
   const label = (d: DateKey) => (d === day ? 'Hoje' : 'Amanhã')
-  for (const c of findConflicts(trip, items).filter((c) => days.includes(c.date))) out.push({ key: c.key, when: label(c.date), text: c.text, item: c.items[0] })
+  for (const c of findConflicts(trip, items, workouts).filter((c) => days.includes(c.date))) out.push({ key: c.key, when: label(c.date), text: c.text, item: c.items[0] })
   for (const d of days) {
     for (const i of itemsOnDay(items, d)) {
       if (!isActive(i) || i.status === 'feito' || i.date !== d) continue
@@ -391,7 +396,8 @@ function Dias({ trip, items }: ViewProps) {
   const [view, setView] = useState<'linha' | 'semana'>('linha')
   const { day } = useTripDay(trip)
   const days = useMemo(() => tripDays(trip), [trip])
-  const conflicts = useMemo(() => findConflicts(trip, items), [trip, items])
+  const workouts = useDB((db) => db.workouts)
+  const conflicts = useMemo(() => findConflicts(trip, items, workouts), [trip, items, workouts])
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
     ref.current?.querySelector<HTMLElement>(`[data-day="${day}"]`)?.scrollIntoView({ block: 'start' })
@@ -458,6 +464,7 @@ function DayCard({ trip, items, date, today, conflicts }: { trip: ViewProps['tri
       ))}
       <DayTimeline trip={trip} items={items} date={date} />
       <DayExtras trip={trip} date={date} />
+      <DayBlocks trip={trip} items={items} date={date} />
       <div className="text-right">
         <button type="button" className="text-[12.5px] text-muted h-8 px-1" onClick={() => openSheet('tripItem', { tripId: trip.id, section: 'roteiro' })}>
           + atividade
@@ -465,6 +472,11 @@ function DayCard({ trip, items, date, today, conflicts }: { trip: ViewProps['tri
       </div>
     </div>
   )
+}
+
+function DayBlocks({ trip, items, date }: { trip: Trip; items: TripItem[]; date: DateKey }) {
+  const plan = useDailyPlan(trip, items, date)
+  return plan ? <DailyBlocksList trip={trip} plan={plan} /> : null
 }
 
 function WeekRow({ trip, items, date, today, conflicts }: { trip: ViewProps['trip']; items: TripItem[]; date: DateKey; today: boolean; conflicts: Conflict[] }) {
@@ -540,7 +552,8 @@ function PrintItinerary({ trip, items }: { trip: Trip; items: TripItem[] }) {
 
 function Pendencias({ trip, items }: ViewProps) {
   const { day } = useTripDay(trip)
-  const p = useMemo(() => pendencies(trip, items, day), [trip, items, day])
+  const workouts = useDB((db) => db.workouts)
+  const p = useMemo(() => pendencies(trip, items, day, workouts), [trip, items, day, workouts])
   const group = (title: string, hint: string, list: TripItem[], extra?: (i: TripItem) => string | undefined) =>
     list.length > 0 && (
       <section key={title}>
@@ -573,6 +586,7 @@ function Pendencias({ trip, items }: ViewProps) {
       {p.conflicts.length > 0 && (
         <section>
           <h3 className="eyebrow px-1 mb-2">conflitos</h3>
+          <p className="text-[12.5px] text-muted px-1 -mt-1 mb-2">Nunca duas atividades incompatíveis no mesmo horário: escolha uma, mude o horário ou anote o fim de cada uma.</p>
           <div className="card divide-y divide-line/70">
             {p.conflicts.map((c) => (
               <button key={c.key} type="button" onClick={() => openSheet('tripItem', { id: c.items[0].id })} className="w-full text-left px-4 py-3 flex gap-3">
@@ -642,8 +656,10 @@ function Custos({ trip, items, expenses }: ViewProps) {
         <p className="text-[12px] text-muted mt-3">Cada item conta pelo valor mais firme: pago, senão cotado, senão estimado. Extras ficam fora do total.</p>
       </Card>
 
+      <FinancialCloseCard trip={trip} items={items} expenses={expenses} />
+
       <Card className="space-y-3">
-        <div className="eyebrow">cotação e margem</div>
+        <div className="eyebrow">cotação, margem e orçamento</div>
         <div className="grid grid-cols-2 gap-2.5">
           <Field label={`1 ${cur} = R$`}>
             <input
@@ -672,7 +688,21 @@ function Custos({ trip, items, expenses }: ViewProps) {
             />
           </Field>
         </div>
-        <p className="text-[12px] text-muted">A cotação é a que você digitar — o app não busca câmbio ao vivo.</p>
+        <Field label="Orçamento original (R$)">
+          <input
+            className="input"
+            inputMode="numeric"
+            placeholder="ex.: 30.000"
+            defaultValue={exp.budgetCents != null ? String(Math.round(exp.budgetCents / 100)) : ''}
+            aria-label="Orçamento original"
+            onBlur={(e) => {
+              const raw = e.target.value.replace(/\./g, '').replace(',', '.').trim()
+              const n = Number(raw)
+              setExp(trip, { budgetCents: raw && Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : undefined })
+            }}
+          />
+        </Field>
+        <p className="text-[12px] text-muted">A cotação é a que você digitar — o app não busca câmbio ao vivo. O orçamento é a referência original, não saldo: o que sobra é sempre calculado.</p>
       </Card>
 
       {(b.extras > 0 || b.unconverted > 0) && (

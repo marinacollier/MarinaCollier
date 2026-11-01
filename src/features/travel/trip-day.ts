@@ -7,7 +7,9 @@ import type { DateKey, DB, Trip, TripCurrency, TripItem, Workout } from '@/data/
 import { travelTripOn } from '@/data/travel-mode'
 import { diffDays, hmToMinutes } from '@/lib/date'
 import { tripDashboard, type TripDashboard } from './expedition/command'
-import { classOn, convert, isActive, itemsOnDay, nextDeparture, schoolDays, type ClassBlock, type Departure } from './expedition/logic'
+import { classOn, isActive, itemsOnDay, nextDeparture, schoolDays, type ClassBlock, type Departure } from './expedition/logic'
+import { dailyPlan, type DailyPlan } from './expedition/daily'
+import { daySpend } from './expedition/ops'
 
 const SPORT_KINDS = new Set(['trilha', 'corrida', 'natacao', 'surf', 'bike', 'scuba'])
 
@@ -38,6 +40,8 @@ export interface TripDay {
   workouts: Workout[]
   /** The command-center strip (next commitment, priorities, bookings, answers, spend, days to the flight). */
   dashboard: TripDashboard
+  /** The day's mandatory blocks (trabalho, inglês, treino, alimentação, revisão) when her brief covers the day. */
+  plan?: DailyPlan
 }
 
 /** The trip day for `date` when modo viagem covers it. `minutes` = local clock for "próxima saída". */
@@ -51,18 +55,8 @@ export function tripDayOf(db: DB, date: DateKey, minutes = 0): TripDay | undefin
   const block = classOn(exp, date)
   const sd = block ? schoolDays(trip, all).find((d) => d.date === date) : undefined
   const currency: TripCurrency = exp?.currency ?? 'BRL'
-  let spent = 0
-  let any = false
-  for (const i of all) {
-    if (i.date !== date || !isActive(i)) continue
-    const from = i.currency ?? currency
-    const paid = (i.paidCents ?? 0) + (i.status === 'feito' ? (i.uberCents ?? 0) : 0)
-    if (!paid) continue
-    const v = exp ? convert(paid, from, currency, exp) : paid
-    if (v == null) continue
-    spent += v
-    any = true
-  }
+  // The bank statement is the truth on the days it covers; the items' paid/Uber elsewhere (never both).
+  const spent = daySpend(trip, all, db.expenses, date)
   return {
     trip,
     date,
@@ -75,9 +69,10 @@ export function tripDayOf(db: DB, date: DateKey, minutes = 0): TripDay | undefin
     sports: activities.filter(isTripSport),
     next: nextDeparture(all, { date, minutes }),
     currency,
-    spentCents: any ? spent : undefined,
+    spentCents: spent?.cents,
     workouts: db.workouts.filter((w) => w.date === date && w.status !== 'pulado'),
     dashboard: tripDashboard(trip, all, db.tasks, { date, minutes }, db.expenses),
+    plan: dailyPlan(trip, all, db.workouts, db.occurrences, date),
   }
 }
 
