@@ -192,7 +192,8 @@ export interface FinancialClose {
   /** Statement lines in another currency without a rate: kept apart, in their own currency. */
   unconverted: { cents: number; currency: string }[]
   budget?: {
-    brlCents: number
+    /** Original budget in the trip currency (her "R30.000" is rand). */
+    cents: number
     /** In the trip currency (undefined: no rate to compare). */
     inTrip?: number
     /** budget − paid − committed − estimated (trip currency). */
@@ -268,8 +269,8 @@ export function financialClose(trip: Trip, items: TripItem[], expenses: Expense[
   let budget: FinancialClose['budget']
   let risk: OverrunRisk = 'sem_orcamento'
   if (exp?.budgetCents != null) {
-    const inTrip = convert(exp.budgetCents, 'BRL', cur, exp)
-    budget = { brlCents: exp.budgetCents, inTrip }
+    const inTrip: number | undefined = exp.budgetCents
+    budget = { cents: exp.budgetCents, inTrip }
     if (inTrip == null) risk = 'sem_cotacao'
     else {
       budget.remaining = inTrip - projected

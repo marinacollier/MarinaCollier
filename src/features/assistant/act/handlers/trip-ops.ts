@@ -175,7 +175,7 @@ function finance(db: DB, trip: Trip): LumosReply {
     { emoji: '🧮', text: `Projetado: ${m(f.projected)}`, sub: `Com a margem de ${f.marginPct}%: ${m(f.projectedWithMargin)}` },
   ]
   if (f.budget) {
-    const ref = `Orçamento original ${formatMoney(f.budget.brlCents, 'BRL')} — referência, não saldo disponível`
+    const ref = `Orçamento original ${formatMoney(f.budget.cents, f.currency)} — referência, não saldo disponível`
     lines.push(f.budget.remaining != null ? { emoji: '💰', text: `Sobra depois do projetado: ${m(f.budget.remaining)}`, sub: `${ref}. Depois só do pago: ${m(f.budget.remainingAfterPaid!)}.` } : { emoji: '💰', text: 'Sem cotação para comparar com o orçamento em reais', sub: `${ref}. Defina a cotação na viagem.` })
   }
   const missing = f.withoutValue.length ? `${f.withoutValue.length} itens ainda sem valor — o total sobe quando entrarem.` : undefined

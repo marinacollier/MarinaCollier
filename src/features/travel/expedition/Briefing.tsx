@@ -264,7 +264,7 @@ export function FinancialCloseCard({ trip, items, expenses }: Props) {
       </dl>
       {f.budget && (
         <div className="mt-3 text-[13px] text-ink-2">
-          Orçamento original {formatMoney(f.budget.brlCents, 'BRL')}
+          Orçamento original {formatMoney(f.budget.cents, f.currency)}
           {f.budget.inTrip != null && cur !== 'BRL' ? ` (≈ ${formatMoney(f.budget.inTrip, cur)})` : ''} — referência, não saldo.
           {f.budget.remaining != null && (
             <span className="block">

@@ -7,7 +7,7 @@ import type { Expense, Trip, TripItem } from '@/data/types'
 import { buildSeed } from '@/data/seed'
 import { applyExpeditionSeed } from '@/data/seed/expedition'
 import { applyMaster1031 } from '@/data/seed/master-1031'
-import { applyOps1101, OPS_1101_ID, ORIGINAL_BUDGET_BRL_CENTS } from '@/data/seed/ops-1101'
+import { applyOps1101, OPS_1101_ID, ORIGINAL_BUDGET_CENTS } from '@/data/seed/ops-1101'
 import { SEED_IDS } from '@/data/seed/ids'
 import { confirmedSpend } from './command'
 import { daySpend, financialClose, isEssential, toBook, tomorrowChecklist } from './ops'
@@ -65,19 +65,15 @@ describe('financial close', () => {
 
   it('the budget is a reference: remaining is computed, risk follows the projection', () => {
     expect(financialClose(trip(), items, ledger).risk).toBe('sem_orcamento')
-    // R$ 30.000 without a rate: can't compare (never assumed available).
-    const noRate = financialClose(trip({ budgetCents: 3_000_000 }), items, ledger)
-    expect(noRate.risk).toBe('sem_cotacao')
-    expect(noRate.budget?.remaining).toBeUndefined()
-    // 1 ZAR = R$ 0,30 → R$ 30.000 = ZAR 100.000.
-    const f = financialClose(trip({ budgetCents: 3_000_000, rateToBRL: 0.3 }), items, ledger)
+    // Her budget is in rand (the trip currency): compared directly, no rate needed.
+    const f = financialClose(trip({ budgetCents: 10_000_000 }), items, ledger)
     expect(f.budget!.inTrip).toBe(10_000_000)
     expect(f.budget!.remaining).toBe(10_000_000 - f.projected)
     expect(f.budget!.remainingAfterPaid).toBe(10_000_000 - f.paid)
     expect(f.risk).toBe('ok')
     // Projected ≈ ZAR 7.875: over ZAR 5.000 → alto; ZAR 8.000 is under it but not with the 10% margin → atenção.
-    expect(financialClose(trip({ budgetCents: 150_000, rateToBRL: 0.3 }), items, ledger).risk).toBe('alto')
-    expect(financialClose(trip({ budgetCents: 240_000, rateToBRL: 0.3 }), items, ledger).risk).toBe('atencao')
+    expect(financialClose(trip({ budgetCents: 500_000 }), items, ledger).risk).toBe('alto')
+    expect(financialClose(trip({ budgetCents: 800_000 }), items, ledger).risk).toBe('atencao')
   })
 
   it('a BRL statement line without a rate is kept apart, not silently dropped', () => {
@@ -152,7 +148,7 @@ describe('budget R$ 30.000 stored once on the expedition', () => {
     const db = applyMaster1031(applyExpeditionSeed(buildSeed('2026-10-27'), at), '2026-10-31', at)
     expect(applyOps1101(db, '2026-10-31')).toBe(db)
     const once = applyOps1101(db, '2026-11-01', at)
-    expect(once.trips.find((t) => t.id === SEED_IDS.tripAfrica)!.expedition!.budgetCents).toBe(ORIGINAL_BUDGET_BRL_CENTS)
+    expect(once.trips.find((t) => t.id === SEED_IDS.tripAfrica)!.expedition!.budgetCents).toBe(ORIGINAL_BUDGET_CENTS)
     expect(once.profile.tripUpdatesApplied).toContain(OPS_1101_ID)
     expect(applyOps1101(once, '2026-11-02')).toBe(once)
     const hers = { ...db, trips: db.trips.map((t) => (t.id === SEED_IDS.tripAfrica ? { ...t, expedition: { ...t.expedition!, budgetCents: 2_500_000 } } : t)) }

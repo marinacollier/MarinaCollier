@@ -100,12 +100,12 @@ describe('Lumos · trip operations', () => {
     expect(text).toMatch(/Pago até agora: ZAR 1\.220/)
     expect(text).toMatch(/Comprometido \(reservado, não pago\): ZAR 0/)
     expect(text).toMatch(/Estimado \(planejado\/cotado\): ZAR 4\.475/)
-    expect(text).toMatch(/Orçamento original R\$ 30\.000 — referência, não saldo disponível/)
+    expect(text).toMatch(/Orçamento original ZAR 30\.000 — referência, não saldo disponível/)
     expect(text).toMatch(/Logística essencial/)
     expect(r.action).toBeUndefined()
-    // With her rate the remaining is computed.
+    // The budget is in rand: the remaining is computed directly (the rate does not change it).
     const withRate = { ...db, tripItems: items, expenses: [...db.expenses, ...ledger], trips: db.trips.map((t) => (t.id === T ? { ...t, expedition: { ...t.expedition!, rateToBRL: 0.3 } } : t)) }
-    expect(all(ask(withRate, 'fechamento financeiro')!)).toMatch(/Sobra depois do projetado: ZAR 94\.305/)
+    expect(all(ask(withRate, 'fechamento financeiro')!)).toMatch(/Sobra depois do projetado: ZAR 24\.305/)
   })
 
   it('outside the trip the commands are not answered by the trip', () => {

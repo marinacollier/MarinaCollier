@@ -688,7 +688,7 @@ function Custos({ trip, items, expenses }: ViewProps) {
             />
           </Field>
         </div>
-        <Field label="Orçamento original (R$)">
+        <Field label={`Orçamento original (${exp.currency})`}>
           <input
             className="input"
             inputMode="numeric"

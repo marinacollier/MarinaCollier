@@ -1629,7 +1629,7 @@ export interface TripExpedition {
   /** Safety margin on the totals, in percent (15). */
   marginPct: number
   /**
-   * Her original budget for the trip, in BRL cents (R$ 30.000 → 3_000_000). A reference to compare against,
+   * Her original budget for the trip, in the trip currency (R30.000 rand → 3_000_000). A reference to compare against,
    * never a balance: what is left is always computed from what was paid/committed (expedition/ops.ts).
    */
   budgetCents?: number
