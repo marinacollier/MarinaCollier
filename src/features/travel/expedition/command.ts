@@ -29,6 +29,7 @@ export const BOOKING_STATUS_META: Record<TripBookingStatus, { label: string; cls
   concluido: { label: 'CONCLUÍDO', cls: 'bg-sage text-bg' },
   reservado: { label: 'RESERVADO', cls: 'bg-sage-soft text-[color-mix(in_oklab,var(--sage)_70%,var(--ink))]' },
   aguardando_resposta: { label: 'AGUARDANDO RESPOSTA', cls: 'bg-ocean-soft text-[color-mix(in_oklab,var(--ocean)_72%,var(--ink))]' },
+  aguardando_pagamento: { label: 'AGUARDANDO PAGAMENTO', cls: 'bg-sand-soft text-[color-mix(in_oklab,var(--sand)_62%,var(--ink))]' },
   a_cotar: { label: 'A COTAR', cls: 'bg-sand-soft text-[color-mix(in_oklab,var(--sand)_62%,var(--ink))]' },
   a_reservar: { label: 'A RESERVAR', cls: 'bg-sand-soft text-[color-mix(in_oklab,var(--sand)_62%,var(--ink))]' },
   opcional: { label: 'OPCIONAL', cls: 'bg-plum-soft text-ink-2' },
@@ -37,7 +38,7 @@ export const BOOKING_STATUS_META: Record<TripBookingStatus, { label: string; cls
   reserva_emitida: { label: 'RESERVA EMITIDA', cls: 'bg-sage-soft text-[color-mix(in_oklab,var(--sage)_70%,var(--ink))]' },
   confirmado: { label: 'CONFIRMADO', cls: 'bg-sage text-bg' },
 }
-export const BOOKING_STATUS_ORDER: TripBookingStatus[] = ['planejado', 'a_cotar', 'a_reservar', 'aguardando_resposta', 'reserva_emitida', 'reservado', 'confirmado', 'concluido', 'opcional', 'cancelado']
+export const BOOKING_STATUS_ORDER: TripBookingStatus[] = ['planejado', 'a_cotar', 'a_reservar', 'aguardando_resposta', 'aguardando_pagamento', 'reserva_emitida', 'reservado', 'confirmado', 'concluido', 'opcional', 'cancelado']
 
 /**
  * Booked: money is committed until it is paid. RESERVA EMITIDA (reference issued, operation/payment may be
@@ -81,6 +82,8 @@ export function bookingStatusPatch(s: TripBookingStatus): Partial<TripItem> {
       return { bookingStatus: s, status: 'confirmado', booking: 'confirmado' }
     case 'aguardando_resposta':
       return { bookingStatus: s, status: 'a_confirmar', booking: 'aguardando' }
+    case 'aguardando_pagamento':
+      return { bookingStatus: s, status: 'a_confirmar', booking: undefined }
     case 'a_cotar':
       return { bookingStatus: s, status: 'a_confirmar', booking: 'nao_pesquisado' }
     case 'a_reservar':
@@ -94,7 +97,7 @@ export function bookingStatusPatch(s: TripBookingStatus): Partial<TripItem> {
   }
 }
 
-export const PENDING_STATUSES: TripBookingStatus[] = ['a_cotar', 'a_reservar']
+export const PENDING_STATUSES: TripBookingStatus[] = ['a_cotar', 'a_reservar', 'aguardando_pagamento']
 const OPEN = (s: TripBookingStatus) => s !== 'concluido' && s !== 'cancelado'
 
 // ─── Priority & category ────────────────────────────────────────────────────

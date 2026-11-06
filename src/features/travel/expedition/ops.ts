@@ -46,7 +46,7 @@ export function daySpend(trip: Trip, items: TripItem[], expenses: Expense[], dat
 
 // ─── What is left to book ───────────────────────────────────────────────────
 
-const TO_BOOK: TripBookingStatus[] = ['a_cotar', 'a_reservar', 'aguardando_resposta']
+const TO_BOOK: TripBookingStatus[] = ['a_cotar', 'a_reservar', 'aguardando_resposta', 'aguardando_pagamento']
 const RESERVABLE: TripItem['section'][] = ['voo', 'hospedagem', 'transporte', 'reserva']
 
 export interface ToBookRow {

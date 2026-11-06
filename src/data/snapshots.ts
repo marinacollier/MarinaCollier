@@ -47,6 +47,20 @@ export async function takeSnapshot(reason: string): Promise<SnapshotInfo | undef
   }
 }
 
+/** A copy of a given DB (not the store's) — boot keeps one right before a one-time data update. */
+export async function snapshotOf(db: DB, reason: string): Promise<SnapshotInfo | undefined> {
+  try {
+    const copy = structuredClone(db)
+    const snap: Snapshot = { id: uid(), at: nowISO(), reason, records: countRecords(copy), db: copy }
+    await set(KEY, [snap, ...(await all())].slice(0, KEEP), kv())
+    const { db: _db, ...info } = snap
+    return info
+  } catch (err) {
+    console.error('[marina-os] snapshot failed', err instanceof Error ? err.message : 'unknown')
+    return undefined
+  }
+}
+
 export async function listSnapshots(): Promise<SnapshotInfo[]> {
   return (await all()).map(({ db: _db, ...info }) => info)
 }

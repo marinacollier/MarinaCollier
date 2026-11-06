@@ -1587,6 +1587,8 @@ export type TripBookingStatus =
   | 'concluido'
   | 'reservado'
   | 'aguardando_resposta'
+  /** Supplier answered; her payment / forms are what is missing (not booked yet). */
+  | 'aguardando_pagamento'
   | 'a_cotar'
   | 'a_reservar'
   | 'opcional'
