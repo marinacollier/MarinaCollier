@@ -85,7 +85,7 @@ describe('Home limpa em viagem (Cape Town, 06/11)', () => {
 
   it('Precisa de você: max 3 short rows from the trip ops, P0 payment first with its amount; tap = the booking sheet', () => {
     const lodge = getDB().tripItems.find((i) => i.tripId === trip().id && /safari|kwa maritane/i.test(i.title))!
-    actions.update('tripItems', lodge.id, { priority: 'P0', bookingStatus: 'reservado', quotedCents: 400000, paidCents: 0, paymentStatus: 'pendente', currency: 'ZAR', nextAction: 'Pagar o saldo do safári até sexta, senão a reserva cai e perdemos a vaga' })
+    actions.update('tripItems', lodge.id, { priority: 'P0', bookingStatus: 'reservado', proof: 'voucher', quotedCents: 400000, paidCents: 0, paymentStatus: 'pendente', currency: 'ZAR', nextAction: 'Pagar o saldo do safári até sexta, senão a reserva cai e perdemos a vaga' })
     renderAt()
     const box = screen.getByLabelText('Precisa de você')
     const rows = [...box.querySelectorAll('li')]

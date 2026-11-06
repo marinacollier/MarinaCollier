@@ -68,7 +68,8 @@ const timeOf = (e: CalendarEntry) => (e.allDay || e.endAt.date > e.startAt.date 
 /** The day's rows, all-day first, then by time. Spans (a stay) show on their first day only. */
 export function dayRows(entries: CalendarEntry[], date: DateKey): CalendarEntry[] {
   return entries
-    .filter((e) => isHomeEntry(e) && e.startAt.date === date)
+    // Something already done with no time (a purchase, a visit) is history, not part of the day ahead.
+    .filter((e) => isHomeEntry(e) && e.startAt.date === date && !(e.status === 'feito' && !timeOf(e)))
     .sort((a, b) => (timeOf(a) ?? '').localeCompare(timeOf(b) ?? '') || a.title.localeCompare(b.title, 'pt-BR'))
 }
 
@@ -138,6 +139,7 @@ export interface Need {
   open: NeedOpen
 }
 
+const BOOKED = new Set<string>(['reserva_emitida', 'reservado', 'confirmado', 'aguardando_pagamento'])
 const RANK = { P0: 0, P1: 1, P2: 2 } as const
 const rankOf = (i: TripItem) => (i.priority ? RANK[i.priority] : 3)
 
@@ -154,6 +156,8 @@ export function tripNeeds(panel: TripOpsPanel, opts: { hideMoney?: boolean; max?
     list.push({ item, chip, order })
   }
   for (const { item, money } of panel.payments) {
+    // A quote or a hotel still to book is not a bill: it shows as "reservar"/"aguardando" below, never "pagar".
+    if (!BOOKED.has(bookingStatusOf(item))) continue
     const owed = money.balance != null && money.balance > 0 && !opts.hideMoney
     add(item, owed ? `pagar ${shortMoney(money.balance!, money.currency)}` : 'pagar', 0)
   }

@@ -82,7 +82,7 @@ describe('Home limpa · picks', () => {
   })
 
   it('Precisa de você (viagem): P0 first, payments with the amount, at most 3, one row per booking', () => {
-    const pay = item({ id: 'pay', title: 'Safari Pilanesberg (Kwa Maritane)', priority: 'P0', bookingStatus: 'reservado', nextAction: 'Pagar o saldo até sexta, senão a reserva cai — falar com a Joyce' })
+    const pay = item({ id: 'pay', title: 'Safari Pilanesberg (Kwa Maritane)', priority: 'P0', bookingStatus: 'reservado', proof: 'voucher', nextAction: 'Pagar o saldo até sexta, senão a reserva cai — falar com a Joyce' })
     const hotel = item({ id: 'hotel', title: 'Hotel OR Tambo', priority: 'P0', bookingStatus: 'a_reservar', group: 'Johannesburg' })
     const kayak = item({ id: 'kayak', title: 'Caiaque', priority: 'P1', bookingStatus: 'aguardando_resposta' })
     const transfer = item({ id: 'transfer', title: 'Transfer', priority: 'P2', bookingStatus: 'a_reservar' })
@@ -101,6 +101,10 @@ describe('Home limpa · picks', () => {
     for (const n of needs) expect(n.title.length + n.chip.length).toBeLessThanOrEqual(ROW_MAX + 15)
     expect(JSON.stringify(needs)).not.toContain('Joyce')
     expect(tripNeeds(panel, { hideMoney: true })[0].chip).toBe('pagar')
+    // A quote is not a bill: never "pagar", it shows what is really missing.
+    const quote = item({ id: 'quote', title: 'Kwa Maritane', priority: 'P0', bookingStatus: 'aguardando_resposta', paymentStatus: 'pendente' })
+    const q = tripNeeds({ ...panel, payments: [{ item: quote, money: { total: 1175000, paid: 0, balance: 1175000, currency: 'ZAR' } }], leg: { label: 'Johannesburg', items: [quote] }, awaiting: [] } as unknown as TripOpsPanel)
+    expect(q[0].chip).toBe('aguardando')
   })
 
   it('Precisa de você (fora da viagem): overdue first, then the attention queue, max 3', () => {
