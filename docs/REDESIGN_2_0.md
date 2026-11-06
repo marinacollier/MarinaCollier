@@ -103,7 +103,7 @@ Nenhuma integração é simulada: o que não está conectado aparece como "Não 
 |---|---|---|
 | 0 | Auditoria, arquitetura, inventário, plano de migração, matriz de integrações, fotos do antes | **feito** |
 | 1 | Navegação em 5 destinos (celular + tablet), Minha Vida, Projetos, Home calma, painel da viagem com divulgação progressiva | **feito** (testes + navegador) |
-| 2 | Calendário universal (modelo canônico por projeção, dedupe, Dia/Semana/Mês/Lista, filtros, detalhe antes de edição, conflitos, fuso) | em construção |
+| 2 | Calendário universal (modelo canônico por projeção, dedupe, Dia/Semana/Mês/Lista, filtros, detalhe antes de edição, conflitos, fuso) | **feito** (1.460 testes + 45 checagens no navegador, celular e tablet) |
 | 3 | Minha Vida a fundo: biblioteca única, trilhas de estudo (Inglês C1, IA, Produto, Psicologia/Psicanálise/Filosofia, Outros), Casa do Saber, materiais do Flexcil, Corpo unificado, Relacionamentos, intercâmbio 2027, Finanças simplificada, viagem sem abas aninhadas | a fazer |
 | 4 | Captura rápida em linguagem natural para todos os tipos, busca global por tipo, conectores reais (Google primeiro), notificações | a fazer |
 | 5 | QA de regressão, acessibilidade, performance com histórico grande, remoção de componentes obsoletos | a fazer |
