@@ -1,114 +1,132 @@
 /**
- * INÍCIO — the command center of the day and the week, calm by progressive disclosure:
- *   1. greeting + date + ONE smart line (or nothing)
- *   2. LUMOS — the way in (text, voice, prints, files; answers in a sheet over the page)
- *   3. a quiet strip ONLY when something needs a decision (precisa de você · a close trip), one line each
- *   4. AGORA — max 3: happening, soon, overdue
- *   5. HOJE — ONE list of everything completable today from every area (filter by area), feitos folded
- *   6. PRÓXIMOS DIAS — one summary line per day (tap = its rows), "sem dia"/radar folded
- * During a trip with an expedition, a compact operational panel (home/TripOpsPanel) sits right under the greeting.
- * Every list is the standard ItemRow; tapping a row opens the one quick-edit sheet (Dia · Hora · Obs).
- * Rows are a projection (data/agenda/items.ts) over the real records — nothing is copied into a Task.
+ * INÍCIO — clean on purpose (MARINA OS 2.0, "sem texto desnecessário"). Top to bottom, nothing else:
+ *   1. one line: "Sexta, 6 nov · Cape Town" (+ the avatar → Ajustes)
+ *   2. HOJE — today's commitments from the universal calendar (the Agenda's own projection), one line each:
+ *      time (or "dia todo") · title · tiny status chip. Tap = the Agenda's entry detail. Empty = "Dia livre".
+ *   3. PRÓXIMOS DIAS — the next 3 days with something, up to 3 rows each, "Ver agenda".
+ *   4. PRECISA DE VOCÊ — max 3 one-liners (trip: unpaid bookings, next leg, answers awaited; otherwise
+ *      overdue + the attention queue). "Ver tudo" → the trip's command center (or Tarefas).
+ *   5. one chip line for the trip: "✈︎ SA366 em 7 dias" · "Saldo R 12.459" → the trip.
+ *   + one small Lumos line at the very end.
+ * Everything that used to be here stays one tap away: the full trip panel (pendências, gastos, agenda,
+ * entregas, conflitos) and the expedition day live on the trip page (Hoje); the full day list, checks and
+ * priorities in Agenda / Tarefas; Lumos with voice and attachments on /lumos.
  */
 import { Suspense, useCallback, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { ROUTES } from '@/app/routes'
+import { openSheet } from '@/app/ui-store'
 import { Page } from '@/components/ui'
-import { dailyBrief, homeSuggestions, lifeContext, needsAttention, type Now } from '@/data/intel'
+import { SheetFrame } from '@/components/ui/Sheet'
+import { lifeContext, needsAttention, type Now } from '@/data/intel'
 import { useDB } from '@/data/store'
-import type { DB } from '@/data/types'
-import { dayItems, undatedItems, upcomingDays } from '@/data/agenda/items'
-import { radarItems } from '@/data/briefing/backlog'
-import { pendingSync } from '@/data/briefing/bundled'
+import type { DateKey, DB } from '@/data/types'
+import { dayItems } from '@/data/agenda/items'
+import { deviceTimeZone, type CalendarEntry } from '@/data/calendar/universal'
 import { areaLocked, useLockState } from '@/app/lock-store'
 import { useNow } from '@/hooks/useToday'
-import { formatLongDate, greeting } from '@/lib/date'
-import { homeContext, tripPriorityItems } from './context'
-import { MAX_PRIORITIES, prioritiesOf } from './priorities'
-import { AttentionRow, SyncLine, TripLine } from './home/blocks'
-import { AgoraBlock, HojeBlock, ProximosBlock } from './home/agenda'
-import { homeLists, loosePriorities } from './home/rows'
-import { composerPlaceholder } from './home/day'
-import { LumosBox } from './home/LumosBox'
+import { addDays } from '@/lib/date'
+import { travelTripOn } from '@/data/travel-mode'
+import { localNow } from '@/features/travel/expedition/logic'
+import { EntryDetail } from '@/features/agenda/calendar/EntryDetail'
+import { useCalendar, useEntry } from '@/features/agenda/calendar/model'
+import { homeContext } from './context'
 import { LumosSheet, lumosHref, type LumosRequest } from './home/lumos'
 import { useMarkSeenOnLeave } from './home/seen'
-import { TripDayCard } from './home/TripDayCard'
-import { TripOpsPanel } from './home/TripOpsPanel'
-import { homeTripOps, workStudyItems, workoutItems } from './home/trip-ops'
-import { tripDayOf } from '@/features/travel/trip-day'
-import { localNow } from '@/features/travel/expedition/logic'
-import { travelTripOn } from '@/data/travel-mode'
+import { homeTripOps } from './home/trip-ops'
+import { dayRows, flightName, headerDate, inDays, lifeNeeds, nextDays, NEEDS_MAX, shortMoney, tripNeeds, type Need } from './home/clean'
+import { ConflictList, HojeList, LumosLine, PrecisaList, ProximosList, TripChips } from './home/CleanBlocks'
 
-/** "Cape Town · UTC+2" while a trip with its own zone is happening; nothing otherwise. */
-function placeLine(db: DB, today: string, clock: Date): string | undefined {
+/** A trip shows on Home (outside it) only when it's really close. */
+const TRIP_LINE_DAYS = 30
+/** How far Home reads the calendar (Próximos dias looks for 3 days with something in this window). */
+const HORIZON = 14
+const CONFLICT_DAYS = 7
+
+/** The trip's place while traveling ("Cape Town"); nothing otherwise. */
+function placeOf(db: DB, today: DateKey): string | undefined {
   const trip = travelTripOn(db, today)
-  const tz = trip?.expedition?.timeZone
-  if (!trip || !tz) return undefined
-  const place = trip.expedition?.weather?.label ?? trip.place?.split(/[·(]/)[0]?.trim()
-  let offset: string | undefined
-  try {
-    offset = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'shortOffset' }).formatToParts(clock).find((p) => p.type === 'timeZoneName')?.value.replace('GMT', 'UTC')
-  } catch {
-    offset = undefined
-  }
-  return [place, offset].filter(Boolean).join(' · ') || undefined
+  if (!trip) return undefined
+  return trip.expedition?.weather?.label ?? trip.place?.split(/[·(,]/)[0]?.trim() ?? undefined
 }
 
-/** A trip shows on Home only when it's really close. */
-const TRIP_LINE_DAYS = 30
-
 const rise = (i: number) => ({
-  initial: { opacity: 0, y: 10 },
+  initial: { opacity: 0, y: 8 },
   animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.45, delay: 0.05 + i * 0.06, ease: [0.22, 1, 0.36, 1] as const },
+  transition: { duration: 0.4, delay: 0.04 + i * 0.05, ease: [0.22, 1, 0.36, 1] as const },
 })
 
 export default function TodayPage() {
   const db = useDB()
   const { today, minutes, now: clock } = useNow()
   const navigate = useNavigate()
-  const now: Now = useMemo(() => ({ date: today, minutes, iso: clock.toISOString() }), [today, minutes, clock])
   const name = db.profile.name?.trim() || 'Marina'
 
   // The "seen" baseline still moves when she leaves (Lumos uses it for "o que mudou").
   useMarkSeenOnLeave()
 
-  const home = useMemo(() => homeContext(db, today, minutes), [db, today, minutes])
-  const life = useMemo(() => lifeContext(db, now), [db, now])
-  const brief = useMemo(() => dailyBrief(db, now) ?? life.today.notes[0]?.value, [db, now, life])
-  const suggestions = useMemo(() => homeSuggestions(db, now).slice(0, 3), [db, now])
-  const attention = useMemo(() => needsAttention(db, now), [db, now])
-  const sync = useMemo(() => pendingSync(db, today), [db, today])
+  // While traveling, "today" is the trip's local day (the calendar stores trip times in its zone).
+  const tz = travelTripOn(db, today)?.expedition?.timeZone
+  const day = useMemo(() => {
+    if (!tz) return today
+    try {
+      return localNow(tz, clock).date
+    } catch {
+      return today
+    }
+  }, [tz, today, clock])
+  const place = useMemo(() => placeOf(db, today), [db, today])
+
+  // 2 · 3 — the same projection as the Agenda.
+  const horizon = addDays(day, HORIZON)
+  const cal = useCalendar(day, horizon, day)
+  const hoje = useMemo(() => dayRows(cal.entries, day), [cal.entries, day])
+  const proximos = useMemo(() => nextDays(cal.entries, day), [cal.entries, day])
+  const conflicts = useMemo(() => {
+    const until = addDays(day, CONFLICT_DAYS)
+    return cal.conflicts.filter((c) => c.date >= day && c.date <= until)
+  }, [cal.conflicts, day])
+
+  // 4 — Precisa de você.
   const lock = useLockState()
   const hidden = useMemo(() => ({ carreira: areaLocked(db.profile.privacyLock, 'carreira', lock), dinheiro: areaLocked(db.profile.privacyLock, 'dinheiro', lock) }), [db.profile.privacyLock, lock])
-  const items = useMemo(() => dayItems(db, today, today, { hidden }), [db, today, hidden])
-  const lists = useMemo(() => homeLists(items, minutes), [items, minutes])
-  const next = useMemo(() => upcomingDays(db, today, 7, { hidden }), [db, today, hidden])
-  const undated = useMemo(() => undatedItems(db, today), [db, today])
-  const radar = useMemo(() => radarItems(db, today), [db, today])
-  const loose = useMemo(() => loosePriorities(prioritiesOf(db, today).slice(0, MAX_PRIORITIES), items), [db, today, items])
-  // Modo viagem: the expedition day replaces the São Paulo routine (derived from the trip's dates).
-  // Where she is: the trip's place and its zone while traveling (2.0: "data e localização/fuso atual").
-  const where = useMemo(() => placeLine(db, today, clock), [db, today, clock])
-  const tripDay = useMemo(() => {
-    const tz = travelTripOn(db, today)?.expedition?.timeZone
-    return tripDayOf(db, today, tz ? localNow(tz, clock).minutes : minutes)
-  }, [db, today, clock, minutes])
-
-  // Painel operacional: only while a trip with an expedition is happening; otherwise Home is unchanged.
   const ops = useMemo(() => homeTripOps(db, today, clock), [db, today, clock])
-  const opsWork = useMemo(() => (ops ? workStudyItems(items) : []), [ops, items])
-  const opsWorkouts = useMemo(() => (ops ? workoutItems(items) : []), [ops, items])
+  const now: Now = useMemo(() => ({ date: today, minutes, iso: clock.toISOString() }), [today, minutes, clock])
+  const items = useMemo(() => dayItems(db, today, today, { hidden }), [db, today, hidden])
+  const attention = useMemo(() => needsAttention(db, now), [db, now])
+  const needs = useMemo(() => {
+    const trip = ops ? tripNeeds(ops, { hideMoney: hidden.dinheiro }) : []
+    return [...trip, ...lifeNeeds(items, attention)].slice(0, NEEDS_MAX)
+  }, [ops, hidden.dinheiro, items, attention])
+  const needsHref = ops ? ROUTES.trip(ops.trip.id) : ROUTES.tasks
 
-  const trip = useMemo(() => {
-    if (life.nextTrip) return life.nextTrip.daysLeft <= TRIP_LINE_DAYS ? life.nextTrip : undefined
-    const soon = home.tripSoon
-    if (!soon) return undefined
-    return { id: soon.trip.id, name: soon.trip.name, startDate: soon.trip.startDate ?? today, daysLeft: soon.days, openItems: tripPriorityItems(db, soon.trip, 99).length }
-  }, [life.nextTrip, home.tripSoon, db, today])
+  // 5 — one chip line for the trip (during it: next flight + the balance she typed; before it: the countdown).
+  const life = useMemo(() => lifeContext(db, now), [db, now])
+  const home = useMemo(() => homeContext(db, today, minutes), [db, today, minutes])
+  const chips = useMemo(() => {
+    if (ops) {
+      const f = ops.flight
+      const w = ops.wallet
+      return {
+        to: ROUTES.trip(ops.trip.id),
+        label: `Abrir a viagem: ${ops.trip.name}`,
+        flight: f ? `${flightName(f.item.title)} ${inDays(f.days)}` : undefined,
+        balance: w && !hidden.dinheiro ? shortMoney(w.cents, ops.finance.currency) : undefined,
+      }
+    }
+    const soon = life.nextTrip && life.nextTrip.daysLeft <= TRIP_LINE_DAYS ? { id: life.nextTrip.id, name: life.nextTrip.name, days: life.nextTrip.daysLeft } : home.tripSoon ? { id: home.tripSoon.trip.id, name: home.tripSoon.trip.name, days: home.tripSoon.days } : undefined
+    return soon ? { to: ROUTES.trip(soon.id), label: `Abrir a viagem: ${soon.name}`, flight: `${soon.name} ${inDays(soon.days)}`, balance: undefined } : undefined
+  }, [ops, hidden.dinheiro, life.nextTrip, home.tripSoon])
 
-  // Answers slide up in the Lumos sheet over the page — Home itself never moves.
+  // Detail of a row: the Agenda's own entry detail, over Home.
+  const [sel, setSel] = useState<{ id: string; date: DateKey }>()
+  const detail = useEntry(sel, day)
+  const device = useMemo(() => deviceTimeZone(), [])
+  const [showConflicts, setShowConflicts] = useState(false)
+  const openEntry = useCallback((e: CalendarEntry, d: DateKey) => setSel({ id: e.id, date: d }), [])
+
+  // Lumos answers slide up in its sheet over the page — Home itself never moves.
   const [lumos, setLumos] = useState<LumosRequest>()
   const ask = useCallback(
     (text: string) => {
@@ -117,81 +135,74 @@ export default function TodayPage() {
     },
     [navigate],
   )
-  // A print/PDF is read in the same sheet (same Lumos, same pipeline).
-  const attach = useCallback((file: File, caption: string) => setLumos((c) => ({ file, caption, n: (c?.n ?? 0) + 1 })), [])
-  const placeholder = composerPlaceholder(home.part, { workNow: home.part === 'dia' })
-  const hasStrip = attention.length > 0 || !!trip || !!sync
+
+  const openNeed = (n: Need) => {
+    const o = n.open
+    if (o.kind === 'tripItem') openSheet('tripItem', { id: o.id })
+    else if (o.kind === 'item') openSheet('itemEdit', { item: o.item, today })
+    else if (o.kind === 'ask') ask(o.text)
+    else navigate(o.to)
+  }
 
   return (
     <Page>
-      <header className="pt-2">
-        <div className="flex items-center justify-between min-h-11">
-          <span className="text-[11px] tracking-[0.22em] uppercase text-muted font-semibold">Marina OS</span>
-          <button
-            type="button"
-            onClick={() => navigate(ROUTES.settings)}
-            aria-label="Ajustes e perfil"
-            className="h-11 w-11 -mr-1.5 inline-flex items-center justify-center rounded-full active:scale-95 transition"
-          >
-            <span className="h-9 w-9 rounded-full bg-accent-soft text-accent font-display text-[17px] inline-flex items-center justify-center">{name.slice(0, 1).toUpperCase()}</span>
-          </button>
-        </div>
-        <motion.div {...rise(0)}>
-          <h1 className="font-display text-[26px] leading-[1.15] tracking-tight mt-3">
-            {greeting(minutes)}, {name}.
-          </h1>
-          <p className="text-[14.5px] text-muted mt-1 first-letter:uppercase">
-            {formatLongDate(today)}
-            {where && <span> · {where}</span>}
-          </p>
-          {brief && <p className="font-display italic text-[17px] text-ink-2 mt-3 leading-snug">{brief}</p>}
-        </motion.div>
+      <header className="pt-2 flex items-center justify-between gap-3 min-h-11">
+        <motion.p {...rise(0)} className="font-display text-[22px] leading-tight tracking-tight truncate">
+          {headerDate(day)}
+          {place && <span className="text-muted"> · {place}</span>}
+        </motion.p>
+        <button
+          type="button"
+          onClick={() => navigate(ROUTES.settings)}
+          aria-label="Ajustes e perfil"
+          className="h-11 w-11 -mr-1.5 shrink-0 inline-flex items-center justify-center rounded-full active:scale-95 transition"
+        >
+          <span className="h-9 w-9 rounded-full bg-accent-soft text-accent font-display text-[17px] inline-flex items-center justify-center">{name.slice(0, 1).toUpperCase()}</span>
+        </button>
       </header>
 
-      {ops && (
-        <motion.div {...rise(1)} className="mt-6">
-          <TripOpsPanel panel={ops} work={opsWork} workouts={opsWorkouts} today={today} hideMoney={hidden.dinheiro} />
+      <motion.div {...rise(1)} className="mt-5">
+        <HojeList rows={hoje} onOpen={(e) => openEntry(e, day)} conflicts={conflicts.length} onConflicts={() => setShowConflicts(true)} />
+      </motion.div>
+
+      <motion.div {...rise(2)} className="mt-7">
+        <ProximosList days={proximos} today={day} onOpen={openEntry} agendaHref={ROUTES.agenda} />
+      </motion.div>
+
+      {needs.length > 0 && (
+        <motion.div {...rise(3)} className="mt-7">
+          <PrecisaList needs={needs} onOpen={openNeed} allHref={needsHref} />
         </motion.div>
       )}
 
-      <motion.div {...rise(1)} className="mt-7">
-        <LumosBox placeholder={placeholder} suggestions={suggestions} onAsk={ask} onAttach={attach} />
+      {chips && (
+        <motion.div {...rise(4)} className="mt-7">
+          <TripChips {...chips} />
+        </motion.div>
+      )}
+
+      <motion.div {...rise(5)} className="mt-9">
+        <LumosLine onAsk={ask} />
       </motion.div>
+
       {lumos && LumosSheet && (
         <Suspense fallback={null}>
           <LumosSheet request={lumos} />
         </Suspense>
       )}
 
-      {tripDay && (
-        <motion.div {...rise(2)} className="mt-5">
-          <TripDayCard day={tripDay} />
-        </motion.div>
-      )}
-
-      {hasStrip && (
-        <motion.div {...rise(2)} className="mt-5">
-          {sync && <SyncLine sync={sync} />}
-          <AttentionRow items={attention} onAsk={ask} />
-          {trip && <TripLine trip={trip} />}
-        </motion.div>
-      )}
-
-      {lists.agora.length > 0 && (
-        <motion.div {...rise(3)} className="mt-7">
-          <AgoraBlock items={lists.agora} today={today} minutes={minutes} />
-        </motion.div>
-      )}
-
-      <motion.div {...rise(4)} className="mt-7">
-        <HojeBlock lists={lists} loose={loose} today={today} minutes={minutes} />
-      </motion.div>
-
-      <motion.div {...rise(5)} className="mt-9">
-        <ProximosBlock days={next} undated={undated} radar={radar} today={today} />
-      </motion.div>
-
-      <p className="text-center font-display italic text-[14px] text-muted mt-14">em constante movimento: corpo, mente e vida.</p>
+      <AnimatePresence>
+        {detail && sel && (
+          <SheetFrame key="detail" onClose={() => setSel(undefined)} label="Detalhe do compromisso" maxHeight="86dvh">
+            <EntryDetail entry={detail} date={sel.date} conflicts={cal.marks.get(detail.id)} device={device} onClose={() => setSel(undefined)} onEdited={() => setSel(undefined)} />
+          </SheetFrame>
+        )}
+        {showConflicts && !sel && (
+          <SheetFrame key="conflicts" onClose={() => setShowConflicts(false)} label="Conflitos">
+            <ConflictList conflicts={conflicts} onOpenEntry={(id, date) => setSel({ id, date })} />
+          </SheetFrame>
+        )}
+      </AnimatePresence>
     </Page>
   )
 }

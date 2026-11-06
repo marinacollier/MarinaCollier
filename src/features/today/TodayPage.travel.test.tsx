@@ -1,93 +1,140 @@
 import 'fake-indexeddb/auto'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { actions, applyModuleSeeds, getDB, hydrate } from '@/data/store'
 import { createMemoryAdapter } from '@/data/storage'
 import { buildSeed } from '@/data/seed'
+import { apply1106, CAIAQUE_1106 } from '@/data/calendar/fixture-1106'
+import { useUI } from '@/app/ui-store'
 import TodayPage from './TodayPage'
+import TripPage from '@/features/travel/TripPage'
 import { setTravelMode } from '@/features/travel/TravelModeLine'
 import { materializeWeek } from '@/features/body/planner'
 
-function renderHome() {
+function Where() {
+  const loc = useLocation()
+  return <div data-testid="where">{loc.pathname + loc.search}</div>
+}
+
+function renderAt(path = '/') {
   return render(
-    <MemoryRouter initialEntries={['/']}>
+    <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/" element={<TodayPage />} />
+        <Route path="/viagens/:id" element={<TripPage />} />
+        <Route path="*" element={<Where />} />
       </Routes>
     </MemoryRouter>,
   )
 }
 
+const trip = () => getDB().trips.find((t) => t.expedition)!
+
 beforeAll(() => {
+  // jsdom has no scrollIntoView (the trip page scrolls its section chips).
+  Element.prototype.scrollIntoView ??= vi.fn()
   vi.useFakeTimers({ toFake: ['Date'] })
-  vi.setSystemTime(new Date('2026-10-29T10:00:00.000Z')) // 07:00 in São Paulo · 12:00 in Cape Town
+  vi.setSystemTime(new Date('2026-11-06T10:00:00.000Z')) // 07:00 in São Paulo · 12:00 in Cape Town, a Friday
 })
 afterAll(() => vi.useRealTimers())
 
 beforeEach(async () => {
   await hydrate(createMemoryAdapter())
-  actions.replaceDB(applyModuleSeeds(buildSeed('2026-10-29')))
+  actions.replaceDB(apply1106(applyModuleSeeds(buildSeed('2026-11-06'))))
+  useUI.setState({ sheets: [], toasts: [] })
 })
 afterEach(cleanup)
 
-describe('Home in modo viagem', () => {
-  it('shows the expedition day instead of the São Paulo routine', () => {
-    renderHome()
-    const card = screen.getByLabelText('Dia da viagem: South Africa 2026')
-    expect(card.textContent).toContain('modo viagem · dia 6 de 24')
-    expect(card.textContent).toContain('Aula 09:00–15:10 · Bayswater Cape Town')
-    expect(card.textContent).toContain('Próxima saída 16:00 · Piscina de água salgada')
-    expect(card.textContent).toContain('Rotina de SP pausada até 16/11')
-    const hoje = screen.getByLabelText('Hoje').textContent ?? ''
-    expect(hoje).toContain('Aula · Bayswater Cape Town')
-    for (const sp of ['Milagre da Manhã', 'Encerrar o dia', 'Natação', 'Passeio', 'Cerâmica']) expect(hoje).not.toContain(sp)
+describe('Home limpa em viagem (Cape Town, 06/11)', () => {
+  it('header is one line with date · place; the old trip blocks are gone from Home', () => {
+    renderAt()
+    expect(screen.getByRole('banner').textContent).toContain('Sexta, 6 nov · Cape Town')
+    for (const label of ['Painel operacional da viagem', 'Painel da viagem', 'Dia da viagem: South Africa 2026', 'Pendências da próxima etapa', 'Gastos e saldo']) expect(screen.queryByLabelText(label)).toBeNull()
+    const text = document.body.textContent ?? ''
+    for (const gone of ['modo viagem', 'Prioridades', 'próxima ação', 'Ver painel completo', 'Rotina de SP pausada', 'urgente ·', 'Saldo Wise não informado']) expect(text).not.toContain(gone)
+    expect(text).not.toMatch(/\d+ de \d+/)
   })
 
-  it('shows the operational panel on top, from stored data only — urgent first, the rest one tap away', () => {
-    renderHome()
-    const panel = screen.getByLabelText('Painel da viagem')
+  it('Hoje lists the day from the universal calendar: the class at 09:00, in time order, one line each', () => {
+    renderAt()
+    const hoje = screen.getByLabelText('Hoje')
+    const rows = [...hoje.querySelectorAll('li')].map((li) => li.textContent ?? '')
+    expect(rows.some((r) => r.startsWith('09:00Aula · Bayswater Cape Town'))).toBe(true)
+    const times = rows.map((r) => r.match(/^(\d\d:\d\d|dia todo)/)?.[1])
+    expect(times.every(Boolean)).toBe(true)
+    const timed = times.filter((t) => t !== 'dia todo')
+    expect(timed).toEqual([...timed].sort())
+    // Deadlines and the trip span are not "commitments of the day".
+    expect(hoje.textContent).not.toContain('Prazo:')
+    expect(hoje.textContent).not.toContain('South Africa 2026')
+  })
+
+  it('Próximos dias shows the caiaque on Monday as one line with a tiny chip; its long text lives in the detail', () => {
+    renderAt()
+    const next = screen.getByLabelText('Próximos dias')
+    const monday = within(next).getByRole('group', { name: 'Segunda, 9 nov' })
+    const row = [...monday.querySelectorAll('li')].find((li) => li.textContent?.includes('Caiaque'))!
+    expect(row.textContent).toBe('13:00Caiaque com focas — Hout Bayaguardando')
+    expect(document.body.textContent).not.toContain(CAIAQUE_1106.nextAction!)
+    expect(document.body.textContent).not.toContain('grupo mínimo')
+    fireEvent.click(row.querySelector('button')!)
+    const dialog = screen.getByRole('dialog', { name: 'Detalhe do compromisso' })
+    expect(dialog.textContent).toContain(CAIAQUE_1106.nextAction!)
+  })
+
+  it('Precisa de você: max 3 short rows from the trip ops, P0 payment first with its amount; tap = the booking sheet', () => {
+    const lodge = getDB().tripItems.find((i) => i.tripId === trip().id && /safari|kwa maritane/i.test(i.title))!
+    actions.update('tripItems', lodge.id, { priority: 'P0', bookingStatus: 'reservado', quotedCents: 400000, paidCents: 0, paymentStatus: 'pendente', currency: 'ZAR', nextAction: 'Pagar o saldo do safári até sexta, senão a reserva cai e perdemos a vaga' })
+    renderAt()
+    const box = screen.getByLabelText('Precisa de você')
+    const rows = [...box.querySelectorAll('li')]
+    expect(rows.length).toBeLessThanOrEqual(3)
+    expect(rows.length).toBeGreaterThan(0)
+    expect(rows[0].textContent).toMatch(/pagar R4\.000$/)
+    for (const li of rows) expect((li.textContent ?? '').length).toBeLessThanOrEqual(55)
+    expect(box.textContent).not.toContain('senão a reserva cai')
+    fireEvent.click(rows[0].querySelector('button')!)
+    expect(useUI.getState().sheets.at(-1)).toMatchObject({ name: 'tripItem', props: { id: lodge.id } })
+    // "Ver tudo" → the trip's command center, where the full panel lives.
+    fireEvent.click(within(box).getByRole('link', { name: /Ver tudo/ }))
+    expect(screen.getByLabelText('Painel operacional da viagem')).toBeTruthy()
+  })
+
+  it('one chip line for the trip: the next flight and the balance only when she typed it', () => {
+    renderAt()
+    const chip = screen.getByRole('link', { name: 'Abrir a viagem: South Africa 2026' })
+    expect(chip.textContent).toBe('✈︎ SA366 em 7 dias')
+    cleanup()
+    actions.update('trips', trip().id, { expedition: { ...trip().expedition!, walletBalance: { cents: 1245900, asOf: '2026-11-06', source: 'Wise' } } })
+    renderAt()
+    expect(screen.getByRole('link', { name: 'Abrir a viagem: South Africa 2026' }).textContent).toBe('✈︎ SA366 em 7 diasSaldo R12.459')
+  })
+
+  it('everything that left Home is on the trip page: the full operational panel, with gastos and saldo', () => {
+    actions.update('trips', trip().id, { expedition: { ...trip().expedition!, walletBalance: { cents: 1234500, asOf: '2026-11-06', source: 'Wise' } } })
+    renderAt(`/viagens/${trip().id}`)
+    const panel = screen.getByLabelText('Painel operacional da viagem')
     expect(panel.textContent).toContain('viagem · ')
-    // First level (2.0): no agenda/money lists until she opens the full panel.
+    expect(panel.textContent).not.toContain('Abrir centro de comando')
     expect(screen.queryByLabelText('Agenda da viagem')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /Ver painel completo/ }))
     expect(screen.getByLabelText('Agenda da viagem')).toBeTruthy()
     const money = screen.getByLabelText('Gastos e saldo').textContent ?? ''
-    for (const k of ['pago', 'comprometido', 'estimado']) expect(money).toContain(k)
-    // No balance stored: says so, never a computed "available".
-    expect(money).toContain('Saldo Wise não informado — atualizar')
-    expect(panel.textContent).toContain('Abrir centro de comando')
-    // The rest of Home is still there, below.
-    expect(screen.getByLabelText('Dia da viagem: South Africa 2026')).toBeTruthy()
-    expect(screen.getByLabelText('Hoje')).toBeTruthy()
+    for (const k of ['pago', 'comprometido', 'estimado', 'Saldo disponível', '12.345']) expect(money).toContain(k)
   })
+})
 
-  it('shows the wallet balance only when she typed it', () => {
-    const t = getDB().trips.find((x) => x.expedition)!
-    actions.update('trips', t.id, { expedition: { ...t.expedition!, walletBalance: { cents: 1234500, asOf: '2026-10-29', source: 'Wise' } } })
-    renderHome()
-    fireEvent.click(screen.getByRole('button', { name: /Ver painel completo/ }))
-    const money = screen.getByLabelText('Gastos e saldo').textContent ?? ''
-    expect(money).toContain('Saldo disponível')
-    expect(money).toContain('12.345')
-    expect(money).not.toContain('não informado')
-  })
-
-  it('the switch on the trip turns it off (routine back) and on again (generated base removed)', () => {
-    const trip = () => getDB().trips.find((t) => t.expedition)!
+describe('modo viagem switch', () => {
+  it('turns it off (routine back) and on again (generated base removed)', () => {
     setTravelMode(trip(), false)
-    renderHome()
-    expect(screen.queryByLabelText('Dia da viagem: South Africa 2026')).toBeNull()
-    expect(screen.getByLabelText('Hoje').textContent).toContain('Encerrar o dia')
-    cleanup()
-    // with it off, "Trazer a base" brings São Paulo workouts into the trip week…
-    const base = materializeWeek(getDB(), '2026-10-26', '2026-10-29')
+    expect(getDB().trips.find((t) => t.expedition)!.pauseHomeRoutine).toBe(false)
+    const base = materializeWeek(getDB(), '2026-11-02', '2026-11-06')
     expect(base.length).toBeGreaterThan(0)
     actions.createMany('workouts', base)
-    // …and turning it back on removes them (untouched), with Desfazer available.
     const { removed } = setTravelMode(trip(), true)
     expect(removed.length).toBe(base.length)
-    expect(getDB().workouts.some((w) => w.date >= '2026-10-29' && w.date <= '2026-11-01' && w.status === 'planejado')).toBe(false)
+    expect(getDB().workouts.some((w) => w.date >= '2026-11-06' && w.date <= '2026-11-08' && w.status === 'planejado' && base.some((b) => b.id === w.id))).toBe(false)
     expect(getDB().trips.find((t) => t.expedition)!.pauseHomeRoutine).toBe(true)
   })
 })

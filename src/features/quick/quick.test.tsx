@@ -1,5 +1,5 @@
 /**
- * The "+" without Lumos: every quick path writes the SAME record Lumos / the screens use, shows on the Home,
+ * The "+" without Lumos: every quick path writes the SAME record Lumos / the screens use, shows where it belongs,
  * says "✓ · Desfazer" only after the device holds it, and is still there after a fresh hydrate.
  */
 import 'fake-indexeddb/auto'
@@ -12,6 +12,7 @@ import { buildSeed } from '@/data/seed'
 import { useUI } from '@/app/ui-store'
 import QuickAddSheet from '@/components/layout/QuickAddSheet'
 import TodayPage from '@/features/today/TodayPage'
+import TasksPage from '@/features/tasks/TasksPage'
 import { addWater, quickMood, quickSleep, sleepHours, sleepMoodWeek } from './ops'
 
 const DAY = '2026-10-02'
@@ -37,6 +38,8 @@ afterEach(() => {
 
 const sheet = () => render(<MemoryRouter><QuickAddSheet /></MemoryRouter>)
 const home = () => render(<MemoryRouter><TodayPage /></MemoryRouter>)
+/** Untimed tasks live in Tarefas (Home lists only commitments with a time, from the universal calendar). */
+const tasksPage = () => render(<MemoryRouter><TasksPage /></MemoryRouter>)
 const pick = (label: string) => fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${label}`) }))
 /** Fresh start from what the device holds. */
 async function reload() {
@@ -60,8 +63,8 @@ describe('+ Registrar (sem IA)', () => {
     expect(t).toMatchObject({ status: 'todo', date: DAY, context: 'trabalho', area: 'profissional' })
     expect(useUI.getState().sheets).toHaveLength(0)
     cleanup()
-    home()
-    expect(screen.getByLabelText('Hoje').textContent).toContain('Ligar pro dentista')
+    tasksPage()
+    expect(document.body.textContent).toContain('Ligar pro dentista')
     const db = await reload()
     expect(db.tasks.some((x) => x.title === 'Ligar pro dentista')).toBe(true)
   })

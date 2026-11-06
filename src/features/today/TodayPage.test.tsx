@@ -1,12 +1,14 @@
 import 'fake-indexeddb/auto'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { actions, getDB, hydrate } from '@/data/store'
 import { createMemoryAdapter } from '@/data/storage'
 import { buildSeed } from '@/data/seed'
 import { needsAttention } from '@/data/intel'
 import { LumosSheet } from './home/lumos'
+import { HojeList } from './home/CleanBlocks'
+import { NEEDS_MAX } from './home/clean'
 import TodayPage from './TodayPage'
 
 function Where() {
@@ -25,6 +27,13 @@ function renderHome() {
   )
 }
 
+/** [time, title] of each one-line row in a list. */
+const rowsOf = (el: HTMLElement) =>
+  [...el.querySelectorAll('li')].map((li) => {
+    const spans = li.querySelectorAll('button > span')
+    return { time: spans[0]?.textContent ?? '', title: spans[1]?.textContent ?? '', text: li.textContent ?? '' }
+  })
+
 beforeAll(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-10-02T13:00:00.000Z')) // 10:00 in São Paulo, a Friday
@@ -37,63 +46,97 @@ beforeEach(async () => {
 })
 afterEach(cleanup)
 
-describe('Início (Lumos-first Home)', () => {
-  it('renders greeting · Lumos · Hoje · Próximos dias — and nothing of the old dashboard', () => {
+describe('Início limpo', () => {
+  it('one header line · Hoje · Próximos dias — no greeting paragraph, no old dashboard', () => {
     renderHome()
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Bom dia, Marina.')
-    expect(screen.getByLabelText('Fala com a Lumos')).toBeTruthy()
+    expect(screen.getByRole('banner').textContent).toContain('Sexta, 2 out')
+    expect(screen.queryByRole('heading', { level: 1 })).toBeNull()
     expect(screen.getByLabelText('Hoje')).toBeTruthy()
     expect(screen.getByLabelText('Próximos dias')).toBeTruthy()
     const text = document.body.textContent ?? ''
-    for (const gone of ['Brain dump', 'Top 3 de hoje', 'Lendo agora', 'Gastos', 'Linha do dia', 'Hoje importa', 'Quando der hoje', 'Mais cedo']) expect(text).not.toContain(gone)
-    // No trip happening: no travel panel — Home is unchanged.
-    expect(screen.queryByLabelText('Painel da viagem')).toBeNull()
-    expect(text).not.toContain('painel da viagem')
+    for (const gone of ['Bom dia', 'Agora', 'Feitos hoje', 'abertas', 'Sem dia', 'No radar', 'Brain dump', 'Top 3 de hoje', 'Linha do dia', 'Sua noite', 'Prioridades', 'Painel da viagem', 'modo viagem'])
+      expect(text).not.toContain(gone)
+    expect(text).not.toMatch(/\d+ de \d+/)
+    expect(screen.queryByLabelText('Filtrar por área')).toBeNull()
   })
 
-  it('free-text priorities show as rows of Hoje (max three), checkable', () => {
-    for (const title of ['Um', 'Dois', 'Três', 'Quatro']) actions.create('priorities', { date: '2026-10-02', title, order: getDB().priorities.length, done: false })
+  it('Hoje is time-ordered, one line per row (time + title + optional chip), from the universal calendar', () => {
     renderHome()
-    const hoje = screen.getByLabelText('Hoje')
-    expect(hoje.textContent).toContain('Um')
-    expect(hoje.textContent).toContain('Três')
-    expect(hoje.textContent).not.toContain('Quatro')
-    fireEvent.click(screen.getByLabelText('Concluir: Um'))
-    expect(getDB().priorities.find((p) => p.title === 'Um')?.done).toBe(true)
+    const rows = rowsOf(screen.getByLabelText('Hoje'))
+    expect(rows.length).toBeGreaterThan(0)
+    const times = rows.map((r) => r.time)
+    for (const t of times) expect(t).toMatch(/^(\d\d:\d\d|dia todo)$/)
+    const timed = times.filter((t) => t !== 'dia todo')
+    expect(timed).toEqual([...timed].sort())
+    expect(times.indexOf('dia todo') === -1 || times.lastIndexOf('dia todo') < times.findIndex((t) => t !== 'dia todo') || times.every((t) => t === 'dia todo')).toBe(true)
+    // No checks, no second line under the title.
+    expect(screen.getByLabelText('Hoje').querySelectorAll('[role="checkbox"]').length).toBe(0)
+    for (const li of screen.getByLabelText('Hoje').querySelectorAll('li')) expect(li.querySelectorAll('button > span').length).toBeLessThanOrEqual(3)
   })
 
-  it('every row uses the standard check, and tapping a row opens the quick-edit sheet', async () => {
-    const { useUI } = await import('@/app/ui-store')
+  it('tapping a row opens the same detail as the Agenda (full text lives there)', () => {
     renderHome()
-    const hoje = screen.getByLabelText('Hoje')
-    expect(hoje.querySelectorAll('button[role="checkbox"]').length).toBeGreaterThan(0)
-    const body = hoje.querySelector('li button:not([role="checkbox"])') as HTMLButtonElement
-    fireEvent.click(body)
-    expect(useUI.getState().sheets.at(-1)?.name).toBe('itemEdit')
+    const first = screen.getByLabelText('Hoje').querySelector('li button') as HTMLButtonElement
+    fireEvent.click(first)
+    const dialog = screen.getByRole('dialog', { name: 'Detalhe do compromisso' })
+    expect(within(dialog).getByRole('article')).toBeTruthy()
+    fireEvent.click(within(dialog).getByLabelText('Fechar detalhe'))
   })
 
-  it('the needs-attention row follows the real queue and disappears once everything is acked', () => {
+  it('an empty day says only "Dia livre"', () => {
+    render(<HojeList rows={[]} onOpen={() => {}} conflicts={0} onConflicts={() => {}} />)
+    expect(screen.getByLabelText('Hoje').textContent).toBe('HojeDia livre')
+  })
+
+  it('Próximos dias: up to 3 days, up to 3 one-line rows each, and "Ver agenda" → /agenda', () => {
+    renderHome()
+    const next = screen.getByLabelText('Próximos dias')
+    const days = within(next).getAllByRole('group')
+    expect(days.length).toBeGreaterThan(0)
+    expect(days.length).toBeLessThanOrEqual(3)
+    expect(days[0].getAttribute('aria-label')).toBe('Amanhã')
+    for (const d of days) expect(d.querySelectorAll('li').length).toBeLessThanOrEqual(3)
+    fireEvent.click(within(next).getByRole('link', { name: /Ver agenda/ }))
+    expect(screen.getByTestId('where').textContent).toBe('/agenda')
+  })
+
+  it('Precisa de você: at most 3 short lines; gone once the queue is answered; "Ver tudo" → Tarefas', () => {
     const now = { date: '2026-10-02', minutes: 600 }
     const items = needsAttention(getDB(), now)
+    for (let i = 0; i < 4; i++) actions.create('tasks', { title: `Atrasada ${i}`, status: 'todo', date: '2026-09-28', area: 'pessoal' } as never)
     renderHome()
-    if (items.length) expect(screen.getByLabelText('Precisa de você')).toBeTruthy()
+    const box = screen.getByLabelText('Precisa de você')
+    const rows = box.querySelectorAll('li')
+    expect(rows.length).toBe(NEEDS_MAX)
+    for (const li of rows) expect((li.textContent ?? '').length).toBeLessThanOrEqual(55)
+    fireEvent.click(within(box).getByRole('link', { name: /Ver tudo/ }))
+    expect(screen.getByTestId('where').textContent).toBe('/tarefas')
     cleanup()
     for (const it of items) actions.create('attentionAcks', { key: it.key, how: 'dismissed' })
-    expect(needsAttention(getDB(), now)).toEqual([])
+    for (const t of getDB().tasks.filter((x) => x.title.startsWith('Atrasada'))) actions.remove('tasks', t.id)
     renderHome()
-    expect(screen.queryByLabelText('Precisa de você')).toBeNull()
+    const left = screen.queryByLabelText('Precisa de você')
+    if (left) for (const li of left.querySelectorAll('li')) expect(li.textContent).toContain('atrasada')
   })
 
-  it('sending to Lumos opens the answer sheet over Home when available, otherwise the conversation', { timeout: 15000 }, async () => {
+  it('the trip shows as ONE chip line when it is close, tappable to the trip', () => {
+    renderHome()
+    const chip = screen.queryByRole('link', { name: /Abrir a viagem/ })
+    if (chip) {
+      expect(chip.textContent).toMatch(/^✈︎ .+ (em \d+ dias|amanhã|hoje)$/)
+      fireEvent.click(chip)
+      expect(screen.getByTestId('where').textContent).toMatch(/^\/viagens\//)
+    }
+  })
+
+  it('one small Lumos line: sending opens the answer sheet over Home when available, otherwise the conversation', { timeout: 15000 }, async () => {
     renderHome()
     fireEvent.change(screen.getByLabelText('Fala com a Lumos'), { target: { value: 'amanhã cancelei inglês' } })
     fireEvent.click(screen.getByLabelText('Enviar para a Lumos'))
     if (LumosSheet) {
       expect(await screen.findByRole('dialog', { name: 'Conversa com a Lumos' }, { timeout: 8000 })).toBeTruthy()
-      // Home itself stays as it was: the composer is still there, the page didn't swap.
       expect(screen.getByLabelText('Fala com a Lumos')).toBeTruthy()
-    }
-    else expect(screen.getByTestId('where').textContent).toBe('/lumos?q=amanh%C3%A3%20cancelei%20ingl%C3%AAs')
+    } else expect(screen.getByTestId('where').textContent).toBe('/lumos?q=amanh%C3%A3%20cancelei%20ingl%C3%AAs')
   })
 
   it('the avatar opens Ajustes', () => {

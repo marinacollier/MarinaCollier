@@ -1,5 +1,6 @@
 /**
- * Home · painel operacional da viagem (only while a trip with an expedition is happening). Computed from what is
+ * Painel operacional da viagem (only while a trip with an expedition is happening) — on the trip page's Hoje
+ * (moved off Home in the clean Home; Home keeps only the top 3 of it in "Precisa de você"). Computed from what is
  * stored — nothing invented: agenda of today + 7 days, the next priority action, payments pending, answers awaited,
  * deliveries, spend (pago · comprometido · estimado), the wallet balance only when she typed it, work/study of the
  * day, conflicts, the countdown to the next flight and the next leg's open items, highlighted until resolved.
@@ -63,7 +64,7 @@ function Row({ title, sub, right, onOpen, warn }: { title: string; sub?: string;
 const openItem = (i: TripItem) => openSheet('tripItem', { id: i.id })
 const statusOf = (i: TripItem) => BOOKING_STATUS_META[bookingStatusOf(i)].label
 
-export function TripOpsPanel({ panel, work, workouts, today, hideMoney }: { panel: Panel; work: ActionItem[]; workouts: ActionItem[]; today: DateKey; hideMoney?: boolean }) {
+export function TripOpsPanel({ panel, work, workouts, today, hideMoney, inTrip }: { panel: Panel; work: ActionItem[]; workouts: ActionItem[]; today: DateKey; hideMoney?: boolean; /** Already on the trip page: no link to it. */ inTrip?: boolean }) {
   const nav = useNavigate()
   const { trip, date } = panel
   const cur = panel.finance.currency
@@ -80,7 +81,7 @@ export function TripOpsPanel({ panel, work, workouts, today, hideMoney }: { pane
   const legRest = panel.leg.items.length - legShown.length
 
   return (
-    <Card aria-label="Painel da viagem">
+    <Card aria-label="Painel operacional da viagem">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="eyebrow">viagem · {place}</div>
@@ -221,10 +222,10 @@ export function TripOpsPanel({ panel, work, workouts, today, hideMoney }: { pane
         {full ? 'Mostrar só o urgente' : `Ver painel completo${legRest > 0 ? ` · +${legRest} pendências` : ''}`}
         <ChevronDown size={16} aria-hidden className={cn('transition-transform', full && 'rotate-180')} />
       </button>
-      <button type="button" onClick={() => nav(ROUTES.trip(trip.id))} className="w-full min-h-11 flex items-center justify-between text-[13.5px] font-semibold text-ink-2 border-t border-line/70 pt-2 active:opacity-70">
+      {!inTrip && <button type="button" onClick={() => nav(ROUTES.trip(trip.id))} className="w-full min-h-11 flex items-center justify-between text-[13.5px] font-semibold text-ink-2 border-t border-line/70 pt-2 active:opacity-70">
         Abrir centro de comando
         <ChevronRight size={16} aria-hidden />
-      </button>
+      </button>}
     </Card>
   )
 }

@@ -16,6 +16,11 @@ import { ReviewItems, SectionItems } from './TripItems'
 import { EXPEDITION_TABS, EXPEDITION_TAB_ALIAS, ExpeditionView, type ExpeditionTab } from './expedition/Views'
 import { pendencies } from './expedition/logic'
 import { TravelModeLine } from './TravelModeLine'
+import { TripOpsPanel } from '@/features/today/home/TripOpsPanel'
+import { homeTripOps, workStudyItems, workoutItems } from '@/features/today/home/trip-ops'
+import { dayItems } from '@/data/agenda/items'
+import { areaLocked, useLockState } from '@/app/lock-store'
+import { useNow } from '@/hooks/useToday'
 import {
   TRIP_STATUS_LABEL,
   TRIP_TABS,
@@ -35,6 +40,25 @@ import {
   tripPhase,
   type TripTab,
 } from './selectors'
+
+/**
+ * The trip's operational panel (pendências, pagamentos, respostas, gastos e saldo, agenda, conflitos) while it
+ * is happening — it used to sit on Home; Home now shows only its top 3 ("Precisa de você").
+ */
+function TripPanel({ tripId }: { tripId: string }) {
+  const db = useDB()
+  const { today, now } = useNow()
+  const lock = useLockState()
+  const hideMoney = areaLocked(db.profile.privacyLock, 'dinheiro', lock)
+  const panel = useMemo(() => homeTripOps(db, today, now), [db, today, now])
+  const rows = useMemo(() => (panel ? dayItems(db, today, today, { hidden: { dinheiro: hideMoney } }) : []), [panel, db, today, hideMoney])
+  if (!panel || panel.trip.id !== tripId) return null
+  return (
+    <div className="mb-4">
+      <TripOpsPanel panel={panel} work={workStudyItems(rows)} workouts={workoutItems(rows)} today={today} hideMoney={hideMoney} inTrip />
+    </div>
+  )
+}
 
 /** Three tabs on top; the trip's sections inside each are chips (?s= still names the section). */
 type TripGroup = 'expedicao' | 'geral' | 'itens' | 'mais'
@@ -160,6 +184,7 @@ export default function TripPage() {
       </div>
 
       <motion.div key={tab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22 }} className="mt-3">
+        {tab === 'hoje' && trip.expedition && <TripPanel tripId={trip.id} />}
         {isExpeditionTab(tab) && trip.expedition ? (
           <ExpeditionView tab={tab} trip={trip as Trip & { expedition: NonNullable<Trip['expedition']> }} items={items} expenses={expenses} onGo={setTab} />
         ) : meta.items ? (
