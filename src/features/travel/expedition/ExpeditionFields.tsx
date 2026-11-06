@@ -59,6 +59,7 @@ export type ExpeditionDraft = Pick<
   | 'caveat'
   | 'person'
   | 'schoolToConfirm'
+  | 'source'
 >
 
 export const DRAFT_KEYS: (keyof ExpeditionDraft)[] = [
@@ -66,7 +67,7 @@ export const DRAFT_KEYS: (keyof ExpeditionDraft)[] = [
   'estimatedCents', 'quotedCents', 'paidCents', 'uberCents', 'outfit', 'checklistKind', 'contact', 'voucherUrl', 'supplier', 'cancellationPolicy',
   'pickup', 'needsPickup', 'pickupConfirmed', 'risk', 'planB', 'schoolImpact', 'schoolMadeUp', 'clearance', 'optional', 'flexible', 'indoor',
   'opportunityCost', 'cancelReason', 'volunteer', 'bookingStatus', 'priority', 'category', 'nextAction', 'deadline', 'proof', 'caveat', 'person',
-  'schoolToConfirm',
+  'schoolToConfirm', 'source',
 ]
 
 export function draftOf(i?: TripItem): ExpeditionDraft {
@@ -171,6 +172,8 @@ export function ExpeditionFields({
         />
         {draft.optional && (draft.bookingStatus === 'concluido' || status === 'feito') && <p className="text-[12px] text-muted mt-1.5 px-0.5">Extra marcado como feito — só se você confirmou que rolou.</p>}
         {draft.bookingStatus === 'planejado' && <p className="text-[12px] text-muted mt-1.5 px-0.5">Sem voucher fica PLANEJADO — não reservado.</p>}
+        {draft.bookingStatus === 'reserva_emitida' && <p className="text-[12px] text-muted mt-1.5 px-0.5">Reserva emitida: guarde a referência. Operação ou pagamento ainda podem estar pendentes.</p>}
+        {draft.bookingStatus === 'confirmado' && <p className="text-[12px] text-muted mt-1.5 px-0.5">O fornecedor confirmou os detalhes (data, horário, pickup).</p>}
       </div>
 
       {draft.bookingStatus === 'reservado' && (
@@ -212,6 +215,9 @@ export function ExpeditionFields({
       <Field label="Ressalva">
         <TextInput placeholder="ex.: sujeito à conferência do bilhete" value={draft.caveat ?? ''} onChange={(e) => set({ caveat: e.target.value })} />
       </Field>
+      <Field label="Fonte da informação">
+        <TextInput placeholder="ex.: e-mail do operador 06/11, WhatsApp" value={draft.source ?? ''} onChange={(e) => set({ source: e.target.value })} />
+      </Field>
 
       {status === 'cancelado' && (
         <div>
@@ -246,8 +252,8 @@ export function ExpeditionFields({
           <TextInput placeholder="Onde é" value={draft.address ?? ''} onChange={(e) => set({ address: e.target.value })} />
         </Field>
         <MapLinks trip={trip} address={draft.address?.trim() || undefined} />
-        <Field label="Rota / transporte">
-          <TextInput placeholder="Uber, transfer do operador, a pé…" value={draft.route ?? ''} onChange={(e) => set({ route: e.target.value })} />
+        <Field label="Transporte (como chegar)">
+          <TextInput placeholder="Uber, shuttle do operador, a pé…" value={draft.route ?? ''} onChange={(e) => set({ route: e.target.value })} />
         </Field>
       </MoreOptions>
 

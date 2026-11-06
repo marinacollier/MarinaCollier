@@ -175,7 +175,9 @@ const GROUPS: { title: string; hint: string; match: (s: ReturnType<typeof bookin
   { title: 'aguardando resposta', hint: 'Pedido feito; falta o fornecedor responder.', match: (s) => s === 'aguardando_resposta' },
   { title: 'a cotar', hint: 'Sem preço final ainda.', match: (s) => s === 'a_cotar' },
   { title: 'a reservar', hint: 'Decidido; falta reservar.', match: (s) => s === 'a_reservar' },
+  { title: 'reserva emitida', hint: 'Reserva emitida; operação ou pagamento ainda pendente.', match: (s) => s === 'reserva_emitida' },
   { title: 'reservado', hint: 'Com voucher, comprovante ou confirmação do fornecedor.', match: (s) => s === 'reservado' },
+  { title: 'confirmado', hint: 'Fornecedor confirmou os detalhes.', match: (s) => s === 'confirmado' },
 ]
 
 export function Reservas({ trip, items }: { trip: ExpTrip; items: TripItem[] }) {

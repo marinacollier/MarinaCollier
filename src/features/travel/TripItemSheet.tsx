@@ -23,6 +23,7 @@ import {
 } from './selectors'
 import { ExpeditionFields, cleanDraft, draftOf, missingProof, type ExpeditionDraft } from './expedition/ExpeditionFields'
 import { bookingStatusOf, bookingStatusPatch } from './expedition/command'
+import { BookingDetails } from './expedition/BookingDetails'
 
 export default function TripItemSheet({ id, tripId, section: sectionProp, group: groupProp }: SheetProps<'tripItem'>) {
   const trips = useDB((db) => db.trips)
@@ -110,6 +111,8 @@ export default function TripItemSheet({ id, tripId, section: sectionProp, group:
       }
     >
       <TitleInput autoFocus={!existing} placeholder="O quê?" value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && save()} />
+
+      {existing && tripRec?.expedition && <BookingDetails trip={tripRec} item={existing} />}
 
       {showTripPicker && (
         <Field label="Viagem">
@@ -220,7 +223,7 @@ export default function TripItemSheet({ id, tripId, section: sectionProp, group:
           <Field label="Valor">
             <MoneyInput valueCents={amountCents} onChange={setAmountCents} />
           </Field>
-          <Field label="Código de confirmação">
+          <Field label="Referência (código da reserva)">
             <TextInput placeholder="ABC123" autoCapitalize="characters" value={code} onChange={(e) => setCode(e.target.value)} />
           </Field>
         </div>

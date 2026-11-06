@@ -34,8 +34,17 @@ export const BOOKING_STATUS_META: Record<TripBookingStatus, { label: string; cls
   opcional: { label: 'OPCIONAL', cls: 'bg-plum-soft text-ink-2' },
   cancelado: { label: 'CANCELADO', cls: 'bg-surface-2 text-muted line-through' },
   planejado: { label: 'PLANEJADO', cls: 'bg-surface-2 text-ink-2' },
+  reserva_emitida: { label: 'RESERVA EMITIDA', cls: 'bg-sage-soft text-[color-mix(in_oklab,var(--sage)_70%,var(--ink))]' },
+  confirmado: { label: 'CONFIRMADO', cls: 'bg-sage text-bg' },
 }
-export const BOOKING_STATUS_ORDER: TripBookingStatus[] = ['planejado', 'a_cotar', 'a_reservar', 'aguardando_resposta', 'reservado', 'concluido', 'opcional', 'cancelado']
+export const BOOKING_STATUS_ORDER: TripBookingStatus[] = ['planejado', 'a_cotar', 'a_reservar', 'aguardando_resposta', 'reserva_emitida', 'reservado', 'confirmado', 'concluido', 'opcional', 'cancelado']
+
+/**
+ * Booked: money is committed until it is paid. RESERVA EMITIDA (reference issued, operation/payment may be
+ * pending), RESERVADO (with proof) and CONFIRMADO (supplier confirmed the details).
+ */
+export const COMMITTED_STATUSES: TripBookingStatus[] = ['reserva_emitida', 'reservado', 'confirmado']
+export const isCommittedStatus = (s: TripBookingStatus) => COMMITTED_STATUSES.includes(s)
 
 /** Voucher, booking code or the supplier's confirmation in words. */
 export const hasProof = (i: Pick<TripItem, 'voucherUrl' | 'confirmationCode' | 'proof'>) => !!(i.voucherUrl?.trim() || i.confirmationCode?.trim() || i.proof?.trim())
@@ -67,6 +76,8 @@ export function bookingStatusPatch(s: TripBookingStatus): Partial<TripItem> {
     case 'concluido':
       return { bookingStatus: s, status: 'feito', booking: 'concluido' }
     case 'reservado':
+    case 'reserva_emitida':
+    case 'confirmado':
       return { bookingStatus: s, status: 'confirmado', booking: 'confirmado' }
     case 'aguardando_resposta':
       return { bookingStatus: s, status: 'a_confirmar', booking: 'aguardando' }
@@ -312,7 +323,8 @@ export function dayPriorities(trip: Trip, items: TripItem[], tasks: Task[], toda
   for (const i of items) {
     if (!isActive(i) || i.optional) continue
     const s = bookingStatusOf(i)
-    if (!OPEN(s) || s === 'reservado') continue
+    // Booked items wait for their day; RESERVA EMITIDA still counts when she set a deadline (payment/operation).
+    if (!OPEN(s) || s === 'reservado' || s === 'confirmado') continue
     const due = i.deadline ?? (i.date && (s === 'planejado' ? i.date : undefined))
     if (!due || due > soon) continue
     if (s === 'planejado' && !i.priority) continue

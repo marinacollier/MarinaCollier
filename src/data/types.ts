@@ -1168,6 +1168,14 @@ export interface Expense extends Entity {
   source?: 'contrato' | 'manual' | 'lumos' | 'organizze'
   /** UGC deal this money belongs to (expected when closed → received when paid). */
   ugcOpportunityId?: ID
+  /** Bought and waiting to arrive ("comprado, entrega pendente"). Missing = nothing to deliver. */
+  delivery?: ExpenseDelivery
+}
+
+export interface ExpenseDelivery {
+  status: 'pendente' | 'recebido'
+  /** Expected arrival, when the store/carrier said. */
+  expected?: DateKey
 }
 
 export interface FinancialAccount extends Entity {
@@ -1584,6 +1592,10 @@ export type TripBookingStatus =
   | 'opcional'
   | 'cancelado'
   | 'planejado'
+  /** Reservation issued (reference in hand); the operation or the payment may still be pending. */
+  | 'reserva_emitida'
+  /** The supplier confirmed the details (date, time, pickup). */
+  | 'confirmado'
 
 export type TripPriority = 'P0' | 'P1' | 'P2'
 
@@ -1641,6 +1653,19 @@ export interface TripExpedition {
   /** Point for the optional forecast card (Open-Meteo, no key). */
   weather?: { lat: number; lon: number; label: string }
   safetyNotes?: string
+  /**
+   * The money she really has available (e.g. the Wise balance), as she typed it, in the trip currency.
+   * Never computed and never assumed: without it the app says "não informado".
+   */
+  walletBalance?: TripWalletBalance
+}
+
+export interface TripWalletBalance {
+  cents: number
+  /** Day she read the balance. */
+  asOf: DateKey
+  /** Where it came from ("app Wise"). */
+  source?: string
 }
 
 export type TripSection =
@@ -1671,6 +1696,7 @@ export interface TripItem extends Entity {
   notes?: string
   url?: string
   amountCents?: number
+  /** Booking reference / locator ("F59F-4976"), shown as "Referência". Counts as proof for RESERVADO. */
   confirmationCode?: string
   order: number
   /** Multi-day items (Safari 14–15/11). */
@@ -1689,7 +1715,7 @@ export interface TripItem extends Entity {
   leaveTime?: TimeHM
   returnTime?: TimeHM
   address?: string
-  /** Route / transport notes ("Uber até Kloof Nek", "transfer do operador"). */
+  /** How she gets there — shown as "Transporte" ("Uber até Kloof Nek", "shuttle do operador"). */
   route?: string
   travelMinutes?: number
   /** Currency of the cost fields below. Missing = the trip's currency. */
@@ -1746,6 +1772,8 @@ export interface TripItem extends Entity {
   person?: string
   /** No class that day and she has not said whether it was an absence (shown "a confirmar"). */
   schoolToConfirm?: boolean
+  /** Where the information came from ("e-mail do operador 06/11", "WhatsApp"). Shown as "Fonte". */
+  source?: string
 }
 
 // ─── Content / UGC ──────────────────────────────────────────────────────────

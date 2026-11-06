@@ -46,6 +46,9 @@ describe('Início (Lumos-first Home)', () => {
     expect(screen.getByLabelText('Próximos dias')).toBeTruthy()
     const text = document.body.textContent ?? ''
     for (const gone of ['Brain dump', 'Top 3 de hoje', 'Lendo agora', 'Gastos', 'Linha do dia', 'Hoje importa', 'Quando der hoje', 'Mais cedo']) expect(text).not.toContain(gone)
+    // No trip happening: no travel panel — Home is unchanged.
+    expect(screen.queryByLabelText('Painel da viagem')).toBeNull()
+    expect(text).not.toContain('painel da viagem')
   })
 
   it('free-text priorities show as rows of Hoje (max three), checkable', () => {

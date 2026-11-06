@@ -6,6 +6,7 @@
  *   4. AGORA — max 3: happening, soon, overdue
  *   5. HOJE — ONE list of everything completable today from every area (filter by area), feitos folded
  *   6. PRÓXIMOS DIAS — one summary line per day (tap = its rows), "sem dia"/radar folded
+ * During a trip with an expedition, a compact operational panel (home/TripOpsPanel) sits right under the greeting.
  * Every list is the standard ItemRow; tapping a row opens the one quick-edit sheet (Dia · Hora · Obs).
  * Rows are a projection (data/agenda/items.ts) over the real records — nothing is copied into a Task.
  */
@@ -33,6 +34,8 @@ import { LumosBox } from './home/LumosBox'
 import { LumosSheet, lumosHref, type LumosRequest } from './home/lumos'
 import { useMarkSeenOnLeave } from './home/seen'
 import { TripDayCard } from './home/TripDayCard'
+import { TripOpsPanel } from './home/TripOpsPanel'
+import { homeTripOps, workStudyItems, workoutItems } from './home/trip-ops'
 import { tripDayOf } from '@/features/travel/trip-day'
 import { localNow } from '@/features/travel/expedition/logic'
 import { travelTripOn } from '@/data/travel-mode'
@@ -76,6 +79,11 @@ export default function TodayPage() {
     const tz = travelTripOn(db, today)?.expedition?.timeZone
     return tripDayOf(db, today, tz ? localNow(tz, clock).minutes : minutes)
   }, [db, today, clock, minutes])
+
+  // Painel operacional: only while a trip with an expedition is happening; otherwise Home is unchanged.
+  const ops = useMemo(() => homeTripOps(db, today, clock), [db, today, clock])
+  const opsWork = useMemo(() => (ops ? workStudyItems(items) : []), [ops, items])
+  const opsWorkouts = useMemo(() => (ops ? workoutItems(items) : []), [ops, items])
 
   const trip = useMemo(() => {
     if (life.nextTrip) return life.nextTrip.daysLeft <= TRIP_LINE_DAYS ? life.nextTrip : undefined
@@ -121,6 +129,12 @@ export default function TodayPage() {
           {brief && <p className="font-display italic text-[17px] text-ink-2 mt-3 leading-snug">{brief}</p>}
         </motion.div>
       </header>
+
+      {ops && (
+        <motion.div {...rise(1)} className="mt-6">
+          <TripOpsPanel panel={ops} work={opsWork} workouts={opsWorkouts} today={today} hideMoney={hidden.dinheiro} />
+        </motion.div>
+      )}
 
       <motion.div {...rise(1)} className="mt-7">
         <LumosBox placeholder={placeholder} suggestions={suggestions} onAsk={ask} onAttach={attach} />

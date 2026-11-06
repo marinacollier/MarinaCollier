@@ -3,7 +3,7 @@ import { closeSheet, toast } from '@/app/ui-store'
 import { removeWithUndo } from '@/app/undo'
 import type { SheetProps } from '@/app/sheet-types'
 import { actions, useDB } from '@/data/store'
-import type { DateKey, Expense, ID, NewItem, PaymentMethod } from '@/data/types'
+import type { DateKey, Expense, ExpenseDelivery, ID, NewItem, PaymentMethod } from '@/data/types'
 import {
   ChipSelect,
   DateInput,
@@ -55,6 +55,9 @@ export default function ExpenseSheet({ id, defaults }: SheetProps<'expense'>) {
   const [notes, setNotes] = useState(initial.notes ?? '')
   const [tripId, setTripId] = useState<ID | undefined>(initial.tripId)
   const [accountId, setAccountId] = useState<ID | undefined>(initial.accountId)
+  // Bought, waiting to arrive (shows on Home while travelling). Missing = nothing to deliver.
+  const [delivery, setDelivery] = useState<ExpenseDelivery['status'] | undefined>(initial.delivery?.status)
+  const [deliveryExpected, setDeliveryExpected] = useState<DateKey | undefined>(initial.delivery?.expected)
 
   const orderedCats = useMemo(() => {
     const list = categoriesByUsage(categories, expenses)
@@ -114,6 +117,7 @@ export default function ExpenseSheet({ id, defaults }: SheetProps<'expense'>) {
       payment,
       planned: planned === 'sim' ? true : planned === 'nao' ? false : undefined,
       accountId,
+      delivery: delivery ? { status: delivery, expected: delivery === 'pendente' ? deliveryExpected : initial.delivery?.expected } : undefined,
     }
     if (existing) actions.update('expenses', existing.id, data)
     else actions.create('expenses', { ...defaults, ...data, origin: 'manual' } as NewItem<'expenses'>)
@@ -253,6 +257,25 @@ export default function ExpenseSheet({ id, defaults }: SheetProps<'expense'>) {
         {tripOptions.length > 0 && (
           <Field label="Viagem">
             <Select value={tripId} onChange={setTripId} options={tripOptions} placeholder="Nenhuma" />
+          </Field>
+        )}
+        <div>
+          <div className="text-[13px] font-medium text-ink-2 mb-1.5 px-0.5">
+            Entrega <span className="font-normal text-muted">(compra que ainda vai chegar)</span>
+          </div>
+          <ChipSelect
+            value={delivery}
+            onChange={setDelivery}
+            clearable
+            options={[
+              { value: 'pendente', label: '📦 entrega pendente' },
+              { value: 'recebido', label: '✓ recebido' },
+            ]}
+          />
+        </div>
+        {delivery === 'pendente' && (
+          <Field label="Previsão de entrega">
+            <DateInput value={deliveryExpected} onChange={setDeliveryExpected} />
           </Field>
         )}
         {activeAccounts.length > 0 && (

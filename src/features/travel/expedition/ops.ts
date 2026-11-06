@@ -10,7 +10,7 @@
  */
 import type { DateKey, Expense, Occurrence, Trip, TripBookingStatus, TripCurrency, TripItem, Workout } from '@/data/types'
 import { addDays } from '@/lib/date'
-import { BOOKING_STATUS_META, bookingStatusOf, categoryOf, hasProof, isShopping, ledgerDays, tripLedger } from './command'
+import { BOOKING_STATUS_META, bookingStatusOf, categoryOf, hasProof, isCommittedStatus, isShopping, ledgerDays, tripLedger } from './command'
 import { blockWhen, countsAsTraining, dailyPlan } from './daily'
 import { CHECKLISTS, convert, formatMoney, isActive, withMargin } from './logic'
 
@@ -131,7 +131,7 @@ export function tomorrowChecklist(trip: Trip, items: TripItem[], workouts: Worko
   const documents = ['Passaporte (ou cópia) e cartão']
   for (const i of day) {
     if (i.voucherUrl) documents.push(`Voucher offline: ${i.title}`)
-    else if (bookingStatusOf(i) === 'reservado') documents.push(`Confirmação salva: ${i.title}`)
+    else if (isCommittedStatus(bookingStatusOf(i))) documents.push(`Confirmação salva: ${i.title}`)
   }
   const food = ['Garrafa de água']
   for (const i of out) if (countsAsTraining(i) || i.leaveTime || i.returnTime || i.checklistKind) food.push(`Lanche para ${i.title}`)
@@ -177,7 +177,7 @@ export interface FinancialClose {
   paid: number
   paidLedger: number
   paidItems: number
-  /** Reserved (with proof), not paid yet: quoted, else reference. */
+  /** Booked (reserva emitida / reservado with proof / confirmado), not paid yet: quoted, else reference. */
   committed: number
   committedLines: CloseLine[]
   /** Planned / to quote / to book / awaiting an answer: quoted, else reference (+ Uber planned). */
@@ -241,11 +241,20 @@ export function financialClose(trip: Trip, items: TripItem[], expenses: Expense[
   const withoutValue: TripItem[] = []
   let uberEstimated = 0
   for (const i of mine) {
-    if (i.optional || i.paidCents != null) continue
+    if (i.optional) continue
     // A day the statement covers already happened: its real money is in the statement.
     if (i.date && covered.has(i.date)) continue
     const s = bookingStatusOf(i)
     if (s === 'concluido' || s === 'cancelado' || s === 'opcional') continue
+    if (i.paidCents != null) {
+      // Partly paid booking (deposit): what is still owed stays committed. Fully paid: nothing more.
+      const total = i.quotedCents ?? i.estimatedCents
+      if (isCommittedStatus(s) && i.paymentStatus !== 'pago' && total != null && total > i.paidCents) {
+        const cents = toTrip(trip, total - i.paidCents, i.currency)
+        if (cents != null) committedLines.push({ item: i, cents, kind: i.quotedCents != null ? 'cotado' : 'referência' })
+      }
+      continue
+    }
     if (i.uberCents != null) uberEstimated += toTrip(trip, i.uberCents, i.currency) ?? 0
     const raw = i.quotedCents ?? i.estimatedCents
     if (raw == null) {
@@ -255,7 +264,7 @@ export function financialClose(trip: Trip, items: TripItem[], expenses: Expense[
     const cents = toTrip(trip, raw, i.currency)
     if (cents == null) continue
     const line: CloseLine = { item: i, cents, kind: i.quotedCents != null ? 'cotado' : 'referência' }
-    if (s === 'reservado') committedLines.push(line)
+    if (isCommittedStatus(s)) committedLines.push(line)
     else estimatedLines.push(line)
   }
   const sum = (ls: CloseLine[]) => ls.reduce((t, l) => t + l.cents, 0)

@@ -44,6 +44,31 @@ describe('Home in modo viagem', () => {
     for (const sp of ['Milagre da Manhã', 'Encerrar o dia', 'Natação', 'Passeio', 'Cerâmica']) expect(hoje).not.toContain(sp)
   })
 
+  it('shows the operational panel on top, from stored data only', () => {
+    renderHome()
+    const panel = screen.getByLabelText('Painel da viagem')
+    expect(panel.textContent).toContain('painel da viagem')
+    expect(screen.getByLabelText('Agenda da viagem')).toBeTruthy()
+    const money = screen.getByLabelText('Gastos e saldo').textContent ?? ''
+    for (const k of ['pago', 'comprometido', 'estimado']) expect(money).toContain(k)
+    // No balance stored: says so, never a computed "available".
+    expect(money).toContain('Saldo Wise não informado — atualizar')
+    expect(panel.textContent).toContain('Abrir centro de comando')
+    // The rest of Home is still there, below.
+    expect(screen.getByLabelText('Dia da viagem: South Africa 2026')).toBeTruthy()
+    expect(screen.getByLabelText('Hoje')).toBeTruthy()
+  })
+
+  it('shows the wallet balance only when she typed it', () => {
+    const t = getDB().trips.find((x) => x.expedition)!
+    actions.update('trips', t.id, { expedition: { ...t.expedition!, walletBalance: { cents: 1234500, asOf: '2026-10-29', source: 'Wise' } } })
+    renderHome()
+    const money = screen.getByLabelText('Gastos e saldo').textContent ?? ''
+    expect(money).toContain('Saldo disponível')
+    expect(money).toContain('12.345')
+    expect(money).not.toContain('não informado')
+  })
+
   it('the switch on the trip turns it off (routine back) and on again (generated base removed)', () => {
     const trip = () => getDB().trips.find((t) => t.expedition)!
     setTravelMode(trip(), false)

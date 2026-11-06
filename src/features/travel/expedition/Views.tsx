@@ -11,6 +11,7 @@ import { Button, Card, Checkbox, DateInput, EmptyState, Field, Segmented, TextAr
 import { useNow } from '@/hooks/useToday'
 import { cn } from '@/lib/cn'
 import { copyText } from '@/lib/clipboard'
+import { centsToInput, parseBRL } from '@/lib/money'
 import { addDays, formatLongDate, formatShortDate, hmToMinutes, inMinutesLabel, weekday, WEEKDAY_SHORT } from '@/lib/date'
 import {
   CANCEL_REASON_LABEL,
@@ -702,7 +703,24 @@ function Custos({ trip, items, expenses }: ViewProps) {
             }}
           />
         </Field>
-        <p className="text-[12px] text-muted">A cotação é a que você digitar — o app não busca câmbio ao vivo. O orçamento é a referência original, não saldo: o que sobra é sempre calculado.</p>
+        <Field label={`Saldo disponível na Wise (${exp.currency})`} hint={exp.walletBalance ? `informado em ${formatShortDate(exp.walletBalance.asOf)}${exp.walletBalance.source ? ` · ${exp.walletBalance.source}` : ''}` : 'não informado'}>
+          <input
+            className="input"
+            inputMode="decimal"
+            placeholder="o que o app da Wise mostra"
+            defaultValue={exp.walletBalance ? centsToInput(exp.walletBalance.cents) : ''}
+            aria-label="Saldo disponível na Wise"
+            onBlur={(e) => {
+              const raw = e.target.value.trim()
+              const cents = raw ? parseBRL(raw) : undefined
+              if (raw && cents == null) return
+              if (cents === exp.walletBalance?.cents) return
+              setExp(trip, { walletBalance: cents != null ? { cents, asOf: localNow(exp.timeZone).date, source: exp.walletBalance?.source ?? 'Wise' } : undefined })
+              toast(cents != null ? 'Saldo atualizado ✓' : 'Saldo removido')
+            }}
+          />
+        </Field>
+        <p className="text-[12px] text-muted">A cotação é a que você digitar — o app não busca câmbio ao vivo. O orçamento é a referência original, não saldo: o que sobra é sempre calculado. O saldo da Wise é só o que você informar.</p>
       </Card>
 
       {(b.extras > 0 || b.unconverted > 0) && (
