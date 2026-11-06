@@ -21,6 +21,7 @@ import { applyUniverseSeed } from './seed/universe'
 import { applyExpeditionSeed } from './seed/expedition'
 import { applyMaster1031 } from './seed/master-1031'
 import { applyOps1101 } from './seed/ops-1101'
+import { applyUpdate1106, needsUpdate1106 } from './seed/update-1106'
 import { applyUgcCrmSeed } from './seed/ugc-crm'
 import { applyPlacesSeed } from './seed/places'
 import { migrateUgc } from './ugc/migrate'
@@ -250,7 +251,7 @@ function flush() {
 export function applyModuleSeeds(db: DB, today: string = todayKey()): DB {
   // The one-time Atualização mestre 31/10 runs right after the Expedição seed it builds on.
   // Lugares que conheci: her list, once (applyPlacesSeed).
-  return pruneTravelWorkouts(applyPlacesSeed(applyAtelieSeed(migrateUgc(applyOps1101(applyMaster1031(applyExpeditionSeed(applyUniverseSeed(applySpiritualSeed(db))), today), today)))))
+  return pruneTravelWorkouts(applyPlacesSeed(applyAtelieSeed(migrateUgc(applyUpdate1106(applyOps1101(applyMaster1031(applyExpeditionSeed(applyUniverseSeed(applySpiritualSeed(db))), today), today), today)))))
 }
 
 export async function hydrate(storage: StorageAdapter = createIndexedDBAdapter()): Promise<void> {
@@ -270,6 +271,11 @@ export async function hydrate(storage: StorageAdapter = createIndexedDBAdapter()
     }
   }
   const migrated = raw ? migrate(raw) : null
+  // Her data as it was, kept on the device right before a one-time data update (Ajustes → Dados → cópias).
+  if (migrated && !loadFailed && needsUpdate1106(migrated, todayKey())) {
+    const { snapshotOf } = await import('./snapshots')
+    await snapshotOf(migrated, 'Antes da atualização operacional de 06/11')
+  }
   const db = applyModuleSeeds(migrated ? applyLifeSeed(migrated, todayKey()) : applyUgcCrmSeed(buildSeed(todayKey())))
   dirty = false
   freshSeedAt = !raw && !loadFailed ? new Date().toISOString() : null

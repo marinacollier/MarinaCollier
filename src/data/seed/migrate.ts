@@ -33,7 +33,7 @@ const DATED_SEED_COLLECTIONS = new Set<CollectionKey>(['workouts'])
  * Records of the boot-time module seeds (Expedição, Atualização mestre 31/10, Lugares) are not the life seed's:
  * a life-seed bump never retires them (the one-time update would never bring them back).
  */
-const MODULE_SEED_PREFIXES = ['seed:za1031:', 'seed:travel:za-', 'marina:place:']
+const MODULE_SEED_PREFIXES = ['seed:za1031:', 'seed:za1106:', 'seed:travel:za-', 'marina:place:']
 const isModuleSeedId = (id: string) => MODULE_SEED_PREFIXES.some((p) => id.startsWith(p))
 
 /**

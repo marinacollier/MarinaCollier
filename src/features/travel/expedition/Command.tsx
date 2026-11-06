@@ -173,6 +173,7 @@ function TaskRow({ task, late, sub }: { task: Task; late?: boolean; sub?: string
 
 const GROUPS: { title: string; hint: string; match: (s: ReturnType<typeof bookingStatusOf>) => boolean }[] = [
   { title: 'aguardando resposta', hint: 'Pedido feito; falta o fornecedor responder.', match: (s) => s === 'aguardando_resposta' },
+  { title: 'aguardando pagamento', hint: 'Fornecedor respondeu; falta pagar ou assinar.', match: (s) => s === 'aguardando_pagamento' },
   { title: 'a cotar', hint: 'Sem preço final ainda.', match: (s) => s === 'a_cotar' },
   { title: 'a reservar', hint: 'Decidido; falta reservar.', match: (s) => s === 'a_reservar' },
   { title: 'reservado', hint: 'Com voucher, comprovante ou confirmação do fornecedor.', match: (s) => s === 'reservado' },
