@@ -89,15 +89,12 @@ describe('+ Registrar (sem IA)', () => {
     expect((await reload()).expenses.some((x) => x.id === e!.id)).toBe(true)
   })
 
-  it('Treino feito: the planned one in ONE tap (same check as the Home) → workout feito; Home counts it', async () => {
+  it('Treino feito: the planned one in ONE tap (same check as the Home) → workout feito', async () => {
     sheet()
     pick('Treino feito')
     fireEvent.click(screen.getByRole('button', { name: 'Fiz: Corrida longa Z2' }))
     const done = () => getDB().workouts.find((w) => w.date === DAY && w.status === 'feito')
     expect(done()).toBeTruthy()
-    cleanup()
-    home()
-    expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('1')
     expect((await reload()).workouts.some((w) => w.id === done()!.id && w.status === 'feito')).toBe(true)
   })
 
@@ -188,13 +185,11 @@ describe('+ Registrar (sem IA)', () => {
   })
 })
 
-describe('Home progress line', () => {
-  it('"N de M hoje" over the same rows as the Hoje list', () => {
+describe('Home (MARINA OS 2.0)', () => {
+  it('no "N de M hoje" counter: the day is read from the list itself', () => {
     home()
-    const bar = screen.getByRole('progressbar')
-    expect(bar.getAttribute('aria-valuenow')).toBe('0')
-    expect(Number(bar.getAttribute('aria-valuemax'))).toBeGreaterThan(5)
-    expect(document.body.textContent).toMatch(/0 de \d+ hoje/)
+    expect(screen.queryByRole('progressbar')).toBeNull()
+    expect(document.body.textContent).not.toMatch(/\d+ de \d+ hoje/)
   })
 })
 

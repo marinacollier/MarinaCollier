@@ -66,6 +66,7 @@ export default function App() {
   return (
     <Router>
       <ScrollToTop />
+      <div className="md:pl-[84px]">
       <Suspense fallback={<div className="min-h-dvh" />}>
         <Routes>
           {routeTable.map(({ path, Component }) => (
@@ -73,11 +74,13 @@ export default function App() {
           ))}
           {/* The assistant was called Mari before Lumos; old links keep working. */}
           <Route path="/mari" element={<Navigate to={ROUTES.assistant} replace />} />
-          {/* "Mais" became Espaços (settings live behind the avatar on Início). */}
+          {/* "Mais" became Espaços, then Minha Vida (settings live behind the avatar on Hoje). */}
           <Route path={ROUTES.more} element={<Navigate to={ROUTES.spaces} replace />} />
+          <Route path={ROUTES.oldSpaces} element={<Navigate to={ROUTES.spaces} replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
+      </div>
       <BottomNav />
       {onboarded && <QuickAddFab />}
       <SheetHost />

@@ -120,6 +120,9 @@ function vida(db: DB, today: DateKey): SpaceEntry[] {
     const t = trips[0]
     const d = t.startDate ? diffDays(today, t.startDate) : undefined
     out.push({ key: 'viagens', label: 'Viagens', emoji: '✈️', to: ROUTES.trips, tone: 'ocean', module: 'viagens', hint: d !== undefined && d >= 0 ? `${t.name} em ${plural(d, 'dia', 'dias')}` : t.name })
+  } else if (db.trips.length) {
+    // Past trips stay reachable after the last one ends.
+    out.push({ key: 'viagens', label: 'Viagens', emoji: '✈️', to: ROUTES.trips, tone: 'ocean', module: 'viagens', hint: plural(db.trips.length, 'viagem', 'viagens') })
   }
   if (db.expenses.length || db.financialAccounts.length) {
     const planned = db.expenses.filter((e) => e.status === 'planned_purchase').length
@@ -170,4 +173,55 @@ export function rituals(db: DB): { key: string; label: string; to: string }[] {
   ]
   if (db.goals.length) out.splice(2, 0, { key: 'metas', label: 'Metas', to: ROUTES.goals })
   return out
+}
+
+// ─── MARINA OS 2.0: Minha Vida (nine life areas) and Projetos ───────────────
+
+export type LifeAreaKey = 'corpo' | 'autocuidado' | 'mente' | 'estudos' | 'biblioteca' | 'viagens' | 'casa' | 'objetivos'
+
+export interface LifeArea {
+  key: LifeAreaKey
+  label: string
+  entries: SpaceEntry[]
+}
+
+const pick = (list: SpaceEntry[], keys: string[]) => keys.flatMap((k) => list.filter((e) => e.key === k))
+
+/**
+ * Her life areas, built from the same entries as before (nothing removed, only regrouped). Empty areas don't
+ * appear; "Relacionamentos e família" has no data model yet and is left out instead of shown empty.
+ * Cuidar de Mim is always reachable, without a hint or a count.
+ */
+export function lifeAreas(db: DB, today: DateKey): LifeArea[] {
+  const hidden = new Set(db.profile.modules.filter((m) => !m.visible).map((m) => m.id))
+  const visible = (e: SpaceEntry) => !e.module || !hidden.has(e.module)
+  const learn = aprender(db)
+  const life = vida(db, today)
+  const care: SpaceEntry = { key: 'cuidar', label: 'Cuidar de Mim', emoji: '', to: ROUTES.care, tone: 'sage' }
+  const task = (key: string, label: string, to: string): SpaceEntry => ({ key, label, emoji: '', to, tone: 'ink' })
+  const areas: LifeArea[] = [
+    { key: 'corpo', label: 'Corpo e movimento', entries: corpo(db, today) },
+    { key: 'autocuidado', label: 'Saúde e autocuidado', entries: pick(life, ['universo']) },
+    { key: 'mente', label: 'Mente e autoconhecimento', entries: [care, ...pick(life, ['biblia']), ...pick(learn, ['atelie'])] },
+    { key: 'estudos', label: 'Estudos e desenvolvimento', entries: pick(learn, ['estudos', 'salvos']) },
+    { key: 'biblioteca', label: 'Livros e biblioteca', entries: pick(learn, ['livros']) },
+    { key: 'viagens', label: 'Viagens e experiências', entries: pick(life, ['viagens']) },
+    {
+      key: 'casa',
+      label: 'Casa, rotina e Luna',
+      entries: [...pick(life, ['luna', 'casa', 'inbox']), task('tarefas', 'Tarefas', ROUTES.tasks), task('semana', 'Montar a semana', ROUTES.weekPlanner)],
+    },
+    {
+      key: 'objetivos',
+      label: 'Objetivos de vida',
+      entries: [...(db.goals.length ? [task('metas', 'Metas', ROUTES.goals)] : []), task('revisao', 'Revisão da semana', ROUTES.weeklyReview), task('mes', 'Meu mês', ROUTES.monthlyReview)],
+    },
+  ]
+  return areas.map((a) => ({ ...a, entries: a.entries.filter(visible) })).filter((a) => a.entries.length > 0)
+}
+
+/** Projetos: her professional projects, career, UGC and what she is waiting for (same entries as before). */
+export function projectEntries(db: DB, today: DateKey): SpaceEntry[] {
+  const hidden = new Set(db.profile.modules.filter((m) => !m.visible).map((m) => m.id))
+  return trabalho(db, today).filter((e) => !e.module || !hidden.has(e.module))
 }

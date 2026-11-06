@@ -52,7 +52,11 @@ export const ROUTES = {
   monthlyReview: '/mes',
   search: '/busca',
   assistant: '/lumos',
-  spaces: '/espacos',
+  /** Minha Vida — the life areas (was Espaços; /espacos redirects here). */
+  spaces: '/minha-vida',
+  /** The old Espaços path, kept as a redirect. */
+  oldSpaces: '/espacos',
+  projects: '/projetos',
   career: '/carreira',
   careerReview: '/carreira/revisao',
   careerPosts: '/carreira/posts',
@@ -113,7 +117,8 @@ export const routeTable: { path: string; Component: React.LazyExoticComponent<Re
   { path: '/mes', Component: lazy(() => import('@/features/reviews/MonthlyReviewPage')) },
   { path: '/busca', Component: lazy(() => import('@/features/search/SearchPage')) },
   { path: '/lumos', Component: lazy(() => import('@/features/assistant/AssistantPage')) },
-  { path: '/espacos', Component: lazy(() => import('@/features/spaces/SpacesPage')) },
+  { path: '/minha-vida', Component: lazy(() => import('@/features/spaces/SpacesPage')) },
+  { path: '/projetos', Component: lazy(() => import('@/features/spaces/ProjectsPage')) },
   { path: '/ajustes', Component: lazy(() => import('@/features/settings/SettingsPage')) },
   { path: '/ajustes/perfil', Component: lazy(() => import('@/features/settings/ProfilePage')) },
   { path: '/ajustes/memoria', Component: lazy(() => import('@/features/settings/MemoryPage')) },

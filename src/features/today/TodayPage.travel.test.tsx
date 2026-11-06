@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { actions, applyModuleSeeds, getDB, hydrate } from '@/data/store'
 import { createMemoryAdapter } from '@/data/storage'
@@ -44,10 +44,13 @@ describe('Home in modo viagem', () => {
     for (const sp of ['Milagre da Manhã', 'Encerrar o dia', 'Natação', 'Passeio', 'Cerâmica']) expect(hoje).not.toContain(sp)
   })
 
-  it('shows the operational panel on top, from stored data only', () => {
+  it('shows the operational panel on top, from stored data only — urgent first, the rest one tap away', () => {
     renderHome()
     const panel = screen.getByLabelText('Painel da viagem')
-    expect(panel.textContent).toContain('painel da viagem')
+    expect(panel.textContent).toContain('viagem · ')
+    // First level (2.0): no agenda/money lists until she opens the full panel.
+    expect(screen.queryByLabelText('Agenda da viagem')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /Ver painel completo/ }))
     expect(screen.getByLabelText('Agenda da viagem')).toBeTruthy()
     const money = screen.getByLabelText('Gastos e saldo').textContent ?? ''
     for (const k of ['pago', 'comprometido', 'estimado']) expect(money).toContain(k)
@@ -63,6 +66,7 @@ describe('Home in modo viagem', () => {
     const t = getDB().trips.find((x) => x.expedition)!
     actions.update('trips', t.id, { expedition: { ...t.expedition!, walletBalance: { cents: 1234500, asOf: '2026-10-29', source: 'Wise' } } })
     renderHome()
+    fireEvent.click(screen.getByRole('button', { name: /Ver painel completo/ }))
     const money = screen.getByLabelText('Gastos e saldo').textContent ?? ''
     expect(money).toContain('Saldo disponível')
     expect(money).toContain('12.345')

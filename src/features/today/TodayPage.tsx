@@ -17,6 +17,7 @@ import { ROUTES } from '@/app/routes'
 import { Page } from '@/components/ui'
 import { dailyBrief, homeSuggestions, lifeContext, needsAttention, type Now } from '@/data/intel'
 import { useDB } from '@/data/store'
+import type { DB } from '@/data/types'
 import { dayItems, undatedItems, upcomingDays } from '@/data/agenda/items'
 import { radarItems } from '@/data/briefing/backlog'
 import { pendingSync } from '@/data/briefing/bundled'
@@ -27,8 +28,7 @@ import { homeContext, tripPriorityItems } from './context'
 import { MAX_PRIORITIES, prioritiesOf } from './priorities'
 import { AttentionRow, SyncLine, TripLine } from './home/blocks'
 import { AgoraBlock, HojeBlock, ProximosBlock } from './home/agenda'
-import { dayProgress, homeLists, loosePriorities } from './home/rows'
-import { DayProgressLine } from './home/progress'
+import { homeLists, loosePriorities } from './home/rows'
 import { composerPlaceholder } from './home/day'
 import { LumosBox } from './home/LumosBox'
 import { LumosSheet, lumosHref, type LumosRequest } from './home/lumos'
@@ -39,6 +39,21 @@ import { homeTripOps, workStudyItems, workoutItems } from './home/trip-ops'
 import { tripDayOf } from '@/features/travel/trip-day'
 import { localNow } from '@/features/travel/expedition/logic'
 import { travelTripOn } from '@/data/travel-mode'
+
+/** "Cape Town · UTC+2" while a trip with its own zone is happening; nothing otherwise. */
+function placeLine(db: DB, today: string, clock: Date): string | undefined {
+  const trip = travelTripOn(db, today)
+  const tz = trip?.expedition?.timeZone
+  if (!trip || !tz) return undefined
+  const place = trip.expedition?.weather?.label ?? trip.place?.split(/[·(]/)[0]?.trim()
+  let offset: string | undefined
+  try {
+    offset = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'shortOffset' }).formatToParts(clock).find((p) => p.type === 'timeZoneName')?.value.replace('GMT', 'UTC')
+  } catch {
+    offset = undefined
+  }
+  return [place, offset].filter(Boolean).join(' · ') || undefined
+}
 
 /** A trip shows on Home only when it's really close. */
 const TRIP_LINE_DAYS = 30
@@ -73,8 +88,9 @@ export default function TodayPage() {
   const undated = useMemo(() => undatedItems(db, today), [db, today])
   const radar = useMemo(() => radarItems(db, today), [db, today])
   const loose = useMemo(() => loosePriorities(prioritiesOf(db, today).slice(0, MAX_PRIORITIES), items), [db, today, items])
-  const progress = useMemo(() => dayProgress(lists, loose), [lists, loose])
   // Modo viagem: the expedition day replaces the São Paulo routine (derived from the trip's dates).
+  // Where she is: the trip's place and its zone while traveling (2.0: "data e localização/fuso atual").
+  const where = useMemo(() => placeLine(db, today, clock), [db, today, clock])
   const tripDay = useMemo(() => {
     const tz = travelTripOn(db, today)?.expedition?.timeZone
     return tripDayOf(db, today, tz ? localNow(tz, clock).minutes : minutes)
@@ -121,11 +137,13 @@ export default function TodayPage() {
           </button>
         </div>
         <motion.div {...rise(0)}>
-          <h1 className="font-display text-[34px] leading-[1.08] tracking-tight mt-4">
+          <h1 className="font-display text-[26px] leading-[1.15] tracking-tight mt-3">
             {greeting(minutes)}, {name}.
           </h1>
-          <p className="text-[15px] text-muted mt-1 first-letter:uppercase">{formatLongDate(today)}.</p>
-          <DayProgressLine {...progress} />
+          <p className="text-[14.5px] text-muted mt-1 first-letter:uppercase">
+            {formatLongDate(today)}
+            {where && <span> · {where}</span>}
+          </p>
           {brief && <p className="font-display italic text-[17px] text-ink-2 mt-3 leading-snug">{brief}</p>}
         </motion.div>
       </header>

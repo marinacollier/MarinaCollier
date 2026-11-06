@@ -5,9 +5,9 @@
  * day, conflicts, the countdown to the next flight and the next leg's open items, highlighted until resolved.
  * Every list is capped; tapping a booking opens its sheet, "centro de comando" opens the trip.
  */
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, ChevronRight } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ChevronRight, Plane } from 'lucide-react'
 import { ROUTES } from '@/app/routes'
 import { openSheet } from '@/app/ui-store'
 import { Card } from '@/components/ui'
@@ -20,6 +20,8 @@ import { formatMoney } from '@/features/travel/expedition/logic'
 import type { TripOpsPanel as Panel } from '@/features/travel/expedition/panel'
 
 const CAP = 5
+/** First level (MARINA OS 2.0): only what is urgent; everything else one tap away. */
+const URGENT = 3
 
 const dayLabel = (d: DateKey, today: DateKey) => (d === today ? 'hoje' : d === addDays(today, 1) ? 'amanhã' : formatShortDate(d))
 
@@ -70,32 +72,39 @@ export function TripOpsPanel({ panel, work, workouts, today, hideMoney }: { pane
   const place = trip.expedition?.weather?.label ?? trip.place?.split(/[·(]/)[0]?.trim() ?? trip.name
   const agenda = panel.agenda
   const openRow = (i: ActionItem) => openSheet('itemEdit', { item: i, today })
+  const [full, setFull] = useState(false)
+  // Urgent = due by tomorrow or P0; the rest of the leg waits in the full panel.
+  const soon = addDays(date, 1)
+  const urgent = panel.leg.items.filter((i) => (i.deadline && i.deadline <= soon) || i.priority === 'P0')
+  const legShown = full ? panel.leg.items.slice(0, CAP) : urgent.slice(0, URGENT)
+  const legRest = panel.leg.items.length - legShown.length
 
   return (
     <Card aria-label="Painel da viagem">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="eyebrow">
-            {trip.flag} painel da viagem · {place}
-          </div>
+          <div className="eyebrow">viagem · {place}</div>
           {panel.flight && (
-            <p className="text-[15px] font-semibold mt-1">
-              ✈️ {panel.flight.item.title} {daysLabel(panel.flight.days)}
+            <p className="text-[15px] font-semibold mt-1 flex items-start gap-1.5">
+              <Plane size={15} aria-hidden className="mt-1 shrink-0 text-muted" />
+              <span>
+              {panel.flight.item.title} {daysLabel(panel.flight.days)}
               {panel.flight.item.time ? <span className="font-normal text-muted"> · {formatShortDate(panel.flight.item.date!)} {panel.flight.item.time}</span> : null}
+              </span>
             </p>
           )}
         </div>
       </div>
 
-      {panel.leg.items.length > 0 && (
+      {legShown.length > 0 && (
         <section aria-label="Pendências da próxima etapa" className="mt-3 rounded-2xl bg-sand-soft px-3.5 py-3">
-          <div className="eyebrow">pendências · {panel.leg.label ?? 'próxima etapa'}</div>
+          <div className="eyebrow">{full ? 'pendências' : 'urgente'} · {panel.leg.label ?? 'próxima etapa'}</div>
           <ul className="mt-1 space-y-0.5">
-            {panel.leg.items.slice(0, CAP).map((i) => (
+            {legShown.map((i) => (
               <Row key={i.id} title={i.title} sub={[i.priority, statusOf(i), i.deadline && `prazo ${formatShortDate(i.deadline)}`, i.nextAction].filter(Boolean).join(' · ')} warn={!!i.deadline && i.deadline <= date} onOpen={() => openItem(i)} />
             ))}
           </ul>
-          {panel.leg.items.length > CAP && <p className="text-[12px] text-muted mt-1">+{panel.leg.items.length - CAP} no centro de comando</p>}
+          {full && legRest > 0 && <p className="text-[12px] text-muted mt-1">+{legRest} no centro de comando</p>}
         </section>
       )}
 
@@ -111,6 +120,8 @@ export function TripOpsPanel({ panel, work, workouts, today, hideMoney }: { pane
           </Section>
         )}
 
+        {full && (
+        <>
         <Section title="agenda · hoje e 7 dias" label="Agenda da viagem" count={agenda.length + workouts.length}>
           {workouts.slice(0, 2).map((w) => (
             <Row key={w.key} title={w.title} sub={['hoje', w.start, 'treino'].filter(Boolean).join(' · ')} onOpen={() => openRow(w)} />
@@ -194,6 +205,9 @@ export function TripOpsPanel({ panel, work, workouts, today, hideMoney }: { pane
           </Section>
         )}
 
+        </>
+        )}
+
         {panel.conflicts.length > 0 && (
           <Section title="conflitos" count={panel.conflicts.length}>
             {panel.conflicts.slice(0, CAP).map((c) => (
@@ -203,7 +217,11 @@ export function TripOpsPanel({ panel, work, workouts, today, hideMoney }: { pane
         )}
       </div>
 
-      <button type="button" onClick={() => nav(ROUTES.trip(trip.id))} className="mt-3 w-full min-h-11 flex items-center justify-between text-[13.5px] font-semibold text-ink-2 border-t border-line/70 pt-2 active:opacity-70">
+      <button type="button" onClick={() => setFull((v) => !v)} aria-expanded={full} className="mt-3 w-full min-h-11 flex items-center justify-between text-[13.5px] text-muted border-t border-line/70 pt-2 active:opacity-70">
+        {full ? 'Mostrar só o urgente' : `Ver painel completo${legRest > 0 ? ` · +${legRest} pendências` : ''}`}
+        <ChevronDown size={16} aria-hidden className={cn('transition-transform', full && 'rotate-180')} />
+      </button>
+      <button type="button" onClick={() => nav(ROUTES.trip(trip.id))} className="w-full min-h-11 flex items-center justify-between text-[13.5px] font-semibold text-ink-2 border-t border-line/70 pt-2 active:opacity-70">
         Abrir centro de comando
         <ChevronRight size={16} aria-hidden />
       </button>

@@ -1,44 +1,23 @@
 /**
- * ESPAÇOS — manual destinations, not the main path. Universal search on top ("buscar na minha vida"),
- * then four quiet groups with live hints; empty modules don't appear.
+ * MINHA VIDA (MARINA OS 2.0) — the library of her life areas. Universal search on top ("buscar na minha vida"),
+ * then the areas with live hints; empty areas don't appear. Work lives in Projetos, money in Finanças.
  */
 import { useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import { ChevronRight, Plus, Search, X } from 'lucide-react'
+import { Plus, Search, X } from 'lucide-react'
 import { openSheet } from '@/app/ui-store'
 import { IconButton, Page, PageHeader } from '@/components/ui'
-import { TONE } from '@/components/ui/tone'
 import { useDB } from '@/data/store'
 import { useToday } from '@/hooks/useToday'
-import { cn } from '@/lib/cn'
 import { SearchResults } from '@/features/search/SearchResults'
 import { pushRecent } from '@/features/search/recent'
 import { searchSuggestions } from '@/features/search/suggestions'
-import { rituals, spaceGroups, type SpaceEntry } from './entries'
-
-function EntryRow({ e }: { e: SpaceEntry }) {
-  const nav = useNavigate()
-  return (
-    <button type="button" onClick={() => nav(e.to)} className="w-full flex items-center gap-3.5 min-h-[58px] py-2 px-4 text-left active:bg-surface-2 transition-colors">
-      <span aria-hidden className={cn('h-10 w-10 shrink-0 rounded-[14px] inline-flex items-center justify-center text-[19px] leading-none', TONE[e.tone].soft)}>
-        {e.emoji}
-      </span>
-      <span className="flex-1 min-w-0">
-        <span className="block text-[15.5px] leading-snug truncate">{e.label}</span>
-        {e.hint && <span className="block text-[13px] text-muted mt-0.5 truncate">{e.hint}</span>}
-      </span>
-      <ChevronRight size={17} className="text-muted/50 shrink-0" />
-    </button>
-  )
-}
+import { lifeAreas } from './entries'
+import { HubSection } from './hub'
 
 export default function SpacesPage() {
   const db = useDB()
   const today = useToday()
-  const nav = useNavigate()
-  const groups = useMemo(() => spaceGroups(db, today), [db, today])
-  const extra = useMemo(() => rituals(db), [db])
+  const areas = useMemo(() => lifeAreas(db, today), [db, today])
   const suggestions = useMemo(() => searchSuggestions(db, today, 5), [db, today])
   const [query, setQuery] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -47,7 +26,7 @@ export default function SpacesPage() {
   return (
     <Page>
       <PageHeader
-        title="Espaços"
+        title="Minha Vida"
         search={false}
         actions={
           <IconButton label="Registrar algo" onClick={() => openSheet('quickAdd')}>
@@ -99,41 +78,9 @@ export default function SpacesPage() {
         <SearchResults query={query} onOpen={() => pushRecent(query)} />
       ) : (
         <>
-          {groups.map((g, gi) => (
-            <motion.section
-              key={g.key}
-              aria-label={g.label}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, delay: gi * 0.05 }}
-              className="mt-6"
-            >
-              <div className="flex items-center justify-between min-h-9 px-1 mb-1.5">
-                <h2 className="eyebrow">{g.label}</h2>
-                {g.all && (
-                  <button type="button" onClick={() => nav(g.all!)} className="h-9 -mr-1 px-1 text-[12.5px] text-muted active:opacity-70">
-                    ver tudo
-                  </button>
-                )}
-              </div>
-              <div className="card overflow-hidden divide-y divide-line/60">
-                {g.entries.map((e) => (
-                  <EntryRow key={e.key} e={e} />
-                ))}
-              </div>
-            </motion.section>
+          {areas.map((a, i) => (
+            <HubSection key={a.key} label={a.label} entries={a.entries} delay={i * 40} />
           ))}
-
-          <nav aria-label="Rituais" className="mt-9 px-1">
-            <div className="eyebrow mb-1">Ritmo</div>
-            <div className="flex flex-wrap gap-x-1 -ml-2">
-              {extra.map((r) => (
-                <button key={r.key} type="button" onClick={() => nav(r.to)} className="h-11 px-2 text-[14px] text-ink-2 active:opacity-70">
-                  {r.label}
-                </button>
-              ))}
-            </div>
-          </nav>
         </>
       )}
     </Page>
