@@ -294,7 +294,7 @@ export function calendarEntries(db: DB, from: DateKey, to: DateKey, opts: Calend
   const tripsById = new Map(db.trips.map((t) => [t.id, t]))
   const tzOfTrip = (tripId?: ID) => (tripId && tripsById.get(tripId)?.expedition?.timeZone) || homeTz
   const sources = new Map(db.calendarSources.map((s) => [s.id, s]))
-  const projectRoute = (id?: ID) => (id ? { label: db.projects.find((p) => p.id === id)?.name ?? 'Projeto', route: ROUTES.project(id) } : undefined)
+  const projectRoute = (id?: ID) => (id ? { label: 'Projeto', route: ROUTES.project(id) } : undefined)
 
   for (const date of eachDay(from, to)) {
     // 1. Calendar events (sources, recurrence, exdates, modo viagem pause — all in eventsFor).
@@ -330,7 +330,7 @@ export function calendarEntries(db: DB, from: DateKey, to: DateKey, opts: Calend
         sourceLabel: src && src.provider !== 'local' ? src.name : 'Agenda',
         approx,
         open: {
-          module: projectRoute(e.projectId) ?? (e.tripId ? { label: tripsById.get(e.tripId)?.name ?? 'Viagem', route: ROUTES.trip(e.tripId) } : undefined),
+          module: projectRoute(e.projectId) ?? (e.tripId ? { label: 'Viagem', route: ROUTES.trip(e.tripId) } : undefined),
           // External events are edited at the origin; the sheet says so itself.
           edit: { sheet: 'event', props: { id: e.id, date: e.recurrence ? date : undefined } },
         },
@@ -447,7 +447,7 @@ export function calendarEntries(db: DB, from: DateKey, to: DateKey, opts: Calend
         allDay: false,
         visibility: 'normal',
         sourceLabel: tripLabel(cls.trip),
-        open: { module: { label: cls.trip.name, route: ROUTES.trip(cls.trip.id) }, edit: { sheet: 'trip', props: { id: cls.trip.id } } },
+        open: { module: { label: 'Viagem', route: ROUTES.trip(cls.trip.id) }, edit: { sheet: 'trip', props: { id: cls.trip.id } } },
         details: compact([{ label: 'Revisão diária', value: school?.reviewMinutes }]),
       })
     }
@@ -500,7 +500,7 @@ export function calendarEntries(db: DB, from: DateKey, to: DateKey, opts: Calend
         visibility: 'normal',
         updatedAt: trip.updatedAt,
         sourceLabel: 'Viagens',
-        open: { module: { label: trip.name, route: ROUTES.trip(trip.id) }, edit: { sheet: 'trip', props: { id: trip.id } } },
+        open: { module: { label: 'Viagem', route: ROUTES.trip(trip.id) }, edit: { sheet: 'trip', props: { id: trip.id } } },
       })
     }
   }
@@ -547,7 +547,7 @@ export function calendarEntries(db: DB, from: DateKey, to: DateKey, opts: Calend
         schoolImpact: i.schoolImpact,
         nextAction: i.nextAction,
         details,
-        open: { module: { label: trip?.name ?? 'Viagem', route: ROUTES.trip(i.tripId) }, edit: { sheet: 'tripItem', props: { id: i.id, tripId: i.tripId } } },
+        open: { module: { label: 'Viagem', route: ROUTES.trip(i.tripId) }, edit: { sheet: 'tripItem', props: { id: i.id, tripId: i.tripId } } },
       })
     }
     // Deadline to resolve it (open items only).
@@ -569,7 +569,7 @@ export function calendarEntries(db: DB, from: DateKey, to: DateKey, opts: Calend
         updatedAt: i.updatedAt,
         sourceLabel: tripLabel(trip),
         nextAction: i.nextAction,
-        open: { module: { label: trip?.name ?? 'Viagem', route: ROUTES.trip(i.tripId) }, edit: { sheet: 'tripItem', props: { id: i.id, tripId: i.tripId } } },
+        open: { module: { label: 'Viagem', route: ROUTES.trip(i.tripId) }, edit: { sheet: 'tripItem', props: { id: i.id, tripId: i.tripId } } },
       })
     }
   }
@@ -595,7 +595,7 @@ export function calendarEntries(db: DB, from: DateKey, to: DateKey, opts: Calend
       linkedTaskId: t.id,
       updatedAt: t.updatedAt,
       sourceLabel: 'Tarefa',
-      open: { module: projectRoute(t.projectId) ?? (t.tripId ? { label: tripsById.get(t.tripId)?.name ?? 'Viagem', route: ROUTES.trip(t.tripId) } : { label: 'Tarefas', route: ROUTES.tasks }), edit: { sheet: 'task', props: { id: t.id } } },
+      open: { module: projectRoute(t.projectId) ?? (t.tripId ? { label: 'Viagem', route: ROUTES.trip(t.tripId) } : { label: 'Tarefas', route: ROUTES.tasks }), edit: { sheet: 'task', props: { id: t.id } } },
     })
   }
 
