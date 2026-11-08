@@ -16,6 +16,8 @@
 import { isPrivateCollection } from '../private-collections'
 import { isSeedRecordId } from '../seed/ids'
 import type { DB, SyncConflict, UserProfile } from '../types'
+import { toDateKey } from '@/lib/date'
+import { dedupeAdopted } from './adopt-dedupe'
 import { hashData } from './hash'
 import type { RemoteRow, SyncTransport } from './transport'
 
@@ -293,6 +295,36 @@ export function createSyncEngine(deps: SyncDeps) {
     return { next: next as unknown as DB, conflicts: conflicts.length }
   }
 
+  /**
+   * Any device adopting the cloud (fresh install, or an old copy of the device storage that never synced):
+   * local-only copies of what the cloud already has — same sourceKey, same brand, a briefing the cloud
+   * profile lists as applied, past week-template workouts, seed records she deleted — are dropped, not
+   * pushed as new records. A copy edited after the cloud's version is kept as a conflict.
+   */
+  function dropCloudDuplicates(m: SyncMeta, db: DB, rows: RemoteRow[]): DB {
+    const raw = db as unknown as Record<string, unknown>
+    const lists: Record<string, (Record<string, unknown> & { id: string })[]> = {}
+    for (const c of syncCollections(db, priv())) lists[c] = raw[c] as never
+    const cloudProfile = rows.find((r) => r.collection === PROFILE_COLLECTION && r.id === PROFILE_ID && !r.deleted)?.data as Record<string, unknown> | undefined
+    const res = dedupeAdopted(lists, rows, cloudProfile, toDateKey(new Date(now())))
+    if (!res.dropped.length && !Object.keys(res.lists).length) return db
+    const next: Record<string, unknown> = { ...raw, ...res.lists }
+    for (const d of res.dropped) delete m.outbox[recordKey(d.collection, d.id)]
+    const kept: SyncConflict[] = res.dropped
+      .filter((d) => d.newer)
+      .map((d) => ({
+        id: newId(),
+        collection: d.collection,
+        recordId: d.id,
+        at: new Date(now()).toISOString(),
+        kept: 'remote',
+        other: d.data,
+        otherVersion: Date.parse(String(d.data.updatedAt)) || 0,
+      }))
+    if (kept.length) next.profile = { ...db.profile, syncConflicts: [...(db.profile.syncConflicts ?? []), ...kept] }
+    return next as unknown as DB
+  }
+
   /** Fresh install adopting the cloud: drop the local-only records nobody touched since the seed. */
   function dropFreshSeed(m: SyncMeta, db: DB, rows: RemoteRow[], before: string): DB {
     const inCloud = new Set(rows.map((r) => recordKey(r.collection, r.id)))
@@ -374,6 +406,7 @@ export function createSyncEngine(deps: SyncDeps) {
         const merged = merge(m, db, rows)
         const conflicts = merged.conflicts
         let next = merged.next
+        if (m.adopt) next = dropCloudDuplicates(m, next, rows)
         if (m.adopt && m.replaceBefore) next = dropFreshSeed(m, next, rows, m.replaceBefore)
         if (m.adopt && deps.reseed) next = deps.reseed(next)
         if (next !== db) await deps.commitDB(next)
