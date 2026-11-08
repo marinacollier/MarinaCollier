@@ -7,7 +7,7 @@ import { Button, Card, SectionTitle, TextArea } from '@/components/ui'
 import { actions, persist, useDB } from '@/data/store'
 import type { LiteraryAuthorProfile } from '@/data/types'
 import { useToday } from '@/hooks/useToday'
-import { developmentSuggestion, latestVersion, overview, workDateLabel } from '../model'
+import { developmentSuggestion, hasText, latestVersion, overview, textCounts, textCountsLine, textWordCount, workDateLabel } from '../model'
 import { dismissTip } from '../ops'
 import { NewWork } from '../NewWork'
 import { Excerpts, SERIF, StatusPill, WorkCard } from '../parts'
@@ -17,6 +17,7 @@ export function Overview({ writing, setWriting }: { writing: boolean; setWriting
   const nav = useNavigate()
   const today = useToday()
   const o = useMemo(() => overview(db), [db])
+  const counts = useMemo(() => textCounts(db), [db])
   const tip = useMemo(() => developmentSuggestion(db, today), [db, today])
   const featuredBody = o.featured ? latestVersion(db, o.featured.id)?.body : undefined
   const versions = db.literaryVersions.length
@@ -24,7 +25,7 @@ export function Overview({ writing, setWriting }: { writing: boolean; setWriting
   return (
     <div>
       {o.featured && (
-        <Card onPress={() => nav(ROUTES.atelieWork(o.featured!.id))} className="bg-surface">
+        <Card onPress={() => nav(ROUTES.atelieWork(o.featured!.id))} className="card-hero p-5">
           <div className="eyebrow">Obra em destaque</div>
           <div className="font-display text-[28px] leading-[1.1] mt-1.5">{o.featured.title}</div>
           <div className="text-[12.5px] text-muted mt-1">{[workDateLabel(o.featured), o.featured.genre].filter(Boolean).join(' · ')}</div>
@@ -43,9 +44,9 @@ export function Overview({ writing, setWriting }: { writing: boolean; setWriting
 
       <div className="grid grid-cols-3 gap-2 mt-3" aria-label="Totais">
         {[
-          { n: o.total, l: o.total === 1 ? 'obra' : 'obras' },
-          { n: o.inLapidacao.length, l: 'em lapidação' },
-          { n: o.pending, l: 'texto pendente' },
+          { n: counts.withText, l: 'com texto' },
+          { n: counts.titleOnly, l: 'só título/ideia' },
+          { n: counts.inLapidacao, l: 'em lapidação' },
         ].map((t) => (
           <div key={t.l} className="rounded-2xl bg-surface-2/70 px-3 py-2.5">
             <div className="font-display text-[24px] leading-none">{t.n}</div>
@@ -53,6 +54,9 @@ export function Overview({ writing, setWriting }: { writing: boolean; setWriting
           </div>
         ))}
       </div>
+      <p className="text-[12px] text-muted mt-2">
+        {counts.total} {counts.total === 1 ? 'registro' : 'registros'} no acervo · {textCountsLine(counts)}
+      </p>
 
       {writing ? (
         <NewWork onClose={() => setWriting(false)} />
@@ -76,7 +80,7 @@ export function Overview({ writing, setWriting }: { writing: boolean; setWriting
             {o.inLapidacao.map((w) => (
               <button key={w.id} type="button" onClick={() => nav(ROUTES.atelieWork(w.id))} className="w-full text-left px-4 py-3 flex items-baseline justify-between gap-3 active:bg-surface-2">
                 <span className="font-display text-[18px] truncate">{w.title}</span>
-                <span className="text-[12px] text-muted shrink-0">{w.textPending ? 'texto pendente' : `${db.literaryVersions.filter((v) => v.workId === w.id).length} versões`}</span>
+                <span className="text-[12px] text-muted shrink-0">{hasText(db, w.id) ? `${textWordCount(db, w.id)} palavras` : 'sem texto'}</span>
               </button>
             ))}
           </div>

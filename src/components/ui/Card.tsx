@@ -43,11 +43,14 @@ export function CardHeader({ eyebrow, title, action, className }: CardHeaderProp
   )
 }
 
-/** Section title between cards on a page. */
-export function SectionTitle({ children, action, className }: { children: ReactNode; action?: ReactNode; className?: string }) {
+/** Section header between cards (the site's pattern): optional small olive label, then a Bodoni title. */
+export function SectionTitle({ children, label, action, className }: { children: ReactNode; label?: ReactNode; action?: ReactNode; className?: string }) {
   return (
-    <div className={cn('flex items-end justify-between px-1 mt-7 mb-2.5', className)}>
-      <h2 className="eyebrow">{children}</h2>
+    <div className={cn('flex items-end justify-between gap-3 px-1 mt-8 mb-3', className)}>
+      <div className="min-w-0">
+        {label && <div className="eyebrow text-[12px] mb-1">{label}</div>}
+        <h2 className="section-title">{children}</h2>
+      </div>
       {action}
     </div>
   )

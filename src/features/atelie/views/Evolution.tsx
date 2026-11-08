@@ -37,7 +37,8 @@ export function Evolution() {
 
       <div className="grid grid-cols-2 gap-2 mt-3">
         {[
-          { n: e.total, l: 'obras no acervo' },
+          { n: e.total, l: 'registros no acervo' },
+          { n: e.withText, l: 'com texto no app' },
           { n: e.concluded, l: 'aprovadas ou publicadas' },
           { n: e.published, l: 'publicadas' },
           { n: e.versionsTotal, l: 'versões guardadas' },

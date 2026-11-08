@@ -49,6 +49,7 @@ export function iconOf(e: CalendarEntry): LucideIcon {
     case 'meeting':
     case 'contact':
     case 'opportunity':
+    case 'ugcFollowUp':
       return Users
     case 'trip':
       return Plane

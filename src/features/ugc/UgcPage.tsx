@@ -11,7 +11,7 @@ import { ROUTES } from '@/app/routes'
 import { Card, Chip, EmptyState, ItemList, ItemRow, Page, PageHeader, ProgressBar, SectionTitle, Segmented } from '@/components/ui'
 import { useDB } from '@/data/store'
 import type { BrandTier, DB, UgcCrmStatus, UgcOpportunity, UgcStage } from '@/data/types'
-import { brandOf, CHANNEL_LABEL, followUpsDue, isLive, STAGES, STATUS_LABEL, TIERS, ugcDayActions, weekNumbers } from '@/data/ugc/model'
+import { brandMatchesProject, brandOf, CHANNEL_LABEL, countryOptions, followUpsDue, isLive, projectFilterOptions, sameCountry, STAGES, STATUS_LABEL, TIERS, ugcDayActions, weekNumbers, type BrandProjectFilter } from '@/data/ugc/model'
 import { ensureProspect } from '@/data/ugc/ops'
 import { useToday } from '@/hooks/useToday'
 import { addDays, formatDayMonth } from '@/lib/date'
@@ -233,6 +233,10 @@ function Brands() {
   const [q, setQ] = useState('')
   const [archived, setArchived] = useState(false)
   const [crm, setCrm] = useState<UgcCrmStatus | undefined>()
+  const [project, setProject] = useState<BrandProjectFilter | undefined>()
+  const [country, setCountry] = useState<string | undefined>()
+  const projects = useMemo(() => projectFilterOptions(db, db.brands.filter((b) => !b.archived)), [db])
+  const countries = useMemo(() => countryOptions(db.brands.filter((b) => !b.archived)), [db.brands])
   const counts = useMemo(() => {
     const c: Record<string, number> = {}
     for (const b of db.brands) if (b.crm?.status) c[b.crm.status] = (c[b.crm.status] ?? 0) + 1
@@ -243,20 +247,22 @@ function Brands() {
   const inStage = (brandId: string) => !stage || live.some((o) => o.brandId === brandId && o.stage === stage)
   const rank = (t?: string) => (t ? TIERS.indexOf(t as BrandTier) : 9)
   const list = db.brands
-    .filter((b) => !!b.archived === archived && (!tier || b.priorityTier === tier) && (!crm || b.crm?.status === crm) && inStage(b.id) && (!q || normalize(b.name).includes(normalize(q))))
+    .filter((b) => !!b.archived === archived && (!tier || b.priorityTier === tier) && (!crm || b.crm?.status === crm) && brandMatchesProject(db, b.id, project) && sameCountry(b, country) && inStage(b.id) && (!q || normalize(b.name).includes(normalize(q))))
     .sort((a, b) => rank(a.priorityTier) - rank(b.priorityTier) || a.name.localeCompare(b.name))
   const drafts = db.ugcMessages.filter((m) => m.status === 'rascunho' || m.status === 'aprovada').sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   const clear = () => {
     setStage(undefined)
     setTier(undefined)
     setArchived(false)
+    setProject(undefined)
+    setCountry(undefined)
   }
   return (
     <div className="space-y-4">
       <AddBrand />
       <input id="ugc-brand-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar marca" className="input w-full" aria-label="Buscar marca" />
       <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-1 px-1" aria-label="Filtrar marcas">
-        <Chip selected={!stage && !tier && !archived} onClick={clear} className="whitespace-nowrap">
+        <Chip selected={!stage && !tier && !archived && !project && !country} onClick={clear} className="whitespace-nowrap">
           Todas
         </Chip>
         {STAGES.map((s) => {
@@ -277,6 +283,20 @@ function Brands() {
           Arquivadas
         </Chip>
       </div>
+      {(projects.length > 0 || countries.length > 0) && (
+        <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-1 px-1" aria-label="Filtrar por projeto e país">
+          {projects.map((p) => (
+            <Chip key={p.value} selected={project === p.value} onClick={() => setProject(project === p.value ? undefined : p.value)} className="whitespace-nowrap">
+              {p.label} <span className="tabular-nums opacity-70">{p.count}</span>
+            </Chip>
+          ))}
+          {countries.map((c) => (
+            <Chip key={c.value} selected={country === c.value} onClick={() => setCountry(country === c.value ? undefined : c.value)} className="whitespace-nowrap">
+              {c.value} <span className="tabular-nums opacity-70">{c.count}</span>
+            </Chip>
+          ))}
+        </div>
+      )}
       <CrmFilter value={crm} onChange={setCrm} counts={counts} />
       {list.length ? (
         <ItemList label="Marcas">

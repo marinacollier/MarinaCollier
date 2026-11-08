@@ -634,6 +634,61 @@ function PendRow({ item, sub }: { item: TripItem; sub?: string }) {
 
 // ─── Custos ─────────────────────────────────────────────────────────────────
 
+/** Documented conversions (a real exchange, e.g. Wise): the only rates Finanças uses for a BRL equivalent. */
+function FxRatesCard({ trip }: { trip: ViewProps['trip'] }) {
+  const exp = trip.expedition
+  const rates = [...(exp.fxRates ?? [])].sort((a, b) => b.date.localeCompare(a.date))
+  const [date, setDate] = useState<string | undefined>(localNow(exp.timeZone).date)
+  const [rate, setRate] = useState('')
+  const [source, setSource] = useState('conversão Wise')
+  const n = Number(rate.replace(',', '.'))
+  const valid = !!date && !!rate.trim() && Number.isFinite(n) && n > 0 && !!source.trim()
+  const add = () => {
+    if (!valid) return
+    setExp(trip, { fxRates: [...(exp.fxRates ?? []), { date: date as DateKey, brlPerUnit: n, source: source.trim() }] })
+    setRate('')
+    toast('Conversão guardada ✓')
+  }
+  const remove = (i: number) => setExp(trip, { fxRates: (exp.fxRates ?? []).filter((_, j) => j !== i) })
+  return (
+    <Card className="space-y-3">
+      <div className="eyebrow">conversões documentadas</div>
+      {rates.length > 0 && (
+        <ul className="space-y-1.5">
+          {rates.map((r) => {
+            const idx = (exp.fxRates ?? []).indexOf(r)
+            return (
+              <li key={`${r.date}-${idx}`} className="flex items-center justify-between gap-2 text-[13.5px]">
+                <span className="min-w-0 truncate">
+                  {formatShortDate(r.date)} · 1 {exp.currency} = R$ {String(r.brlPerUnit).replace('.', ',')} <span className="text-muted">· {r.source}</span>
+                </span>
+                <button type="button" aria-label={`Remover conversão de ${formatShortDate(r.date)}`} className="h-9 w-9 inline-flex items-center justify-center text-muted shrink-0" onClick={() => remove(idx)}>
+                  <Trash2 size={15} />
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      <div className="grid grid-cols-2 gap-2.5">
+        <Field label="Data">
+          <DateInput value={date} onChange={setDate} aria-label="Data da conversão" />
+        </Field>
+        <Field label={`1 ${exp.currency} = R$`}>
+          <input className="input" inputMode="decimal" placeholder="ex.: 0,31" value={rate} aria-label="Taxa da conversão" onChange={(e) => setRate(e.target.value)} />
+        </Field>
+      </div>
+      <Field label="Fonte">
+        <input className="input" value={source} aria-label="Fonte da conversão" onChange={(e) => setSource(e.target.value)} />
+      </Field>
+      <Button size="sm" variant="primary" disabled={!valid} onClick={add}>
+        Guardar conversão
+      </Button>
+      <p className="text-[12px] text-muted">Em Finanças, o equivalente em reais dos gastos da viagem usa só a conversão mais recente daqui, com a fonte. Sem conversão, nenhum valor em reais é estimado.</p>
+    </Card>
+  )
+}
+
 function Custos({ trip, items, expenses }: ViewProps) {
   const b = useMemo(() => expeditionBudget(trip, items, expenses)!, [trip, items, expenses])
   const exp = trip.expedition
@@ -722,6 +777,8 @@ function Custos({ trip, items, expenses }: ViewProps) {
         </Field>
         <p className="text-[12px] text-muted">A cotação é a que você digitar — o app não busca câmbio ao vivo. O orçamento é a referência original, não saldo: o que sobra é sempre calculado. O saldo da Wise é só o que você informar.</p>
       </Card>
+
+      {cur !== 'BRL' && <FxRatesCard trip={trip} />}
 
       {(b.extras > 0 || b.unconverted > 0) && (
         <div className="grid grid-cols-2 gap-2.5">

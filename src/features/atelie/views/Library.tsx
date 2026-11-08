@@ -4,7 +4,7 @@ import { Search } from 'lucide-react'
 import { EmptyState, Segmented, Select } from '@/components/ui'
 import { useDB } from '@/data/store'
 import type { LiteraryStatus } from '@/data/types'
-import { filterWorks, genresOf, latestVersion, STATUS_LABEL, STATUS_ORDER, tagCounts, type LibrarySort } from '../model'
+import { filterWorks, genresOf, hasText, STATUS_LABEL, STATUS_ORDER, tagCounts, type LibrarySort } from '../model'
 import { WorkCard } from '../parts'
 
 const SORTS: { value: LibrarySort; label: string }[] = [
@@ -66,7 +66,7 @@ export function Library() {
 
       <div className="flex items-center justify-between gap-3 mt-3">
         <span className="text-[12.5px] text-muted">
-          {works.length} {works.length === 1 ? 'obra' : 'obras'}
+          {works.length} {works.length === 1 ? 'registro' : 'registros'} · {works.filter((w) => hasText(db, w.id)).length} com texto
           {filtered && (
             <button
               type="button"
@@ -88,8 +88,8 @@ export function Library() {
 
       <div className="space-y-3 mt-3">
         {works.map((w) => {
-          const v = latestVersion(db, w.id)
-          return <WorkCard key={w.id} work={w} meta={v ? `${v.wordCount} palavras · ${db.literaryVersions.filter((x) => x.workId === w.id).length} versões` : undefined} />
+          const n = db.literaryVersions.filter((x) => x.workId === w.id).length
+          return <WorkCard key={w.id} work={w} meta={hasText(db, w.id) ? `${n} ${n === 1 ? 'versão' : 'versões'}` : undefined} />
         })}
       </div>
       {works.length === 0 && <EmptyState emoji="🖋️" title="Nada por aqui" text={filtered ? 'Nenhuma obra com esses filtros.' : 'Quando você escrever, as obras aparecem aqui.'} />}

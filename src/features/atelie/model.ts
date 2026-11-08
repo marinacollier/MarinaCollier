@@ -68,6 +68,44 @@ export function versionNumber(db: Pick<DB, 'literaryVersions'>, v: LiteraryVersi
   return versionsOf(db, v.workId).findIndex((x) => x.id === v.id) + 1
 }
 
+/**
+ * A work "has text" only when at least one saved version has a non-empty body. A record (title, idea,
+ * excerpts) is not a text, and `textPending: false` alone is not proof: new works start with it false.
+ */
+export function hasText(db: Pick<DB, 'literaryVersions'>, workId: ID): boolean {
+  return (db.literaryVersions ?? []).some((v) => v.workId === workId && v.body.trim().length > 0)
+}
+
+/** Words in the latest non-empty version (0 when the work has no text). */
+export function textWordCount(db: Pick<DB, 'literaryVersions'>, workId: ID): number {
+  const v = versionsOf(db, workId)
+    .filter((x) => x.body.trim())
+    .at(-1)
+  return v ? wordCount(v.body) : 0
+}
+
+export interface TextCounts {
+  /** Active (non-archived) works. */
+  total: number
+  withText: number
+  /** Only a title / idea / excerpts — no text in the app. */
+  titleOnly: number
+  inLapidacao: number
+}
+
+/** Honest counters: never imply a registered title is a complete work. */
+export function textCounts(db: Pick<DB, 'literaryWorks' | 'literaryVersions'>): TextCounts {
+  const active = (db.literaryWorks ?? []).filter((w) => w.status !== 'arquivado')
+  const withText = active.filter((w) => hasText(db, w.id)).length
+  return { total: active.length, withText, titleOnly: active.length - withText, inLapidacao: active.filter((w) => w.status === 'lapidacao').length }
+}
+
+/** "2 com texto · 7 só título/ideia · 1 em lapidação" (zero parts dropped, except when everything is zero). */
+export function textCountsLine(c: TextCounts): string {
+  const parts = [c.withText && `${c.withText} com texto`, c.titleOnly && `${c.titleOnly} só título/ideia`, c.inLapidacao && `${c.inLapidacao} em lapidação`].filter(Boolean)
+  return parts.length ? parts.join(' · ') : 'Nenhuma obra ainda'
+}
+
 export function workOf(db: Pick<DB, 'literaryWorks'>, id: ID): LiteraryWork | undefined {
   return (db.literaryWorks ?? []).find((w) => w.id === id)
 }
@@ -203,6 +241,8 @@ export function developmentSuggestion(db: Pick<DB, 'literaryProfile'>, today: Da
 
 export interface Evolution {
   total: number
+  /** Works with at least one non-empty version (the rest are records: title / idea). */
+  withText: number
   byStatus: { status: LiteraryStatus; count: number }[]
   concluded: number
   published: number
@@ -247,6 +287,7 @@ export function evolution(db: Pick<DB, 'literaryWorks' | 'literaryVersions'>, to
   })
   return {
     total: works.length,
+    withText: works.filter((w) => hasText(db, w.id)).length,
     byStatus,
     concluded: works.filter((w) => w.status === 'final_aprovada' || w.status === 'publicado').length,
     published: works.filter((w) => w.status === 'publicado').length,

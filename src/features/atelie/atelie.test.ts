@@ -13,7 +13,7 @@ import { spaceGroups } from '@/features/spaces/entries'
 import { lockSession } from '@/app/lock-store'
 import type { DB } from '@/data/types'
 import { diffLines, diffStats, diffWords } from './diff'
-import { evolution, filterWorks, latestVersion, versionsOf, writingMap, developmentSuggestion } from './model'
+import { evolution, filterWorks, hasText, latestVersion, textCounts, textCountsLine, textWordCount, versionsOf, writingMap, developmentSuggestion } from './model'
 import { approveVersion, checkpoint, createWork, restoreVersion, saveDraft, saveVersion, setInCollection, toggleFavorite } from './ops'
 import { toMarkdown, toTxt } from './export'
 
@@ -290,5 +290,35 @@ describe('privacy', () => {
     lockSession()
     expect(entry()).toBeTruthy()
     expect(entry()?.hint).toBeUndefined()
+  })
+})
+
+describe('honest counters — a title is not a complete work', () => {
+  it('the seed has no text: every work counts as "só título/ideia", lapidação kept apart', () => {
+    const c = textCounts(getDB())
+    expect(c.withText).toBe(0)
+    expect(c.titleOnly).toBe(c.total)
+    expect(c.inLapidacao).toBe(getDB().literaryWorks.filter((w) => w.status === 'lapidacao').length)
+    expect(textCountsLine(c)).not.toMatch(/com texto/)
+    expect(textCountsLine(c)).toMatch(/só título\/ideia/)
+  })
+
+  it('a work has text only with a non-empty version; a new empty work (textPending false) does not', () => {
+    const w = createWork({ title: 'Vazia' })
+    expect(getDB().literaryWorks.find((x) => x.id === w.id)!.textPending).toBe(false)
+    expect(hasText(getDB(), w.id)).toBe(false)
+    saveDraft(w.id, 'três palavras aqui')
+    expect(hasText(getDB(), w.id)).toBe(true)
+    expect(textWordCount(getDB(), w.id)).toBe(3)
+    const c = textCounts(getDB())
+    expect(c.withText).toBe(1)
+    expect(textCountsLine(c)).toMatch(/^1 com texto · \d+ só título\/ideia · \d+ em lapidação$/)
+  })
+
+  it('archived works are not counted; statuses are untouched', () => {
+    const before = textCounts(getDB())
+    actions.update('literaryWorks', ATELIE_IDS.aCasa, { status: 'arquivado' })
+    expect(textCounts(getDB()).total).toBe(before.total - 1)
+    expect(evolution(getDB(), TODAY).withText).toBe(0)
   })
 })
