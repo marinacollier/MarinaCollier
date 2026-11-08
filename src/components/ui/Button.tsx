@@ -10,12 +10,12 @@ const VARIANT: Record<Variant, string> = {
   soft: 'bg-surface-2 text-ink active:bg-line',
   ghost: 'bg-transparent text-ink-2 active:bg-surface-2',
   danger: 'bg-transparent text-accent active:bg-accent-soft',
-  outline: 'bg-transparent text-ink border border-line active:bg-surface-2',
+  outline: 'bg-transparent text-ink border border-ink/35 active:bg-surface-2',
 }
 const SIZE: Record<Size, string> = {
   sm: 'h-9 px-3.5 text-[13px] rounded-full gap-1.5',
   md: 'h-11 px-5 text-[15px] rounded-full gap-2',
-  lg: 'h-13 px-6 text-base rounded-2xl gap-2 w-full',
+  lg: 'h-13 px-6 text-base rounded-full gap-2 w-full',
 }
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {

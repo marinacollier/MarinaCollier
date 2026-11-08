@@ -4,11 +4,12 @@ import { useNavigate } from 'react-router-dom'
 import { ROUTES } from '@/app/routes'
 import { toast } from '@/app/ui-store'
 import { Button, Pill } from '@/components/ui'
+import { useDB } from '@/data/store'
 import type { LiteraryStatus, LiteraryWork } from '@/data/types'
 import { copyText } from '@/lib/clipboard'
 import { cn } from '@/lib/cn'
 import { saveFile } from '@/features/settings/platform'
-import { PROVENANCE_LABEL, STATUS_LABEL, workDateLabel } from './model'
+import { hasText, PROVENANCE_LABEL, STATUS_LABEL, textWordCount, workDateLabel } from './model'
 import { slug, toMarkdown, toTxt } from './export'
 
 /** Bodoni for reading, without the display weight/tracking used for titles. */
@@ -56,9 +57,16 @@ export function Tags({ tags, max = 4, className }: { tags: string[]; max?: numbe
   )
 }
 
-/** A library card: serif title, status, date · genre, themes, "texto pendente". */
+/** Subtle marker for a work that is only a record (title / idea) — no text in the app. */
+export function NoTextMark() {
+  return <span className="text-[12px] text-muted italic">sem texto</span>
+}
+
+/** A library card: serif title, status, date · genre, themes, and "sem texto" or the word count. */
 export function WorkCard({ work, meta, children }: { work: LiteraryWork; meta?: ReactNode; children?: ReactNode }) {
   const nav = useNavigate()
+  const words = useDB((db) => textWordCount(db, work.id))
+  const withText = useDB((db) => hasText(db, work.id))
   return (
     <button type="button" onClick={() => nav(ROUTES.atelieWork(work.id))} className="card w-full text-left p-4 active:scale-[0.99] transition">
       <div className="flex items-start justify-between gap-3">
@@ -77,7 +85,7 @@ export function WorkCard({ work, meta, children }: { work: LiteraryWork; meta?: 
       </div>
       <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
         <StatusPill status={work.status} />
-        {work.textPending && <PendingBadge />}
+        {withText ? <span className="text-[12px] text-muted tabular-nums">{words} {words === 1 ? 'palavra' : 'palavras'}</span> : <NoTextMark />}
       </div>
       <ProvenanceNote work={work} className="mt-2" />
       <Tags tags={work.themes} className="mt-2.5" />

@@ -10,7 +10,7 @@ export function BottomNav() {
   return (
     <>
       <nav
-        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-bg/85 backdrop-blur-xl border-t border-line/70"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-bg/90 backdrop-blur-xl border-t border-line"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         aria-label="Navegação principal"
       >
@@ -20,7 +20,7 @@ export function BottomNav() {
             return (
               <NavLink key={to} to={to} aria-current={isActive ? 'page' : undefined} className="relative flex flex-col items-center justify-center gap-0.5 min-w-0">
                 <Icon size={21} strokeWidth={isActive ? 2.1 : 1.6} className={cn('transition-colors', isActive ? 'text-ink' : 'text-muted')} />
-                <span className={cn('text-[10.5px] tracking-wide transition-colors truncate max-w-full px-0.5', isActive ? 'text-ink font-semibold' : 'text-muted')}>{label}</span>
+                <span className={cn('font-sport uppercase text-[11px] tracking-[0.08em] transition-colors truncate max-w-full px-0.5', isActive ? 'text-ink' : 'text-muted')}>{label}</span>
                 {isActive && <motion.span layoutId="nav-dot" className="absolute top-1.5 h-1 w-1 rounded-full bg-accent" />}
               </NavLink>
             )
@@ -38,7 +38,7 @@ export function BottomNav() {
               className={cn('w-[72px] min-h-[64px] rounded-2xl flex flex-col items-center justify-center gap-1 transition-colors', isActive ? 'bg-surface-2 text-ink' : 'text-muted hover:text-ink')}
             >
               <Icon size={21} strokeWidth={isActive ? 2.1 : 1.6} />
-              <span className={cn('text-[11px] leading-tight text-center', isActive && 'font-semibold')}>{label}</span>
+              <span className="font-sport uppercase text-[11px] tracking-[0.08em] leading-tight text-center">{label}</span>
             </NavLink>
           )
         })}

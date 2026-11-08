@@ -6,7 +6,7 @@
  * what was left. After the last follow-up with no answer → "sem resposta", tried again after 90 days.
  * Closed, lost, refused, paused or archived → never in a queue.
  */
-import type { Brand, BrandTier, CreatorProfile, DateKey, DB, UgcChannel, UgcDealType, UgcInteraction, UgcOpportunity, UgcPrefs, UgcStage, UgcStatus } from '../types'
+import type { Brand, BrandTier, CreatorProfile, DateKey, DB, ID, UgcChannel, UgcDealType, UgcInteraction, UgcOpportunity, UgcPrefs, UgcStage, UgcStatus } from '../types'
 import { addDays, formatDayMonth, startOfWeek, weekday } from '@/lib/date'
 import { normalize } from '@/lib/text'
 import { LEVEL_LABEL, potential } from './score'
@@ -92,6 +92,63 @@ export function currentOpportunity(db: DB, brandId: string): UgcOpportunity | un
   const pick = (l: UgcOpportunity[]) => [...l].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]
   return pick(live) ?? pick(list)
 }
+
+// ─── Home pulse ─────────────────────────────────────────────────────────────
+
+/**
+ * Open CRM opportunities (live, already contacted — prospects not approached don't count): how many need her
+ * now (follow-up due today or overdue, or the brand wrote last) and how many are only waiting on the brand.
+ * Undefined when nothing is open.
+ */
+export function crmPulse(db: DB, today: DateKey): { waiting: number; action: number } | undefined {
+  const open = db.ugcOpportunities.filter((o) => isLive(db, o) && (!!o.firstContactAt || o.stage !== 'prospectar'))
+  if (!open.length) return undefined
+  const answer = new Set(toAnswer(db).map((o) => o.id))
+  const action = open.filter((o) => answer.has(o.id) || (!!o.nextFollowUpAt && o.nextFollowUpAt <= today)).length
+  return { waiting: open.length - action, action }
+}
+
+// ─── CRM list filters (project · country) ───────────────────────────────────
+
+/** 'none' = the brand has no opportunity linked to a project ("sem projeto"). */
+export type BrandProjectFilter = ID | 'none'
+
+/** Projects the brand's opportunities belong to (empty = sem projeto). */
+export function brandProjectIds(db: Pick<DB, 'ugcOpportunities'>, brandId: ID): ID[] {
+  return [...new Set(db.ugcOpportunities.filter((o) => o.brandId === brandId && o.projectId).map((o) => o.projectId!))]
+}
+
+export function brandMatchesProject(db: Pick<DB, 'ugcOpportunities'>, brandId: ID, f: BrandProjectFilter | undefined): boolean {
+  if (!f) return true
+  const ids = brandProjectIds(db, brandId)
+  return f === 'none' ? ids.length === 0 : ids.includes(f)
+}
+
+/** Project chips for the CRM list: only projects some opportunity points to (+ "sem projeto"), with brand counts. */
+export function projectFilterOptions(db: Pick<DB, 'ugcOpportunities' | 'projects' | 'brands'>, brands: Brand[] = db.brands): { value: BrandProjectFilter; label: string; count: number }[] {
+  const used = [...new Set(db.ugcOpportunities.filter((o) => o.projectId).map((o) => o.projectId!))]
+  if (!used.length) return []
+  const opts = used.map((id) => ({ value: id as BrandProjectFilter, label: db.projects.find((p) => p.id === id)?.name ?? 'Projeto', count: brands.filter((b) => brandMatchesProject(db, b.id, id)).length }))
+  opts.sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
+  opts.push({ value: 'none', label: 'Sem projeto', count: brands.filter((b) => brandMatchesProject(db, b.id, 'none')).length })
+  return opts.filter((o) => o.count > 0)
+}
+
+/** Countries of the brands, as she wrote them (trimmed; same spelling ignoring case/accents = one). */
+export function countryOptions(brands: Brand[]): { value: string; count: number }[] {
+  const map = new Map<string, { value: string; count: number }>()
+  for (const b of brands) {
+    const c = b.country?.trim()
+    if (!c) continue
+    const k = normalize(c)
+    const e = map.get(k) ?? { value: c, count: 0 }
+    e.count += 1
+    map.set(k, e)
+  }
+  return [...map.values()].sort((a, b) => b.count - a.count || a.value.localeCompare(b.value, 'pt-BR'))
+}
+
+export const sameCountry = (brand: Pick<Brand, 'country'>, country: string | undefined) => !country || normalize(brand.country?.trim() ?? '') === normalize(country)
 
 export const isWeekday = (d: DateKey) => weekday(d) >= 1 && weekday(d) <= 5
 

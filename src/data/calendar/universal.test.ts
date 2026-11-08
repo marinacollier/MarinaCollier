@@ -335,3 +335,60 @@ describe('time zones', () => {
     expect(tzNote({ timezone: 'Africa/Johannesburg' }, 'Africa/Johannesburg')).toBeUndefined()
   })
 })
+
+describe('calendarEntries · CRM follow-ups (projection of ugcOpportunities)', () => {
+  const brand = (id: string, name: string, extra: Partial<DB['brands'][number]> = {}): DB['brands'][number] => ({ ...ent, id, name, ...extra })
+  const opp = (id: string, brandId: string, extra: Partial<DB['ugcOpportunities'][number]> = {}): DB['ugcOpportunities'][number] => ({
+    ...ent,
+    id,
+    brandId,
+    title: 'UGC',
+    stage: 'contatada',
+    status: 'aguardando_resposta',
+    nextFollowUpAt: MON,
+    ...extra,
+  })
+
+  function crmDB(): DB {
+    const db = herDB()
+    db.brands = [brand('b1', 'Ocean Drop', { city: 'São Paulo', country: 'BR' }), brand('b2', 'Lost Co'), brand('b3', 'Paused Co'), brand('b4', 'No FU', { crm: { noFollowUp: true } }), brand('b5', 'Archived', { archived: true }), brand('b6', 'Done Co')]
+    db.ugcOpportunities = [
+      opp('o1', 'b1', { projectId: 'proj-ugc' }),
+      opp('o2', 'b2', { status: 'perdida' }),
+      opp('o3', 'b3', { status: 'pausada' }),
+      opp('o4', 'b4'),
+      opp('o5', 'b5'),
+      opp('o6', 'b6', { status: 'concluida' }),
+      opp('o7', 'b1', { nextFollowUpAt: undefined }),
+    ]
+    return db
+  }
+
+  it('projects a live follow-up: "Follow-up: <marca>", all-day, trabalho, pendente, opens the brand in the CRM', () => {
+    const list = day(crmDB()).filter((e) => e.sourceType === 'ugcFollowUp')
+    expect(list).toHaveLength(1)
+    expect(list[0]).toMatchObject({
+      id: 'ugcFollowUp:o1',
+      title: 'Follow-up: Ocean Drop',
+      sourceId: 'o1',
+      allDay: true,
+      category: 'trabalho',
+      status: 'pendente',
+      linkedProjectId: 'proj-ugc',
+      startAt: { date: MON },
+      open: { module: { label: 'CRM', route: '/trabalho/creator/ugc/marca/b1' } },
+    })
+  })
+
+  it('skips closed / lost / paused deals, archived brands and brands with crm.noFollowUp', () => {
+    const ids = day(crmDB()).map((e) => e.id)
+    for (const o of ['o2', 'o3', 'o4', 'o5', 'o6', 'o7']) expect(ids).not.toContain(`ugcFollowUp:${o}`)
+  })
+
+  it('is a projection: nothing is written and nothing on other days', () => {
+    const db = crmDB()
+    const before = JSON.stringify(db.ugcOpportunities)
+    expect(calendarEntries(db, '2026-11-10', '2026-11-12', { today: TODAY }).some((e) => e.sourceType === 'ugcFollowUp')).toBe(false)
+    expect(JSON.stringify(db.ugcOpportunities)).toBe(before)
+  })
+})

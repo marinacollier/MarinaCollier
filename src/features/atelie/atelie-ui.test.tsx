@@ -34,10 +34,18 @@ describe('Ateliê screens', () => {
     expect(screen.getAllByText('Ateliê Literário').length).toBeGreaterThan(0)
   })
 
-  it('library lists the seeded works with "texto pendente"', () => {
+  it('library lists the seeded works marked "sem texto" (none implied complete)', () => {
     at('/atelie?v=biblioteca')
     expect(screen.getByText('A Cadeira')).toBeTruthy()
-    expect(screen.getAllByText('texto pendente').length).toBe(9)
+    expect(screen.getAllByText('sem texto').length).toBe(9)
+    expect(screen.getByText(/9 registros · 0 com texto/)).toBeTruthy()
+  })
+
+  it('overview counts text honestly', () => {
+    at('/atelie')
+    expect(screen.getByText('com texto')).toBeTruthy()
+    expect(screen.getByText('só título/ideia')).toBeTruthy()
+    expect(screen.getByText(/registros no acervo · \d+ só título\/ideia/)).toBeTruthy()
   })
 
   it('a seeded work shows its excerpts as excerpts and the provenance flag', () => {

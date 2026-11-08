@@ -15,6 +15,7 @@ import { CategoriesEditor } from './CategoriesEditor'
 import { ConnectionsSection } from './ConnectionsSection'
 import { IncomeSection } from './IncomeSection'
 import { BillsSection } from './BillsSection'
+import { TripMonthSection } from './TripMonthSection'
 import { LockGate } from '@/components/layout/LockGate'
 
 function Stat({ label, cents, big }: { label: string; cents: number; big?: boolean }) {
@@ -39,7 +40,7 @@ export default function FinancePageGuarded() {
 
 function FinancePage() {
   const all = useDB((db) => db.expenses)
-  // Reais only: trip statement lines in another currency (ZAR) are shown in the trip, not summed here.
+  // Reais only: trip statement lines in another currency (ZAR) get their own section (TripMonthSection), never summed here.
   const expenses = useMemo(() => all.filter((e) => (e.currency ?? 'BRL') === 'BRL'), [all])
   const categories = useDB((db) => db.financialCategories)
   const trips = useDB((db) => db.trips)
@@ -65,7 +66,7 @@ function FinancePage() {
       />
 
       <Reveal>
-        <Card className="p-5">
+        <Card className="card-hero p-5">
           <div className="grid grid-cols-[1.15fr_1fr_1fr] gap-3 items-end">
             <Stat label="Hoje" cents={totals.today} big />
             <Stat label="Semana" cents={totals.week} />
@@ -82,6 +83,10 @@ function FinancePage() {
             Anotar gasto
           </Button>
         </Card>
+      </Reveal>
+
+      <Reveal delay={0.01}>
+        <TripMonthSection today={today} />
       </Reveal>
 
       <Reveal delay={0.02}>

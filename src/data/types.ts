@@ -1660,6 +1660,21 @@ export interface TripExpedition {
    * Never computed and never assumed: without it the app says "não informado".
    */
   walletBalance?: TripWalletBalance
+  /**
+   * Documented conversions (a real exchange she made, e.g. the Wise conversion of 06/11): BRL paid for 1 unit
+   * of the trip currency, with where it came from. Finanças shows a BRL equivalent only from these — the
+   * latest by date, with its source. Never fetched live, never guessed.
+   */
+  fxRates?: TripFxRate[]
+}
+
+export interface TripFxRate {
+  /** Day of the conversion. */
+  date: DateKey
+  /** BRL for 1 unit of the trip currency (1 ZAR = 0,30 BRL → 0.3). */
+  brlPerUnit: number
+  /** Where the rate is documented ("conversão Wise"). */
+  source: string
 }
 
 export interface TripWalletBalance {
@@ -1852,6 +1867,8 @@ export interface Brand extends Entity {
   instagram?: string
   linkedin?: string
   country?: string
+  /** City of the brand (or of the contact), when known ("Cape Town", "São Paulo"). */
+  city?: string
   // who the brand is (Entrega 2 reads these)
   positioning?: string
   toneOfVoice?: string
@@ -1916,6 +1933,8 @@ export type UgcDealType = 'ugc' | 'permuta' | 'campanha_paga' | 'afiliado' | 'em
 /** One attempt / deal with a brand. A brand can have many over the years. */
 export interface UgcOpportunity extends Entity {
   brandId: ID
+  /** Project it belongs to (UGC, Fashion Finder…). Missing = sem projeto. */
+  projectId?: ID
   title: string
   type?: UgcDealType
   stage: UgcStage

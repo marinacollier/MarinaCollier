@@ -12,10 +12,14 @@ import { cn } from '@/lib/cn'
 import { haptic } from '@/lib/haptics'
 import { dayHeader, entryChip, rowTime, shortTitle, type Need, type NextDay } from './clean'
 
-export function Eyebrow({ children, action }: { children: ReactNode; action?: ReactNode }) {
+/** Section header on Home: small olive label ("01 / Agora") over a Bodoni title — the site's pattern. */
+export function Eyebrow({ children, label, action }: { children: ReactNode; label?: ReactNode; action?: ReactNode }) {
   return (
-    <div className="flex items-center justify-between min-h-9 mb-0.5">
-      <h2 className="eyebrow">{children}</h2>
+    <div className="flex items-end justify-between gap-3 min-h-9 mb-1.5">
+      <div className="min-w-0">
+        {label && <div className="eyebrow text-[12px] leading-none mb-1.5">{label}</div>}
+        <h2 className="section-title">{children}</h2>
+      </div>
       {action}
     </div>
   )
@@ -84,6 +88,7 @@ export function HojeList({ rows, onOpen, conflicts, onConflicts }: { rows: Calen
   return (
     <section aria-label="Hoje">
       <Eyebrow
+        label="01 / Dia"
         action={
           conflicts > 0 ? (
             <button type="button" onClick={onConflicts} className="h-8 px-2.5 -mr-1 rounded-full inline-flex items-center gap-1 text-[12px] bg-sand-soft text-ink-2 active:opacity-70">
@@ -113,7 +118,9 @@ export function HojeList({ rows, onOpen, conflicts, onConflicts }: { rows: Calen
 export function ProximosList({ days, today, onOpen, agendaHref }: { days: NextDay[]; today: DateKey; onOpen: (e: CalendarEntry, d: DateKey) => void; agendaHref: string }) {
   return (
     <section aria-label="Próximos dias">
-      <Eyebrow action={<SeeAll to={agendaHref}>Ver agenda</SeeAll>}>Próximos dias</Eyebrow>
+      <Eyebrow label="02 / Agenda" action={<SeeAll to={agendaHref}>Ver agenda</SeeAll>}>
+        Próximos dias
+      </Eyebrow>
       {days.length ? (
         <div className="space-y-3">
           {days.map((d) => (
@@ -149,7 +156,9 @@ export function PrecisaList({ needs, onOpen, allHref }: { needs: Need[]; onOpen:
   if (!needs.length) return null
   return (
     <section aria-label="Precisa de você">
-      <Eyebrow action={<SeeAll to={allHref}>Ver tudo</SeeAll>}>Precisa de você</Eyebrow>
+      <Eyebrow label="03 / Pendências" action={<SeeAll to={allHref}>Ver tudo</SeeAll>}>
+        Precisa de você
+      </Eyebrow>
       <ul className="divide-y divide-line/60">
         {needs.map((n) => (
           <OneLine key={n.key} title={n.title} chip={n.chip} onOpen={() => onOpen(n)} />
@@ -167,6 +176,18 @@ export function TripChips({ flight, balance, to, label }: { flight?: string; bal
     <Link to={to} aria-label={label} className="flex flex-wrap items-center gap-1.5 active:opacity-70">
       {flight && <span className="h-8 px-3 rounded-full bg-surface-2 text-[13px] text-ink-2 inline-flex items-center">✈︎ {flight}</span>}
       {balance && <span className="h-8 px-3 rounded-full bg-surface-2 text-[13px] text-ink-2 inline-flex items-center tabular-nums">Saldo {balance}</span>}
+    </Link>
+  )
+}
+
+/** One quiet line for the CRM: "Oportunidades · 4 aguardando · 2 pedem ação". */
+export function CrmLine({ waiting, action, to }: { waiting: number; action: number; to: string }) {
+  return (
+    <Link to={to} aria-label="Abrir o CRM de marcas" className="flex items-center gap-2 min-h-11 text-[14px] text-ink-2 active:opacity-70">
+      <span className="eyebrow text-accent">Oportunidades</span>
+      <span className="truncate tabular-nums">
+        · {waiting} aguardando · {action} {action === 1 ? 'pede' : 'pedem'} ação
+      </span>
     </Link>
   )
 }

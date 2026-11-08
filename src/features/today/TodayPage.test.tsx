@@ -85,7 +85,7 @@ describe('Início limpo', () => {
 
   it('an empty day says only "Dia livre"', () => {
     render(<HojeList rows={[]} onOpen={() => {}} conflicts={0} onConflicts={() => {}} />)
-    expect(screen.getByLabelText('Hoje').textContent).toBe('HojeDia livre')
+    expect(screen.getByLabelText('Hoje').textContent).toBe('01 / DiaHojeDia livre')
   })
 
   it('Próximos dias: up to 3 days, up to 3 one-line rows each, and "Ver agenda" → /agenda', () => {
@@ -143,5 +143,27 @@ describe('Início limpo', () => {
     renderHome()
     fireEvent.click(screen.getByLabelText('Ajustes e perfil'))
     expect(screen.getByTestId('where').textContent).toBe('/ajustes')
+  })
+
+  it('CRM: ONE line "Oportunidades · N aguardando · M pedem ação" → the CRM; gone when nothing is open', () => {
+    const db = getDB()
+    const AT = '2026-10-01T10:00:00.000Z'
+    actions.replaceDB({
+      ...db,
+      brands: [{ id: 'b1', createdAt: AT, updatedAt: AT, name: 'Ocean Drop' }, { id: 'b2', createdAt: AT, updatedAt: AT, name: 'Trail Co' }],
+      ugcOpportunities: [
+        { id: 'o1', createdAt: AT, updatedAt: AT, brandId: 'b1', title: 'UGC', stage: 'contatada', status: 'aguardando_resposta', firstContactAt: '2026-09-28', nextFollowUpAt: '2026-10-01' },
+        { id: 'o2', createdAt: AT, updatedAt: AT, brandId: 'b2', title: 'UGC', stage: 'contatada', status: 'aguardando_resposta', firstContactAt: '2026-09-30', nextFollowUpAt: '2026-10-07' },
+      ],
+    })
+    renderHome()
+    const line = screen.getByLabelText('Abrir o CRM de marcas')
+    expect(line.textContent).toBe('Oportunidades· 1 aguardando · 1 pede ação')
+    fireEvent.click(line)
+    expect(screen.getByTestId('where').textContent).toBe('/trabalho/creator/ugc?aba=marcas')
+    cleanup()
+    actions.replaceDB({ ...getDB(), ugcOpportunities: [] })
+    renderHome()
+    expect(screen.queryByLabelText('Abrir o CRM de marcas')).toBeNull()
   })
 })

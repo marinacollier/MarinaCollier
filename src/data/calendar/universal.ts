@@ -39,6 +39,7 @@ import { billDueDate, billPaid, isBill } from '../finance/bills'
 import { isIncome, receivablesFor } from '../finance/receivables'
 import { BOOKING_STATUS_META, bookingStatusOf } from '@/features/travel/expedition/command'
 import { findConflicts } from '@/features/travel/expedition/logic'
+import { brandOf, isLive } from '../ugc/model'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -68,6 +69,7 @@ export type CalendarSourceType =
   | 'meeting'
   | 'opportunity'
   | 'contact'
+  | 'ugcFollowUp'
 
 /** A moment in the source's own wall time (see `timezone`). */
 export interface CalendarPoint {
@@ -820,6 +822,32 @@ export function calendarEntries(db: DB, from: DateKey, to: DateKey, opts: Calend
       updatedAt: c.updatedAt,
       sourceLabel: 'Carreira · networking',
       open: { module: { label: 'Carreira', route: ROUTES.career }, edit: opts.careerLocked ? undefined : { sheet: 'contact', props: { id: c.id } } },
+    })
+  }
+
+  // CRM: the day to write again to a brand. Live deals only (not closed / lost / refused / paused, brand not
+  // archived, no `crm.noFollowUp`). A projection of the opportunity — nothing is copied.
+  for (const o of db.ugcOpportunities ?? []) {
+    const d = o.nextFollowUpAt
+    if (!d || d < from || d > to || !isLive(db, o)) continue
+    const brand = brandOf(db, o)
+    push({
+      id: `ugcFollowUp:${o.id}`,
+      title: `Follow-up: ${brand?.name ?? o.title}`,
+      startAt: { date: d },
+      endAt: { date: d },
+      timezone: homeTz,
+      category: 'trabalho',
+      sourceType: 'ugcFollowUp',
+      sourceId: o.id,
+      status: 'pendente',
+      allDay: true,
+      visibility: 'normal',
+      linkedProjectId: o.projectId,
+      updatedAt: o.updatedAt,
+      sourceLabel: 'CRM · marcas',
+      details: o.followUpWindowEnd && o.followUpWindowEnd !== d ? [{ label: 'Janela', value: `até ${o.followUpWindowEnd.split('-').reverse().slice(0, 2).join('/')}` }] : undefined,
+      open: { module: { label: 'CRM', route: ROUTES.ugcBrand(o.brandId) } },
     })
   }
 

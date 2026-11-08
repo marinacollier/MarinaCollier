@@ -7,54 +7,70 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * MARINA OS — identidade "terra & mata".
- * Neutros de pedra com um leve tom verde, tinta verde-mata, musgo como cor de ação,
- * eucalipto, areia, cacau e um verde-mar frio. Nada de creme + terracota.
+ * MARINA OS — mesma linguagem do site (marinacollierhub.com): papel quente off-white, tinta oliva-escura,
+ * oliva como cor de ação, cards "hero" quase pretos em oliva com texto off-white, cantos grandes (24px),
+ * botões em pílula, Bodoni Moda nos títulos, Barlow Condensed em rótulos pequenos em caixa alta.
+ * Medido no site: bg oklch(0.9389 0.0094 99.99) · texto oklch(0.2443 0.0149 136.72) ·
+ * primária oklch(0.4473 0.0718 122.96) · texto claro oklch(0.9725 0.0067 97.35).
  * Token names stay generic (accent / sage / ocean / sand / plum) so every component follows.
+ * Contrast (WCAG AA, checked): ink/bg 13.6:1 · ink-2/bg 9.0:1 · muted/bg 5.2:1 · muted/surface-2 4.7:1 ·
+ * accent/bg 6.2:1 · bg/accent (botão) 6.2:1 · on-hero/hero 15.1:1 · hero-muted/hero 7.1:1;
+ * dark: ink/bg 17:1 · muted/surface-2 5.8:1 · accent/surface 8.6:1; pills sand/sage on their soft ≥ 4.6:1.
  */
 :root {
-  --bg: #ecebe4; /* pedra */
-  --surface: #f7f6f1; /* papel de algodão */
-  --surface-2: #e2e0d6;
-  --ink: #1d221b; /* mata */
-  --ink-2: #41463c;
-  --muted: #777a6c;
-  --line: #d6d3c6;
-  --accent: #4d5b2c; /* musgo — ações */
-  --accent-soft: #dce1cd;
-  --sage: #7f957a; /* eucalipto */
-  --sage-soft: #e0e6dc;
-  --ocean: #4a6b68; /* mar frio — natação, surf */
-  --ocean-soft: #d9e3e1;
-  --sand: #a88b62; /* areia */
-  --sand-soft: #ece3d2;
-  --plum: #6d4a37; /* cacau */
-  --plum-soft: #e9ddd3;
-  --scrim: rgb(29 34 27 / 0.38);
-  --shadow: 0 1px 2px rgb(29 34 27 / 0.05), 0 10px 28px -14px rgb(29 34 27 / 0.18);
+  --bg: oklch(0.9389 0.0094 99.99); /* papel quente do site */
+  --surface: oklch(0.965 0.006 100); /* card secundário, um tom acima do papel */
+  --surface-2: oklch(0.905 0.011 101);
+  --ink: oklch(0.2443 0.0149 136.72); /* tinta oliva-escura */
+  --ink-2: oklch(0.36 0.014 134);
+  --muted: oklch(0.49 0.014 128);
+  --line: oklch(0.865 0.012 101); /* filete */
+  --accent: oklch(0.4473 0.0718 122.96); /* oliva — ações e rótulos */
+  --accent-soft: oklch(0.885 0.032 121);
+  --sage: oklch(0.47 0.045 140); /* eucalipto */
+  --sage-soft: oklch(0.9 0.022 140);
+  --ocean: oklch(0.5 0.04 190); /* mar frio — natação, surf */
+  --ocean-soft: oklch(0.9 0.016 190);
+  --sand: oklch(0.48 0.07 75); /* areia */
+  --sand-soft: oklch(0.91 0.03 80);
+  --plum: oklch(0.45 0.06 45); /* cacau */
+  --plum-soft: oklch(0.9 0.02 45);
+  /* Hero: o card escuro do site. Children re-read the tokens below (see .card-hero). */
+  --hero: oklch(0.24 0.015 137);
+  --on-hero: oklch(0.9725 0.0067 97.35);
+  --hero-muted: oklch(0.74 0.012 110);
+  --hero-line: oklch(0.36 0.016 137);
+  --hero-accent: oklch(0.8 0.08 122);
+  --scrim: oklch(0.2443 0.0149 136.72 / 0.4);
+  --shadow: 0 1px 2px oklch(0.2443 0.0149 136.72 / 0.04), 0 12px 32px -18px oklch(0.2443 0.0149 136.72 / 0.16);
   color-scheme: light;
 }
 
 .dark {
-  --bg: #131611; /* mata à noite */
-  --surface: #1b1f18;
-  --surface-2: #252a21;
-  --ink: #eceae1;
-  --ink-2: #cfcdc1;
-  --muted: #97988a;
-  --line: #2f342b;
-  --accent: #a6b97a; /* líquen */
-  --accent-soft: #2a3220;
-  --sage: #a9bca2;
-  --sage-soft: #222a20;
-  --ocean: #8fb3ae;
-  --ocean-soft: #1b2827;
-  --sand: #cdb48c;
-  --sand-soft: #2c2619;
-  --plum: #c49c84;
-  --plum-soft: #2d221c;
-  --scrim: rgb(0 0 0 / 0.5);
-  --shadow: 0 1px 2px rgb(0 0 0 / 0.35), 0 10px 28px -14px rgb(0 0 0 / 0.6);
+  --bg: oklch(0.19 0.012 137); /* oliva quase preta */
+  --surface: oklch(0.23 0.014 137);
+  --surface-2: oklch(0.275 0.015 137);
+  --ink: oklch(0.9725 0.0067 97.35); /* off-white do site */
+  --ink-2: oklch(0.86 0.01 100);
+  --muted: oklch(0.71 0.012 110);
+  --line: oklch(0.32 0.015 137);
+  --accent: oklch(0.78 0.085 122); /* a mesma oliva, mais clara */
+  --accent-soft: oklch(0.3 0.04 124);
+  --sage: oklch(0.78 0.05 140);
+  --sage-soft: oklch(0.28 0.025 140);
+  --ocean: oklch(0.76 0.04 190);
+  --ocean-soft: oklch(0.27 0.02 190);
+  --sand: oklch(0.8 0.06 80);
+  --sand-soft: oklch(0.29 0.03 80);
+  --plum: oklch(0.76 0.05 45);
+  --plum-soft: oklch(0.28 0.025 45);
+  --hero: oklch(0.13 0.01 137);
+  --on-hero: oklch(0.9725 0.0067 97.35);
+  --hero-muted: oklch(0.72 0.012 110);
+  --hero-line: oklch(0.27 0.014 137);
+  --hero-accent: oklch(0.8 0.08 122);
+  --scrim: rgb(0 0 0 / 0.55);
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.35), 0 12px 32px -18px rgb(0 0 0 / 0.6);
   color-scheme: dark;
 }
 
@@ -80,7 +96,7 @@
   --font-sans: 'Figtree Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-sport: 'Barlow Condensed', 'Arial Narrow', ui-sans-serif, sans-serif;
   --shadow-card: var(--shadow);
-  --radius-card: 1.125rem;
+  --radius-card: 1.5rem;
 }
 
 /*
@@ -136,19 +152,58 @@ html body {
     letter-spacing: 0.02em;
     font-variant-numeric: tabular-nums;
   }
+  /* Secondary card: one step lighter than the paper, hairline border, almost no shadow (as on the site). */
   .card {
     background: var(--surface);
     border-radius: var(--radius-card);
     box-shadow: var(--shadow);
-    border: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
+    border: 1px solid var(--line);
   }
+  /*
+   * Hero card: near-black olive with off-white text. It redefines the tokens for everything inside, so
+   * text-ink / text-muted / bg-surface-2 / buttons keep reading correctly on the dark fill.
+   */
+  .card-hero {
+    --ink: var(--on-hero);
+    --ink-2: color-mix(in oklab, var(--on-hero) 86%, var(--hero));
+    --muted: var(--hero-muted);
+    --line: var(--hero-line);
+    --surface-2: color-mix(in oklab, var(--on-hero) 10%, var(--hero));
+    --accent: var(--hero-accent);
+    --accent-soft: oklch(0.32 0.04 124);
+    /* Pills keep the dark-theme pairs on the dark fill (light text on a dark tint, ≥ 7:1). */
+    --sage: oklch(0.78 0.05 140);
+    --sage-soft: oklch(0.3 0.025 140);
+    --ocean: oklch(0.76 0.04 190);
+    --ocean-soft: oklch(0.29 0.02 190);
+    --sand: oklch(0.8 0.06 80);
+    --sand-soft: oklch(0.31 0.03 80);
+    --plum: oklch(0.76 0.05 45);
+    --plum-soft: oklch(0.3 0.025 45);
+    --bg: var(--hero);
+    background: var(--hero);
+    color: var(--on-hero);
+    border-color: var(--hero-line);
+    box-shadow: none;
+  }
+  /* Small uppercase tracked label in olive ("HUB OFICIAL", "02 / PARCERIAS"). */
   .eyebrow {
     font-family: var(--font-sport);
     font-size: 13px;
     letter-spacing: 0.16em;
     text-transform: uppercase;
-    color: var(--muted);
+    color: var(--accent);
     font-weight: 600;
+  }
+  /* Section title under an eyebrow: Bodoni, tight. */
+  .section-title {
+    font-family: var(--font-display);
+    font-optical-sizing: auto;
+    font-weight: 500;
+    letter-spacing: -0.015em;
+    font-size: 22px;
+    line-height: 1.12;
+    color: var(--ink);
   }
   .input {
     width: 100%;

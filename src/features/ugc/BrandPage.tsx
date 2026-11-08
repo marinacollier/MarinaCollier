@@ -137,6 +137,8 @@ export default function BrandPage() {
             <Saved id={`b-prod-${brand.id}`} label="Produtos" value={brand.products?.join(', ')} placeholder="mochilas, botas, whey…" onSave={(v) => save({ products: v ? v.split(',').map((x) => x.trim()).filter(Boolean) : undefined })} />
             <Saved id={`b-ig-${brand.id}`} label="Instagram" value={brand.instagram} placeholder="@marca" onSave={(v) => save({ instagram: v })} />
             <Saved id={`b-site-${brand.id}`} label="Site" value={brand.website} placeholder="marca.com.br" onSave={(v) => save({ website: v })} />
+            <Saved id={`b-country-${brand.id}`} label="País" value={brand.country} placeholder="Brasil, África do Sul…" onSave={(v) => save({ country: v })} />
+            <Saved id={`b-city-${brand.id}`} label="Cidade" value={brand.city} placeholder="São Paulo, Cape Town…" onSave={(v) => save({ city: v })} />
             <Saved
               id={`b-mail-${brand.id}`}
               label="E-mail de contato"

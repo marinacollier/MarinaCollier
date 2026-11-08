@@ -36,7 +36,8 @@ import { LumosSheet, lumosHref, type LumosRequest } from './home/lumos'
 import { useMarkSeenOnLeave } from './home/seen'
 import { homeTripOps } from './home/trip-ops'
 import { dayRows, flightName, headerDate, inDays, lifeNeeds, nextDays, NEEDS_MAX, shortMoney, tripNeeds, type Need } from './home/clean'
-import { ConflictList, HojeList, LumosLine, PrecisaList, ProximosList, TripChips } from './home/CleanBlocks'
+import { ConflictList, CrmLine, HojeList, LumosLine, PrecisaList, ProximosList, TripChips } from './home/CleanBlocks'
+import { crmPulse } from '@/data/ugc/model'
 
 /** A trip shows on Home (outside it) only when it's really close. */
 const TRIP_LINE_DAYS = 30
@@ -119,6 +120,9 @@ export default function TodayPage() {
     return soon ? { to: ROUTES.trip(soon.id), label: `Abrir a viagem: ${soon.name}`, flight: `${soon.name} ${inDays(soon.days)}`, balance: undefined } : undefined
   }, [ops, hidden.dinheiro, life.nextTrip, home.tripSoon])
 
+  // 6 — one line for the CRM, only when there are open opportunities.
+  const crm = useMemo(() => crmPulse(db, today), [db, today])
+
   // Detail of a row: the Agenda's own entry detail, over Home.
   const [sel, setSel] = useState<{ id: string; date: DateKey }>()
   const detail = useEntry(sel, day)
@@ -181,7 +185,13 @@ export default function TodayPage() {
         </motion.div>
       )}
 
-      <motion.div {...rise(5)} className="mt-9">
+      {crm && (
+        <motion.div {...rise(5)} className="mt-5">
+          <CrmLine waiting={crm.waiting} action={crm.action} to={`${ROUTES.ugc}?aba=marcas`} />
+        </motion.div>
+      )}
+
+      <motion.div {...rise(6)} className="mt-9">
         <LumosLine onAsk={ask} />
       </motion.div>
 
