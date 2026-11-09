@@ -35,6 +35,7 @@ import { conflictsOn, PERIOD_RANGES, workBlocks } from '../planning'
 import { contextWorkouts } from '../fuel'
 import { overrideFor } from '../timeline'
 import { classLineOn, isSchoolAbsence } from '../travel-mode'
+import { tripItemKind } from './kind'
 import { billDueDate, billPaid, isBill } from '../finance/bills'
 import { isIncome, receivablesFor } from '../finance/receivables'
 import { BOOKING_STATUS_META, bookingStatusOf } from '@/features/travel/expedition/command'
@@ -521,7 +522,7 @@ export function calendarEntries(db: DB, from: DateKey, to: DateKey, opts: Calend
       { label: 'Volta', value: i.returnTime },
       { label: 'Endereço', value: i.address },
       { label: 'Transporte', value: i.route },
-      { label: 'Fornecedor', value: i.supplier },
+      { label: tripItemKind(i) === 'reserva' ? 'Fornecedor' : 'Com', value: i.supplier },
       { label: 'Atenção', value: i.caveat },
       { label: 'Plano B', value: i.planB },
       { label: 'Aula', value: i.schoolImpact === 'parcial' ? 'saída antecipada (parte da aula)' : i.schoolImpact === 'dia' ? 'ausência no dia' : undefined },
