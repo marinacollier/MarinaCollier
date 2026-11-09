@@ -85,14 +85,15 @@ const timeOf = (e: CalendarEntry) => (e.allDay || e.endAt.date > e.startAt.date 
 /** The day's rows, all-day first, then by time. Spans (a stay) show on their first day only. */
 export function dayRows(entries: CalendarEntry[], date: DateKey): CalendarEntry[] {
   return entries
-    // Something already done with no time (a purchase, a visit) is history, not part of the day ahead.
-    .filter((e) => isHomeEntry(e) && e.startAt.date === date && !(e.status === 'feito' && !timeOf(e)))
+    // Something already done with no time (a purchase, a visit) is history, not part of the day ahead —
+    // except a workout she logged today ("nadei 1.000 m"): that is her day and shows as "feito".
+    .filter((e) => isHomeEntry(e) && e.startAt.date === date && !(e.status === 'feito' && !timeOf(e) && e.sourceType !== 'workout'))
     .sort((a, b) => (timeOf(a) ?? '').localeCompare(timeOf(b) ?? '') || a.title.localeCompare(b.title, 'pt-BR'))
 }
 
 /** "dia todo" or "09:00". */
 export function rowTime(e: CalendarEntry): string {
-  return timeOf(e) ?? 'dia todo'
+  return timeOf(e) ?? (e.sourceType === 'workout' ? 'treino' : 'dia todo')
 }
 
 export interface NextDay {

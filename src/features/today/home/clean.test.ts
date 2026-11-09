@@ -142,3 +142,14 @@ describe('Home limpa · cidade do dia (stayPlace)', () => {
     expect(stayPlace([{ ...hotel, status: 'cancelado', bookingStatus: 'cancelado' }], 't', '2026-11-14')).toBeUndefined()
   })
 })
+
+describe('Home limpa · treino registrado sem horário', () => {
+  it('aparece no dia como "treino · feito"; uma compra feita sem horário não', () => {
+    const base = { startAt: { date: '2026-11-09' }, endAt: { date: '2026-11-09' }, timezone: 'Africa/Johannesburg', category: 'treino', visibility: 'normal', sourceLabel: 'Treino', open: {}, allDay: false } as unknown as CalendarEntry
+    const swim = { ...base, id: 'workout:s', title: 'Natação · 1.000 m', sourceType: 'workout', sourceId: 's', status: 'feito' } as CalendarEntry
+    const buy = { ...base, id: 'tripItem:b', title: 'Rip Curl', sourceType: 'tripItem', sourceId: 'b', status: 'feito', allDay: true } as CalendarEntry
+    const rows = dayRows([swim, buy], '2026-11-09')
+    expect(rows.map((r) => r.title)).toEqual(['Natação · 1.000 m'])
+    expect(rowTime(rows[0])).toBe('treino')
+  })
+})
