@@ -134,6 +134,8 @@ export interface CalendarEntry {
   light?: boolean
   /** A dated extra she has not committed to (trip OPCIONAL). */
   optional?: boolean
+  /** A flexible plan (moves around fixed things): never a conflict by itself. */
+  flexible?: boolean
   /** Trip item: what it does to the class day (she already decided → not a clash with the class). */
   schoolImpact?: 'parcial' | 'dia'
   /** A class she missed: stays on the day (status 'cancelado', never a clash), tagged "faltei". */
@@ -605,6 +607,7 @@ export function calendarEntries(db: DB, from: DateKey, to: DateKey, opts: Calend
         updatedAt: i.updatedAt,
         sourceLabel: tripLabel(trip),
         optional: !!i.optional || bookingStatusOf(i) === 'opcional',
+        flexible: i.flexible || undefined,
         schoolImpact: i.schoolImpact,
         nextAction: i.nextAction,
         details,
@@ -1118,6 +1121,8 @@ const live = (e: CalendarEntry) => e.status !== 'feito' && e.status !== 'cancela
  * (TotalPass) and the expedition's own warnings (crossing the class without saying, flight, dive → flight).
  * Acknowledged conflicts (Pontos de atenção → "ok, sei disso") stay out.
  */
+const SCHOOL_ACTIVITY = /\((?:escola|school)\)|\bda escola\b/i
+
 export function calendarConflicts(entries: CalendarEntry[], db?: DB): CalendarConflict[] {
   const out: CalendarConflict[] = []
   const keys = new Set<string>()
@@ -1138,6 +1143,10 @@ export function calendarConflicts(entries: CalendarEntry[], db?: DB): CalendarCo
         const b = day[j]
         const schoolPair = (a.sourceType === 'school' && b.schoolImpact) || (b.sourceType === 'school' && a.schoolImpact)
         if (schoolPair) continue
+        // Not a real clash: a flexible plan ("compras depois da aula") moves around the fixed things, and an
+        // activity OF the school ("Long March Tour (escola)") is the class itself that day.
+        if (a.flexible || b.flexible) continue
+        if ((a.sourceType === 'school' && SCHOOL_ACTIVITY.test(b.title)) || (b.sourceType === 'school' && SCHOOL_ACTIVITY.test(a.title))) continue
         const wa = windowOf(a)
         const wb = windowOf(b)
         if (!(wa.start < wb.end && wb.start < wa.end)) continue

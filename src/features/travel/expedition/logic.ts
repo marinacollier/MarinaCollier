@@ -189,7 +189,8 @@ export function schoolDays(trip: Trip, items: TripItem[]): SchoolDay[] {
     const absences = day.filter((i) => i.schoolImpact)
     const impact = absences.some((i) => i.schoolImpact === 'dia') ? 'dia' : absences.length ? 'parcial' : 'nenhum'
     const cw = classWindow(block)
-    const conflicts = day.filter((i) => !i.schoolImpact && !isFlight(i) && (() => {
+    // A flexible plan ("compras depois da aula") just starts when the class ends — not a clash.
+    const conflicts = day.filter((i) => !i.schoolImpact && !i.flexible && !isFlight(i) && (() => {
       const w = busyWindow(i, d)
       return !!w && overlaps(w, cw)
     })())

@@ -309,6 +309,17 @@ describe('conflicts', () => {
     expect(calendarConflicts(list)).toEqual([])
   })
 
+  it('a flexible plan and a school activity are not clashes; the class × missa is', () => {
+    const aula = E('aula', 'school', '09:00', '15:00')
+    const list = [
+      aula,
+      E('compras', 'tripItem', '14:30', '16:00', { flexible: true }),
+      E('Long March to Freedom Tour (escola)', 'event', '14:00', '15:00'),
+      E('Missa', 'event', '13:15', '14:00'),
+    ]
+    expect(calendarConflicts(list).map((c) => c.ids)).toEqual([['school:aula', 'event:Missa']])
+  })
+
   it('class vs activity: a clash unless the item already says what happens to the class', () => {
     const cls = E('trip', 'school', '09:00', '15:10')
     expect(calendarConflicts([cls, E('kayak', 'tripItem', '13:00', '15:00', { schoolImpact: 'parcial' })])).toEqual([])

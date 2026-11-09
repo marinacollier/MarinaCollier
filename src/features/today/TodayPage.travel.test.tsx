@@ -81,7 +81,8 @@ describe('Home limpa em viagem (Cape Town, 06/11)', () => {
   it('Hoje lists the day from the universal calendar: the class at 09:00, in time order, one line each', () => {
     renderAt()
     const hoje = screen.getByLabelText('Hoje')
-    const rows = [...hoje.querySelectorAll('li')].map((li) => li.textContent ?? '')
+    // Timed lines only ("Sem horário" lists the day's untimed things below, without a made-up time).
+    const rows = [...hoje.querySelectorAll('li')].filter((li) => !li.closest('[aria-label="Sem horário"]')).map((li) => li.textContent ?? '')
     expect(rows.some((r) => r.startsWith('09:00Aula · Bayswater Cape Town'))).toBe(true)
     const times = rows.map((r) => r.match(/^(\d\d:\d\d|dia todo)/)?.[1])
     expect(times.every(Boolean)).toBe(true)

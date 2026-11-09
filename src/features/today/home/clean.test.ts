@@ -4,7 +4,7 @@ import type { ActionItem } from '@/data/agenda/items'
 import type { AttentionItem } from '@/data/intel'
 import type { Trip, TripItem } from '@/data/types'
 import type { TripOpsPanel } from '@/features/travel/expedition/panel'
-import { dayHeader, dayRows, entryChip, flightName, headerDate, inDays, lifeNeeds, nextDays, ROW_MAX, rowTime, shortTitle, stayPlace, tripNeeds } from './clean'
+import { chipTone, dayHeader, dayRows, entryChip, looseRows, timedRows, flightName, headerDate, inDays, lifeNeeds, nextDays, ROW_MAX, rowTime, shortTitle, stayPlace, tripNeeds } from './clean'
 
 const entry = (p: Partial<CalendarEntry> & { id: string; date: string; time?: string; endDate?: string }): CalendarEntry => ({
   title: p.id,
@@ -32,7 +32,7 @@ describe('Home limpa · picks', () => {
     expect(dayHeader('2026-11-09', '2026-11-06')).toBe('Segunda, 9 nov')
   })
 
-  it('Hoje: all-day first, then by time; no base, no trip span, no optional, no deadlines/bills, no cancelled', () => {
+  it('Hoje: by time, then all-day; no base, no trip span, no optional, no deadlines/bills, no cancelled', () => {
     const d = '2026-11-06'
     const rows = dayRows(
       [
@@ -49,20 +49,22 @@ describe('Home limpa · picks', () => {
       ],
       d,
     )
-    expect(rows.map((r) => r.title)).toEqual(['Kirstenbosch', 'Aula', 'Natação'])
-    expect(rows.map(rowTime)).toEqual(['dia todo', '09:00', '14:00'])
+    expect(rows.map((r) => r.title)).toEqual(['Aula', 'Natação', 'Kirstenbosch'])
+    expect(rows.map(rowTime)).toEqual(['09:00', '14:00', 'dia todo'])
   })
 
-  it('Próximos dias: the next 3 days that have something, max 3 rows each', () => {
+  it('Próximos dias: the next days that have something, max 3 rows each (the rest behind "+N")', () => {
     const list = [
       ...['07:00', '08:00', '09:00', '10:00'].map((t) => entry({ id: `a${t}`, date: '2026-11-07', time: t })),
       entry({ id: 'b', date: '2026-11-09', time: '09:00' }),
       entry({ id: 'c', date: '2026-11-10', time: '09:00' }),
       entry({ id: 'd', date: '2026-11-11', time: '09:00' }),
     ]
-    const days = nextDays(list, '2026-11-06')
+    const days = nextDays(list, '2026-11-06', 3)
     expect(days.map((x) => x.date)).toEqual(['2026-11-07', '2026-11-09', '2026-11-10'])
     expect(days[0].rows).toHaveLength(3)
+    expect(days[0].more?.map((e) => e.id)).toEqual(['a10:00'])
+    expect(nextDays(list, '2026-11-06').map((x) => x.date)).toHaveLength(4)
   })
 
   it('status chips are tiny words, never sentences', () => {
@@ -151,5 +153,30 @@ describe('Home limpa · treino registrado sem horário', () => {
     const rows = dayRows([swim, buy], '2026-11-09')
     expect(rows.map((r) => r.title)).toEqual(['Natação · 1.000 m'])
     expect(rowTime(rows[0])).toBe('treino')
+  })
+})
+
+describe('Home · sem horário e status', () => {
+  const tasks = [
+    { id: 't1', title: 'Comprar canga', status: 'todo', date: '2026-11-10', order: 0 },
+    { id: 't2', title: 'Pesar mala', status: 'todo', date: '2026-11-10', dueDate: '2026-11-10', order: 0 },
+    { id: 't3', title: 'Já feito', status: 'done', date: '2026-11-10', order: 0 },
+    { id: 't4', title: 'Com hora', status: 'todo', date: '2026-11-10', time: '10:00', order: 0 },
+  ] as never
+  it('untimed to-dos and deadlines show once, with no invented time; timed ones stay in the time column', () => {
+    const dl = entry({ id: 'taskDeadline:t2', date: '2026-11-10', sourceType: 'taskDeadline', sourceId: 't2', status: 'pendente', title: 'Prazo: Pesar mala' })
+    const dl2 = entry({ id: 'taskDeadline:t9', date: '2026-11-10', sourceType: 'taskDeadline', sourceId: 't9', status: 'pendente', title: 'Prazo: Conferir voo' })
+    const stay = entry({ id: 'tripItem:h', date: '2026-11-10', sourceType: 'tripItem', sourceId: 'h' })
+    const aula = entry({ id: 'aula', date: '2026-11-10', time: '09:00', sourceType: 'school' })
+    const rows = looseRows({ tripItems: [], tasks }, [dl, dl2, stay, aula], '2026-11-10')
+    expect(rows.map((r) => r.title)).toEqual(['tripItem:h', 'Comprar canga', 'Pesar mala', 'Conferir voo'])
+    expect(timedRows([dl, stay, aula], '2026-11-10').map((e) => e.id)).toEqual(['aula'])
+  })
+  it('a paid booking, a confirmed one and an idea never look the same', () => {
+    const db = { tripItems: [item({ id: 'p', bookingStatus: 'confirmado', paymentStatus: 'pago' }), item({ id: 'c', bookingStatus: 'reserva_emitida' }), item({ id: 'i', section: 'quero_ir', bookingStatus: 'planejado' }), item({ id: 'o', bookingStatus: 'opcional' })] }
+    const chip = (id: string, status: CalendarEntry['status'] = 'planejado') => entryChip(db, entry({ id, date: '2026-11-10', sourceType: 'tripItem', sourceId: id, status }))
+    expect([chip('p', 'confirmado'), chip('c', 'confirmado'), chip('i'), chip('o')]).toEqual(['pago', 'confirmado', 'planejado', 'opcional'])
+    expect(new Set(['pago', 'confirmado', 'planejado'].map(chipTone)).size).toBe(3)
+    expect(entryChip(db, entry({ id: 'w', date: '2026-11-11', time: '07:00', sourceType: 'workout', status: 'planejado' }))).toBe('planejado')
   })
 })

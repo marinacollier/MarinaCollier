@@ -10,7 +10,7 @@ import { useDB } from '@/data/store'
 import type { DateKey } from '@/data/types'
 import { cn } from '@/lib/cn'
 import { haptic } from '@/lib/haptics'
-import { dayHeader, entryChip, rowTime, shortTitle, type Need, type NextDay } from './clean'
+import { chipTone, dayHeader, entryChip, rowTime, shortTitle, type ChipTone, type LooseRow, type Need, type NextDay } from './clean'
 
 /** Section header on Home: small olive label ("01 / Agora") over a Bodoni title — the site's pattern. */
 export function Eyebrow({ children, label, action }: { children: ReactNode; label?: ReactNode; action?: ReactNode }) {
@@ -25,7 +25,7 @@ export function Eyebrow({ children, label, action }: { children: ReactNode; labe
   )
 }
 
-export function Chip({ children, tone = 'soft' }: { children: ReactNode; tone?: 'soft' | 'warn' | 'done' }) {
+export function Chip({ children, tone = 'soft' }: { children: ReactNode; tone?: ChipTone }) {
   return (
     <span
       className={cn(
@@ -33,6 +33,9 @@ export function Chip({ children, tone = 'soft' }: { children: ReactNode; tone?: 
         tone === 'warn' && 'bg-sand-soft text-[color-mix(in_oklab,var(--sand)_62%,var(--ink))]',
         tone === 'done' && 'bg-sage-soft text-[color-mix(in_oklab,var(--sage)_70%,var(--ink))]',
         tone === 'soft' && 'bg-surface-2 text-ink-2',
+        tone === 'ok' && 'bg-ocean-soft text-[color-mix(in_oklab,var(--ocean)_70%,var(--ink))]',
+        tone === 'plan' && 'border border-dashed border-line text-muted leading-[20px]',
+        tone === 'alert' && 'bg-plum-soft text-[color-mix(in_oklab,var(--plum)_75%,var(--ink))]',
       )}
     >
       {children}
@@ -40,9 +43,7 @@ export function Chip({ children, tone = 'soft' }: { children: ReactNode; tone?: 
   )
 }
 
-const chipTone = (c: string) => (c === 'feito' || c === 'pago' ? 'done' : 'warn')
-
-function OneLine({ left, title, chip, onOpen, muted, label }: { left?: ReactNode; title: string; chip?: string; onOpen: () => void; muted?: boolean; label?: string }) {
+function OneLine({ left, title, chip, onOpen, muted, label, conflict }: { left?: ReactNode; title: string; chip?: string; onOpen: () => void; muted?: boolean; label?: string; conflict?: boolean }) {
   return (
     <li>
       <button
@@ -56,13 +57,14 @@ function OneLine({ left, title, chip, onOpen, muted, label }: { left?: ReactNode
       >
         {left}
         <span className={cn('flex-1 min-w-0 truncate text-[15px]', muted ? 'text-muted line-through decoration-muted/50' : 'text-ink')}>{title}</span>
+        {conflict && <Chip tone="alert">conflito</Chip>}
         {chip && <Chip tone={chipTone(chip)}>{chip}</Chip>}
       </button>
     </li>
   )
 }
 
-function EntryLine({ e, onOpen }: { e: CalendarEntry; onOpen: (e: CalendarEntry) => void }) {
+function EntryLine({ e, onOpen, conflict }: { e: CalendarEntry; onOpen: (e: CalendarEntry) => void; conflict?: boolean }) {
   const db = useDB()
   const chip = entryChip(db, e)
   const time = rowTime(e)
@@ -76,39 +78,84 @@ function EntryLine({ e, onOpen }: { e: CalendarEntry; onOpen: (e: CalendarEntry)
       }
       title={shortTitle(e.title, 60)}
       chip={chip}
-      muted={e.status === 'feito'}
+      muted={e.status === 'feito' || e.status === 'cancelado'}
+      conflict={conflict}
       onOpen={() => onOpen(e)}
     />
   )
 }
 
-// ─── Hoje ───────────────────────────────────────────────────────────────────
-
-export function HojeList({ rows, onOpen, conflicts, onConflicts }: { rows: CalendarEntry[]; onOpen: (e: CalendarEntry) => void; conflicts: number; onConflicts: () => void }) {
+/** "Sem horário": the day's lines that have no time — never given one. */
+function LooseList({ rows, onOpen }: { rows: LooseRow[]; onOpen: (r: LooseRow) => void }) {
+  if (!rows.length) return null
   return (
-    <section aria-label="Hoje">
+    <div className="mt-2" role="group" aria-label="Sem horário">
+      <h3 className="text-[12px] text-muted font-medium pt-1">Sem horário</h3>
+      <ul className="divide-y divide-line/60">
+        {rows.map((r) => (
+          <OneLine
+            key={r.key}
+            left={<span aria-hidden className="w-[62px] shrink-0 pl-[1px] text-[12px] text-muted">—</span>}
+            title={shortTitle(r.title, 60)}
+            chip={r.chip}
+            muted={r.done}
+            onOpen={() => onOpen(r)}
+          />
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+/** One day, complete: timed lines in order, then "Sem horário". */
+export function DayBlock({
+  label,
+  title,
+  rows,
+  loose,
+  onOpen,
+  onLoose,
+  conflicts,
+  conflictIds,
+  onConflicts,
+  empty = 'Dia livre',
+}: {
+  label: string
+  title: string
+  rows: CalendarEntry[]
+  loose: LooseRow[]
+  onOpen: (e: CalendarEntry) => void
+  onLoose: (r: LooseRow) => void
+  conflicts: number
+  conflictIds?: ReadonlySet<string>
+  onConflicts: () => void
+  empty?: string
+}) {
+  return (
+    <section aria-label={title}>
       <Eyebrow
-        label="01 / Dia"
+        label={label}
         action={
           conflicts > 0 ? (
-            <button type="button" onClick={onConflicts} className="h-8 px-2.5 -mr-1 rounded-full inline-flex items-center gap-1 text-[12px] bg-sand-soft text-ink-2 active:opacity-70">
+            <button type="button" onClick={onConflicts} className="h-8 px-2.5 -mr-1 rounded-full inline-flex items-center gap-1 text-[12px] bg-plum-soft text-ink-2 active:opacity-70">
               <TriangleAlert size={12} aria-hidden />
               {conflicts === 1 ? '1 conflito' : `${conflicts} conflitos`}
             </button>
           ) : undefined
         }
       >
-        Hoje
+        {title}
       </Eyebrow>
       {rows.length ? (
         <ul className="divide-y divide-line/60">
           {rows.map((e) => (
-            <EntryLine key={e.id} e={e} onOpen={onOpen} />
+            <EntryLine key={e.id} e={e} onOpen={onOpen} conflict={conflictIds?.has(e.id)} />
           ))}
         </ul>
-      ) : (
-        <p className="text-[15px] text-ink-2 py-2">Dia livre</p>
-      )}
+      ) : !loose.length ? (
+        <p className="text-[15px] text-ink-2 py-2">{empty}</p>
+      ) : null}
+      <LooseList rows={loose} onOpen={onLoose} />
     </section>
   )
 }
@@ -122,6 +169,10 @@ export function ProximosList({
   agendaHref,
   conflicts,
   onConflicts,
+  label = '02 / Agenda',
+  conflictIds,
+  looseOf,
+  onLoose,
 }: {
   days: NextDay[]
   today: DateKey
@@ -130,10 +181,17 @@ export function ProximosList({
   /** Conflicts per day: a day with any gets its own small chip next to its name. */
   conflicts?: Map<DateKey, number>
   onConflicts?: (date: DateKey) => void
+  label?: string
+  conflictIds?: ReadonlySet<string>
+  /** The day's to-dos without time (shown when the day is expanded). */
+  looseOf?: (d: DateKey) => LooseRow[]
+  onLoose?: (r: LooseRow) => void
 }) {
+  const [open, setOpen] = useState<ReadonlySet<DateKey>>(new Set())
+  const toggle = (d: DateKey) => setOpen((s) => { const n = new Set(s); if (n.has(d)) n.delete(d); else n.add(d); return n })
   return (
     <section aria-label="Próximos dias">
-      <Eyebrow label="02 / Agenda" action={<SeeAll to={agendaHref}>Ver agenda</SeeAll>}>
+      <Eyebrow label={label} action={<SeeAll to={agendaHref}>Ver agenda</SeeAll>}>
         Próximos dias
       </Eyebrow>
       {days.length ? (
@@ -150,10 +208,20 @@ export function ProximosList({
                 )}
               </div>
               <ul className="divide-y divide-line/60">
-                {d.rows.map((e) => (
-                  <EntryLine key={e.id} e={e} onOpen={(x) => onOpen(x, d.date)} />
+                {[...d.rows, ...(open.has(d.date) ? (d.more ?? []) : [])].map((e) => (
+                  <EntryLine key={e.id} e={e} onOpen={(x) => onOpen(x, d.date)} conflict={conflictIds?.has(e.id)} />
                 ))}
               </ul>
+              {open.has(d.date) && looseOf && onLoose && <LooseList rows={looseOf(d.date).filter((r) => r.open.kind === 'task' || !d.rows.concat(d.more ?? []).some((e) => e.id === r.key))} onOpen={onLoose} />}
+              {(() => {
+                const extra = (d.more?.length ?? 0) + (looseOf ? looseOf(d.date).filter((r) => r.open.kind === 'task' || !d.rows.concat(d.more ?? []).some((e) => e.id === r.key)).length : 0)
+                if (!extra) return null
+                return (
+                  <button type="button" onClick={() => toggle(d.date)} aria-expanded={open.has(d.date)} className="h-9 text-[12.5px] text-muted active:opacity-70">
+                    {open.has(d.date) ? 'Mostrar menos' : `+${extra} ${extra === 1 ? 'item' : 'itens'} nesse dia`}
+                  </button>
+                )
+              })()}
             </div>
           ))}
         </div>
@@ -175,11 +243,11 @@ function SeeAll({ to, children }: { to: string; children: ReactNode }) {
 
 // ─── Precisa de você ────────────────────────────────────────────────────────
 
-export function PrecisaList({ needs, onOpen, allHref }: { needs: Need[]; onOpen: (n: Need) => void; allHref: string }) {
+export function PrecisaList({ needs, onOpen, allHref, label = '03 / Pendências' }: { needs: Need[]; onOpen: (n: Need) => void; allHref: string; label?: string }) {
   if (!needs.length) return null
   return (
     <section aria-label="Precisa de você">
-      <Eyebrow label="03 / Pendências" action={<SeeAll to={allHref}>Ver tudo</SeeAll>}>
+      <Eyebrow label={label} action={<SeeAll to={allHref}>Ver tudo</SeeAll>}>
         Precisa de você
       </Eyebrow>
       <ul className="divide-y divide-line/60">

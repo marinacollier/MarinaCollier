@@ -37,15 +37,15 @@ import { homeContext } from './context'
 import { LumosSheet, lumosHref, type LumosRequest } from './home/lumos'
 import { useMarkSeenOnLeave } from './home/seen'
 import { homeTripOps } from './home/trip-ops'
-import { dayRows, flightName, headerDate, inDays, lifeNeeds, nextDays, NEEDS_MAX, shortMoney, stayPlace, tripNeeds, type Need } from './home/clean'
-import { ConflictList, CrmLine, HojeList, LumosLine, PrecisaList, ProximosList, TripChips } from './home/CleanBlocks'
+import { flightName, headerDate, inDays, lifeNeeds, looseRows, nextDays, NEEDS_MAX, shortMoney, stayPlace, timedRows, tripNeeds, type LooseRow, type Need } from './home/clean'
+import { ConflictList, CrmLine, DayBlock, LumosLine, PrecisaList, ProximosList, TripChips } from './home/CleanBlocks'
 import { crmPulse } from '@/data/ugc/model'
 
 /** A trip shows on Home (outside it) only when it's really close. */
 const TRIP_LINE_DAYS = 30
 /** How far Home reads the calendar (Próximos dias looks for 3 days with something in this window). */
 const HORIZON = 14
-const CONFLICT_DAYS = 7
+const CONFLICT_DAYS = 8
 
 /** The trip's place while traveling ("Cape Town"); nothing otherwise. */
 function placeOf(db: DB, today: DateKey, localDay: DateKey = today): string | undefined {
@@ -77,8 +77,15 @@ export default function TodayPage() {
   // 2 · 3 — the same projection as the Agenda.
   const horizon = addDays(day, HORIZON)
   const cal = useCalendar(day, horizon, day)
-  const hoje = useMemo(() => dayRows(cal.entries, day), [cal.entries, day])
-  const proximos = useMemo(() => nextDays(cal.entries, day), [cal.entries, day])
+  // Hoje and Amanhã are complete (timed lines + "Sem horário"); then the next 7 days with something.
+  const tomorrow = addDays(day, 1)
+  const hoje = useMemo(() => timedRows(cal.entries, day), [cal.entries, day])
+  const hojeLoose = useMemo(() => looseRows(db, cal.entries, day), [db, cal.entries, day])
+  const amanha = useMemo(() => timedRows(cal.entries, tomorrow), [cal.entries, tomorrow])
+  const amanhaLoose = useMemo(() => looseRows(db, cal.entries, tomorrow), [db, cal.entries, tomorrow])
+  const looseOf = useCallback((d: DateKey) => looseRows(db, cal.entries, d), [db, cal.entries])
+  const proximos = useMemo(() => nextDays(cal.entries, tomorrow, undefined, undefined, undefined, (d) => looseOf(d).length > 0), [cal.entries, tomorrow, looseOf])
+  const conflictIds = useMemo(() => new Set(cal.marks.keys()), [cal.marks])
   // 0 — Check-in do dia → "O que faz sentido fazer agora?" (+ the optional review after 20:00).
   const dayCheckin = checkinOf(db, day)
 
@@ -133,6 +140,10 @@ export default function TodayPage() {
   const device = useMemo(() => deviceTimeZone(), [])
   const [showConflicts, setShowConflicts] = useState<DateKey>()
   const openEntry = useCallback((e: CalendarEntry, d: DateKey) => setSel({ id: e.id, date: d }), [])
+  const openLoose = useCallback((r: LooseRow) => {
+    if (r.open.kind === 'task') openSheet('task', { id: r.open.id })
+    else setSel({ id: r.open.entry.id, date: r.open.entry.startAt.date })
+  }, [])
 
   // Lumos answers slide up in its sheet over the page — Home itself never moves.
   const [lumos, setLumos] = useState<LumosRequest>()
@@ -175,16 +186,20 @@ export default function TodayPage() {
       </motion.div>
 
       <motion.div {...rise(1)} className="mt-7">
-        <HojeList rows={hoje} onOpen={(e) => openEntry(e, day)} conflicts={conflictsByDay.get(day) ?? 0} onConflicts={() => setShowConflicts(day)} />
+        <DayBlock label="01 / Dia" title="Hoje" rows={hoje} loose={hojeLoose} onOpen={(e) => openEntry(e, day)} onLoose={openLoose} conflicts={conflictsByDay.get(day) ?? 0} conflictIds={conflictIds} onConflicts={() => setShowConflicts(day)} />
       </motion.div>
 
       <motion.div {...rise(2)} className="mt-7">
-        <ProximosList days={proximos} today={day} onOpen={openEntry} agendaHref={ROUTES.agenda} conflicts={conflictsByDay} onConflicts={setShowConflicts} />
+        <DayBlock label={`02 / ${headerDate(tomorrow)}`} title="Amanhã" rows={amanha} loose={amanhaLoose} onOpen={(e) => openEntry(e, tomorrow)} onLoose={openLoose} conflicts={conflictsByDay.get(tomorrow) ?? 0} conflictIds={conflictIds} onConflicts={() => setShowConflicts(tomorrow)} empty="Nada marcado" />
+      </motion.div>
+
+      <motion.div {...rise(2)} className="mt-7">
+        <ProximosList label="03 / Agenda" days={proximos} today={day} onOpen={openEntry} agendaHref={ROUTES.agenda} conflicts={conflictsByDay} onConflicts={setShowConflicts} conflictIds={conflictIds} looseOf={looseOf} onLoose={openLoose} />
       </motion.div>
 
       {needs.length > 0 && (
         <motion.div {...rise(3)} className="mt-7">
-          <PrecisaList needs={needs} onOpen={openNeed} allHref={needsHref} />
+          <PrecisaList label="04 / Pendências" needs={needs} onOpen={openNeed} allHref={needsHref} />
         </motion.div>
       )}
 

@@ -19,7 +19,7 @@ export const ROW_MAX = 40
 /** Precisa de você: never more than this on Home. */
 export const NEEDS_MAX = 3
 /** Próximos dias: days and rows per day. */
-export const NEXT_DAYS = 3
+export const NEXT_DAYS = 7
 export const NEXT_PER_DAY = 3
 
 /** "R4.000" (rand) · "R$ 1.200" (real): whole units, short enough for a chip. */
@@ -82,13 +82,14 @@ export function isHomeEntry(e: CalendarEntry): boolean {
 
 const timeOf = (e: CalendarEntry) => (e.allDay || e.endAt.date > e.startAt.date ? undefined : e.startAt.time)
 
-/** The day's rows, all-day first, then by time. Spans (a stay) show on their first day only. */
+/** The day's rows, by time, then the all-day ones. Spans (a stay) show on their first day only. */
 export function dayRows(entries: CalendarEntry[], date: DateKey): CalendarEntry[] {
   return entries
     // Something already done with no time (a purchase, a visit) is history, not part of the day ahead —
     // except a workout she logged today ("nadei 1.000 m"): that is her day and shows as "feito".
     .filter((e) => isHomeEntry(e) && e.startAt.date === date && !(e.status === 'feito' && !timeOf(e) && e.sourceType !== 'workout'))
-    .sort((a, b) => (timeOf(a) ?? '').localeCompare(timeOf(b) ?? '') || a.title.localeCompare(b.title, 'pt-BR'))
+    // Timed lines in order first (a flight must not hide behind a stay), then the all-day ones.
+    .sort((a, b) => (timeOf(a) ?? '99:99').localeCompare(timeOf(b) ?? '99:99') || a.title.localeCompare(b.title, 'pt-BR'))
 }
 
 /** "dia todo" or "09:00". */
@@ -99,15 +100,17 @@ export function rowTime(e: CalendarEntry): string {
 export interface NextDay {
   date: DateKey
   rows: CalendarEntry[]
+  /** Rows past `perDay` (shown when she expands the day). */
+  more?: CalendarEntry[]
 }
 
-/** The next `days` days (after `date`, within `horizon`) that have something, `perDay` rows each. */
-export function nextDays(entries: CalendarEntry[], date: DateKey, days = NEXT_DAYS, perDay = NEXT_PER_DAY, horizon = 14): NextDay[] {
+/** The next `days` days (after `date`, within `horizon`) that have something, `perDay` rows each (+ the rest). */
+export function nextDays(entries: CalendarEntry[], date: DateKey, days = NEXT_DAYS, perDay = NEXT_PER_DAY, horizon = 14, hasLoose?: (d: DateKey) => boolean): NextDay[] {
   const out: NextDay[] = []
   for (let i = 1; i <= horizon && out.length < days; i++) {
     const d = addDays(date, i)
     const rows = dayRows(entries, d)
-    if (rows.length) out.push({ date: d, rows: rows.slice(0, perDay) })
+    if (rows.length || hasLoose?.(d)) out.push({ date: d, rows: rows.slice(0, perDay), more: rows.length > perDay ? rows.slice(perDay) : undefined })
   }
   return out
 }
@@ -117,19 +120,89 @@ export function dayHeader(d: DateKey, today: DateKey): string {
   return d === addDays(today, 1) ? 'Amanhã' : headerDate(d)
 }
 
-/** Tiny status chip of a row ("a confirmar", "pago", "reservar"…), or nothing when all is fine. */
+/**
+ * Status chip of a row — a confirmed booking never looks like an idea:
+ *   reserva paga "pago" · reserva fechada "confirmado" · ideia/roteiro "planejado" · extra "opcional" ·
+ *   falta "reservar"/"cotar"/"aguardando"/"a pagar" · "a confirmar" · "feito" · "faltei" · "cancelado".
+ * A plain event/class she put in the agenda has no chip (it is simply the day).
+ */
 export function entryChip(db: Pick<DB, 'tripItems'>, e: CalendarEntry): string | undefined {
   if (e.absent) return 'faltei'
   if (e.status === 'feito') return 'feito'
+  if (e.status === 'cancelado') return 'cancelado'
   if (e.sourceType === 'tripItem') {
     const i = db.tripItems.find((x) => x.id === e.sourceId)
     if (i) {
       const chip = tripChip(i)
       if (chip) return chip
       if (i.paymentStatus === 'pago') return 'pago'
+      const b = bookingStatusOf(i)
+      if (BOOKED.has(b)) return 'confirmado'
+      if (b === 'opcional' || i.optional) return 'opcional'
+      if (b === 'planejado' || i.section === 'quero_ir' || i.section === 'roteiro' || i.flexible) return e.status === 'confirmado' ? undefined : 'planejado'
     }
   }
+  if (e.sourceType === 'workout' && e.status === 'planejado') return 'planejado'
   return e.status === 'pendente' ? 'a confirmar' : undefined
+}
+
+export type ChipTone = 'soft' | 'warn' | 'done' | 'ok' | 'plan' | 'alert'
+
+/** How a chip looks: done/paid green, confirmed blue, ideas outlined, open things sand, conflicts plum. */
+export function chipTone(c: string): ChipTone {
+  if (c === 'feito' || c === 'pago') return 'done'
+  if (c === 'confirmado') return 'ok'
+  if (c === 'planejado' || c === 'opcional') return 'plan'
+  if (c === 'cancelado' || c === 'faltei') return 'soft'
+  if (c === 'conflito') return 'alert'
+  return 'warn'
+}
+
+// ─── Sem horário ────────────────────────────────────────────────────────────
+
+/** One line of the day that has no time: a booking/stay, an untimed workout, a to-do or a deadline. */
+export interface LooseRow {
+  key: string
+  title: string
+  chip?: string
+  done?: boolean
+  open: { kind: 'entry'; entry: CalendarEntry } | { kind: 'task'; id: string }
+}
+
+const isTimed = (e: CalendarEntry) => !!timeOf(e)
+
+/** The day's timed commitments, in order (what goes in the time column). */
+export function timedRows(entries: CalendarEntry[], date: DateKey): CalendarEntry[] {
+  return dayRows(entries, date).filter(isTimed)
+}
+
+/**
+ * What the day holds WITHOUT a time — never given a made-up one: all-day commitments (a stay, an untimed
+ * booking or workout), the to-dos planned for that day, deadlines and follow-ups that fall on it.
+ * Each record shows once (a to-do planned AND due that day is one line).
+ */
+export function looseRows(db: Pick<DB, 'tripItems' | 'tasks'>, entries: CalendarEntry[], date: DateKey): LooseRow[] {
+  const out: LooseRow[] = []
+  const seen = new Set<string>()
+  for (const e of dayRows(entries, date)) {
+    if (isTimed(e)) continue
+    seen.add(`${e.sourceType}:${e.sourceId}`)
+    out.push({ key: e.id, title: e.title, chip: entryChip(db, e), done: e.status === 'feito', open: { kind: 'entry', entry: e } })
+  }
+  for (const t of db.tasks) {
+    if (t.date !== date || t.time || t.recurrence || (t.status !== 'todo' && t.status !== 'doing')) continue
+    seen.add(`task:${t.id}`)
+    out.push({ key: `task:${t.id}`, title: t.title, chip: t.dueDate && t.dueDate <= date ? 'prazo' : undefined, open: { kind: 'task', id: t.id } })
+  }
+  for (const e of entries) {
+    if (e.startAt.date !== date || e.status === 'feito' || e.status === 'cancelado') continue
+    if (e.sourceType !== 'taskDeadline' && e.sourceType !== 'tripDeadline' && e.sourceType !== 'waiting') continue
+    const base = e.sourceType === 'tripDeadline' ? `tripItem:${e.sourceId}` : `task:${e.sourceId}`
+    if (seen.has(base) || seen.has(e.id)) continue
+    seen.add(base)
+    out.push({ key: e.id, title: e.title.replace(/^Prazo: /, ''), chip: e.sourceType === 'waiting' ? 'cobrar' : 'prazo', open: { kind: 'entry', entry: e } })
+  }
+  return out
 }
 
 function tripChip(i: TripItem): string | undefined {

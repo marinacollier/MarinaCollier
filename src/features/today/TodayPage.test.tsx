@@ -7,7 +7,7 @@ import { createMemoryAdapter } from '@/data/storage'
 import { buildSeed } from '@/data/seed'
 import { needsAttention } from '@/data/intel'
 import { LumosSheet } from './home/lumos'
-import { HojeList } from './home/CleanBlocks'
+import { DayBlock } from './home/CleanBlocks'
 import { NEEDS_MAX } from './home/clean'
 import TodayPage from './TodayPage'
 
@@ -84,17 +84,17 @@ describe('Início limpo', () => {
   })
 
   it('an empty day says only "Dia livre"', () => {
-    render(<HojeList rows={[]} onOpen={() => {}} conflicts={0} onConflicts={() => {}} />)
+    render(<DayBlock label="01 / Dia" title="Hoje" rows={[]} loose={[]} onOpen={() => {}} onLoose={() => {}} conflicts={0} onConflicts={() => {}} />)
     expect(screen.getByLabelText('Hoje').textContent).toBe('01 / DiaHojeDia livre')
   })
 
-  it('Próximos dias: up to 3 days, up to 3 one-line rows each, and "Ver agenda" → /agenda', () => {
+  it('Próximos dias: up to 7 days after tomorrow, up to 3 one-line rows each (+ expand), and "Ver agenda" → /agenda', () => {
     renderHome()
     const next = screen.getByLabelText('Próximos dias')
     const days = within(next).getAllByRole('group')
     expect(days.length).toBeGreaterThan(0)
-    expect(days.length).toBeLessThanOrEqual(3)
-    expect(days[0].getAttribute('aria-label')).toBe('Amanhã')
+    expect(days.length).toBeLessThanOrEqual(7)
+    expect(days[0].getAttribute('aria-label')).not.toBe('Amanhã')
     for (const d of days) expect(d.querySelectorAll('li').length).toBeLessThanOrEqual(3)
     fireEvent.click(within(next).getByRole('link', { name: /Ver agenda/ }))
     expect(screen.getByTestId('where').textContent).toBe('/agenda')
