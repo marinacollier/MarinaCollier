@@ -436,6 +436,14 @@ export interface UserProfile {
   routineModes?: RoutineModesConfig
   /** The base day: editable background blocks shown in the calendar (never conflicts, never on Home). */
   dayPlan?: { blocks: DayBlock[] }
+  /** Aprendizagem: language split, weekly target, reviews per day. Missing = defaults (70% inglês / 30% espanhol). */
+  learningPlan?: LearningPlan
+  /** Aprendizagem: session templates (missing = defaults). */
+  learningTemplates?: LearningTemplate[]
+  /** Aprendizagem: tools she has access to (missing = all). */
+  learningTools?: LearningTool[]
+  /** Aprendizagem: knowledge domains (missing = defaults; she can add new ones). */
+  learningDomains?: LearningDomain[]
 }
 
 /** 'viagem' / 'ferias': home routine paused, no work base. 'transicao': recovery (essential routines, light workouts, no work base). */
@@ -787,6 +795,8 @@ export interface CalendarEvent extends Entity {
   external?: ExternalRef
   /** Her retag ("isso é uma reunião"). Missing = derived (data/calendar/kind.ts). Not the life `kind` above. */
   entryKind?: EntryKind
+  /** Language the meeting happens in, when she says so (StudyTrack id, e.g. 'track-ingles'). Used by Aprendizagem. */
+  language?: ID
 }
 
 // ─── Body ───────────────────────────────────────────────────────────────────
@@ -1317,6 +1327,8 @@ export interface Goal extends Entity {
   notes?: string
   parentId?: ID
   order: number
+  /** Aprendizagem: knowledge domain this goal is about (makes matching study "prioritária"). */
+  learningDomain?: string
 }
 
 // ─── Work ───────────────────────────────────────────────────────────────────
@@ -1335,6 +1347,8 @@ export interface Project extends Entity {
   deadline?: DateKey
   nextDelivery?: { title: string; date?: DateKey }
   nextAction?: string
+  /** Language the project works in, when she says so (StudyTrack id). Used by Aprendizagem for meeting prep. */
+  language?: ID
   links: Link[]
   files: Link[]
   people: Person[]
@@ -1541,6 +1555,12 @@ export interface StudyTrack extends Entity {
   /** Ways of studying this track (Inglês: Cambly, conversação, vocabulário...). */
   formats?: string[]
   notes?: string
+  /** Level she (or a teacher/test) assessed ("B2"). Never inferred from hours: missing = "nível: a avaliar". */
+  level?: string
+  /** Where she wants to get ("C1"). */
+  goalLevel?: string
+  /** Knowledge domain id (Aprendizagem). Missing = derived for known tracks, else 'outros'. */
+  domain?: string
 }
 
 export type StudyStatus = 'estudando' | 'proximo' | 'backlog' | 'pausado' | 'finalizado'
@@ -1559,6 +1579,162 @@ export interface StudyItem extends Entity {
   notes?: string
   order: number
   finishedAt?: DateKey
+  /** Aprendizagem · Biblioteca (all optional). */
+  domain?: string
+  relatedDomains?: string[]
+  tags?: string[]
+  resourceType?: LearningResourceType
+  contentLanguage?: string
+  libraryStatus?: LibraryStatus
+  /** Each status she marked, with its day (conclui ≠ apliquei: both can be there). */
+  libraryLog?: { status: LibraryStatus; date: DateKey; note?: string }[]
+}
+
+// ─── Aprendizagem (sessions, review cards, library, plan) ────────────────────
+//
+// Study is multidisciplinary: every session has ONE main `domain` (its minutes count there, once) and may
+// touch others (`relatedDomains`, shown as "também tocou", never summed twice). The language split
+// (70% inglês / 30% espanhol) lives only inside the 'idiomas' domain.
+
+/** Language skills (fixed ids) — `skills` also accepts free skills ("business english", "discovery"). */
+export type LanguageSkill = 'grammar' | 'reading' | 'writing' | 'listening' | 'speaking' | 'pronunciation' | 'vocabulary' | 'review'
+/** @deprecated name kept for readability: a language skill id. */
+export type LearningSkill = LanguageSkill
+export type LearningTool = 'cambly' | 'flexcil' | 'chatgpt' | 'curso' | 'livro' | 'podcast' | 'video' | 'aula' | 'conversa' | 'outro'
+export type LearningResourceType =
+  | 'livro'
+  | 'podcast'
+  | 'video'
+  | 'artigo'
+  | 'curso'
+  | 'aula'
+  | 'pratica'
+  | 'exercicio'
+  | 'projeto'
+  | 'documentario'
+  | 'estudo_biblico'
+  | 'anotacao'
+  | 'newsletter'
+export type LearningMode = 'leitura' | 'listening' | 'speaking' | 'escrita' | 'pratica' | 'reflexao' | 'pesquisa' | 'aplicacao'
+export type StudySessionStatus = 'planejado' | 'iniciado' | 'concluido' | 'abandonado'
+/** Library statuses — not equivalent: finishing (conclui) is not learning (anotei / pratiquei / apliquei). */
+export type LibraryStatus = 'quero_conhecer' | 'comecei' | 'conclui' | 'abandonei' | 'anotei' | 'pratiquei' | 'apliquei'
+
+/** One knowledge domain (configurable in profile.learningDomains; new ones need no code). */
+export interface LearningDomain {
+  id: string
+  label: string
+  emoji?: string
+}
+
+/**
+ * One real study session, any domain. `minutes` count ONCE in every total, however many domains, topics,
+ * skills or goals it touches. A session linked to a calendar class replaces that class in the totals.
+ */
+export interface StudySession extends Entity {
+  date: DateKey
+  startTime?: TimeHM
+  minutes: number
+  /** Main domain id (profile.learningDomains: 'idiomas', 'ia', 'cristianismo_teologia'…). Its minutes count here only. */
+  domain: string
+  /** Other domains it touched ("também tocou") — never summed into their totals. */
+  relatedDomains?: string[]
+  /** StudyTrack id when it belongs to one (Inglês, Espanhol, Pós…). Language sessions: the language track. */
+  trackId?: ID
+  /** Short title ("Speaking practice / Professional role-play"). */
+  title?: string
+  /** Only skills she said she practised: language ids (LanguageSkill) or free text ("business english"). Never inferred. */
+  skills?: string[]
+  /** Free subjects ("agentes de IA", "história do cristianismo"). */
+  topics?: string[]
+  /** Free tags she creates. */
+  tags?: string[]
+  resourceType?: LearningResourceType
+  /** StudyItem / Book id of the resource used. */
+  resourceId?: ID
+  /** Language of the content, ISO-ish ('en', 'es', 'pt'). */
+  contentLanguage?: string
+  learningMode?: LearningMode
+  tool?: LearningTool
+  relatedProjectId?: ID
+  /** Default 'concluido'. Only 'concluido' / 'iniciado' sessions count minutes. */
+  status?: StudySessionStatus
+  /** Why / for what ("preparação para reunião (não reunião realizada)"). */
+  context?: string
+  /** What shows it was applied ("usei na reunião de 10/11"). */
+  evidence?: string
+  /** Pages read, when she says so. */
+  pages?: number
+  goalIds?: ID[]
+  /** Calendar entry id (e.g. 'school:<trip>:<date>') or CalendarEvent id it was part of. */
+  linkedEventId?: ID
+  linkedTaskId?: ID
+  source: 'app' | 'retroativo' | 'importado' | 'aula' | 'lumos'
+  notes?: string
+  learned?: string
+}
+
+export type ReviewCardStatus = 'novo' | 'em_pratica' | 'consolidando' | 'dominado_provisorio' | 'revisar'
+
+/**
+ * A review card (collection `learningErrors`, name kept): a mistake to fix ('erro': front = what she said,
+ * back = the correction) or a concept to memorize ('conceito': front = question, back = answer), any domain.
+ * Only things she chose to memorize — reflections never become cards on their own.
+ */
+export interface LearningError extends Entity {
+  /** Default 'erro'. */
+  kind?: 'erro' | 'conceito'
+  /** Domain id; missing = 'idiomas' when trackId is set. */
+  domain?: string
+  trackId?: ID
+  front: string
+  back: string
+  explanation?: string
+  /** Free grouping ("verbos", "preposições", "patrística"). */
+  category?: string
+  /** Session it came from. */
+  sessionId?: ID
+  firstSeen: DateKey
+  lastSeen: DateKey
+  /** Times it happened (impact). */
+  count: number
+  status: ReviewCardStatus
+  nextReview: DateKey
+  intervalDays: number
+  ease: number
+  /** Consecutive successful spaced reviews. */
+  streak?: number
+  lastReviewed?: DateKey
+  source?: string
+}
+export type ReviewCard = LearningError
+
+export interface LearningPlan {
+  /** Share of LANGUAGE time per language track (inside 'idiomas' only; never total study time). */
+  split: Record<ID, number>
+  /** Autonomous language minutes per week she aims for (classes not included). */
+  weeklyAutonomousMin?: number
+  /** Default 8. */
+  maxReviewsPerDay?: number
+  /**
+   * Words that mean "this commitment happens in that language" (contact names, project names: 'Hillary', 'Bluemoon').
+   * Missing = only explicit `language` fields and language words in titles count.
+   */
+  contextTerms?: { trackId: ID; terms: string[] }[]
+}
+
+export interface LearningTemplateStep {
+  label: string
+  minutes: number
+  skills?: string[]
+}
+
+export interface LearningTemplate {
+  id: ID
+  name: string
+  trackId?: ID
+  domain?: string
+  steps: LearningTemplateStep[]
 }
 
 export type BookStatus = 'lendo' | 'proximo' | 'quero' | 'finalizado'
@@ -1799,6 +1975,8 @@ export interface TripItem extends Entity {
   endDate?: DateKey
   /** Payment is tracked separately from the plan; never inferred from an itinerary. */
   paymentStatus?: 'a_confirmar' | 'pendente' | 'pago' | 'nao_se_aplica'
+  /** Language it happens in, when she says so (StudyTrack id). Used by Aprendizagem for meeting prep. */
+  language?: ID
 
   // ── Expedição (all optional: items from before stay valid as they are) ──
   /** Missing = derived from `status` (confirmado/feito → confirmado, else pendente). */
@@ -2697,6 +2875,8 @@ export interface DB {
 
   studyTracks: StudyTrack[]
   studyItems: StudyItem[]
+  studySessions: StudySession[]
+  learningErrors: LearningError[]
   books: Book[]
 
   trips: Trip[]
@@ -2792,6 +2972,8 @@ export type EntityType =
   | 'workInbox'
   | 'meeting'
   | 'studyItem'
+  | 'studySession'
+  | 'learningError'
   | 'book'
   | 'trip'
   | 'tripItem'
@@ -2830,6 +3012,8 @@ export const ENTITY_COLLECTION: Record<EntityType, CollectionKey> = {
   workInbox: 'workInbox',
   meeting: 'meetings',
   studyItem: 'studyItems',
+  studySession: 'studySessions',
+  learningError: 'learningErrors',
   book: 'books',
   trip: 'trips',
   tripItem: 'tripItems',

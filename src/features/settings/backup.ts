@@ -98,6 +98,8 @@ export const COLLECTION_LABELS: Partial<Record<CollectionKey, string>> = {
   meetings: 'Reuniões',
   studyTracks: 'Trilhas de estudo',
   studyItems: 'Estudos',
+  studySessions: 'Sessões de estudo',
+  learningErrors: 'Erros em prática (idiomas)',
   books: 'Livros',
   trips: 'Viagens',
   tripItems: 'Itens de viagem',
