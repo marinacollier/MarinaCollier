@@ -217,6 +217,12 @@ export function scoreOf(db: DB, c: RawCandidate, ctx: DayContext): { score: numb
   } else if (t) {
     value = W.priority[t.priority ?? 'none']
     if (t.priority) reasons.push(`Prioridade ${t.priority === 'media' ? 'média' : t.priority} (${value}/${W.rice})`)
+  } else if (c.prepFor) {
+    // Preparing for a real commitment is worth what the commitment is worth: the closer it is, the more
+    // (today = full slot, so prep for tonight's meeting beats a task that only "ficou de antes").
+    const d = diffDays(ctx.date, c.prepFor)
+    value = d <= 0 ? W.rice : d === 1 ? W.priority.alta : W.priority.media
+    reasons.push(`Preparação de compromisso (${value}/${W.rice})`)
   } else value = c.score ?? W.priority.none
 
   let urgency = 0

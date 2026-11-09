@@ -155,6 +155,17 @@ describe('MoSCoW', () => {
     expect(moscowOf(db, near, ctx()).moscow).toBe('must')
   })
 
+  it('prep for a meeting tonight outranks a high-priority task carried from before', () => {
+    const db = base({
+      tasks: [task({ id: 'old', title: 'Solucionar conta Google', priority: 'alta', date: '2026-11-05' })],
+      events: [event({ id: 'm', title: 'Fashion Finder — Tutorial', date: MON, startTime: '21:00', endTime: '22:00', url: 'https://meet.google.com/abc-defg-hij' })],
+    })
+    const ranked = rankCandidates(db, ctx())
+    expect(ranked[0].title).toBe('Preparar: Fashion Finder — Tutorial')
+    expect(ranked[0].moscow).toBe('must')
+    expect(planDay(db, ctx()).primary?.c.title).toBe('Preparar: Fashion Finder — Tutorial')
+  })
+
   it('explicit moscow wins; carried tasks are must; plain backlog is could', () => {
     const db = base({
       tasks: [task({ id: 'a', title: 'A', moscow: 'could', dueDate: MON }), task({ id: 'b', title: 'B', date: '2026-11-05' }), task({ id: 'c', title: 'C' })],
