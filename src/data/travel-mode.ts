@@ -15,11 +15,12 @@
  * She can turn it off per trip: `trip.pauseHomeRoutine === false`.
  * Pure and dependency-light (types + date helpers) so every data module can import it.
  */
-import type { CalendarEvent, DateKey, DB, Routine, Trip, TripItem, Workout } from './types'
+import type { CalendarEvent, DateKey, DB, Routine, RoutineMode, Trip, TripItem, UserProfile, Workout } from './types'
 import { SEED_IDS } from './seed/ids'
 import { weekday } from '@/lib/date'
 
-type TripsOf = Pick<DB, 'trips'>
+/** The profile is optional so callers holding only trips keep working (no modes = automatic). */
+type TripsOf = Pick<DB, 'trips'> & { profile?: Pick<UserProfile, 'routineModes'> & Partial<Pick<UserProfile, 'timezone'>> }
 
 /** A trip that can pause the home routine at all (dates set, really happening, switch not off). */
 export function travelModeEligible(t: Trip): boolean {
@@ -52,7 +53,63 @@ export function travelTripOn(db: TripsOf, date: DateKey): Trip | undefined {
   return eligibleTrips(db.trips).find((t) => inTrip(t, date))
 }
 
+// ─── Modos de rotina (viagem · férias · transição · Brasil) ──────────────────
+
+export type RoutineModeSource = 'manual' | 'periodo' | 'viagem' | 'padrao'
+
+export interface RoutineModeInfo {
+  mode: RoutineMode
+  source: RoutineModeSource
+  /** Period label, or the trip's name. */
+  label?: string
+  /** Last day (inclusive) of what set the mode, when known. */
+  until?: DateKey
+  /** IANA zone the day's wall times live in: the trip's during 'viagem', else the profile's. */
+  timeZone: string
+  trip?: Trip
+}
+
+const inside = (date: DateKey, from: DateKey, to?: DateKey) => from <= date && (!to || date <= to)
+
+/** Manual override > explicit period (the latest-starting one when several cover the date). Undefined = automatic. */
+export function explicitModeOn(profile: Pick<UserProfile, 'routineModes'> | undefined, date: DateKey): Omit<RoutineModeInfo, 'timeZone' | 'trip'> | undefined {
+  const cfg = profile?.routineModes
+  if (!cfg) return undefined
+  const m = cfg.manual
+  if (m && inside(date, m.from, m.to)) return { mode: m.mode, source: 'manual', until: m.to }
+  const p = (cfg.periods ?? []).filter((x) => inside(date, x.from, x.to)).sort((a, b) => b.from.localeCompare(a.from))[0]
+  return p ? { mode: p.mode, source: 'periodo', label: p.label, until: p.to } : undefined
+}
+
+/** Which routine mode a (local) day is in, and why. Pure; dates are DateKeys, so no clock or zone math here. */
+export function routineModeInfo(db: TripsOf, date: DateKey): RoutineModeInfo {
+  const homeTz = db.profile?.timezone ?? 'America/Sao_Paulo'
+  const trip = travelTripOn(db, date)
+  const tripTz = trip?.expedition?.timeZone
+  const explicit = explicitModeOn(db.profile, date)
+  if (explicit) return { ...explicit, timeZone: explicit.mode === 'viagem' && tripTz ? tripTz : homeTz, trip: explicit.mode === 'viagem' ? trip : undefined }
+  if (trip) return { mode: 'viagem', source: 'viagem', label: trip.name, until: trip.endDate ?? trip.startDate, timeZone: tripTz ?? homeTz, trip }
+  return { mode: 'brasil', source: 'padrao', timeZone: homeTz }
+}
+
+/** manual (if the date is inside it) > period > trip day ('viagem') > 'brasil'. */
+export function routineModeOn(db: TripsOf, date: DateKey): RoutineMode {
+  return routineModeInfo(db, date).mode
+}
+
+/** 'viagem' and 'férias' pause the São Paulo routine (routines, recurring events, weekly templates). */
+export const modePausesHome = (m: RoutineMode) => m === 'viagem' || m === 'ferias'
+
+/** Only 'brasil' has the work base (hours + commute). */
+export const modeHasWorkBase = (m: RoutineMode) => m === 'brasil'
+
+/**
+ * Home routine paused that day: modo viagem/férias. Without routine modes in the profile this is exactly
+ * "the day falls inside a real trip" (the original behaviour); a manual 'brasil'/'transição' on a trip day un-pauses it.
+ */
 export function isTravelDay(db: TripsOf, date: DateKey): boolean {
+  const explicit = explicitModeOn(db.profile, date)
+  if (explicit) return modePausesHome(explicit.mode)
   return !!travelTripOn(db, date)
 }
 
@@ -143,8 +200,8 @@ export function isUntouchedTemplateWorkout(w: Workout): boolean {
 }
 
 /** Ids of the workouts `pruneTravelWorkouts` would remove. */
-export function travelPrunableWorkouts(db: Pick<DB, 'trips' | 'workouts'>): Workout[] {
-  if (!eligibleTrips(db.trips).length) return []
+export function travelPrunableWorkouts(db: Pick<DB, 'trips' | 'workouts'> & { profile?: Pick<UserProfile, 'routineModes'> }): Workout[] {
+  if (!eligibleTrips(db.trips).length && !db.profile?.routineModes) return []
   return db.workouts.filter((w) => isTravelDay(db, w.date) && isUntouchedTemplateWorkout(w))
 }
 

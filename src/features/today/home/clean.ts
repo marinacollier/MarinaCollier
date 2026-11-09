@@ -76,7 +76,7 @@ const COMMITMENT = new Set<CalendarEntry['sourceType']>(['event', 'workout', 'ta
 
 /** A commitment worth a line on Home: no background base (work hours), no trip span, no undecided extras. */
 export function isHomeEntry(e: CalendarEntry): boolean {
-  if (e.base || e.optional || (e.status === 'cancelado' && !e.absent)) return false
+  if (e.base || e.suggested || e.optional || (e.status === 'cancelado' && !e.absent)) return false
   return COMMITMENT.has(e.sourceType)
 }
 

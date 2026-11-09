@@ -19,6 +19,7 @@ import type { SheetName, SheetProps } from '@/app/sheet-types'
 import type {
   CalendarEvent,
   DateKey,
+  DayBlockCategory,
   DB,
   ID,
   Recurrence,
@@ -35,6 +36,7 @@ import { conflictsOn, PERIOD_RANGES, workBlocks } from '../planning'
 import { contextWorkouts } from '../fuel'
 import { overrideFor } from '../timeline'
 import { classLineOn, isSchoolAbsence } from '../travel-mode'
+import { DAY_BLOCK_CATEGORY_META, dayBlocksOn, routineModeInfo } from '../routine-modes'
 import { tripItemKind } from './kind'
 import { billDueDate, billPaid, isBill } from '../finance/bills'
 import { isIncome, receivablesFor } from '../finance/receivables'
@@ -71,6 +73,7 @@ export type CalendarSourceType =
   | 'opportunity'
   | 'contact'
   | 'ugcFollowUp'
+  | 'dayBlock'
 
 /** A moment in the source's own wall time (see `timezone`). */
 export interface CalendarPoint {
@@ -123,8 +126,12 @@ export interface CalendarEntry {
   sourceLabel: string
   /** Time derived from a period ("noite"), not exact. */
   approx?: boolean
-  /** BASE plan (work hours): background, never a conflict. */
+  /** BASE plan (work hours, base-day blocks): background, never a conflict. */
   base?: boolean
+  /** A suggested block of her base day (profile.dayPlan, kind 'sugerido'): never a conflict, gone when something real takes its time. */
+  suggested?: boolean
+  /** Modo Transição: a template workout that is light and optional (never "missed"). */
+  light?: boolean
   /** A dated extra she has not committed to (trip OPCIONAL). */
   optional?: boolean
   /** Trip item: what it does to the class day (she already decided → not a clash with the class). */
@@ -279,6 +286,21 @@ export function tripItemStatus(i: TripItem): CalendarStatus {
   }
 }
 
+/** Base-day block category → calendar color family. */
+const BLOCK_CATEGORY: Record<DayBlockCategory, CalendarCategory> = {
+  ritual: 'pessoal',
+  luna: 'luna',
+  trabalho: 'trabalho',
+  almoco: 'pessoal',
+  treino: 'treino',
+  estudo: 'estudo',
+  idiomas: 'estudo',
+  faculdade: 'estudo',
+  criatividade: 'pessoal',
+  pessoal: 'pessoal',
+  descanso: 'pessoal',
+}
+
 const tripLabel = (trip?: Trip) => (trip ? `Viagem · ${trip.name}` : 'Viagem')
 
 function compact<T extends { label: string; value?: string }>(rows: T[]): { label: string; value: string }[] {
@@ -302,6 +324,7 @@ export function calendarEntries(db: DB, from: DateKey, to: DateKey, opts: Calend
   const projectRoute = (id?: ID) => (id ? { label: 'Projeto', route: ROUTES.project(id) } : undefined)
 
   for (const date of eachDay(from, to)) {
+    const modeInfo = routineModeInfo(db, date)
     // 1. Calendar events (sources, recurrence, exdates, modo viagem pause — all in eventsFor).
     for (const e of eventsFor(db, date)) {
       const multi = !e.recurrence && !!e.endDate && e.endDate > e.date
@@ -355,6 +378,9 @@ export function calendarEntries(db: DB, from: DateKey, to: DateKey, opts: Calend
       const dur = w.durationMin ?? w.plannedDurationMin ?? 60
       const start = w.time ?? (w.period ? PERIOD_RANGES[w.period][0] : undefined)
       const approx = !w.time && !!w.period
+      const done = w.status === 'feito' || w.status === 'adaptado'
+      // Modo Transição: the week template's sessions are light and optional.
+      const light = modeInfo.mode === 'transicao' && !!w.templateId && !done
       push({
         id: `workout:${w.id}`,
         title: w.title || m.label,
@@ -372,6 +398,7 @@ export function calendarEntries(db: DB, from: DateKey, to: DateKey, opts: Calend
         updatedAt: w.updatedAt || undefined,
         sourceLabel: fromTemplate ? 'Treino · semana modelo' : 'Treino',
         approx,
+        light: light || undefined,
         open: {
           module: { label: 'Treino', route: ROUTES.body },
           edit: fromTemplate ? undefined : { sheet: 'workout', props: { id: w.id } },
@@ -379,7 +406,8 @@ export function calendarEntries(db: DB, from: DateKey, to: DateKey, opts: Calend
         details: compact([
           { label: 'Modalidade', value: m.label },
           { label: 'Duração', value: w.plannedDurationMin ? `${w.plannedDurationMin}${w.plannedDurationMaxMin ? `–${w.plannedDurationMaxMin}` : ''} min` : undefined },
-          { label: 'Treino-chave', value: w.isKeySession ? 'sim' : undefined },
+          { label: 'Treino-chave', value: w.isKeySession && !light ? 'sim' : undefined },
+          { label: 'Modo', value: light ? 'Transição · leve e opcional' : undefined },
         ]),
       })
     }
@@ -430,6 +458,31 @@ export function calendarEntries(db: DB, from: DateKey, to: DateKey, opts: Calend
         sourceLabel: 'Trabalho · horário base',
         base: true,
         open: { module: { label: 'Trabalho', route: ROUTES.work } },
+      })
+    }
+
+    // 4b. The base day (profile.dayPlan): blocks of the day's mode and weekday. 'base' = background like the
+    // work hours; 'sugerido' = a suggestion (dropped below when something real takes its time).
+    for (const b of dayBlocksOn(db, date)) {
+      const meta = DAY_BLOCK_CATEGORY_META[b.category]
+      push({
+        id: `dayBlock:${b.id}:${date}`,
+        title: b.title,
+        description: b.note,
+        startAt: { date, time: b.start },
+        endAt: { date, time: b.end },
+        timezone: modeInfo.timeZone,
+        category: BLOCK_CATEGORY[b.category] ?? 'outro',
+        sourceType: 'dayBlock',
+        sourceId: b.id,
+        status: 'planejado',
+        allDay: false,
+        visibility: 'normal',
+        sourceLabel: b.kind === 'sugerido' ? 'Dia base · sugestão' : 'Dia base',
+        base: b.kind === 'base' || undefined,
+        suggested: b.kind === 'sugerido' || undefined,
+        open: { module: { label: 'Rotina', route: ROUTES.routineSettings } },
+        details: compact([{ label: 'Categoria', value: `${meta.emoji} ${meta.label}` }]),
       })
     }
 
@@ -883,7 +936,21 @@ export function calendarEntries(db: DB, from: DateKey, to: DateKey, opts: Calend
   }
 
   const visible = opts.includeCancelled ? out : out.filter((e) => e.status !== 'cancelado' || e.absent)
-  return sortEntries(dedupeEntries(visible).map((e) => applyPrivacy(e, opts)))
+  return sortEntries(dedupeEntries(dropCoveredSuggestions(visible)).map((e) => applyPrivacy(e, opts)))
+}
+
+/**
+ * Real things always win: a suggested base-day block overlapping a real timed entry that day (event, trip item,
+ * task with time, workout, class, meeting…) is left out for that day. Base backgrounds never hide it.
+ */
+export function dropCoveredSuggestions(list: CalendarEntry[]): CalendarEntry[] {
+  if (!list.some((e) => e.suggested)) return list
+  const real = list.filter((e) => !e.base && !e.suggested && !e.approx && isTimed(e) && e.status !== 'cancelado')
+  return list.filter((s) => {
+    if (!s.suggested || !isTimed(s)) return true
+    const ws = windowOf(s)
+    return !real.some((r) => r.startAt.date === s.startAt.date && ((w) => w.start < ws.end && ws.start < w.end)(windowOf(r)))
+  })
 }
 
 // ─── Privacy ────────────────────────────────────────────────────────────────
@@ -993,7 +1060,7 @@ export function dedupeEntries(list: CalendarEntry[]): CalendarEntry[] {
   for (const a of sorted) {
     if (!items.includes(a)) continue
     for (const b of sorted) {
-      if (a === b || !items.includes(b) || a.sourceType === b.sourceType || a.base || b.base) continue
+      if (a === b || !items.includes(b) || a.sourceType === b.sourceType || a.base || b.base || a.suggested || b.suggested) continue
       if (!sameStart(a, b) || !sameTitle(a.title, b.title)) continue
       const current = items.find((x) => x.id === a.id)!
       absorb(current, b)
@@ -1004,7 +1071,7 @@ export function dedupeEntries(list: CalendarEntry[]): CalendarEntry[] {
 
 // ─── Reading helpers ────────────────────────────────────────────────────────
 
-const sortKey = (e: CalendarEntry) => `${e.startAt.date}|${e.allDay || e.startAt.date !== e.endAt.date ? '0' : '1'}|${e.startAt.time ?? '99:99'}|${e.base ? '1' : '0'}`
+const sortKey = (e: CalendarEntry) => `${e.startAt.date}|${e.allDay || e.startAt.date !== e.endAt.date ? '0' : '1'}|${e.startAt.time ?? '99:99'}|${e.base || e.suggested ? '1' : '0'}`
 
 export function sortEntries(list: CalendarEntry[]): CalendarEntry[] {
   return [...list].sort((a, b) => sortKey(a).localeCompare(sortKey(b)) || a.title.localeCompare(b.title))
@@ -1061,7 +1128,7 @@ export function calendarConflicts(entries: CalendarEntry[], db?: DB): CalendarCo
   }
   const byDate = new Map<DateKey, CalendarEntry[]>()
   for (const e of entries) {
-    if (!isTimed(e) || !live(e) || e.base || e.approx) continue
+    if (!isTimed(e) || !live(e) || e.base || e.suggested || e.approx) continue
     byDate.set(e.startAt.date, [...(byDate.get(e.startAt.date) ?? []), e])
   }
   for (const [date, day] of byDate) {

@@ -43,6 +43,7 @@ import { contextWorkouts, dayPlanFor } from './fuel'
 import { PERIOD_LABEL, PERIOD_RANGES, workBlocks } from './planning'
 import { hmToMinutes, startOfWeek, toTimeHM } from '@/lib/date'
 import { prepChecklistFor } from './mealprep'
+import { effectiveRoutineMode } from './routine-modes'
 import { occurrenceFor } from '@/lib/recurrence'
 
 /** Minutes assumed for a routine item without durationMin / stepDurations. */
@@ -204,7 +205,7 @@ export function scheduleRoutine(
 /** Items of a routine shown that day (Essential mode keeps only essential items). */
 export function routineItemsInMode(db: DB, routine: Routine, date: DateKey): { items: RoutineItem[]; essential: boolean } {
   const all = routineItemsFor(db, routine.id, date)
-  const essential = !!routine.hasEssential && checkinFor(db, date)?.routineModes?.[routine.id] === 'essential'
+  const essential = effectiveRoutineMode(db, routine, date, checkinFor(db, date)?.routineModes?.[routine.id]) === 'essential'
   return { items: essential ? all.filter((i) => i.essential) : all, essential }
 }
 

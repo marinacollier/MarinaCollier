@@ -77,8 +77,8 @@ export function CategoryDot({ entry, className, style }: { entry: Pick<CalendarE
 /** Status in words, quiet; pending things are the ones that ask for attention. */
 export function StatusTag({ entry, className }: { entry: CalendarEntry; className?: string }) {
   if (entry.status === 'confirmado' && !entry.optional) return null
-  if (entry.status === 'planejado' && !entry.optional) return null
-  const label = entry.optional ? 'opcional' : STATUS_LABEL[entry.status]
+  if (entry.status === 'planejado' && !entry.optional && !entry.light && !entry.suggested) return null
+  const label = entry.light ? 'leve · opcional' : entry.suggested ? 'sugerido' : entry.optional ? 'opcional' : STATUS_LABEL[entry.status]
   return (
     <span
       className={cn(
@@ -130,7 +130,7 @@ export function EntryLine({
         'w-full flex items-center gap-2.5 text-left rounded-xl px-2 -mx-2 transition-colors active:bg-surface-2',
         dense ? 'min-h-10 py-1' : 'min-h-12 py-1.5',
         selected && 'bg-surface-2',
-        (entry.optional || entry.base) && 'opacity-75',
+        (entry.optional || entry.base || entry.suggested || entry.light) && 'opacity-75',
       )}
     >
       {showWhen && (

@@ -21,7 +21,8 @@ export interface ViewProps {
 const HOUR_PX = 56
 const GUTTER = 44
 
-const notBase = (e: CalendarEntry) => !e.base
+/** Background (work hours, base-day blocks, suggestions): only the Dia timeline shows them, as quiet bands. */
+const notBase = (e: CalendarEntry) => !e.base && !e.suggested
 const dayLabel = (d: DateKey) => formatLongDate(d).replace(/^./, (c) => c.toUpperCase())
 
 // ─── Dia ────────────────────────────────────────────────────────────────────
@@ -29,8 +30,8 @@ const dayLabel = (d: DateKey) => formatLongDate(d).replace(/^./, (c) => c.toUppe
 export function DayView({ date, nowMinutes, device, onNew, ...p }: ViewProps & { date: DateKey; nowMinutes?: number; device: string; onNew: (time?: string) => void }) {
   const day = useMemo(() => entriesOn(p.entries, date), [p.entries, date])
   const allDay = day.filter((e) => !isTimed(e))
-  const timed = day.filter((e) => isTimed(e) && !e.base)
-  const base = day.filter((e) => isTimed(e) && e.base)
+  const timed = day.filter((e) => isTimed(e) && notBase(e))
+  const base = day.filter((e) => isTimed(e) && !notBase(e))
   const conflicts = p.conflicts.filter((c) => c.date === date)
   const zones = [...new Set(day.map((e) => tzNote(e, device)).filter(Boolean))]
   const open = (e: CalendarEntry) => p.onOpen(e, date)
@@ -152,7 +153,7 @@ function DayGrid({
         ))}
       </div>
 
-      {/* BASE work hours: quiet background bands (tap opens them). */}
+      {/* BASE work hours + base-day blocks / suggestions: quiet background bands (tap opens them). */}
       {base.map((b) => {
         const top = y(hmToMinutes(b.startAt.time!))
         const h = y(hmToMinutes(b.endAt.time ?? b.startAt.time!)) - top
@@ -161,13 +162,13 @@ function DayGrid({
             key={b.id}
             type="button"
             onClick={() => onOpen(b)}
-            aria-label={`${b.title} ${whenLabel(b)} (base)`}
-            className="absolute right-0 rounded-l-xl text-left bg-ink/[0.03]"
+            aria-label={`${b.title} ${whenLabel(b)} (${b.suggested ? 'sugestão' : 'base'})`}
+            className={cn('absolute right-0 rounded-l-xl text-left', b.suggested ? 'border border-dashed border-line bg-transparent' : 'bg-ink/[0.03]')}
             style={{ top, height: Math.max(h, 18), left: GUTTER - 2 }}
           >
-            <span aria-hidden className="absolute left-0 top-0 bottom-0 w-[2px] rounded-full bg-ink/15" />
+            <span aria-hidden className="absolute left-0 top-0 bottom-0 w-[2px] rounded-full bg-ink/15" style={b.suggested ? { background: catColor(b), opacity: 0.5 } : undefined} />
             <span className="absolute left-2.5 right-2 top-1 text-[10.5px] text-muted leading-none truncate">
-              {b.title} · base
+              {b.title} · {b.suggested ? 'sugerido' : 'base'}
             </span>
           </button>
         )
@@ -193,7 +194,7 @@ function DayGrid({
                 'absolute pointer-events-auto rounded-xl overflow-hidden flex text-left transition-shadow',
                 pending ? 'border-[1.5px] border-dashed' : 'border border-surface',
                 done && 'opacity-60',
-                e.optional && 'opacity-75',
+                (e.optional || e.light) && 'opacity-75',
                 selectedId === e.id && 'ring-2 ring-ink/40',
               )}
               style={{
@@ -384,7 +385,7 @@ export function ListView({ from, to, onMore, onOpenDay, ...p }: ViewProps & { fr
     const out: { date: DateKey; list: CalendarEntry[] }[] = []
     for (let d = from; d <= to; d = addDays(d, 1)) {
       const list = entriesOn(p.entries, d).filter((e) => {
-        if (e.base) return false
+        if (!notBase(e)) return false
         if (!isSpan(e)) return true
         if (seen.has(e.id)) return false
         seen.add(e.id)

@@ -21,7 +21,7 @@ import type {
 } from './types'
 import { addDays, hmToMinutes, weekday, weekDays } from '@/lib/date'
 import { modalityGroup } from './planning'
-import { isTravelDay } from './travel-mode'
+import { isTravelDay, routineModeOn } from './travel-mode'
 
 const ACTIVE = (w: Workout) => w.status !== 'pulado' && w.status !== 'descanso'
 
@@ -44,6 +44,8 @@ export function contextWorkouts(db: DB, date: DateKey): Workout[] {
   // belongs to that workout now — it must not reappear on its original weekday.
   const week = new Set(weekDays(date))
   const used = new Set(db.workouts.filter((w) => w.templateId && week.has(w.date)).map((w) => w.templateId))
+  // Transição: the template's lines stand in as light, optional sessions.
+  const light = routineModeOn(db, date) === 'transicao'
   return db.weekTemplate
     .filter((t) => t.active && t.choice === 'fixed' && t.weekday === weekday(date) && t.modalities[0] && !used.has(t.id))
     .filter((t) => !dayOverride(db, date, 'weekTemplate', t.id)?.cancelled)
@@ -72,6 +74,7 @@ export function contextWorkouts(db: DB, date: DateKey): Workout[] {
       tags: t.tags,
       templateId: t.id,
       order: t.order,
+      ...(light ? { planType: 'flexivel' as const, isKeySession: false } : {}),
     }))
     .map((w) => withDayOverride(db, date, 'weekTemplate', w.templateId!, w))
 }

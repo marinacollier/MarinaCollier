@@ -27,6 +27,7 @@ import { isDue, lastDoneDate, occurrenceFor, occursOn } from '@/lib/recurrence'
 import { DEFAULT_MODALITIES } from './defaults'
 import { eventOccursOn, PERIOD_LABEL, PERIOD_RANGES, workBlocks } from './planning'
 import { eventPausedOn, isTravelDay, routinePausedOn, travelClassOn } from './travel-mode'
+import { effectiveRoutineMode } from './routine-modes'
 
 const byOrder = <T extends { order: number }>(a: T, b: T) => a.order - b.order
 
@@ -91,7 +92,9 @@ export function routineItemsFor(db: DB, routineId: ID, date: DateKey): RoutineIt
 }
 
 export function routineProgress(db: DB, routineId: ID, date: DateKey): { done: number; total: number } {
-  const mode = checkinFor(db, date)?.routineModes?.[routineId]
+  const routine = db.routines.find((r) => r.id === routineId)
+  const chosen = checkinFor(db, date)?.routineModes?.[routineId]
+  const mode = routine ? effectiveRoutineMode(db, routine, date, chosen) : chosen
   const items = routineItemsFor(db, routineId, date).filter((i) => mode !== 'essential' || i.essential)
   const isDone = (id: string) => occurrenceFor(db.occurrences, 'routineItem', id, date)?.status === 'done'
   // Optional items (e.g. Luna's walk) only count once they're done — never as "missing".

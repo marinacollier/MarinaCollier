@@ -427,6 +427,64 @@ export interface UserProfile {
    * device — never in the seed or the code.
    */
   execBlockedTerms?: string[]
+  /**
+   * Modos de rotina (data/routine-modes.ts). Optional: missing = automatic (trip days → 'viagem', else 'brasil').
+   * Precedence: `manual` (when the date is inside it) > a `periods` entry > trip day > 'brasil'.
+   */
+  routineModes?: RoutineModesConfig
+  /** The base day: editable background blocks shown in the calendar (never conflicts, never on Home). */
+  dayPlan?: { blocks: DayBlock[] }
+}
+
+/** 'viagem' / 'ferias': home routine paused, no work base. 'transicao': recovery (essential routines, light workouts, no work base). */
+export type RoutineMode = 'viagem' | 'transicao' | 'brasil' | 'ferias'
+
+export interface RoutineModePeriod {
+  mode: RoutineMode
+  from: DateKey
+  /** Inclusive. Missing = open-ended. */
+  to?: DateKey
+  label?: string
+}
+
+export interface RoutineModesConfig {
+  periods: RoutineModePeriod[]
+  /** "Mudar o modo" in Ajustes → Rotina. Wins over everything while the date is inside it. */
+  manual?: { mode: RoutineMode; from: DateKey; to?: DateKey }
+  /**
+   * Milagre da Manhã goes Essential by itself on days with a workout starting before this time (default '08:00').
+   * Only once `routineModes` exists (no config = the old behaviour: a gentle suggestion). Empty string = off.
+   */
+  essentialIfWorkoutBefore?: TimeHM | ''
+}
+
+export type DayBlockCategory =
+  | 'ritual'
+  | 'luna'
+  | 'trabalho'
+  | 'almoco'
+  | 'treino'
+  | 'estudo'
+  | 'idiomas'
+  | 'faculdade'
+  | 'criatividade'
+  | 'pessoal'
+  | 'descanso'
+
+/** One block of the base day ("Inglês 19:00–19:45, seg/qua"). */
+export interface DayBlock {
+  id: ID
+  title: string
+  category: DayBlockCategory
+  /** 0 = domingo … 6 = sábado. */
+  weekdays: number[]
+  start: TimeHM
+  end: TimeHM
+  /** Modes in which it applies. Default ['brasil']. */
+  modes?: RoutineMode[]
+  /** 'base' = quiet background; 'sugerido' = a suggestion (hidden when something real takes its time). */
+  kind: 'base' | 'sugerido'
+  note?: string
 }
 
 export interface SyncConflict {

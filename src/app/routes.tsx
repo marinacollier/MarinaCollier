@@ -70,6 +70,7 @@ export const ROUTES = {
   integrations: '/ajustes/integracoes',
   data: '/ajustes/dados',
   notifications: '/ajustes/notificacoes',
+  routineSettings: '/ajustes/rotina',
 } as const
 
 export const routeTable: { path: string; Component: React.LazyExoticComponent<React.ComponentType> }[] = [
@@ -127,4 +128,5 @@ export const routeTable: { path: string; Component: React.LazyExoticComponent<Re
   { path: '/ajustes/integracoes', Component: lazy(() => import('@/features/integrations/IntegrationsPage')) },
   { path: '/ajustes/dados', Component: lazy(() => import('@/features/settings/DataPage')) },
   { path: '/ajustes/notificacoes', Component: lazy(() => import('@/features/settings/NotificationsPage')) },
+  { path: '/ajustes/rotina', Component: lazy(() => import('@/features/settings/RoutinePage')) },
 ]

@@ -6,12 +6,15 @@
  *   until the item is complete — they never count as done.
  * - Optional items are never counted as missing: they only join the total once checked.
  * - "Hoje vou de versão curta" = DailyCheckIn.routineModes[routineId] = 'essential' for that day.
+ *   Without her choice, the routine goes Essential by itself in modo Transição, and the morning one on
+ *   days with a workout before 08:00 (data/routine-modes.ts). Items are never deleted, only filtered.
  *   It never breaks the routine; switching back is one tap.
  * Pure helpers first (tested), writes at the bottom.
  */
 import { actions, getDB } from '@/data/store'
 import { checkinFor, routineItemsFor, workoutsOn } from '@/data/selectors'
 import { isPresencial } from '@/data/planning'
+import { effectiveRoutineMode } from '@/data/routine-modes'
 import { SEED_IDS } from '@/data/seed/ids'
 import type { DateKey, DB, ID, Occurrence, Routine, RoutineItem } from '@/data/types'
 import { hmToMinutes } from '@/lib/date'
@@ -29,9 +32,9 @@ export function eveningRoutine(db: DB): Routine | undefined {
   return db.routines.filter((r) => r.period === 'noite').sort((a, b) => a.order - b.order)[0]
 }
 
+/** Her choice of the day wins; otherwise Essential by itself in modo Transição or with a workout before 08:00 (morning). */
 export function routineMode(db: DB, routine: Routine, date: DateKey): RoutineMode {
-  if (!routine.hasEssential) return 'completa'
-  return checkinFor(db, date)?.routineModes?.[routine.id] ?? 'completa'
+  return effectiveRoutineMode(db, routine, date, checkinFor(db, date)?.routineModes?.[routine.id])
 }
 
 /** The mode was chosen explicitly today (so we stop suggesting). */
@@ -94,6 +97,8 @@ export function shortTime(t: string): string {
  */
 export function essentialSuggestion(db: DB, routine: Routine, date: DateKey): string | undefined {
   if (!routine.hasEssential || modeChosen(db, routine, date)) return undefined
+  // Already short by itself (transição / treino antes das 08h): nothing to suggest.
+  if (routineMode(db, routine, date) === 'essential') return undefined
   const early = workoutsOn(db, date).find((w) => w.status === 'planejado' && w.time && hmToMinutes(w.time) <= 7 * 60 + 30)
   if (early) return `Treino às ${shortTime(early.time!)} — que tal a versão curta hoje?`
   if (isPresencial(db, date)) return 'Dia presencial — que tal a versão curta hoje?'

@@ -61,7 +61,7 @@ export default function AgendaPage() {
   // Today's line under the title: what's now / next (from the same consolidated entries).
   const todayRange = useCalendar(today, today, today)
   const subtitle = useMemo(() => {
-    const timed = entriesOn(todayRange.entries, today).filter((e) => isTimed(e) && !e.base && !e.approx && e.status !== 'feito' && e.status !== 'cancelado')
+    const timed = entriesOn(todayRange.entries, today).filter((e) => isTimed(e) && !e.base && !e.suggested && !e.approx && e.status !== 'feito' && e.status !== 'cancelado')
     const now = timed.find((e) => hmToMinutes(e.startAt.time!) <= minutes && minutes < hmToMinutes(e.endAt.time ?? e.startAt.time!))
     const next = timed.find((e) => hmToMinutes(e.startAt.time!) > minutes)
     if (now) return `agora: ${now.title}${next ? ` · depois, ${next.startAt.time} ${next.title}` : ''}`

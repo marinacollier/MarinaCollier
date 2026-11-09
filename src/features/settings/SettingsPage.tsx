@@ -5,7 +5,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Bell, Brain, Database, Palette, Plug, Share, Shield, SquarePlus, UserRound, X } from 'lucide-react'
+import { Bell, Brain, CalendarClock, Database, Palette, Plug, Share, Shield, SquarePlus, UserRound, X } from 'lucide-react'
 import { IconButton, ListCard, ListRow, Page, PageHeader } from '@/components/ui'
 import { useDB } from '@/data/store'
 import { ROUTES } from '@/app/routes'
@@ -57,6 +57,7 @@ export default function SettingsPage() {
         <ListCard className="mt-6">
           <ListRow leading={<Plug size={19} className="text-ocean" />} title="Conexões" subtitle="agenda, e-mail, finanças" chevron onPress={() => nav(ROUTES.integrations)} />
           <ListRow leading={<UserRound size={19} className="text-accent" />} title="Perfil" subtitle="ritmo, trabalho, sobre mim" chevron onPress={() => nav(ROUTES.profile)} />
+          <ListRow leading={<CalendarClock size={19} className="text-sage" />} title="Rotina" subtitle="modo do dia · dia base" chevron onPress={() => nav(ROUTES.routineSettings)} />
           <ListRow
             leading={<Brain size={19} className="text-plum" />}
             title="O que Lumos sabe sobre mim"

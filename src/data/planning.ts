@@ -27,7 +27,7 @@ import type {
 import { addDays, hmToMinutes, minutesToHM, weekday, weekDays } from '@/lib/date'
 import { occursOn } from '@/lib/recurrence'
 import { DEFAULT_MODALITIES } from './defaults'
-import { isTravelDay } from './travel-mode'
+import { isTravelDay, modeHasWorkBase, routineModeOn } from './travel-mode'
 
 // ─── Basics ─────────────────────────────────────────────────────────────────
 
@@ -82,15 +82,16 @@ export function workOverride(db: DB, date: DateKey): ScheduleOverride | undefine
 
 /**
  * Work mode of a day: the per-day override (when `src` is the DB) wins over the weekly BASE.
- * A cancelled 'work' override means no work that day ('off'). On a trip day (modo viagem, see
- * travel-mode.ts) the São Paulo work week doesn't apply: 'off' — no commute, no "dia presencial".
+ * A cancelled 'work' override means no work that day ('off'). Outside modo Brasil (a trip day, férias,
+ * transição — see routine-modes.ts) the São Paulo work week doesn't apply: 'off' — no commute, no "dia presencial".
  */
 export function workMode(src: WorkSource, date: DateKey): WorkDayMode {
   if (isDB(src)) {
     const o = workOverride(src, date)
     if (o?.workMode) return o.workMode
     if (o?.cancelled) return 'off'
-    if (isTravelDay(src, date)) return 'off'
+    // Only modo Brasil has a work base: viagem / férias / transição are 'off' (no commute, no "dia presencial").
+    if (!modeHasWorkBase(routineModeOn(src, date))) return 'off'
   }
   return profileOf(src).work?.days?.[weekday(date)] ?? 'remoto'
 }
@@ -534,7 +535,10 @@ export function proposeWeekFromTemplate(db: DB, anyDayOfWeek: DateKey): Template
         continue
       }
     }
-    const base = { date, templateId: t.id, choice: t.choice, planType: t.planType, note: t.notes }
+    // Transição: the base comes back light — every session optional (flexível), never "missed".
+    const light = routineModeOn(db, date) === 'transicao'
+    const planType: Workout['planType'] = light && t.choice !== 'rest' ? 'flexivel' : t.planType
+    const base = { date, templateId: t.id, choice: t.choice, planType, note: t.notes }
     if (t.choice === 'fixed' && t.modalities[0]) {
       out.push({
         ...base,
@@ -546,14 +550,14 @@ export function proposeWeekFromTemplate(db: DB, anyDayOfWeek: DateKey): Template
           time: t.time,
           period: t.time ? undefined : t.period,
           plannedDurationMin: t.durationMin,
-          planType: t.planType,
+          planType,
           templateId: t.id,
           notes: t.notes,
           order: 0,
           plannedDurationMaxMin: t.durationMaxMin,
           sessionType: t.sessionType,
           loadCategory: t.loadCategory,
-          isKeySession: t.isKeySession,
+          isKeySession: light ? undefined : t.isKeySession,
           isLongSession: t.isLongSession,
           requiresPreviousDayPrep: t.requiresPreviousDayPrep,
           requiresPreWorkout: t.requiresPreWorkout,

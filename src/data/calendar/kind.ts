@@ -143,5 +143,7 @@ export function kindOfEntry(db: DB, e: CalendarEntry): EntryKind {
     case 'petTask':
     case 'petBirthday':
       return 'pessoal'
+    case 'dayBlock':
+      return e.category === 'trabalho' ? 'trabalho' : e.category === 'estudo' ? 'estudo' : e.category === 'treino' ? 'treino' : 'pessoal'
   }
 }
