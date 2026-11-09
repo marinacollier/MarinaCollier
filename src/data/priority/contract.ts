@@ -34,6 +34,8 @@ export interface DayContext {
   now: TimeHM
   /** Free text she wrote ("reunião importante amanhã"). Never parsed into facts silently. */
   note?: string
+  /** Interest of the day she stated ("quero estudar política", "não quero idiomas", "quero descansar"). */
+  interest?: string
 }
 
 /** One thing that could be done in a free slot. Producers must not invent facts. */

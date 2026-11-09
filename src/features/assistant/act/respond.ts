@@ -20,6 +20,7 @@ import { dayHandler } from './handlers/day'
 import { kitchenHandler } from './handlers/kitchen'
 import { memoryHandler } from './handlers/memory'
 import { placesHandler } from './handlers/places'
+import { priorityHandler } from './handlers/priority'
 import { studyHandler } from './handlers/study'
 import { tasksHandler } from './handlers/tasks'
 import { travelHandler } from './handlers/travel'
@@ -33,7 +34,7 @@ import type { AttachmentReading } from '../attach/types'
 import type { Handler, LumosReply, TurnContext } from './types'
 
 /** Cuidar de Mim comes first: a crisis signal is answered with human help before anything else. */
-export const HANDLERS: Handler[] = [careHandler, briefingHandler, backupHandler, placesHandler, tripOpsHandler, tripHandler, recurringHandler, ugcHandler, backlogHandler, universeHandler, careerHandler, calendarHandler, attachmentHandler, memoryHandler, booksHandler, kitchenHandler, workHandler, tasksHandler, dayHandler, travelHandler, studyHandler, captureHandler]
+export const HANDLERS: Handler[] = [careHandler, priorityHandler, briefingHandler, backupHandler, placesHandler, tripOpsHandler, tripHandler, recurringHandler, ugcHandler, backlogHandler, universeHandler, careerHandler, calendarHandler, attachmentHandler, memoryHandler, booksHandler, kitchenHandler, workHandler, tasksHandler, dayHandler, travelHandler, studyHandler, captureHandler]
 
 export function respond(db: DB, text: string, now: Now, ctx: TurnContext = {}, attachment?: AttachmentReading): LumosReply | undefined {
   const n = norm(text)

@@ -1,3 +1,5 @@
+import type { Energy, LifeArea, MoSCoW } from './priority/contract'
+
 /**
  * MARINA OS — shared data contracts.
  *
@@ -602,6 +604,23 @@ export interface Task extends Entity {
   entryKind?: EntryKind
   /** Minutes she actually spent on it (optional log; "Minha semana" counts it as horas feitas). */
   spentMin?: number
+  // ── Motor de prioridade (src/data/priority/*). All optional: missing = derived, never guessed as fact. ──
+  /** Life area for the priority engine. Named `lifeArea` because `area` (legacy Area) already exists on Task. */
+  lifeArea?: LifeArea
+  /** Her explicit MoSCoW (wins over the contextual one). */
+  moscow?: MoSCoW
+  /** Energy it needs to be done well (1–5). */
+  energyNeed?: Energy
+  /** Rough effort: 1 leve · 2 médio · 3 pesado. */
+  effort?: 1 | 2 | 3
+  /** The concrete next step ("abrir o doc e escrever o título"). */
+  nextStep?: string
+  /** Goals it serves (in addition to the legacy single `goalId`). */
+  goalIds?: ID[]
+  /** RICE-lite (reach 1–5, impact 1–5, confidence 0.5/0.8/1, effort 1–5). */
+  rice?: { reach: 1 | 2 | 3 | 4 | 5; impact: 1 | 2 | 3 | 4 | 5; confidence: 0.5 | 0.8 | 1; effort: 1 | 2 | 3 | 4 | 5 }
+  /** What kind of thing it is (compromisso has a fixed time; flexível can move). */
+  itemKind?: 'compromisso' | 'prazo' | 'flexivel' | 'habito' | 'projeto' | 'ideia'
 }
 
 export interface TaskStep {
@@ -1097,6 +1116,31 @@ export interface MealTemplate extends Entity {
   slot?: MealSlot
   tags: FoodTag[]
   order: number
+}
+
+export type DayChangeAction = 'adiar' | 'trocar' | 'dividir' | 'concluir' | 'hoje_nao' | 'sem_energia' | 'menos_tempo' | 'mais_tempo' | 'mais_tarde'
+
+/**
+ * Check-in do dia for the priority engine ("quanto tempo livre tu tem hoje?"). One per local day (`date` unique).
+ * Separate from DailyCheckIn (habits/closing) so the engine never rewrites her habit records.
+ */
+export interface DayCheckin extends Entity {
+  date: DateKey
+  /** Minutes free for flexible activities (her answer or "calcula pela agenda"). */
+  freeMin?: number
+  focusMin?: number
+  energy?: Energy
+  mood?: string
+  note?: string
+  /** "Interesse de hoje" (free text / chips): filters and boosts the plan; "descansar" means rest. */
+  interest?: string
+  /** She tapped "Pular" — the card stays away for the day, the plan runs on the calendar alone. */
+  skipped?: boolean
+  /** The last plan she saw (candidate keys). */
+  plan?: { primary?: string; secondary: string[]; deferred: string[] }
+  changes: { at: ISODateTime; key: string; action: DayChangeAction; reason?: string }[]
+  /** End-of-day review (optional, after 20:00). */
+  review?: { aconteceu?: string; pendente?: string; mudou?: string; amanha?: string; at?: ISODateTime; dismissed?: boolean }
 }
 
 /** One per day (id is free, `date` is unique). Holds check-in, simple habits and the daily closing. */
@@ -2758,6 +2802,8 @@ export interface DB {
   careTechniquePrefs: CareTechniquePref[]
   carePauseDrafts: CarePauseDraft[]
   careSupportPlan: CareSupportPlan[]
+  /** Check-in do dia + changes of the "O que faz sentido agora?" plan (priority engine). */
+  dayCheckins: DayCheckin[]
 }
 
 /** Keys of DB that hold arrays of entities. */

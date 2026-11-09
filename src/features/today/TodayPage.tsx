@@ -28,7 +28,9 @@ import { areaLocked, useLockState } from '@/app/lock-store'
 import { useNow } from '@/hooks/useToday'
 import { addDays } from '@/lib/date'
 import { travelTripOn } from '@/data/travel-mode'
-import { activeDate } from './local-day'
+import { activeDay } from './local-day'
+import { checkinOf } from './home/day-checkin'
+import { DayCheckinCard, DayReviewCard, NowPlanCard, showReview } from './home/DayPlanCards'
 import { EntryDetail } from '@/features/agenda/calendar/EntryDetail'
 import { useCalendar, useEntry } from '@/features/agenda/calendar/model'
 import { homeContext } from './context'
@@ -68,7 +70,8 @@ export default function TodayPage() {
   useMarkSeenOnLeave()
 
   // While traveling, "today" is the trip's local day (the calendar stores trip times in its zone).
-  const day = useMemo(() => activeDate(db, today, clock), [db, today, clock])
+  const local = useMemo(() => activeDay(db, today, clock, minutes), [db, today, clock, minutes])
+  const day = local.date
   const place = useMemo(() => placeOf(db, today, day), [db, today, day])
 
   // 2 · 3 — the same projection as the Agenda.
@@ -76,6 +79,9 @@ export default function TodayPage() {
   const cal = useCalendar(day, horizon, day)
   const hoje = useMemo(() => dayRows(cal.entries, day), [cal.entries, day])
   const proximos = useMemo(() => nextDays(cal.entries, day), [cal.entries, day])
+  // 0 — Check-in do dia → "O que faz sentido fazer agora?" (+ the optional review after 20:00).
+  const dayCheckin = checkinOf(db, day)
+
   const conflicts = useMemo(() => {
     const until = addDays(day, CONFLICT_DAYS)
     return cal.conflicts.filter((c) => c.date >= day && c.date <= until)
@@ -163,7 +169,12 @@ export default function TodayPage() {
         </button>
       </header>
 
-      <motion.div {...rise(1)} className="mt-5">
+      <motion.div {...rise(1)} className="mt-5 grid gap-4">
+        {!dayCheckin ? <DayCheckinCard key={day} date={day} nowMin={local.minutes} entries={cal.entries} /> : <NowPlanCard date={day} nowMin={local.minutes} entries={cal.entries} />}
+        {dayCheckin && showReview(local.minutes, dayCheckin.review) && <DayReviewCard date={day} />}
+      </motion.div>
+
+      <motion.div {...rise(1)} className="mt-7">
         <HojeList rows={hoje} onOpen={(e) => openEntry(e, day)} conflicts={conflictsByDay.get(day) ?? 0} onConflicts={() => setShowConflicts(day)} />
       </motion.div>
 

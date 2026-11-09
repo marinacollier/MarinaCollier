@@ -224,6 +224,7 @@ export function emptyDB(): DB {
     careTechniquePrefs: [],
     carePauseDrafts: [],
     careSupportPlan: [],
+    dayCheckins: [],
   }
 }
 
