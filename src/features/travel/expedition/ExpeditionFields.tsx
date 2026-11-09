@@ -131,6 +131,7 @@ export function ExpeditionFields({
   status,
   onBooking,
   confirmationCode,
+  simple,
 }: {
   trip: Trip
   draft: ExpeditionDraft
@@ -142,6 +143,8 @@ export function ExpeditionFields({
   onBooking: (b: TripBookingStatus | undefined) => void
   /** The sheet's booking code (counts as proof for RESERVADO). */
   confirmationCode?: string
+  /** Not a booking (reunião, tarefa, estudo…): no certainty, booking status, costs or voucher. */
+  simple?: boolean
 }) {
   const cur = draft.currency ?? trip.expedition?.currency ?? 'BRL'
   const clash = trip.expedition ? classClash(trip, { ...when, ...draft }) : undefined
@@ -157,6 +160,8 @@ export function ExpeditionFields({
         </div>
       )}
 
+      {!simple && (
+      <>
       <div>
         <div className="text-[13px] font-medium text-ink-2 mb-1.5 px-0.5">Certeza</div>
         <Chips label="Certeza" value={draft.certainty} onPick={(v) => set({ certainty: v as TripCertainty | undefined })} options={CERTAINTY_ORDER.map((c) => ({ value: c, label: CERTAINTY_META[c].label, cls: CERTAINTY_META[c].cls }))} />
@@ -191,15 +196,17 @@ export function ExpeditionFields({
           </Field>
         </div>
       )}
+      </>
+      )}
 
       <div className="grid grid-cols-2 gap-2.5">
         <div>
           <div className="text-[13px] font-medium text-ink-2 mb-1.5 px-0.5">Prioridade</div>
           <Chips label="Prioridade" value={draft.priority} onPick={(v) => set({ priority: v as TripPriority | undefined })} options={PRIORITIES.map((p) => ({ value: p, label: p }))} />
         </div>
-        <Field label="Categoria">
+        {!simple && <Field label="Categoria">
           <Select<TripBudgetCategory> value={draft.category} placeholder="Pela seção" onChange={(v) => set({ category: v })} options={CATEGORY_ORDER.map((c) => ({ value: c, label: `${CATEGORY_META[c].emoji} ${CATEGORY_META[c].label}` }))} />
-        </Field>
+        </Field>}
       </div>
       <Field label="Próxima ação">
         <TextInput placeholder="O que destrava isto" value={draft.nextAction ?? ''} onChange={(e) => set({ nextAction: e.target.value })} />
@@ -257,6 +264,7 @@ export function ExpeditionFields({
         </Field>
       </MoreOptions>
 
+      {!simple && (
       <MoreOptions label="custos" defaultOpen={has('estimatedCents', 'quotedCents', 'paidCents', 'uberCents')}>
         <Field label="Moeda">
           <Select value={cur} onChange={(v) => set({ currency: v })} options={[{ value: 'ZAR', label: 'Rand (ZAR)' }, { value: 'BRL', label: 'Real (BRL)' }]} />
@@ -276,7 +284,9 @@ export function ExpeditionFields({
           </Field>
         </div>
       </MoreOptions>
+      )}
 
+      {!simple && (
       <MoreOptions label="fornecedor, voucher e pickup" defaultOpen={has('supplier', 'contact', 'voucherUrl', 'cancellationPolicy', 'pickup', 'needsPickup')}>
         <Field label="Fornecedor">
           <TextInput value={draft.supplier ?? ''} onChange={(e) => set({ supplier: e.target.value })} />
@@ -304,6 +314,7 @@ export function ExpeditionFields({
           </>
         )}
       </MoreOptions>
+      )}
 
       <MoreOptions label="preparo e segurança" defaultOpen={has('outfit', 'checklistKind', 'risk', 'planB', 'clearance', 'volunteer')}>
         <div className="grid grid-cols-2 gap-2.5">

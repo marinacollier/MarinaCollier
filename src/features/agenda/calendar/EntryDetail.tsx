@@ -3,21 +3,39 @@
  * Editing is a second-level action that opens the record's own editor ("Editar") or its module.
  * No form here.
  */
-import { useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowUpRight, Globe, Link2, Lock, MapPin, Pencil, TriangleAlert, UserX, X } from 'lucide-react'
+import { ArrowUpRight, CalendarClock, Check, CircleCheck, ClipboardList, Globe, Link2, Lock, MapPin, Pencil, Redo2, Tag, TriangleAlert, UserX, X, XCircle } from 'lucide-react'
 import { unlockSession } from '@/app/lock-store'
 import { openSheet, toast } from '@/app/ui-store'
 import { markAbsence, unmarkAbsence } from '@/features/travel/expedition/absence'
-import { Button, IconButton } from '@/components/ui'
+import { Button, DateInput, IconButton, TimeInput } from '@/components/ui'
 import { useDB } from '@/data/store'
-import type { DateKey } from '@/data/types'
+import type { DateKey, EntryKind, TimeHM } from '@/data/types'
 import { CATEGORY_META, isSpan, STATUS_LABEL, tzNote, type CalendarConflict, type CalendarEntry, type CalendarSourceType } from '@/data/calendar/universal'
-import { formatLongDate } from '@/lib/date'
+import { KIND_META, KIND_ORDER, kindOfEntry } from '@/data/calendar/kind'
+import { formatLongDate, todayKey } from '@/lib/date'
 import { cn } from '@/lib/cn'
 import { haptic } from '@/lib/haptics'
 import { verifyPin } from '@/lib/lock'
 import { catColor, iconOf, whenLabel } from './parts'
+import {
+  canCancel,
+  canConfirm,
+  canMarkDone,
+  canMove,
+  canRetag,
+  cancelEntry,
+  confirmEntry,
+  createPrepTask,
+  markDone,
+  moveEntry,
+  postponeTask,
+  prepTaskOf,
+  quickSource,
+  setEntryKind,
+  type Undo,
+} from './quick'
 
 const SOURCE_NAME: Partial<Record<CalendarSourceType, string>> = {
   event: 'evento da agenda',
@@ -52,10 +70,31 @@ export function EntryDetail({
   onEdited?: () => void
 }) {
   const nav = useNavigate()
+  const db = useDB()
+  const kind = useMemo(() => kindOfEntry(db, entry), [db, entry])
+  const src = useMemo(() => quickSource(db, entry), [db, entry])
+  const hasPrep = useMemo(() => !!prepTaskOf(db, entry), [db, entry])
   const Icon = iconOf(entry)
   const tz = tzNote(entry, device)
   const day = formatLongDate(isSpan(entry) ? entry.startAt.date : date)
   const statusText = entry.absent ? 'faltei' : entry.optional ? 'opcional' : STATUS_LABEL[entry.status]
+  // Booking words (A COTAR, RESERVA EMITIDA…) only mean something for a reserva/passeio.
+  const bookingWords = entry.sourceType !== 'tripItem' && entry.sourceType !== 'tripDeadline' ? true : kind === 'reserva'
+  const kindLabel = KIND_META[kind].label
+  const [moving, setMoving] = useState(false)
+  const [retag, setRetag] = useState(false)
+  const [mDate, setMDate] = useState<DateKey | undefined>(entry.startAt.date)
+  const [mTime, setMTime] = useState<TimeHM | undefined>(entry.startAt.time)
+  const occDay = isSpan(entry) ? entry.startAt.date : date
+  const open = entry.status !== 'feito' && entry.status !== 'cancelado'
+
+  /** Runs a quick action, closes the detail and offers "Desfazer". */
+  const run = (message: string, act: () => Undo, close = true) => {
+    haptic('light')
+    const undo = act()
+    if (close) onClose()
+    toast(message, { action: { label: 'Desfazer', run: undo } })
+  }
   // A class of the trip's school: "Faltei" right here, no trip page needed.
   const isClass = entry.sourceType === 'school'
   const classDay = entry.startAt.date
@@ -76,7 +115,8 @@ export function EntryDetail({
         </span>
         <div className="flex-1 min-w-0">
           <div className="text-[11.5px] tracking-[0.06em] uppercase text-muted">
-            {entry.sourceLabel.toLowerCase().startsWith(CATEGORY_META[entry.category].label.toLowerCase()) ? entry.sourceLabel : `${CATEGORY_META[entry.category].label} · ${entry.sourceLabel}`}
+            <span aria-label={`Tipo: ${kindLabel}`} className="text-ink-2">{kindLabel}</span>
+            {entry.sourceLabel.toLowerCase().startsWith(kindLabel.toLowerCase()) ? entry.sourceLabel.slice(kindLabel.length) : ` · ${entry.sourceLabel}`}
           </div>
           <h2 className={cn('font-display text-[22px] leading-tight mt-0.5 break-words', entry.status === 'feito' && 'line-through decoration-muted/50')}>{entry.title}</h2>
         </div>
@@ -102,7 +142,7 @@ export function EntryDetail({
             <dt className="w-[78px] shrink-0 text-muted text-[13px] pt-[1px]">Status</dt>
             <dd className="flex flex-wrap items-center gap-1.5">
               <span className={cn('inline-flex items-center h-6 px-2.5 rounded-full text-[12.5px]', entry.status === 'pendente' ? 'border border-dashed border-sand' : 'bg-surface-2')}>{statusText}</span>
-              {entry.statusLabel && entry.statusLabel.toLowerCase() !== statusText && <span className="text-[12px] text-muted tracking-[0.04em]">{entry.statusLabel}</span>}
+              {bookingWords && entry.statusLabel && entry.statusLabel.toLowerCase() !== statusText && <span className="text-[12px] text-muted tracking-[0.04em]">{entry.statusLabel}</span>}
             </dd>
           </div>
           {entry.location && !entry.masked && (
@@ -155,6 +195,95 @@ export function EntryDetail({
                   </div>
                 ))}
               </dl>
+            )}
+
+            {src && !entry.absent && (
+              <section aria-label="Ações rápidas" className="space-y-2.5">
+                <div className="flex flex-wrap gap-1.5">
+                  {kind === 'reuniao' && canConfirm(src) && open && entry.status !== 'confirmado' && (
+                    <Quick icon={<Check size={15} />} onClick={() => run('Reunião confirmada', () => confirmEntry(src))}>
+                      Confirmar
+                    </Quick>
+                  )}
+                  {kind === 'reuniao' && open && !hasPrep && (
+                    <Quick
+                      icon={<ClipboardList size={15} />}
+                      onClick={() => {
+                        const made = createPrepTask(src, entry, todayKey())
+                        if (made) run('Tarefa de preparo criada para hoje', () => made.undo, false)
+                      }}
+                    >
+                      Criar tarefa de preparo
+                    </Quick>
+                  )}
+                  {src.key === 'tasks' && canMove(src) && open && (
+                    <Quick icon={<Redo2 size={15} />} onClick={() => run('Adiada para amanhã', () => postponeTask(src, occDay))}>
+                      Adiar para amanhã
+                    </Quick>
+                  )}
+                  {canMove(src) && open && (
+                    <Quick icon={<CalendarClock size={15} />} pressed={moving} onClick={() => setMoving((v) => !v)}>
+                      Mudar dia/hora
+                    </Quick>
+                  )}
+                  {canMarkDone(src) && open && (
+                    <Quick icon={<CircleCheck size={15} />} onClick={() => run('Feito ✓', () => markDone(src, occDay))}>
+                      Feito
+                    </Quick>
+                  )}
+                  {canCancel(src) && open && (
+                    <Quick icon={<XCircle size={15} />} onClick={() => run('Cancelado (continua guardado)', () => cancelEntry(src, occDay))}>
+                      Cancelar
+                    </Quick>
+                  )}
+                  {canRetag(src) && (
+                    <Quick icon={<Tag size={15} />} pressed={retag} onClick={() => setRetag((v) => !v)}>
+                      Mudar tipo
+                    </Quick>
+                  )}
+                </div>
+                {hasPrep && kind === 'reuniao' && <p className="text-[12.5px] text-muted">Tarefa de preparo já criada.</p>}
+
+                {moving && (
+                  <form
+                    aria-label="Mudar dia e hora"
+                    className="rounded-2xl bg-surface-2 p-3 space-y-2.5"
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      if (!mDate) return
+                      run(`Movido para ${formatLongDate(mDate)}${mTime ? ` · ${mTime}` : ''}`, () => moveEntry(src, mDate, mTime))
+                    }}
+                  >
+                    <div className="grid grid-cols-2 gap-2">
+                      <DateInput aria-label="Novo dia" value={mDate} onChange={setMDate} />
+                      <TimeInput aria-label="Novo horário" value={mTime} onChange={setMTime} />
+                    </div>
+                    <Button type="submit" variant="primary" size="sm" className="w-full" disabled={!mDate}>
+                      Salvar novo dia/hora
+                    </Button>
+                  </form>
+                )}
+
+                {retag && (
+                  <div role="group" aria-label="Tipo" className="flex flex-wrap gap-1.5">
+                    {KIND_ORDER.map((k: EntryKind) => (
+                      <button
+                        key={k}
+                        type="button"
+                        aria-pressed={kind === k}
+                        onClick={() => {
+                          if (k === kind) return
+                          setRetag(false)
+                          run(`Agora é ${KIND_META[k].label.toLowerCase()}`, () => setEntryKind(src, k), false)
+                        }}
+                        className={cn('h-8 px-3 rounded-full text-[12.5px] border', kind === k ? 'bg-ink text-bg border-ink' : 'border-line text-ink-2')}
+                      >
+                        {KIND_META[k].label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </section>
             )}
 
             {!!entry.alsoFrom?.length && (
@@ -214,6 +343,14 @@ export function EntryDetail({
         </footer>
       )}
     </article>
+  )
+}
+
+function Quick({ icon, pressed, onClick, children }: { icon: ReactNode; pressed?: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <Button variant={pressed ? 'primary' : 'soft'} size="sm" icon={icon} aria-pressed={pressed} onClick={onClick} className="whitespace-nowrap">
+      {children}
+    </Button>
   )
 }
 

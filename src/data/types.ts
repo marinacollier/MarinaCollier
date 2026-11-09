@@ -459,6 +459,12 @@ export interface WorkSchedule {
 
 // ─── Today / tasks / routines ───────────────────────────────────────────────
 
+/**
+ * What a dated thing IS (reunião, aula, treino…), whatever record it lives in. Derived by default
+ * (data/calendar/kind.ts); an explicit `entryKind` on the record is her retag and always wins.
+ */
+export type EntryKind = 'reuniao' | 'aula' | 'treino' | 'tarefa' | 'trabalho' | 'estudo' | 'ugc' | 'reserva' | 'pessoal' | 'espiritualidade'
+
 export type TaskStatus =
   | 'todo'
   | 'doing'
@@ -532,6 +538,8 @@ export interface Task extends Entity {
   contentItemId?: ID
   /** Day it was planned for before she moved it ("Adiado"). */
   postponedFrom?: DateKey
+  /** Her retag ("isso é uma reunião"). Missing = derived (data/calendar/kind.ts). */
+  entryKind?: EntryKind
 }
 
 export interface TaskStep {
@@ -715,6 +723,8 @@ export interface CalendarEvent extends Entity {
   tripId?: ID
   recurrence?: Recurrence
   external?: ExternalRef
+  /** Her retag ("isso é uma reunião"). Missing = derived (data/calendar/kind.ts). Not the life `kind` above. */
+  entryKind?: EntryKind
 }
 
 // ─── Body ───────────────────────────────────────────────────────────────────
@@ -1791,6 +1801,11 @@ export interface TripItem extends Entity {
   schoolToConfirm?: boolean
   /** Where the information came from ("e-mail do operador 06/11", "WhatsApp"). Shown as "Fonte". */
   source?: string
+  /**
+   * Her retag: what this item IS (reunião, tarefa, reserva…). Missing = derived (data/calendar/kind.ts).
+   * Booking vocabulary (A COTAR, RESERVA EMITIDA, pagamento…) only applies to 'reserva'.
+   */
+  entryKind?: EntryKind
 }
 
 // ─── Content / UGC ──────────────────────────────────────────────────────────

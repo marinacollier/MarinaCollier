@@ -3,7 +3,8 @@ import { closeSheet, toast } from '@/app/ui-store'
 import type { SheetProps } from '@/app/sheet-types'
 import { removeWithUndo } from '@/app/undo'
 import { actions, getDB, nextOrder, useDB } from '@/data/store'
-import type { TripItem, TripSection } from '@/data/types'
+import type { EntryKind, TripItem, TripSection } from '@/data/types'
+import { KIND_META, KIND_ORDER, tripItemKind } from '@/data/calendar/kind'
 import { useToday } from '@/hooks/useToday'
 import { DateInput, Field, MoneyInput, MoreOptions, Select, SheetLayout, TextArea, TextInput, TimeInput, TitleInput } from '@/components/ui'
 import { cn } from '@/lib/cn'
@@ -24,6 +25,20 @@ import {
 import { ExpeditionFields, cleanDraft, draftOf, missingProof, type ExpeditionDraft } from './expedition/ExpeditionFields'
 import { bookingStatusOf, bookingStatusPatch } from './expedition/command'
 import { BookingDetails } from './expedition/BookingDetails'
+
+/** Status of anything that is not a booking (reunião, tarefa, estudo…): no booking words. */
+type SimpleStatus = 'proposto' | 'confirmado' | 'feito' | 'cancelado'
+const SIMPLE_ORDER: SimpleStatus[] = ['proposto', 'confirmado', 'feito', 'cancelado']
+const SIMPLE_LABEL: Record<SimpleStatus, string> = { proposto: 'Proposto', confirmado: 'Confirmado', feito: 'Feito', cancelado: 'Cancelado' }
+const SIMPLE_STATUS: Record<SimpleStatus, ItemStatus> = { proposto: 'a_confirmar', confirmado: 'confirmado', feito: 'feito', cancelado: 'cancelado' }
+/** Kept in step with bookingStatus through the same helper the trip screens use (nothing reads as paid/booked). */
+const SIMPLE_PATCH: Record<SimpleStatus, () => Partial<TripItem>> = {
+  proposto: () => ({ ...bookingStatusPatch('planejado'), status: 'a_confirmar' }),
+  confirmado: () => bookingStatusPatch('confirmado'),
+  feito: () => bookingStatusPatch('concluido'),
+  cancelado: () => bookingStatusPatch('cancelado'),
+}
+const simpleOf = (s: ItemStatus): SimpleStatus => (s === 'a_fazer' ? 'proposto' : (Object.keys(SIMPLE_STATUS) as SimpleStatus[]).find((k) => SIMPLE_STATUS[k] === s) ?? 'proposto')
 
 export default function TripItemSheet({ id, tripId, section: sectionProp, group: groupProp }: SheetProps<'tripItem'>) {
   const trips = useDB((db) => db.trips)
@@ -51,13 +66,24 @@ export default function TripItemSheet({ id, tripId, section: sectionProp, group:
     return existing && trips.find((t) => t.id === existing.tripId)?.expedition ? { ...d, bookingStatus: bookingStatusOf(existing) } : d
   })
   const patchX = (p: ExpeditionDraft) => setX((d) => ({ ...d, ...p }))
+  // Tipo: her retag, or what the item reads as (section, checklist, title). Only a reserva/passeio
+  // gets the booking vocabulary, payment, valor and código.
+  const [kindPick, setKindPick] = useState<EntryKind | undefined>(existing?.entryKind)
+  const kind = kindPick ?? tripItemKind({ ...existing, ...x, id: existing?.id, section, title, entryKind: undefined, confirmationCode: code, amountCents, paymentStatus: payment })
+  const bookable = kind === 'reserva'
+  const pickSimple = (s: SimpleStatus) => {
+    const { status: st, ...rest } = SIMPLE_PATCH[s]()
+    patchX(rest)
+    setStatus(st!)
+    setStatusTouched(true)
+  }
 
   const groups = useMemo(() => (trip ? groupsOfTrip(itemsOfTrip(allItems, trip)) : []), [allItems, trip])
   const showTripPicker = !existing && !tripId && trips.length > 1
   const tripRec = trips.find((t) => t.id === trip)
   const showExpedition = !!tripRec?.expedition || Object.keys(draftOf(existing)).length > 0
 
-  const needsProof = showExpedition && missingProof(x, code)
+  const needsProof = bookable && showExpedition && missingProof(x, code)
   const save = () => {
     const t = title.trim()
     if (!t || !trip || needsProof) return
@@ -77,6 +103,7 @@ export default function TripItemSheet({ id, tripId, section: sectionProp, group:
       amountCents,
       confirmationCode: code.trim() || undefined,
       ...(showExpedition ? cleanDraft(x) : {}),
+      entryKind: kindPick,
     } satisfies Partial<TripItem>
     if (existing) {
       actions.update('tripItems', existing.id, patch)
@@ -112,7 +139,43 @@ export default function TripItemSheet({ id, tripId, section: sectionProp, group:
     >
       <TitleInput autoFocus={!existing} placeholder="O quê?" value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && save()} />
 
-      {existing && tripRec?.expedition && <BookingDetails trip={tripRec} item={existing} />}
+      <div>
+        <div className="text-[13px] font-medium text-ink-2 mb-1.5 px-0.5">Tipo</div>
+        <div role="group" aria-label="Tipo" className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-5 px-5">
+          {KIND_ORDER.map((k) => (
+            <button
+              key={k}
+              type="button"
+              aria-pressed={kind === k}
+              onClick={() => setKindPick(kindPick === k ? undefined : k)}
+              className={cn('h-8 px-3 rounded-full text-[12.5px] shrink-0 border', kind === k ? 'bg-ink text-bg border-ink' : 'border-line text-ink-2')}
+            >
+              {KIND_META[k].label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {!bookable && (
+        <div>
+          <div className="text-[13px] font-medium text-ink-2 mb-1.5 px-0.5">Status</div>
+          <div role="group" aria-label="Status" className="flex flex-wrap gap-1.5">
+            {SIMPLE_ORDER.map((s) => (
+              <button
+                key={s}
+                type="button"
+                aria-pressed={simpleOf(status) === s}
+                onClick={() => pickSimple(s)}
+                className={cn('h-9 px-3.5 rounded-full text-[13px] font-semibold border-2 transition', STATUS_META[SIMPLE_STATUS[s]].cls, simpleOf(status) === s ? 'border-ink' : 'border-transparent opacity-80')}
+              >
+                {SIMPLE_LABEL[s]}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {bookable && existing && tripRec?.expedition && <BookingDetails trip={tripRec} item={existing} />}
 
       {showTripPicker && (
         <Field label="Viagem">
@@ -156,7 +219,7 @@ export default function TripItemSheet({ id, tripId, section: sectionProp, group:
         </div>
       )}
 
-      {!tripRec?.expedition && (
+      {bookable && !tripRec?.expedition && (
       <div>
         <div className="text-[13px] font-medium text-ink-2 mb-1.5 px-0.5">Status</div>
         <div className="flex flex-wrap gap-1.5">
@@ -179,7 +242,7 @@ export default function TripItemSheet({ id, tripId, section: sectionProp, group:
       </div>
       )}
 
-      {(PAYABLE_SECTIONS.includes(section) || payment) && (
+      {bookable && (PAYABLE_SECTIONS.includes(section) || payment) && (
         <div>
           <div className="text-[13px] font-medium text-ink-2 mb-1.5 px-0.5">Pagamento</div>
           <div className="flex flex-wrap gap-1.5">
@@ -219,14 +282,16 @@ export default function TripItemSheet({ id, tripId, section: sectionProp, group:
         <Field label="Link">
           <TextInput inputMode="url" placeholder="https://…" value={url} onChange={(e) => setUrl(e.target.value)} />
         </Field>
-        <div className="grid grid-cols-2 gap-2.5">
-          <Field label="Valor">
-            <MoneyInput valueCents={amountCents} onChange={setAmountCents} />
-          </Field>
-          <Field label="Referência (código da reserva)">
-            <TextInput placeholder="ABC123" autoCapitalize="characters" value={code} onChange={(e) => setCode(e.target.value)} />
-          </Field>
-        </div>
+        {bookable && (
+          <div className="grid grid-cols-2 gap-2.5">
+            <Field label="Valor">
+              <MoneyInput valueCents={amountCents} onChange={setAmountCents} />
+            </Field>
+            <Field label="Referência (código da reserva)">
+              <TextInput placeholder="ABC123" autoCapitalize="characters" value={code} onChange={(e) => setCode(e.target.value)} />
+            </Field>
+          </div>
+        )}
       </MoreOptions>
 
       {showExpedition && tripRec && (
@@ -239,6 +304,7 @@ export default function TripItemSheet({ id, tripId, section: sectionProp, group:
             when={{ date, endDate, time: date ? time : undefined, section }}
             status={status}
             confirmationCode={code}
+            simple={!bookable}
             onBooking={(b) => {
               if (!b) return patchX({ bookingStatus: undefined })
               const { status: st, ...rest } = bookingStatusPatch(b)
