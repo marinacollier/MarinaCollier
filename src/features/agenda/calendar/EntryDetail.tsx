@@ -5,9 +5,10 @@
  */
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowUpRight, Globe, Link2, Lock, MapPin, Pencil, TriangleAlert, X } from 'lucide-react'
+import { ArrowUpRight, Globe, Link2, Lock, MapPin, Pencil, TriangleAlert, UserX, X } from 'lucide-react'
 import { unlockSession } from '@/app/lock-store'
-import { openSheet } from '@/app/ui-store'
+import { openSheet, toast } from '@/app/ui-store'
+import { markAbsence, unmarkAbsence } from '@/features/travel/expedition/absence'
 import { Button, IconButton } from '@/components/ui'
 import { useDB } from '@/data/store'
 import type { DateKey } from '@/data/types'
@@ -55,6 +56,9 @@ export function EntryDetail({
   const tz = tzNote(entry, device)
   const day = formatLongDate(isSpan(entry) ? entry.startAt.date : date)
   const statusText = entry.optional ? 'opcional' : STATUS_LABEL[entry.status]
+  // A class of the trip's school: "Faltei" right here, no trip page needed.
+  const isClass = entry.sourceType === 'school'
+  const classDay = entry.startAt.date
 
   const edit = () => {
     if (!entry.open.edit) return
@@ -163,8 +167,25 @@ export function EntryDetail({
         )}
       </div>
 
-      {(entry.open.module || (entry.open.edit && !entry.masked)) && (
+      {(entry.open.module || (entry.open.edit && !entry.masked) || isClass) && (
         <footer className="mt-auto px-5 pt-3 border-t border-line/70 flex flex-wrap gap-2" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 14px)' }}>
+          {isClass && (
+            <Button
+              variant="primary"
+              size="md"
+              className="w-full whitespace-nowrap px-4"
+              icon={<UserX size={16} />}
+              onClick={() => {
+                haptic('light')
+                const tripId = entry.sourceId
+                markAbsence(tripId, classDay)
+                onClose()
+                toast('Falta registrada', { action: { label: 'Desfazer', run: () => unmarkAbsence(tripId, classDay) } })
+              }}
+            >
+              Faltei nessa aula
+            </Button>
+          )}
           {entry.open.module && (
             <Button
               variant="soft"

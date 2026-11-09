@@ -115,7 +115,22 @@ export function HojeList({ rows, onOpen, conflicts, onConflicts }: { rows: Calen
 
 // ─── Próximos dias ──────────────────────────────────────────────────────────
 
-export function ProximosList({ days, today, onOpen, agendaHref }: { days: NextDay[]; today: DateKey; onOpen: (e: CalendarEntry, d: DateKey) => void; agendaHref: string }) {
+export function ProximosList({
+  days,
+  today,
+  onOpen,
+  agendaHref,
+  conflicts,
+  onConflicts,
+}: {
+  days: NextDay[]
+  today: DateKey
+  onOpen: (e: CalendarEntry, d: DateKey) => void
+  agendaHref: string
+  /** Conflicts per day: a day with any gets its own small chip next to its name. */
+  conflicts?: Map<DateKey, number>
+  onConflicts?: (date: DateKey) => void
+}) {
   return (
     <section aria-label="Próximos dias">
       <Eyebrow label="02 / Agenda" action={<SeeAll to={agendaHref}>Ver agenda</SeeAll>}>
@@ -125,7 +140,15 @@ export function ProximosList({ days, today, onOpen, agendaHref }: { days: NextDa
         <div className="space-y-3">
           {days.map((d) => (
             <div key={d.date} aria-label={dayHeader(d.date, today)} role="group">
-              <h3 className="text-[12.5px] text-muted font-medium pt-1">{dayHeader(d.date, today)}</h3>
+              <div className="flex items-center justify-between gap-2 pt-1">
+                <h3 className="text-[12.5px] text-muted font-medium">{dayHeader(d.date, today)}</h3>
+                {!!conflicts?.get(d.date) && (
+                  <button type="button" onClick={() => onConflicts?.(d.date)} className="h-7 px-2 -mr-1 rounded-full inline-flex items-center gap-1 text-[11.5px] bg-sand-soft text-ink-2 active:opacity-70">
+                    <TriangleAlert size={11} aria-hidden />
+                    {conflicts.get(d.date) === 1 ? '1 conflito' : `${conflicts.get(d.date)} conflitos`}
+                  </button>
+                )}
+              </div>
               <ul className="divide-y divide-line/60">
                 {d.rows.map((e) => (
                   <EntryLine key={e.id} e={e} onOpen={(x) => onOpen(x, d.date)} />

@@ -88,6 +88,12 @@ export default function TodayPage() {
     const until = addDays(day, CONFLICT_DAYS)
     return cal.conflicts.filter((c) => c.date >= day && c.date <= until)
   }, [cal.conflicts, day])
+  // Each conflict shows on its own day: "Hoje" counts only today's, Próximos dias marks the others.
+  const conflictsByDay = useMemo(() => {
+    const m = new Map<DateKey, number>()
+    for (const c of conflicts) m.set(c.date, (m.get(c.date) ?? 0) + 1)
+    return m
+  }, [conflicts])
 
   // 4 — Precisa de você.
   const lock = useLockState()
@@ -127,7 +133,7 @@ export default function TodayPage() {
   const [sel, setSel] = useState<{ id: string; date: DateKey }>()
   const detail = useEntry(sel, day)
   const device = useMemo(() => deviceTimeZone(), [])
-  const [showConflicts, setShowConflicts] = useState(false)
+  const [showConflicts, setShowConflicts] = useState<DateKey>()
   const openEntry = useCallback((e: CalendarEntry, d: DateKey) => setSel({ id: e.id, date: d }), [])
 
   // Lumos answers slide up in its sheet over the page — Home itself never moves.
@@ -166,11 +172,11 @@ export default function TodayPage() {
       </header>
 
       <motion.div {...rise(1)} className="mt-5">
-        <HojeList rows={hoje} onOpen={(e) => openEntry(e, day)} conflicts={conflicts.length} onConflicts={() => setShowConflicts(true)} />
+        <HojeList rows={hoje} onOpen={(e) => openEntry(e, day)} conflicts={conflictsByDay.get(day) ?? 0} onConflicts={() => setShowConflicts(day)} />
       </motion.div>
 
       <motion.div {...rise(2)} className="mt-7">
-        <ProximosList days={proximos} today={day} onOpen={openEntry} agendaHref={ROUTES.agenda} />
+        <ProximosList days={proximos} today={day} onOpen={openEntry} agendaHref={ROUTES.agenda} conflicts={conflictsByDay} onConflicts={setShowConflicts} />
       </motion.div>
 
       {needs.length > 0 && (
@@ -208,8 +214,8 @@ export default function TodayPage() {
           </SheetFrame>
         )}
         {showConflicts && !sel && (
-          <SheetFrame key="conflicts" onClose={() => setShowConflicts(false)} label="Conflitos">
-            <ConflictList conflicts={conflicts} onOpenEntry={(id, date) => setSel({ id, date })} />
+          <SheetFrame key="conflicts" onClose={() => setShowConflicts(undefined)} label="Conflitos">
+            <ConflictList conflicts={conflicts.filter((c) => c.date === showConflicts)} onOpenEntry={(id, date) => setSel({ id, date })} />
           </SheetFrame>
         )}
       </AnimatePresence>

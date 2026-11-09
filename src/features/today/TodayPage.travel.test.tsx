@@ -56,6 +56,25 @@ describe('Home limpa em viagem (Cape Town, 06/11)', () => {
     expect(text).not.toMatch(/\d+ de \d+/)
   })
 
+  it('"Faltei nessa aula" right from Home: one absence record, the class leaves the day, Desfazer brings it back', () => {
+    renderAt()
+    const hoje = () => screen.getByLabelText('Hoje')
+    fireEvent.click(within(hoje()).getByText('Aula · Bayswater Cape Town'))
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Detalhe do compromisso' })).getByRole('button', { name: /Faltei nessa aula/ }))
+    const absences = getDB().tripItems.filter((i) => i.id === `school-absence:${trip().id}:2026-11-06`)
+    expect(absences).toHaveLength(1)
+    expect(absences[0]).toMatchObject({ title: 'Falta na escola', schoolImpact: 'dia', status: 'feito', date: '2026-11-06' })
+    expect(hoje().textContent).not.toContain('Aula · Bayswater')
+    useUI.getState().toasts.at(-1)!.action!.run()
+    expect(getDB().tripItems.some((i) => i.id === `school-absence:${trip().id}:2026-11-06`)).toBe(false)
+  })
+
+  it('a conflict on another day is not shown as a conflict of today', () => {
+    renderAt()
+    const hoje = screen.getByLabelText('Hoje')
+    expect(within(hoje).queryByRole('button', { name: /conflito/ })).toBeNull()
+  })
+
   it('Hoje lists the day from the universal calendar: the class at 09:00, in time order, one line each', () => {
     renderAt()
     const hoje = screen.getByLabelText('Hoje')
