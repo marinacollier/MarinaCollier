@@ -56,7 +56,7 @@ describe('Home limpa em viagem (Cape Town, 06/11)', () => {
     expect(text).not.toMatch(/\d+ de \d+/)
   })
 
-  it('"Faltei nessa aula" right from Home: one absence record, the class leaves the day, Desfazer brings it back', () => {
+  it('"Faltei nessa aula" right from Home: one absence record, the class stays tagged "faltei", Desfazer clears it', () => {
     renderAt()
     const hoje = () => screen.getByLabelText('Hoje')
     fireEvent.click(within(hoje()).getByText('Aula · Bayswater Cape Town'))
@@ -64,7 +64,10 @@ describe('Home limpa em viagem (Cape Town, 06/11)', () => {
     const absences = getDB().tripItems.filter((i) => i.id === `school-absence:${trip().id}:2026-11-06`)
     expect(absences).toHaveLength(1)
     expect(absences[0]).toMatchObject({ title: 'Falta na escola', schoolImpact: 'dia', status: 'feito', date: '2026-11-06' })
-    expect(hoje().textContent).not.toContain('Aula · Bayswater')
+    // The class stays on the day, tagged "faltei" (not "feito", not gone).
+    const row = [...hoje().querySelectorAll('li')].find((li) => li.textContent?.includes('Aula · Bayswater'))
+    expect(row?.textContent).toContain('faltei')
+    expect(row?.textContent).not.toContain('feito')
     useUI.getState().toasts.at(-1)!.action!.run()
     expect(getDB().tripItems.some((i) => i.id === `school-absence:${trip().id}:2026-11-06`)).toBe(false)
   })

@@ -76,7 +76,7 @@ const COMMITMENT = new Set<CalendarEntry['sourceType']>(['event', 'workout', 'ta
 
 /** A commitment worth a line on Home: no background base (work hours), no trip span, no undecided extras. */
 export function isHomeEntry(e: CalendarEntry): boolean {
-  if (e.base || e.optional || e.status === 'cancelado') return false
+  if (e.base || e.optional || (e.status === 'cancelado' && !e.absent)) return false
   return COMMITMENT.has(e.sourceType)
 }
 
@@ -118,6 +118,7 @@ export function dayHeader(d: DateKey, today: DateKey): string {
 
 /** Tiny status chip of a row ("a confirmar", "pago", "reservar"…), or nothing when all is fine. */
 export function entryChip(db: Pick<DB, 'tripItems'>, e: CalendarEntry): string | undefined {
+  if (e.absent) return 'faltei'
   if (e.status === 'feito') return 'feito'
   if (e.sourceType === 'tripItem') {
     const i = db.tripItems.find((x) => x.id === e.sourceId)

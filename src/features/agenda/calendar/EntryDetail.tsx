@@ -55,7 +55,7 @@ export function EntryDetail({
   const Icon = iconOf(entry)
   const tz = tzNote(entry, device)
   const day = formatLongDate(isSpan(entry) ? entry.startAt.date : date)
-  const statusText = entry.optional ? 'opcional' : STATUS_LABEL[entry.status]
+  const statusText = entry.absent ? 'faltei' : entry.optional ? 'opcional' : STATUS_LABEL[entry.status]
   // A class of the trip's school: "Faltei" right here, no trip page needed.
   const isClass = entry.sourceType === 'school'
   const classDay = entry.startAt.date
@@ -171,19 +171,25 @@ export function EntryDetail({
         <footer className="mt-auto px-5 pt-3 border-t border-line/70 flex flex-wrap gap-2" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 14px)' }}>
           {isClass && (
             <Button
-              variant="primary"
+              variant={entry.absent ? 'outline' : 'primary'}
               size="md"
               className="w-full whitespace-nowrap px-4"
               icon={<UserX size={16} />}
               onClick={() => {
                 haptic('light')
                 const tripId = entry.sourceId
+                if (entry.absent) {
+                  unmarkAbsence(tripId, classDay)
+                  onClose()
+                  toast('Falta desfeita: aula de volta', { action: { label: 'Desfazer', run: () => markAbsence(tripId, classDay) } })
+                  return
+                }
                 markAbsence(tripId, classDay)
                 onClose()
                 toast('Falta registrada', { action: { label: 'Desfazer', run: () => unmarkAbsence(tripId, classDay) } })
               }}
             >
-              Faltei nessa aula
+              {entry.absent ? 'Não faltei: desfazer' : 'Faltei nessa aula'}
             </Button>
           )}
           {entry.open.module && (

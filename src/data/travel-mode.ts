@@ -15,7 +15,7 @@
  * She can turn it off per trip: `trip.pauseHomeRoutine === false`.
  * Pure and dependency-light (types + date helpers) so every data module can import it.
  */
-import type { CalendarEvent, DateKey, DB, Routine, Trip, Workout } from './types'
+import type { CalendarEvent, DateKey, DB, Routine, Trip, TripItem, Workout } from './types'
 import { SEED_IDS } from './seed/ids'
 import { weekday } from '@/lib/date'
 
@@ -85,6 +85,27 @@ export function travelClassOn(db: Pick<DB, 'trips' | 'tripItems'>, date: DateKey
   if (!trip || !cls) return undefined
   const absent = db.tripItems.some((i) => i.tripId === trip.id && i.status !== 'cancelado' && i.schoolImpact === 'dia' && !!i.date && i.date <= date && (i.endDate ?? i.date) >= date)
   return absent ? undefined : { trip, ...cls }
+}
+
+/** "Falta na escola" she marked for that day (not an activity that takes the day): the class stays visible, tagged "faltei". */
+export function isSchoolAbsence(i: Pick<TripItem, 'id' | 'group' | 'title' | 'schoolImpact'>): boolean {
+  return i.schoolImpact === 'dia' && (i.id.startsWith('school-absence:') || (i.group === 'Escola' && /^falta/i.test(i.title)))
+}
+
+/**
+ * The class of the day as the calendar shows it: also on a day she missed (`absent`), so the day keeps the
+ * class with a "faltei" tag. A day taken by an activity (Garden Route, mergulho) still has no class line.
+ */
+export function classLineOn(db: Pick<DB, 'trips' | 'tripItems'>, date: DateKey): ({ trip: Trip; start: string; end: string; name: string; absent?: TripItem }) | undefined {
+  const live = travelClassOn(db, date)
+  if (live) return live
+  const trip = travelTripOn(db, date)
+  const cls = trip && classBlockOn(trip, date)
+  if (!trip || !cls) return undefined
+  const covering = db.tripItems.filter((i) => i.tripId === trip.id && i.status !== 'cancelado' && i.schoolImpact === 'dia' && !!i.date && i.date <= date && (i.endDate ?? i.date) >= date)
+  const absence = covering.find(isSchoolAbsence)
+  // Only her own absence keeps the line; an activity that takes the whole day already says so itself.
+  return absence && covering.every(isSchoolAbsence) ? { trip, ...cls, absent: absence } : undefined
 }
 
 // ─── What pauses ────────────────────────────────────────────────────────────

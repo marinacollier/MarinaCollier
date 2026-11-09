@@ -34,7 +34,7 @@ import { eventsFor, isTaskDoneOn, modalityOf, petTasksDue, tasksForDay } from '.
 import { conflictsOn, PERIOD_RANGES, workBlocks } from '../planning'
 import { contextWorkouts } from '../fuel'
 import { overrideFor } from '../timeline'
-import { travelClassOn } from '../travel-mode'
+import { classLineOn, isSchoolAbsence } from '../travel-mode'
 import { billDueDate, billPaid, isBill } from '../finance/bills'
 import { isIncome, receivablesFor } from '../finance/receivables'
 import { BOOKING_STATUS_META, bookingStatusOf } from '@/features/travel/expedition/command'
@@ -128,6 +128,8 @@ export interface CalendarEntry {
   optional?: boolean
   /** Trip item: what it does to the class day (she already decided → not a clash with the class). */
   schoolImpact?: 'parcial' | 'dia'
+  /** A class she missed: stays on the day (status 'cancelado', never a clash), tagged "faltei". */
+  absent?: boolean
   /** What to do next, when the source says. */
   nextAction?: string
   /** Extra lines for the detail view (label → value). Never amounts when finance is locked. */
@@ -431,7 +433,7 @@ export function calendarEntries(db: DB, from: DateKey, to: DateKey, opts: Calend
     }
 
     // 5. Modo viagem: the expedition's class (her English course) on class days.
-    const cls = travelClassOn(db, date)
+    const cls = classLineOn(db, date)
     if (cls) {
       const school = cls.trip.expedition?.school
       push({
@@ -444,7 +446,8 @@ export function calendarEntries(db: DB, from: DateKey, to: DateKey, opts: Calend
         category: 'estudo',
         sourceType: 'school',
         sourceId: cls.trip.id,
-        status: 'confirmado',
+        status: cls.absent ? 'cancelado' : 'confirmado',
+        absent: cls.absent ? true : undefined,
         location: school?.address,
         allDay: false,
         visibility: 'normal',
@@ -510,6 +513,8 @@ export function calendarEntries(db: DB, from: DateKey, to: DateKey, opts: Calend
     const trip = tripsById.get(i.tripId)
     const status = tripItemStatus(i)
     if (status === 'cancelado' && !opts.includeCancelled) continue
+    // Her "Falta na escola" is shown on the class itself ("faltei"), not as a second line.
+    if (isSchoolAbsence(i) && i.date && classLineOn(db, i.date)?.absent) continue
     const meta = BOOKING_STATUS_META[bookingStatusOf(i)]
     const details = compact([
       { label: 'Saída', value: i.leaveTime },
@@ -876,7 +881,7 @@ export function calendarEntries(db: DB, from: DateKey, to: DateKey, opts: Calend
     }
   }
 
-  const visible = opts.includeCancelled ? out : out.filter((e) => e.status !== 'cancelado')
+  const visible = opts.includeCancelled ? out : out.filter((e) => e.status !== 'cancelado' || e.absent)
   return sortEntries(dedupeEntries(visible).map((e) => applyPrivacy(e, opts)))
 }
 

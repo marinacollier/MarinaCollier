@@ -6,6 +6,7 @@
  */
 import { actions, getDB } from '@/data/store'
 import type { DateKey, ID, TripItem } from '@/data/types'
+import { isSchoolAbsence } from '@/data/travel-mode'
 
 export const absenceId = (tripId: ID, date: DateKey) => `school-absence:${tripId}:${date}`
 
@@ -32,7 +33,11 @@ export function markAbsence(tripId: ID, date: DateKey): TripItem {
   } as TripItem)
 }
 
-/** Undo: the class comes back on that day. */
+/** Undo: the class is back as a normal class that day. Her older absence records are cancelled, not deleted. */
 export function unmarkAbsence(tripId: ID, date: DateKey): void {
-  actions.remove('tripItems', absenceId(tripId, date))
+  for (const i of getDB().tripItems) {
+    if (i.tripId !== tripId || i.status === 'cancelado' || !isSchoolAbsence(i) || !i.date || i.date > date || (i.endDate ?? i.date) < date) continue
+    if (i.id === absenceId(tripId, date)) actions.remove('tripItems', i.id)
+    else actions.update('tripItems', i.id, { status: 'cancelado' })
+  }
 }
