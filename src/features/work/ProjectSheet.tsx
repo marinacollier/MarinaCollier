@@ -4,7 +4,7 @@ import type { SheetProps } from '@/app/sheet-types'
 import { removeWithUndo } from '@/app/undo'
 import { actions, getDB, nextOrder } from '@/data/store'
 import type { Priority, Project, ProjectStatus, Tone } from '@/data/types'
-import { ChipSelect, DateInput, Field, MoreOptions, SheetLayout, TextArea, TextInput, TitleInput, tone } from '@/components/ui'
+import { ChipSelect, DateInput, Field, MoreOptions, NumberInput, SheetLayout, TextArea, TextInput, TitleInput, tone } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { haptic } from '@/lib/haptics'
 import { PRIORITY_OPTIONS, PROJECT_STATUS_OPTIONS, TONE_OPTIONS } from './constants'
@@ -32,6 +32,8 @@ export default function ProjectSheet({ id }: SheetProps<'project'>) {
   const [creator, setCreator] = useState(existing?.kind === 'creator')
   const [sections, setSections] = useState((existing?.sections ?? []).join(', '))
   const [categories, setCategories] = useState((existing?.categories ?? []).join(', '))
+  const [weeklyHours, setWeeklyHours] = useState(existing?.weeklyHours)
+  const [weeklyHoursFrom, setWeeklyHoursFrom] = useState(existing?.weeklyHoursFrom)
 
   const save = () => {
     const data: Partial<Project> = {
@@ -47,6 +49,8 @@ export default function ProjectSheet({ id }: SheetProps<'project'>) {
       kind: creator ? 'creator' : 'default',
       sections: splitList(sections),
       categories: creator ? splitList(categories) : existing?.categories,
+      weeklyHours: weeklyHours && weeklyHours > 0 ? weeklyHours : undefined,
+      weeklyHoursFrom: weeklyHours && weeklyHours > 0 ? weeklyHoursFrom : undefined,
     }
     if (existing) {
       updateProject(existing.id, data)
@@ -123,6 +127,17 @@ export default function ProjectSheet({ id }: SheetProps<'project'>) {
         </Field>
         <Field label="Seções" hint="Áreas do projeto, separadas por vírgula — viram filtros das tarefas.">
           <TextInput placeholder="ex.: Planner, Match" value={sections} onChange={(e) => setSections(e.target.value)} />
+        </Field>
+        <Field label="Horas por semana (planejamento)" hint="Uma proposta, não um contrato — entra na capacidade de “Minha semana”. Vazio = não conta.">
+          <div className="flex items-center gap-2">
+            <NumberInput aria-label="Horas por semana" min={0} max={80} step={0.5} placeholder="ex.: 20" value={weeklyHours} onChange={setWeeklyHours} className="w-28" />
+            {!!weeklyHours && (
+              <>
+                <span className="text-[13px] text-muted shrink-0">a partir de</span>
+                <DateInput aria-label="Horas por semana a partir de" value={weeklyHoursFrom} onChange={setWeeklyHoursFrom} />
+              </>
+            )}
+          </div>
         </Field>
         <Field label="Deadline" hint="Só se existir de verdade.">
           <DateInput value={deadline} onChange={setDeadline} />

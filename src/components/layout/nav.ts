@@ -18,7 +18,7 @@ const PROJECT_PATHS = [ROUTES.projects, ROUTES.work, ROUTES.career]
 /** The tab a page belongs to (pages reached from a hub keep that hub lit). */
 export function activeTab(pathname: string): string {
   if (pathname === '/' || pathname.startsWith('/lumos') || pathname.startsWith('/ajustes')) return ROUTES.today
-  if (pathname.startsWith(ROUTES.agenda) || pathname.startsWith(ROUTES.weekPlanner)) return ROUTES.agenda
+  if (pathname.startsWith(ROUTES.agenda) || pathname.startsWith(ROUTES.weekPlanner) || pathname.startsWith(ROUTES.myWeek)) return ROUTES.agenda
   if (PROJECT_PATHS.some((p) => pathname.startsWith(p))) return ROUTES.projects
   if (pathname.startsWith(ROUTES.money)) return ROUTES.money
   return ROUTES.spaces
