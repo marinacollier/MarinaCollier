@@ -326,3 +326,28 @@ describe('ChatGPT context (marina-os/context@1)', () => {
     expect(getDB()).toBe(before)
   })
 })
+
+describe('a semana inteira num JSON só (evento · estudo · reserva)', () => {
+  it('cria evento e sessão de estudo; reenviar o mesmo arquivo não duplica', async () => {
+    const d = doc([
+      { op: 'create', type: 'event', sourceKey: 'ev-missa', fields: { title: 'Missa', date: '2026-10-21', startTime: '13:15', tentative: true, externalId: 'g-123' } },
+      { op: 'create', type: 'studySession', sourceKey: 'st-1', fields: { date: '2026-10-15', minutes: 60, domain: 'idiomas', title: 'Speaking' } },
+    ])
+    const a = await run(d)
+    expect(a.written).toBe(2)
+    expect(getDB().events.find((e) => e.title === 'Missa')).toMatchObject({ date: '2026-10-21', startTime: '13:15', planType: 'a_confirmar', external: { externalId: 'g-123' } })
+    expect(getDB().studySessions.filter((s) => s.title === 'Speaking')).toHaveLength(1)
+    later(1)
+    expect((await run(d)).written).toBe(0)
+    expect(getDB().events.filter((e) => e.title === 'Missa')).toHaveLength(1)
+  })
+
+  it('uma remarcação acha a reserva pelo nº de confirmação, mesmo com outro título', async () => {
+    const trip = getDB().trips[0]
+    expect(trip).toBeTruthy()
+    actions.create('tripItems', { id: 'shark', tripId: trip.id, section: 'reserva', title: 'Shark dive', confirmationCode: '390589937', date: '2026-10-20', status: 'confirmado', order: 0 } as never)
+    const plan = planChanges(getDB(), doc([{ op: 'move', type: 'tripItem', match: { title: 'Hookah Shark Dive + Whale Watching' }, fields: { trip: trip.name, confirmationCode: '390589937', date: '2026-10-22' } }]), { today: TODAY })
+    expect(plan.items[0]).toMatchObject({ action: 'move' })
+    expect(plan.items[0].targetId).toBe('shark')
+  })
+})

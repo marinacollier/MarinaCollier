@@ -169,7 +169,8 @@ describe('Home · sem horário e status', () => {
     const stay = entry({ id: 'tripItem:h', date: '2026-11-10', sourceType: 'tripItem', sourceId: 'h' })
     const aula = entry({ id: 'aula', date: '2026-11-10', time: '09:00', sourceType: 'school' })
     const rows = looseRows({ tripItems: [], tasks }, [dl, dl2, stay, aula], '2026-11-10')
-    expect(rows.map((r) => r.title)).toEqual(['tripItem:h', 'Comprar canga', 'Pesar mala', 'Conferir voo'])
+    expect(rows.map((r) => r.title)).toEqual(['tripItem:h', 'Comprar canga', 'Pesar mala', 'Conferir voo', 'Já feito'])
+    expect(rows.at(-1)).toMatchObject({ chip: 'feito', done: true })
     expect(timedRows([dl, stay, aula], '2026-11-10').map((e) => e.id)).toEqual(['aula'])
   })
   it('a paid booking, a confirmed one and an idea never look the same', () => {

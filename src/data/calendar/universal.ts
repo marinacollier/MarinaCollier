@@ -35,7 +35,7 @@ import { eventsFor, isTaskDoneOn, modalityOf, petTasksDue, tasksForDay } from '.
 import { conflictsOn, PERIOD_RANGES, workBlocks } from '../planning'
 import { contextWorkouts } from '../fuel'
 import { overrideFor } from '../timeline'
-import { classLineOn, isSchoolAbsence } from '../travel-mode'
+import { classLineOn, isSchoolAbsence, isTravelDay } from '../travel-mode'
 import { DAY_BLOCK_CATEGORY_META, dayBlocksOn, routineModeInfo } from '../routine-modes'
 import { tripItemKind } from './kind'
 import { billDueDate, billPaid, isBill } from '../finance/bills'
@@ -412,6 +412,40 @@ export function calendarEntries(db: DB, from: DateKey, to: DateKey, opts: Calend
           { label: 'Modo', value: light ? 'Transição · leve e opcional' : undefined },
         ]),
       })
+    }
+
+    // 2b. Modo viagem: her week template stays visible as a SUGGESTION (light, optional, never "missed") on
+    // ordinary trip days with no workout of their own — not on a day with a flight, an early pickup or a
+    // full-day activity (the trip leads there).
+    if (date >= today && isTravelDay(db, date) && !db.workouts.some((w) => w.date === date) && !travelDayIsFull(db, date)) {
+      for (const t of db.weekTemplate) {
+        if (!t.active || t.choice !== 'fixed' || t.weekday !== weekdayOf(date) || !t.modalities[0]) continue
+        const o = overrideFor(db, date, 'weekTemplate', t.id)
+        if (o?.cancelled) continue
+        const m = modalityOf(db, t.modalities[0])
+        const dur = t.durationMin ?? 45
+        push({
+          id: `workout:template:${t.id}:${date}`,
+          title: t.title || m.label,
+          startAt: { date, time: o?.time ?? t.time },
+          endAt: { date, time: (o?.time ?? t.time) ? plusMin((o?.time ?? t.time)!, dur) : undefined },
+          timezone: homeTz,
+          category: 'treino',
+          sourceType: 'workout',
+          sourceId: `template:${t.id}:${date}`,
+          status: 'planejado',
+          allDay: false,
+          visibility: 'normal',
+          sourceLabel: 'Sugestão · semana modelo (viagem)',
+          approx: !t.time,
+          light: true,
+          open: { module: { label: 'Treino', route: ROUTES.body } },
+          details: compact([
+            { label: 'Modalidade', value: m.label },
+            { label: 'Modo', value: 'Viagem · sugestão leve e opcional da tua semana modelo' },
+          ]),
+        })
+      }
     }
 
     // 3. Tasks with a time that day (or placed there by an override).
@@ -1071,6 +1105,16 @@ export function dedupeEntries(list: CalendarEntry[]): CalendarEntry[] {
   }
   return items
 }
+
+/** A trip day already full: a flight, a pickup before 08:00 or a full-day activity (no extra workout then). */
+function travelDayIsFull(db: DB, date: DateKey): boolean {
+  return db.tripItems.some((i) => {
+    if (i.date !== date || tripItemStatus(i) === 'cancelado') return false
+    return i.section === 'voo' || /^voo\b/i.test(i.title) || i.schoolImpact === 'dia' || (!!i.time && i.time < '08:00')
+  })
+}
+
+const weekdayOf = (date: DateKey) => new Date(`${date}T12:00:00Z`).getUTCDay()
 
 // ─── Reading helpers ────────────────────────────────────────────────────────
 

@@ -22,7 +22,7 @@ Concluir um treino muda o registro: a Home e a página de Treinos mostram o mesm
   - Valida o arquivo e mostra uma prévia.
   - Reconhece o que já existe por `id`, `sourceKey` ou `externalRef`.
   - Importar o mesmo arquivo duas vezes dá "unchanged".
-  - Tipos aceitos: task, waiting, backlog, plannedWorkout, completedWorkout, tripItem, project, routine, expense, receita.
+  - Tipos aceitos: task, waiting, backlog, plannedWorkout, completedWorkout, tripItem, event, studySession, project, routine, expense, receita.
   - Não precisa de IA.
 - **Lumos:** grava pelos mesmos registros, então não duplica.
 - **Google Calendar, Gmail, Garmin:** **não sincronizam sozinhos.**
@@ -31,10 +31,10 @@ Concluir um treino muda o registro: a Home e a página de Treinos mostram o mesm
 
 ## Plano (em ordem, cada passo só leitura + aprovação)
 
-1. **Mais tipos no importador** (próximo passo):
-   - `event`, identificado pelo id externo do Google (`external.globalId`);
-   - `studySession`;
-   - `tripItem` identificado pelo número de confirmação e pelo fornecedor.
+1. **Mais tipos no importador — FEITO (09/11):**
+   - `event`, identificado pelo id externo (`externalId`) ou por título + dia;
+   - `studySession`, identificada por dia + área + título (os minutos nunca contam duas vezes);
+   - `tripItem` identificado primeiro pelo nº de confirmação. Agora aceita hora, fornecedor, status da reserva e próximo passo.
 
    Com isso, o JSON do Daily Briefing ou do ChatGPT cobre a semana inteira.
 2. **Google Calendar só leitura dentro do app:**

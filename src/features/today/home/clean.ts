@@ -142,7 +142,7 @@ export function entryChip(db: Pick<DB, 'tripItems'>, e: CalendarEntry): string |
       if (b === 'planejado' || i.section === 'quero_ir' || i.section === 'roteiro' || i.flexible) return e.status === 'confirmado' ? undefined : 'planejado'
     }
   }
-  if (e.sourceType === 'workout' && e.status === 'planejado') return 'planejado'
+  if (e.sourceType === 'workout' && e.status === 'planejado') return e.light ? 'sugestão' : 'planejado'
   return e.status === 'pendente' ? 'a confirmar' : undefined
 }
 
@@ -152,7 +152,7 @@ export type ChipTone = 'soft' | 'warn' | 'done' | 'ok' | 'plan' | 'alert'
 export function chipTone(c: string): ChipTone {
   if (c === 'feito' || c === 'pago') return 'done'
   if (c === 'confirmado') return 'ok'
-  if (c === 'planejado' || c === 'opcional') return 'plan'
+  if (c === 'planejado' || c === 'opcional' || c === 'sugestão') return 'plan'
   if (c === 'cancelado' || c === 'faltei') return 'soft'
   if (c === 'conflito') return 'alert'
   return 'warn'
@@ -170,6 +170,12 @@ export interface LooseRow {
 }
 
 const isTimed = (e: CalendarEntry) => !!timeOf(e)
+
+/** The device-local day of an ISO instant (where she is now). */
+const localDay = (iso: string): DateKey => {
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 /** The day's timed commitments, in order (what goes in the time column). */
 export function timedRows(entries: CalendarEntry[], date: DateKey): CalendarEntry[] {
@@ -190,9 +196,12 @@ export function looseRows(db: Pick<DB, 'tripItems' | 'tasks'>, entries: Calendar
     out.push({ key: e.id, title: e.title, chip: entryChip(db, e), done: e.status === 'feito', open: { kind: 'entry', entry: e } })
   }
   for (const t of db.tasks) {
-    if (t.date !== date || t.time || t.recurrence || (t.status !== 'todo' && t.status !== 'doing')) continue
+    if (t.time || t.recurrence) continue
+    // What she finished that day stays on the day as "feito" (it never just vanishes).
+    const done = t.status === 'done' && (t.date === date || (!!t.completedAt && localDay(t.completedAt) === date))
+    if (!done && (t.date !== date || (t.status !== 'todo' && t.status !== 'doing'))) continue
     seen.add(`task:${t.id}`)
-    out.push({ key: `task:${t.id}`, title: t.title, chip: t.dueDate && t.dueDate <= date ? 'prazo' : undefined, open: { kind: 'task', id: t.id } })
+    out.push({ key: `task:${t.id}`, title: t.title, chip: done ? 'feito' : t.dueDate && t.dueDate <= date ? 'prazo' : undefined, done, open: { kind: 'task', id: t.id } })
   }
   for (const e of entries) {
     if (e.startAt.date !== date || e.status === 'feito' || e.status === 'cancelado') continue
@@ -202,7 +211,8 @@ export function looseRows(db: Pick<DB, 'tripItems' | 'tasks'>, entries: Calendar
     seen.add(base)
     out.push({ key: e.id, title: e.title.replace(/^Prazo: /, ''), chip: e.sourceType === 'waiting' ? 'cobrar' : 'prazo', open: { kind: 'entry', entry: e } })
   }
-  return out
+  // Open first, done at the end of the list.
+  return out.sort((a, b) => Number(!!a.done) - Number(!!b.done))
 }
 
 function tripChip(i: TripItem): string | undefined {

@@ -39,6 +39,8 @@ export const CHANGE_TYPES = [
   'project',
   'routine',
   'tripItem',
+  'event',
+  'studySession',
 ] as const
 export type ChangeType = (typeof CHANGE_TYPES)[number]
 /** Accepted spellings of a type (habit = an item of a routine). */

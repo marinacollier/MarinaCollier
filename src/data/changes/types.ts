@@ -720,19 +720,26 @@ const tripItem: TypeDef = {
     group: { kind: 'str', label: 'grupo' },
     status: { kind: 'enum', label: 'status', values: ['a_confirmar', 'a_fazer', 'confirmado', 'feito'] },
     paymentStatus: { kind: 'enum', label: 'pagamento', values: ['a_confirmar', 'pendente', 'pago', 'nao_se_aplica'] },
+    bookingStatus: { kind: 'enum', label: 'reserva', values: ['planejado', 'a_cotar', 'a_reservar', 'aguardando_resposta', 'reservado', 'reserva_emitida', 'confirmado', 'aguardando_pagamento', 'concluido', 'cancelado', 'opcional'] },
     date: { kind: 'date', label: 'dia' },
+    time: { kind: 'time', label: 'hora' },
+    endTime: { kind: 'time', label: 'até (hora)' },
     endDate: { kind: 'date', label: 'até' },
+    confirmationCode: { kind: 'str', label: 'nº da reserva' },
+    supplier: { kind: 'str', label: 'fornecedor' },
+    address: { kind: 'str', label: 'endereço' },
+    nextAction: { kind: 'text', label: 'próximo passo' },
     notes: { kind: 'text', label: 'notas' },
   },
-  moveFields: ['date', 'endDate'],
+  moveFields: ['date', 'time', 'endTime', 'endDate'],
   required: ['trip', 'title', 'section'],
   belongs: () => true,
   titleOf: (r) => r.title,
-  read: (r, db) => ({ trip: tripName(db, r.tripId), title: r.title, section: r.section, group: r.group, status: r.status, paymentStatus: r.paymentStatus, date: r.date, endDate: r.endDate, notes: r.notes }),
+  read: (r, db) => ({ trip: tripName(db, r.tripId), title: r.title, section: r.section, group: r.group, status: r.status, paymentStatus: r.paymentStatus, bookingStatus: r.bookingStatus, date: r.date, time: r.time, endTime: r.endTime, endDate: r.endDate, confirmationCode: r.confirmationCode, supplier: r.supplier, address: r.address, nextAction: r.nextAction, notes: r.notes }),
   write: (f, db) => {
     const trip = tripRef(db, f)
     if (typeof trip === 'string') return trip
-    return { ...pick(f, ['title', 'section', 'group', 'status', 'paymentStatus', 'date', 'endDate', 'notes']), ...trip }
+    return { ...pick(f, ['title', 'section', 'group', 'status', 'paymentStatus', 'bookingStatus', 'date', 'time', 'endTime', 'endDate', 'confirmationCode', 'supplier', 'address', 'nextAction', 'notes']), ...trip }
   },
   build: (f, db) => {
     const w = tripItem.write(f, db)
@@ -743,12 +750,108 @@ const tripItem: TypeDef = {
   completeTarget: () => ({ status: 'feito' }),
   archiveTarget: { status: 'cancelado' },
   match: (db, q) => {
-    if (!q.title) return []
     const trip = tripRef(db, q.fields)
     const tripId = typeof trip === 'string' ? undefined : trip.tripId
+    // A booking is the same booking by its confirmation number (+ supplier) — a remarcação keeps the code.
+    const code = typeof q.fields.confirmationCode === 'string' ? normalize(q.fields.confirmationCode) : ''
+    if (code) {
+      const byCode = db.tripItems.filter((x) => (!tripId || x.tripId === tripId) && !!x.confirmationCode && normalize(x.confirmationCode) === code)
+      if (byCode.length) return byCode as Rec[]
+    }
+    if (!q.title) return []
     return db.tripItems.filter((x) => (!tripId || x.tripId === tripId) && sameTitle(x.title, q.title!)) as Rec[]
   },
   sub: (r, db) => [tripName(db, r.tripId), r.group, r.paymentStatus === 'pago' ? 'pago' : undefined].filter(Boolean).join(' · ') || undefined,
+}
+
+// ─── agenda events (her own calendar; external ones are edited at the origin) ─
+
+const event: TypeDef = {
+  label: 'evento',
+  collection: 'events',
+  fields: {
+    title: { kind: 'str', label: 'título' },
+    date: { kind: 'date', label: 'dia' },
+    startTime: { kind: 'time', label: 'início' },
+    endTime: { kind: 'time', label: 'fim' },
+    location: { kind: 'str', label: 'local' },
+    url: { kind: 'str', label: 'link' },
+    notes: { kind: 'text', label: 'notas' },
+    tentative: { kind: 'bool', label: 'a confirmar' },
+    externalId: { kind: 'str', label: 'id externo' },
+  },
+  moveFields: ['date', 'startTime', 'endTime'],
+  required: ['title', 'date'],
+  belongs: (r) => !r.sourceId || r.sourceId === 'cal-local' || r.sourceId === 'local',
+  titleOf: (r) => r.title,
+  read: (r) => ({ title: r.title, date: r.date, startTime: r.startTime, endTime: r.endTime, location: r.location, url: r.url, notes: r.notes, tentative: r.planType === 'a_confirmar' || undefined, externalId: r.external?.globalId ?? r.external?.externalId }),
+  write: (f, db) => {
+    const out: Record<string, unknown> = pick(f, ['title', 'date', 'startTime', 'endTime', 'location', 'url', 'notes'])
+    if ('tentative' in f) out.planType = f.tentative ? 'a_confirmar' : undefined
+    if (typeof f.externalId === 'string') out.external = { externalId: f.externalId }
+    const date = (f.date as string | undefined) ?? undefined
+    const trip = date ? db.trips.find((t) => t.startDate && t.startDate <= date && (t.endDate ?? t.startDate) >= date) : undefined
+    if (trip && date) out.tripId = trip.id
+    return out
+  },
+  build: (f, db) => {
+    const w = event.write(f, db)
+    if (typeof w === 'string') return w
+    return { sourceId: 'cal-local', allDay: !f.startTime, ...w }
+  },
+  state: () => 'open',
+  match: (db, q) => {
+    const ext = typeof q.fields.externalId === 'string' ? q.fields.externalId : undefined
+    if (ext) {
+      const byExt = db.events.filter((e) => e.external?.externalId === ext || e.external?.globalId === ext)
+      if (byExt.length) return byExt as Rec[]
+    }
+    if (!q.title) return []
+    const date = q.date ?? (q.fields.date as string | undefined)
+    return db.events.filter((e) => sameTitle(e.title, q.title!) && (!date || e.date === date)) as Rec[]
+  },
+  sub: (r) => [r.date, r.startTime].filter(Boolean).join(' · ') || undefined,
+}
+
+// ─── study sessions (Aprendizagem: minutes count once, in the main domain) ─
+
+const studySession: TypeDef = {
+  label: 'sessão de estudo',
+  collection: 'studySessions',
+  fields: {
+    date: { kind: 'date', label: 'dia' },
+    startTime: { kind: 'time', label: 'hora' },
+    minutes: { kind: 'int', label: 'minutos' },
+    domain: { kind: 'str', label: 'área' },
+    title: { kind: 'str', label: 'título' },
+    skills: { kind: 'strs', label: 'habilidades' },
+    topics: { kind: 'strs', label: 'assuntos' },
+    tags: { kind: 'strs', label: 'tags' },
+    context: { kind: 'text', label: 'contexto' },
+    notes: { kind: 'text', label: 'notas' },
+  },
+  moveFields: ['date', 'startTime'],
+  required: ['date', 'minutes', 'domain'],
+  belongs: () => true,
+  titleOf: (r) => r.title ?? `${r.domain} · ${r.minutes} min`,
+  read: (r) => ({ date: r.date, startTime: r.startTime, minutes: r.minutes, domain: r.domain, title: r.title, skills: r.skills, topics: r.topics, tags: r.tags, context: r.context, notes: r.notes }),
+  write: (f) => {
+    if (typeof f.minutes === 'number' && (f.minutes < 1 || f.minutes > 720)) return 'minutos entre 1 e 720'
+    return pick(f, ['date', 'startTime', 'minutes', 'domain', 'title', 'skills', 'topics', 'tags', 'context', 'notes'])
+  },
+  build: (f) => {
+    const w = studySession.write(f, {} as DB)
+    if (typeof w === 'string') return w
+    return { status: 'concluido', ...w }
+  },
+  state: (r) => (r.status === 'cancelado' ? 'gone' : 'open'),
+  // The same session = same day + domain + title (a re-sent file never adds minutes twice).
+  match: (db, q) => {
+    const date = q.date ?? (q.fields.date as string | undefined)
+    if (!date) return []
+    return (db.studySessions ?? []).filter((x) => x.date === date && x.domain === q.fields.domain && (!q.title || sameTitle(x.title ?? '', q.title))) as Rec[]
+  },
+  sub: (r) => [r.date, r.minutes ? `${r.minutes} min` : undefined].filter(Boolean).join(' · ') || undefined,
 }
 
 export const TYPE_DEFS: Partial<Record<ChangeType, TypeDef>> = {
@@ -767,6 +870,8 @@ export const TYPE_DEFS: Partial<Record<ChangeType, TypeDef>> = {
   project,
   routine,
   tripItem,
+  event,
+  studySession,
 }
 
 /** Labels for every type, supported or not (the preview names things in her words). */
