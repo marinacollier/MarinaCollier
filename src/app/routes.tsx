@@ -49,6 +49,8 @@ export const ROUTES = {
   trip: (id: string) => `/viagens/${id}`,
   weeklyReview: '/revisao',
   weekPlanner: '/semana',
+  /** Minha semana: capacidade de trabalho por projeto + viabilidade da semana (leitura; nada muda sozinho). */
+  myWeek: '/minha-semana',
   monthlyReview: '/mes',
   search: '/busca',
   assistant: '/lumos',
@@ -113,6 +115,7 @@ export const routeTable: { path: string; Component: React.LazyExoticComponent<Re
   { path: '/viagens/lugares', Component: lazy(() => import('@/features/travel/places/PlacesPage')) },
   { path: '/viagens/:id', Component: lazy(() => import('@/features/travel/TripPage')) },
   { path: '/semana', Component: lazy(() => import('@/features/planner/WeekPlannerPage')) },
+  { path: '/minha-semana', Component: lazy(() => import('@/features/week/WeekPage')) },
   { path: '/revisao', Component: lazy(() => import('@/features/reviews/WeeklyReviewPage')) },
   { path: '/mes', Component: lazy(() => import('@/features/reviews/MonthlyReviewPage')) },
   { path: '/busca', Component: lazy(() => import('@/features/search/SearchPage')) },

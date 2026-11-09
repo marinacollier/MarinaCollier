@@ -8,7 +8,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion, type PanInfo } from 'framer-motion'
-import { CalendarClock, CalendarPlus, CalendarRange, ChevronLeft, ChevronRight, Ellipsis, TriangleAlert } from 'lucide-react'
+import { CalendarClock, CalendarPlus, CalendarRange, ChevronLeft, ChevronRight, Ellipsis, Gauge, TriangleAlert } from 'lucide-react'
 import { ROUTES } from '@/app/routes'
 import { openSheet } from '@/app/ui-store'
 import { Button, Chip, IconButton, Page, PageHeader, Segmented } from '@/components/ui'
@@ -118,6 +118,9 @@ export default function AgendaPage() {
         subtitle={subtitle}
         actions={
           <>
+            <IconButton label="Minha semana" onClick={() => nav(ROUTES.myWeek)}>
+              <Gauge size={20} />
+            </IconButton>
             <IconButton label="Novo compromisso" onClick={() => onNew()}>
               <CalendarPlus size={20} />
             </IconButton>

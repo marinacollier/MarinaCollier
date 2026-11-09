@@ -33,6 +33,9 @@ export default function ProjectsPage() {
         }
       />
       {projects.length > 0 && <HubSection label="Projetos" entries={projects} all="visão de trabalho" onAll={() => nav(ROUTES.work)} />}
+      <button type="button" onClick={() => nav(ROUTES.myWeek)} className="mt-2 px-1 text-[13.5px] text-muted underline underline-offset-2">
+        Minha semana · horas por projeto
+      </button>
       {around.length > 0 && <HubSection label="Carreira, parcerias e retornos" entries={around} delay={40} />}
       {!entries.length && <p className="mt-10 px-1 text-[15px] text-muted">Nenhum projeto aberto. Um projeto novo começa pelo + .</p>}
     </Page>

@@ -540,6 +540,8 @@ export interface Task extends Entity {
   postponedFrom?: DateKey
   /** Her retag ("isso é uma reunião"). Missing = derived (data/calendar/kind.ts). */
   entryKind?: EntryKind
+  /** Minutes she actually spent on it (optional log; "Minha semana" counts it as horas feitas). */
+  spentMin?: number
 }
 
 export interface TaskStep {
@@ -1288,6 +1290,13 @@ export interface Project extends Entity {
   tripId?: ID
   /** Content categories for creator projects. */
   categories?: string[]
+  /**
+   * Capacidade planejada (horas por semana) — uma proposta de planejamento, não um contrato.
+   * Missing = o projeto não entra na conta de capacidade de "Minha semana".
+   */
+  weeklyHours?: number
+  /** A partir de quando `weeklyHours` vale (ex.: um projeto que começa em dezembro). */
+  weeklyHoursFrom?: DateKey
 }
 
 export interface ProjectMilestone extends Entity {
