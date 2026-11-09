@@ -9,6 +9,7 @@
 import { logLife } from '../intel/log'
 import { SEED_IDS } from '../seed/ids'
 import { actions, getDB } from '../store'
+import { travelTripOn } from '../travel-mode'
 import type { CalendarEvent, DateKey, DB, ID, TimeHM } from '../types'
 import { addDays, formatDayMonth, hmToMinutes, minutesToHM, weekday } from '@/lib/date'
 
@@ -31,6 +32,8 @@ export interface EventDraft {
   missing: DraftField[]
   /** For "17 de qual mês?": the day number she has to place. */
   dayOfMonth?: number
+  /** She said it is planned / to be confirmed: saved as "a confirmar", never as done or confirmed. */
+  tentative?: boolean
 }
 
 /** Make sure the local "MARINA OS" calendar exists before saving into it. */
@@ -66,6 +69,9 @@ export function createCalendarEvent(d: EventDraft, by: 'marina' | 'lumos' = 'lum
     location: d.location,
     notes: [d.description, d.sourceAttachment ? `Lido de ${d.sourceAttachment.kind === 'pdf' ? 'um PDF' : 'um print'} (${d.sourceAttachment.name})` : undefined].filter(Boolean).join('\n') || undefined,
     kind: 'pessoal',
+    planType: d.tentative ? 'a_confirmar' : undefined,
+    // On a trip day it belongs to the trip too (shows in the trip's itinerary/agenda).
+    tripId: travelTripOn(getDB(), d.date)?.id,
   })
   const log = logLife({ kind: 'created', date: d.date, title: `Na agenda: ${d.title} (${formatDayMonth(d.date)}${d.startTime ? ` · ${d.startTime}` : ''})`, area: 'rotina', ref: { type: 'event', id: event.id }, by, provenance: d.sourceAttachment ? 'inference' : 'user' })
   return {
@@ -232,7 +238,46 @@ export function readTitle(text: string): string | undefined {
 }
 
 /** A draft from her own words (typed or spoken). The month of a bare "dia 17" follows the next 17th. */
+/**
+ * A message written as a form ("Evento: Missa…\nData: Quarta-feira, 11/11/2026\nHorário: 13h15\nLocal: …"):
+ * each field read from its own line, so the title is the event's name and not the whole message.
+ * Undefined when the text is not shaped like that (needs "Evento:"/"Título:" and a date line).
+ */
+export function formFields(text: string): Record<string, string> | undefined {
+  const out: Record<string, string> = {}
+  for (const raw of text.split(/\n+/)) {
+    const m = raw.match(/^\s*[*•-]?\s*([A-Za-zÀ-ÿ ]{3,20}?)\s*:\s*(.+?)\s*$/)
+    if (!m) continue
+    const key = fold(m[1]).trim()
+    const k = /^(evento|titulo|nome|compromisso)$/.test(key) ? 'title' : /^data$|^dia$/.test(key) ? 'date' : /^(horario|hora)$/.test(key) ? 'time' : /^(local|endereco|onde)$/.test(key) ? 'location' : /^(descricao|detalhes)$/.test(key) ? 'description' : /^status$/.test(key) ? 'status' : undefined
+    if (k && !out[k]) out[k] = m[2]
+  }
+  return out.title && out.date ? out : undefined
+}
+
 export function eventDraftFromText(text: string, today: DateKey, opts: { strict?: boolean } = {}): EventDraft {
+  const form = formFields(text)
+  if (form) {
+    const date = readDate(form.date, today, opts.strict)
+    const time = form.time ? readTime(form.time) : { start: undefined, end: undefined }
+    const missing: DraftField[] = []
+    if (date.needsMonth) missing.push('month')
+    else if (!date.date) missing.push('date')
+    if (!time.start) missing.push('time')
+    const tentative = !!form.status && /a confirmar|planejad|tentativ/.test(fold(form.status))
+    return {
+      title: form.title.replace(/[.;]+$/, '').trim(),
+      date: date.date,
+      startTime: time.start,
+      endTime: time.end,
+      location: form.location,
+      description: [form.description, form.status ? `Status: ${form.status}` : undefined].filter(Boolean).join('\n') || undefined,
+      tentative: tentative || undefined,
+      dayOfMonth: date.needsMonth,
+      missing,
+      confidence: missing.some((f) => f !== 'time') ? 'low' : 'high',
+    }
+  }
   const date = readDate(text, today, opts.strict)
   const time = readTime(text)
   const title = readTitle(text)

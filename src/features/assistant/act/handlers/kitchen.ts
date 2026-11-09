@@ -104,7 +104,8 @@ export function weekShopping(db: DB, today: DateKey): WeekShopping {
   }
 }
 
-const SHOP = /\b(feira|lista de (?:compras|mercado|supermercado)|o que (?:eu )?(?:preciso )?comprar)\b/
+// "feira" alone is the market; "quarta-feira" / "quarta feira" is a weekday, never a shopping request.
+const SHOP = /(?<!(?:segunda|terca|quarta|quinta|sexta)[- ])\b(feira|lista de (?:compras|mercado|supermercado)|o que (?:eu )?(?:preciso )?comprar)\b/
 
 function dayNames(dates: DateKey[]): string {
   return listJoin(dates.map((d) => WEEKDAY_LONG[weekday(d)]))
