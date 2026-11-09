@@ -32,6 +32,8 @@ import type { Handler, HandlerInput, LumosReply, ReplyLine, ReplySection, Undo }
 import { shortDM } from '@/data/travel-mode'
 import { formatMoney, localNow } from '@/features/travel/expedition/logic'
 import { schoolLine, tripDayOf, tripDayRows, type TripDay } from '@/features/travel/trip-day'
+import { areaLocked } from '@/app/lock-store'
+import { dailyBriefing, isEndedProject } from '../../day/daily'
 
 const RELEVANT = new Set<TimelineEntry['kind']>(['workout', 'event', 'work', 'task'])
 const NUM_FEM = ['nenhuma', 'uma', 'duas', 'três']
@@ -131,14 +133,16 @@ function today(input: HandlerInput): LumosReply | undefined {
   const mode = workModeOn(db, date)
   const free = eveningFree(db, entries)
   if (!entries.length) {
-    return { area: 'seu dia', text: `${label} ${date === now.date ? 'não tem mais nada marcado' : 'está livre'} ✨${mode === 'off' ? '' : ` Trabalho ${MODE_TEXT[mode]}.`}`, options: [{ label: 'Organiza comigo', ask: date === now.date ? 'organiza meu dia' : 'monta minha semana' }] }
+    return { area: 'seu dia', text: `${label} ${date === now.date ? 'não tem mais nada marcado' : 'está livre'} ✨${mode === 'off' ? '' : ` Trabalho ${MODE_TEXT[mode]}.`}`, sections: date === now.date ? dailySections(db, now) : undefined, options: [{ label: 'Organiza comigo', ask: date === now.date ? 'organiza meu dia' : 'monta minha semana' }] }
   }
   const named = entries.slice(0, 4).map((e) => `${e.kind === 'work' ? e.title.toLowerCase() : e.title} ${when(e)}`)
   const notes = contextOf(db, now)?.[date === now.date ? 'today' : 'tomorrow'].notes ?? []
   return {
     area: 'seu dia',
     text: `${label}${date === now.date && now.minutes > 6 * 60 ? ' ainda' : ''} tem ${listJoin(named)}${entries.length > 4 ? ` e mais ${entries.length - 4}` : ''}.${free ? ` Sua noite ${date === now.date ? 'está' : 'fica'} livre.` : ''}`,
-    lines: [...notes.slice(0, 2).map((s) => ({ text: s.value, emoji: '✨', provenance: s.provenance })), ...entries.map(rowOf)],
+    // Today: the DAILY MARINA OS sections (from now on); tomorrow: the plain list.
+    lines: [...notes.slice(0, 2).map((s) => ({ text: s.value, emoji: '✨', provenance: s.provenance })), ...(date === now.date ? [] : entries.map(rowOf))],
+    sections: date === now.date ? dailySections(db, now) : undefined,
     options: [{ label: 'Quer organizar comigo?', ask: date === now.date ? 'organiza meu dia' : 'organiza amanhã' }],
     link: { label: 'Abrir Agenda', to: ROUTES.agenda },
   }
@@ -146,10 +150,17 @@ function today(input: HandlerInput): LumosReply | undefined {
 
 // ─── Daily brief ────────────────────────────────────────────────────────────
 
+/** DAILY MARINA OS: the eight sections of the day (agenda → alertas), each line tagged. */
+export function dailySections(db: DB, now: Now): ReplySection[] {
+  const locks = { financeLocked: areaLocked(db.profile.privacyLock, 'dinheiro'), careerLocked: areaLocked(db.profile.privacyLock, 'carreira') }
+  return dailyBriefing(db, now, { ...locks, suggest: pickPriorities }).sections
+}
+
 const BRIEF = /^(?:bom dia|boa tarde|boa noite)(?:,? lumos)?$|\bresumo do (?:meu )?dia\b|\bme (?:da|faz|manda) (?:o |um )?(?:brief|resumo)\b|\bmeu brief\b/
 
 function importantToday(db: DB, date: DateKey): Task[] {
-  return db.tasks.filter((t) => isTaskOpen(t) && t.status !== 'waiting' && !t.recurrence && (t.needsMe || (t.dueDate && t.dueDate <= addDays(date, 1)) || t.date === date || t.bucket === 'hoje' || t.priority === 'alta'))
+  const ended = new Set(db.projects.filter((p) => isEndedProject(db, p, date)).map((p) => p.id))
+  return db.tasks.filter((t) => isTaskOpen(t) && !(t.projectId && ended.has(t.projectId)) && t.status !== 'waiting' && !t.recurrence && (t.needsMe || (t.dueDate && t.dueDate <= addDays(date, 1)) || t.date === date || t.bucket === 'hoje' || t.priority === 'alta'))
 }
 
 export function composeBrief(db: DB, now: Now): string {
@@ -174,10 +185,11 @@ function brief(input: HandlerInput): LumosReply | undefined {
   const { db, n, now } = input
   if (!BRIEF.test(n)) return undefined
   const trip = tripDayNow(db, now.date, now)
-  if (trip) return { area: 'viagem', text: composeTripBrief(trip, now), sub: 'Rotina de SP pausada enquanto você viaja.', options: [{ label: 'O que tenho hoje?', ask: 'o que eu tenho hoje?' }], link: { label: 'Abrir a viagem', to: ROUTES.trip(trip.trip.id) } }
+  const sections = dailySections(db, now)
+  if (trip) return { area: 'viagem', text: composeTripBrief(trip, now), sub: 'Rotina de SP pausada enquanto você viaja.', sections, options: [{ label: 'O que tenho hoje?', ask: 'o que eu tenho hoje?' }], link: { label: 'Abrir a viagem', to: ROUTES.trip(trip.trip.id) } }
   const engine = briefFor(db, now)
   const text = engine ? `${greeting(now.minutes)}. ${engine}` : composeBrief(db, now)
-  return { area: 'seu dia', text, sub: 'Quer organizar comigo?', options: [{ label: 'Organiza meu dia', ask: 'organiza meu dia' }, { label: 'O que precisa de mim?', ask: 'o que realmente precisa de mim?' }] }
+  return { area: 'seu dia', text, sub: 'Quer organizar comigo?', sections, options: [{ label: 'Organiza meu dia', ask: 'organiza meu dia' }, { label: 'O que precisa de mim?', ask: 'o que realmente precisa de mim?' }] }
 }
 
 // ─── "organiza meu dia" → Hoje importa ──────────────────────────────────────

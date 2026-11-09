@@ -14,6 +14,8 @@ import type { DB, ImportBatch } from '@/data/types'
 import { formatDayMonth } from '@/lib/date'
 import { eventDraft, runLogged } from '../log'
 import type { Handler, HandlerInput, LumosReply, ReplyLine, ReplySection } from '../types'
+import { actions } from '@/data/store'
+import { briefingTimeOf } from '../../day/daily'
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 const MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
@@ -138,9 +140,44 @@ function whatCame(input: HandlerInput): LumosReply | undefined {
   }
 }
 
+// ─── Daily MARINA OS time: "meu briefing às 6h30" · "que horas é meu briefing?" ─
+
+const SET_TIME = /\b(?:briefing|daily|resumo da manha)\b.*?\b(?:as|pra|para|a partir das)\s+(\d{1,2})\s*(?:h|:)\s*(\d{2})?\b/
+const ASK_TIME = /\b(?:que horas?|qual (?:o )?horario)\b.*\b(?:briefing|daily)\b/
+
+function briefingTime(input: HandlerInput): LumosReply | undefined {
+  const { db, n, now } = input
+  const m = SET_TIME.exec(n)
+  if (m) {
+    const h = Number(m[1])
+    const min = Number(m[2] ?? 0)
+    if (h > 23 || min > 59) return undefined
+    const time = `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`
+    const before = db.profile.briefingTime
+    return {
+      area: 'briefing',
+      text: `Seu Daily MARINA OS fica às ${time} ✓`,
+      sub: 'A partir desse horário, ao abrir a Lumos de manhã, o resumo do dia aparece primeiro.',
+      action: {
+        mode: 'direct',
+        run: () =>
+          runLogged(
+            () => {
+              actions.setProfile({ briefingTime: time })
+              return () => actions.setProfile({ briefingTime: before })
+            },
+            [eventDraft(now, { kind: 'changed', title: `Daily MARINA OS às ${time}`, area: 'rotina' })],
+          ),
+      },
+    }
+  }
+  if (ASK_TIME.test(n)) return { area: 'briefing', text: `Seu Daily MARINA OS é às ${briefingTimeOf(db)}.`, sub: 'Quer mudar? É só dizer "meu briefing às 6h30".' }
+  return undefined
+}
+
 export const briefingHandler: Handler = {
   id: 'briefing',
   run(input) {
-    return briefing(input) ?? importToday(input) ?? weekPriorities(input) ?? whatCame(input)
+    return briefingTime(input) ?? briefing(input) ?? importToday(input) ?? weekPriorities(input) ?? whatCame(input)
   },
 }

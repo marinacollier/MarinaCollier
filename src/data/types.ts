@@ -382,6 +382,8 @@ export interface UserProfile {
   about?: string
   /** Base rhythm. Never a streak: if she wakes later, the day just adapts. */
   rhythm: { wakeTime: TimeHM; sleepTime: TimeHM }
+  /** When the Daily MARINA OS (Lumos' morning briefing) is offered. Missing = '06:15'. */
+  briefingTime?: TimeHM
   work: WorkSchedule
   /** UGC Business OS: who she is for brands, and her prospecting rhythm. */
   creator?: CreatorProfile

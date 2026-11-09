@@ -15,10 +15,12 @@ import { ProvenanceTag } from './ReplyCard'
 import { ask, useConversation } from './conversation'
 import { buildInsights } from './insights'
 import LumosInline from './LumosInline'
+import { briefingTimeOf, isBriefingWindow } from './day/daily'
+import { activeDay } from '@/features/today/local-day'
 
 export default function AssistantPage() {
   const db = useDB()
-  const { today, minutes } = useNow()
+  const { today, minutes, now: clock } = useNow()
   const [params, setParams] = useSearchParams()
   const [initial] = useState(() => params.get('q')?.trim() || undefined)
   const empty = useConversation((s) => s.exchanges.length === 0)
@@ -35,9 +37,26 @@ export default function AssistantPage() {
       .map((i) => ({ key: i.id, text: `${i.emoji} ${i.text}`, ask: i.ask, provenance: 'inference' as const }))
   }, [db, today, minutes])
 
+  // Morning (from her briefing time, in the active zone): the Daily MARINA OS is the first offer.
+  const morning = useMemo(() => empty && isBriefingWindow(db, activeDay(db, today, clock, minutes).minutes), [empty, db, today, clock, minutes])
+
   return (
     <Page>
       <PageHeader back eyebrow="Lumos" title={<>Oi, {db.profile.name || 'Marina'}.</>} subtitle="Me conta o que aconteceu — eu organizo. O simples eu já faço (com Desfazer); o sensível eu pergunto antes." />
+
+      {morning && (
+        <button
+          type="button"
+          onClick={() => ask('bom dia')}
+          className="w-full mb-3 flex items-center gap-3 rounded-2xl bg-surface border border-line px-4 py-3 text-left active:scale-[0.99] transition"
+        >
+          <span aria-hidden className="text-[20px]">☀️</span>
+          <span className="flex-1 min-w-0">
+            <span className="block text-[15px] font-medium text-ink">Seu Daily MARINA OS</span>
+            <span className="block text-[12.5px] text-muted">Agenda, prioridades, treino, Luna e alertas · a partir das {briefingTimeOf(db)}</span>
+          </span>
+        </button>
+      )}
 
       {empty && insights.length > 0 && (
         <div className="space-y-2 mb-5">

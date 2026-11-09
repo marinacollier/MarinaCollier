@@ -3,10 +3,10 @@
  * browser can transcribe, attachments routed through Universal Capture (honest when unsupported),
  * and at most three context suggestions from the intelligence layer (nothing generic).
  */
-import { useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowUp, ClipboardPaste, Mic, Paperclip, X } from 'lucide-react'
+import { ArrowUp, ClipboardPaste, Keyboard, Mic, Paperclip, X } from 'lucide-react'
 import { ROUTES } from '@/app/routes'
 import { normalizeCapture } from '@/data/intel'
 import { cn } from '@/lib/cn'
@@ -29,12 +29,18 @@ export function LumosBox({ placeholder, suggestions, onAsk, onAttach }: { placeh
   const fileRef = useRef<HTMLInputElement>(null)
   const areaRef = useRef<HTMLTextAreaElement>(null)
   // The transcript goes to Lumos like typed text. When the browser says it's unsure, she confirms first.
-  const speech = useSpeech(({ text: said, confidence }) => {
+  // Never loses text: interrupted / unsure takes, or one spoken after typing, go into the field to check.
+  const typedRef = useRef('')
+  useEffect(() => {
+    typedRef.current = text
+  }, [text])
+  const speech = useSpeech(({ text: said, confidence, partial }) => {
     const q = normalizeCapture({ kind: 'voice', transcript: said }).text?.trim()
     if (!q) return
-    if (confidence !== undefined && confidence < LOW_CONFIDENCE) {
-      setText(q)
-      setNote(`Entendi: “${q}” — confere e envia (ou corrige antes).`)
+    const typed = typedRef.current.trim()
+    if (partial || typed || (confidence !== undefined && confidence < LOW_CONFIDENCE)) {
+      setText(typed ? `${typed} ${q}` : q)
+      setNote(partial ? 'A gravação foi interrompida — guardei o que ouvi no campo. Confere e envia.' : `Entendi: “${q}” — confere e envia (ou corrige antes).`)
       areaRef.current?.focus()
       return
     }
@@ -99,9 +105,22 @@ export function LumosBox({ placeholder, suggestions, onAsk, onAttach }: { placeh
               <button type="button" aria-label="Importar JSON" onClick={openImport} className="h-11 w-11 rounded-full inline-flex items-center justify-center text-muted active:bg-surface-2 transition">
                 <ClipboardPaste size={19} />
               </button>
-              {speech.available && (
+              {speech.available ? (
                 <button type="button" aria-label="Falar com a Lumos" onClick={() => speech.start()} className="h-11 w-11 rounded-full inline-flex items-center justify-center transition text-muted active:bg-surface-2">
                   <Mic size={19} />
+                </button>
+              ) : (
+                // No working recognizer here: open the keyboard, whose 🎙 dictates (same text pipeline).
+                <button
+                  type="button"
+                  aria-label="Ditar pelo teclado do iPhone"
+                  onClick={() => {
+                    areaRef.current?.focus()
+                    setNote(speech.fallback)
+                  }}
+                  className="h-11 w-11 rounded-full inline-flex items-center justify-center transition text-muted active:bg-surface-2"
+                >
+                  <Keyboard size={19} />
                 </button>
               )}
               <input ref={fileRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
