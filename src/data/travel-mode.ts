@@ -172,10 +172,15 @@ export function isHomeRoutine(r: Pick<Routine, 'id' | 'planType'>): boolean {
   return r.id === SEED_IDS.routineMorning || r.id.startsWith('seed:today:routine-') || r.planType === 'base'
 }
 
+/**
+ * A routine pauses on trip days only when it is tied to the house (`pauseOnTrips`). Her personal rituals —
+ * Milagre da Manhã, Encerrar o dia — go with her (items that need the house, like Luna's walk, are their own
+ * items and she turns them off).
+ */
 export function routinePausedOn(db: TripsOf & Pick<DB, 'routines'>, routineId: string, date: DateKey): boolean {
   if (!isTravelDay(db, date)) return false
   const r = db.routines.find((x) => x.id === routineId)
-  return !r || isHomeRoutine(r)
+  return !r || !!r.pauseOnTrips
 }
 
 /**

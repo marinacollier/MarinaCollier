@@ -140,21 +140,18 @@ describe('trabalho', () => {
 })
 
 describe('rotinas e vida local', () => {
-  it('Milagre da Manhã and Encerrar o dia pause on trip days (not deleted) and resume on 17/11', () => {
+  it('Milagre da Manhã and Encerrar o dia travel with her; only a routine tied to the house pauses (never deleted)', () => {
     const db = ready()
     const before = db.routineItems.length
     for (const r of [SEED_IDS.routineMorning, EVENING_ROUTINE_ID]) {
-      expect(routineItemsFor(db, r, TODAY)).toEqual([])
-      expect(routineItemsFor(db, r, '2026-11-16')).toEqual([])
+      expect(routineItemsFor(db, r, TODAY).length).toBeGreaterThan(0)
       expect(routineItemsFor(db, r, '2026-11-17').length).toBeGreaterThan(0)
     }
+    const house = { ...db, routines: db.routines.map((r) => (r.id === EVENING_ROUTINE_ID ? { ...r, pauseOnTrips: true } : r)) }
+    expect(routineItemsFor(house, EVENING_ROUTINE_ID, TODAY)).toEqual([])
+    expect(routineItemsFor(house, EVENING_ROUTINE_ID, '2026-11-17').length).toBeGreaterThan(0)
     expect(db.routineItems.length).toBe(before)
     expect(db.routines.every((r) => r.active)).toBe(true)
-    const tl = dayTimeline(db, TODAY)
-    expect(tl.some((e) => e.kind === 'routineItem')).toBe(false)
-    expect(dayTimeline(db, '2026-11-17').some((e) => e.kind === 'routineItem')).toBe(true)
-    // no occurrences are ever written for the paused days
-    expect(db.occurrences.some((o) => o.date >= '2026-10-24' && o.date <= '2026-11-16' && o.parentType === 'routineItem')).toBe(false)
   })
 
   it('Luna, meal plan and recurring local events pause; a one-off event she created stays', () => {
@@ -174,15 +171,13 @@ describe('rotinas e vida local', () => {
 })
 
 describe('Home rows on a trip day', () => {
-  it('the class and the trip activities replace the São Paulo routine', () => {
+  it('on a trip day: the class and the trip activities, plus her own rituals; Luna house tasks pause', () => {
     const db = ready()
     const items = dayItems(db, '2026-10-28', '2026-10-28')
     const titles = items.map((i) => i.title)
     expect(titles).toContain('Aula · Bayswater Cape Town')
     expect(titles.some((t) => /Lion's Head/.test(t))).toBe(true)
-    expect(titles).not.toContain('Milagre da Manhã')
-    expect(titles).not.toContain('Encerrar o dia')
-    expect(items.some((i) => i.front.label === 'ROTINA')).toBe(false)
+    expect(titles).toContain('Milagre da Manhã')
     expect(items.some((i) => i.refType === 'petTask')).toBe(false)
     // back home: the routine is there again
     expect(dayItems(db, '2026-11-17', '2026-11-17').map((i) => i.title)).toContain('Milagre da Manhã')

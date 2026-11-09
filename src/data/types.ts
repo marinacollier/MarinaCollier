@@ -725,6 +725,8 @@ export interface Routine extends Entity {
   essentialName?: string
   /** Free note about the routine ("obs"), edited from any row of it. */
   notes?: string
+  /** Pauses on trip days (a routine tied to the house). Her personal rituals (Milagre da Manhã, Encerrar o dia) travel with her. */
+  pauseOnTrips?: boolean
 }
 
 export interface RoutineItem extends Entity {

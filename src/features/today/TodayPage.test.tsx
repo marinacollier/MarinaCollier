@@ -27,9 +27,9 @@ function renderHome() {
   )
 }
 
-/** [time, title] of each one-line row in a list. */
+/** [time, title] of each one-line row in a list (the timed column — not the Rotinas / Sem horário groups). */
 const rowsOf = (el: HTMLElement) =>
-  [...el.querySelectorAll('li')].map((li) => {
+  [...el.querySelectorAll('li')].filter((li) => !li.closest('[aria-label="Rotinas"], [aria-label="Sem horário"]')).map((li) => {
     const spans = li.querySelectorAll('button > span')
     return { time: spans[0]?.textContent ?? '', title: spans[1]?.textContent ?? '', text: li.textContent ?? '' }
   })

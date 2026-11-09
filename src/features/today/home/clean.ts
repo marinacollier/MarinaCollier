@@ -12,6 +12,9 @@ import type { DateKey, DB, TripItem } from '@/data/types'
 import { addDays, MONTHS, WEEKDAY_LONG, weekday } from '@/lib/date'
 import { bookingStatusOf } from '@/features/travel/expedition/command'
 import { formatMoney } from '@/features/travel/expedition/logic'
+import { routineItemsFor, routineProgress } from '@/data/selectors'
+import { dayBlocksOn } from '@/data/routine-modes'
+import { normalize } from '@/lib/text'
 import type { TripOpsPanel } from '@/features/travel/expedition/panel'
 
 /** Max length of a one-line row title on Home (the rest lives in the sheet). */
@@ -153,7 +156,7 @@ export function chipTone(c: string): ChipTone {
   if (c === 'feito' || c === 'pago') return 'done'
   if (c === 'confirmado') return 'ok'
   if (c === 'planejado' || c === 'opcional' || c === 'sugestão') return 'plan'
-  if (c === 'cancelado' || c === 'faltei') return 'soft'
+  if (c === 'cancelado' || c === 'faltei' || /^\d+\/\d+$/.test(c)) return 'soft'
   if (c === 'conflito') return 'alert'
   return 'warn'
 }
@@ -301,4 +304,30 @@ export function flightName(title: string): string {
 export function inDays(n: number): string {
   if (n <= 0) return 'hoje'
   return n === 1 ? 'amanhã' : `em ${n} dias`
+}
+
+// ─── Rotinas (Milagre da Manhã, Encerrar o dia) ─────────────────────────────
+
+export interface RoutineRow {
+  id: string
+  name: string
+  emoji?: string
+  /** The day plan's block for it (mode-aware), else the routine's own start. */
+  time?: string
+  done: number
+  total: number
+}
+
+/** Her rituals of the day, with how much is ticked — one line each on Home. */
+export function routineRows(db: DB, date: DateKey): RoutineRow[] {
+  const blocks = dayBlocksOn(db, date)
+  return db.routines
+    .filter((r) => r.active)
+    .sort((a, b) => a.order - b.order)
+    .flatMap((r) => {
+      if (!routineItemsFor(db, r.id, date).length) return []
+      const block = blocks.find((b) => normalize(b.title) === normalize(r.name))
+      const { done, total } = routineProgress(db, r.id, date)
+      return [{ id: r.id, name: r.name, emoji: r.emoji, time: block?.start ?? r.startTime, done, total }]
+    })
 }

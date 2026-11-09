@@ -37,8 +37,8 @@ import { homeContext } from './context'
 import { LumosSheet, lumosHref, type LumosRequest } from './home/lumos'
 import { useMarkSeenOnLeave } from './home/seen'
 import { homeTripOps } from './home/trip-ops'
-import { flightName, headerDate, inDays, lifeNeeds, looseRows, nextDays, NEEDS_MAX, shortMoney, stayPlace, timedRows, tripNeeds, type LooseRow, type Need } from './home/clean'
-import { ConflictList, CrmLine, DayBlock, LumosLine, PrecisaList, ProximosList, TripChips } from './home/CleanBlocks'
+import { flightName, headerDate, inDays, lifeNeeds, looseRows, nextDays, NEEDS_MAX, routineRows, shortMoney, stayPlace, timedRows, tripNeeds, type LooseRow, type Need } from './home/clean'
+import { ConflictList, CrmLine, DayBlock, LumosLine, PrecisaList, ProximosList, RoutineChecklist, RoutineList, TripChips } from './home/CleanBlocks'
 import { crmPulse } from '@/data/ugc/model'
 
 /** A trip shows on Home (outside it) only when it's really close. */
@@ -86,6 +86,8 @@ export default function TodayPage() {
   const looseOf = useCallback((d: DateKey) => looseRows(db, cal.entries, d), [db, cal.entries])
   const proximos = useMemo(() => nextDays(cal.entries, tomorrow, undefined, undefined, undefined, (d) => looseOf(d).length > 0), [cal.entries, tomorrow, looseOf])
   const conflictIds = useMemo(() => new Set(cal.marks.keys()), [cal.marks])
+  const rituals = useMemo(() => routineRows(db, day), [db, day])
+  const [routineOpen, setRoutineOpen] = useState<string>()
   // 0 — Check-in do dia → "O que faz sentido fazer agora?" (+ the optional review after 20:00).
   const dayCheckin = checkinOf(db, day)
 
@@ -186,7 +188,7 @@ export default function TodayPage() {
       </motion.div>
 
       <motion.div {...rise(1)} className="mt-7">
-        <DayBlock label="01 / Dia" title="Hoje" rows={hoje} loose={hojeLoose} onOpen={(e) => openEntry(e, day)} onLoose={openLoose} conflicts={conflictsByDay.get(day) ?? 0} conflictIds={conflictIds} onConflicts={() => setShowConflicts(day)} />
+        <DayBlock label="01 / Dia" title="Hoje" rows={hoje} loose={hojeLoose} onOpen={(e) => openEntry(e, day)} onLoose={openLoose} conflicts={conflictsByDay.get(day) ?? 0} conflictIds={conflictIds} onConflicts={() => setShowConflicts(day)} routines={<RoutineList rows={rituals} onOpen={setRoutineOpen} />} />
       </motion.div>
 
       <motion.div {...rise(2)} className="mt-7">
@@ -229,6 +231,11 @@ export default function TodayPage() {
         {detail && sel && (
           <SheetFrame key="detail" onClose={() => setSel(undefined)} label="Detalhe do compromisso" maxHeight="86dvh">
             <EntryDetail entry={detail} date={sel.date} conflicts={cal.marks.get(detail.id)} device={device} onClose={() => setSel(undefined)} onEdited={() => setSel(undefined)} />
+          </SheetFrame>
+        )}
+        {routineOpen && (
+          <SheetFrame key="routine" onClose={() => setRoutineOpen(undefined)} label="Rotina">
+            <RoutineChecklist routineId={routineOpen} date={day} />
           </SheetFrame>
         )}
         {showConflicts && !sel && (

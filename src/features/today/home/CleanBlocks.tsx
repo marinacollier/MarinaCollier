@@ -10,7 +10,11 @@ import { useDB } from '@/data/store'
 import type { DateKey } from '@/data/types'
 import { cn } from '@/lib/cn'
 import { haptic } from '@/lib/haptics'
-import { chipTone, dayHeader, entryChip, rowTime, shortTitle, type ChipTone, type LooseRow, type Need, type NextDay } from './clean'
+import { chipTone, dayHeader, entryChip, rowTime, shortTitle, type ChipTone, type LooseRow, type Need, type NextDay, type RoutineRow } from './clean'
+import { actions } from '@/data/store'
+import { routineItemsFor } from '@/data/selectors'
+import { occurrenceFor } from '@/lib/recurrence'
+import { Check } from 'lucide-react'
 
 /** Section header on Home: small olive label ("01 / Agora") over a Bodoni title — the site's pattern. */
 export function Eyebrow({ children, label, action }: { children: ReactNode; label?: ReactNode; action?: ReactNode }) {
@@ -119,6 +123,7 @@ export function DayBlock({
   conflictIds,
   onConflicts,
   empty = 'Dia livre',
+  routines,
 }: {
   label: string
   title: string
@@ -130,6 +135,8 @@ export function DayBlock({
   conflictIds?: ReadonlySet<string>
   onConflicts: () => void
   empty?: string
+  /** Her rituals of the day (Hoje only). */
+  routines?: ReactNode
 }) {
   return (
     <section aria-label={title}>
@@ -152,9 +159,10 @@ export function DayBlock({
             <EntryLine key={e.id} e={e} onOpen={onOpen} conflict={conflictIds?.has(e.id)} />
           ))}
         </ul>
-      ) : !loose.length ? (
+      ) : !loose.length && !routines ? (
         <p className="text-[15px] text-ink-2 py-2">{empty}</p>
       ) : null}
+      {routines}
       <LooseList rows={loose} onOpen={onLoose} />
     </section>
   )
@@ -329,6 +337,68 @@ export function ConflictList({ conflicts, onOpenEntry }: { conflicts: CalendarCo
             </button>
           </li>
         ))}
+      </ul>
+    </div>
+  )
+}
+
+// ─── Rotinas ────────────────────────────────────────────────────────────────
+
+/** "06:00 · ☀️ Milagre da Manhã · 3/12" — tap opens the checklist. */
+export function RoutineList({ rows, onOpen }: { rows: RoutineRow[]; onOpen: (id: string) => void }) {
+  if (!rows.length) return null
+  return (
+    <div className="mt-2" role="group" aria-label="Rotinas">
+      <h3 className="text-[12px] text-muted font-medium pt-1">Rotinas</h3>
+      <ul className="divide-y divide-line/60">
+        {rows.map((r) => (
+          <OneLine
+            key={r.id}
+            label={`${r.name}: ${r.done} de ${r.total}`}
+            left={<span className="w-[62px] shrink-0 tabular-nums text-[14px] text-ink-2 font-medium">{r.time ?? '—'}</span>}
+            title={`${r.emoji ? `${r.emoji} ` : ''}${r.name}`}
+            chip={r.total && r.done >= r.total ? 'feito' : `${r.done}/${r.total}`}
+            onOpen={() => onOpen(r.id)}
+          />
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+/** The routine's items for the day; each tap ticks/unticks it (an occurrence of that day — the rule never changes). */
+export function RoutineChecklist({ routineId, date }: { routineId: string; date: DateKey }) {
+  const db = useDB()
+  const routine = db.routines.find((r) => r.id === routineId)
+  const items = routineItemsFor(db, routineId, date)
+  if (!routine) return null
+  return (
+    <div className="flex-1 overflow-y-auto overscroll-contain px-5 pb-6">
+      <h2 className="font-display text-[22px] mb-2">
+        {routine.emoji ? `${routine.emoji} ` : ''}
+        {routine.name}
+      </h2>
+      <ul className="divide-y divide-line/60">
+        {items.map((i) => {
+          const done = occurrenceFor(db.occurrences, 'routineItem', i.id, date)?.status === 'done'
+          return (
+            <li key={i.id}>
+              <button
+                type="button"
+                aria-pressed={done}
+                onClick={() => {
+                  haptic('light')
+                  actions.toggleOccurrence('routineItem', i.id, date)
+                }}
+                className="w-full min-h-11 py-2 flex items-center gap-3 text-left active:opacity-70"
+              >
+                <span className={cn('h-6 w-6 shrink-0 rounded-full border inline-flex items-center justify-center', done ? 'bg-sage border-sage text-bg' : 'border-line')}>{done && <Check size={14} aria-hidden />}</span>
+                <span className={cn('flex-1 text-[15px]', done ? 'text-muted line-through decoration-muted/50' : 'text-ink')}>{i.title}</span>
+                {!!i.durationMin && <span className="text-[12px] text-muted tabular-nums">{i.durationMin} min</span>}
+              </button>
+            </li>
+          )
+        })}
       </ul>
     </div>
   )

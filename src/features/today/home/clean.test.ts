@@ -4,7 +4,7 @@ import type { ActionItem } from '@/data/agenda/items'
 import type { AttentionItem } from '@/data/intel'
 import type { Trip, TripItem } from '@/data/types'
 import type { TripOpsPanel } from '@/features/travel/expedition/panel'
-import { chipTone, dayHeader, dayRows, entryChip, looseRows, timedRows, flightName, headerDate, inDays, lifeNeeds, nextDays, ROW_MAX, rowTime, shortTitle, stayPlace, tripNeeds } from './clean'
+import { chipTone, dayHeader, dayRows, entryChip, looseRows, routineRows, timedRows, flightName, headerDate, inDays, lifeNeeds, nextDays, ROW_MAX, rowTime, shortTitle, stayPlace, tripNeeds } from './clean'
 
 const entry = (p: Partial<CalendarEntry> & { id: string; date: string; time?: string; endDate?: string }): CalendarEntry => ({
   title: p.id,
@@ -179,5 +179,20 @@ describe('Home · sem horário e status', () => {
     expect([chip('p', 'confirmado'), chip('c', 'confirmado'), chip('i'), chip('o')]).toEqual(['pago', 'confirmado', 'planejado', 'opcional'])
     expect(new Set(['pago', 'confirmado', 'planejado'].map(chipTone)).size).toBe(3)
     expect(entryChip(db, entry({ id: 'w', date: '2026-11-11', time: '07:00', sourceType: 'workout', status: 'planejado' }))).toBe('planejado')
+  })
+})
+
+describe('Home · rotinas', () => {
+  it('Milagre da Manhã shows with the day plan time and progress', async () => {
+    const { emptyDB } = await import('@/data/defaults')
+    const db = emptyDB()
+    db.routines = [{ id: 'm', name: 'Milagre da Manhã', emoji: '☀️', period: 'manha', order: 0, active: true, startTime: '04:40', createdAt: '', updatedAt: '' }]
+    db.routineItems = [
+      { id: 'a', routineId: 'm', title: 'Despertar', order: 0, active: true, recurrence: { kind: 'daily' }, createdAt: '', updatedAt: '' },
+      { id: 'b', routineId: 'm', title: 'Devocional', order: 1, active: true, recurrence: { kind: 'daily' }, createdAt: '', updatedAt: '' },
+    ] as never
+    db.occurrences = [{ id: 'o', parentType: 'routineItem', parentId: 'a', date: '2026-11-10', status: 'done', createdAt: '', updatedAt: '' }] as never
+    db.profile = { ...db.profile, dayPlan: { blocks: [{ id: 'x', title: 'Milagre da Manhã', category: 'ritual', kind: 'base', start: '06:00', end: '07:00', weekdays: [0, 1, 2, 3, 4, 5, 6] }] } } as never
+    expect(routineRows(db, '2026-11-10')).toEqual([{ id: 'm', name: 'Milagre da Manhã', emoji: '☀️', time: '06:00', done: 1, total: 2 }])
   })
 })
