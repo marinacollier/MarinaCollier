@@ -48,6 +48,23 @@ export function shortTitle(title: string, max = ROW_MAX): string {
   return t.length > max ? `${t.slice(0, max - 1).trimEnd()}…` : t
 }
 
+/**
+ * Where she wakes up today during a trip, from a booked stay: the night before falls inside it
+ * (check-in < today ≤ check-out). "Johannesburg" from the group "Johannesburg / Safari". Undefined
+ * when no booked stay covers the day (the header then keeps the trip's base city).
+ */
+export function stayPlace(items: TripItem[], tripId: string, today: DateKey): string | undefined {
+  const stay = items.find(
+    (i) =>
+      i.tripId === tripId &&
+      i.section === 'hospedagem' &&
+      BOOKED.has(bookingStatusOf(i)) &&
+      !!i.date && !!i.endDate &&
+      i.date < today && today <= i.endDate,
+  )
+  return stay?.group?.split(/[·/(,]/)[0]?.trim() || undefined
+}
+
 // ─── Hoje / Próximos dias ───────────────────────────────────────────────────
 
 /**

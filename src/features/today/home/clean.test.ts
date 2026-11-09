@@ -4,7 +4,7 @@ import type { ActionItem } from '@/data/agenda/items'
 import type { AttentionItem } from '@/data/intel'
 import type { Trip, TripItem } from '@/data/types'
 import type { TripOpsPanel } from '@/features/travel/expedition/panel'
-import { dayHeader, dayRows, entryChip, flightName, headerDate, inDays, lifeNeeds, nextDays, ROW_MAX, rowTime, shortTitle, tripNeeds } from './clean'
+import { dayHeader, dayRows, entryChip, flightName, headerDate, inDays, lifeNeeds, nextDays, ROW_MAX, rowTime, shortTitle, stayPlace, tripNeeds } from './clean'
 
 const entry = (p: Partial<CalendarEntry> & { id: string; date: string; time?: string; endDate?: string }): CalendarEntry => ({
   title: p.id,
@@ -126,5 +126,19 @@ describe('Home limpa · picks', () => {
     expect(inDays(7)).toBe('em 7 dias')
     expect(inDays(1)).toBe('amanhã')
     expect(inDays(0)).toBe('hoje')
+  })
+})
+
+describe('Home limpa · cidade do dia (stayPlace)', () => {
+  const hotel = item({ id: 'rl', section: 'hospedagem', group: 'Johannesburg / Safari', date: '2026-11-13', endDate: '2026-11-16', status: 'confirmado', bookingStatus: 'confirmado', confirmationCode: '337BC28C2' })
+  it('acorda no hotel reservado: do dia seguinte ao check-in até o check-out', () => {
+    expect(stayPlace([hotel], 't', '2026-11-13')).toBeUndefined() // ainda dorme em Cape Town
+    expect(stayPlace([hotel], 't', '2026-11-14')).toBe('Johannesburg')
+    expect(stayPlace([hotel], 't', '2026-11-16')).toBe('Johannesburg')
+    expect(stayPlace([hotel], 't', '2026-11-17')).toBeUndefined()
+  })
+  it('cotação ou hotel cancelado não muda a cidade', () => {
+    expect(stayPlace([{ ...hotel, bookingStatus: 'a_reservar', status: 'a_confirmar', confirmationCode: undefined }], 't', '2026-11-14')).toBeUndefined()
+    expect(stayPlace([{ ...hotel, status: 'cancelado', bookingStatus: 'cancelado' }], 't', '2026-11-14')).toBeUndefined()
   })
 })

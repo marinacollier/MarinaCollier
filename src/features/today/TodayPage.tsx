@@ -35,7 +35,7 @@ import { homeContext } from './context'
 import { LumosSheet, lumosHref, type LumosRequest } from './home/lumos'
 import { useMarkSeenOnLeave } from './home/seen'
 import { homeTripOps } from './home/trip-ops'
-import { dayRows, flightName, headerDate, inDays, lifeNeeds, nextDays, NEEDS_MAX, shortMoney, tripNeeds, type Need } from './home/clean'
+import { dayRows, flightName, headerDate, inDays, lifeNeeds, nextDays, NEEDS_MAX, shortMoney, stayPlace, tripNeeds, type Need } from './home/clean'
 import { ConflictList, CrmLine, HojeList, LumosLine, PrecisaList, ProximosList, TripChips } from './home/CleanBlocks'
 import { crmPulse } from '@/data/ugc/model'
 
@@ -46,10 +46,10 @@ const HORIZON = 14
 const CONFLICT_DAYS = 7
 
 /** The trip's place while traveling ("Cape Town"); nothing otherwise. */
-function placeOf(db: DB, today: DateKey): string | undefined {
+function placeOf(db: DB, today: DateKey, localDay: DateKey = today): string | undefined {
   const trip = travelTripOn(db, today)
   if (!trip) return undefined
-  return trip.expedition?.weather?.label ?? trip.place?.split(/[·(,]/)[0]?.trim() ?? undefined
+  return stayPlace(db.tripItems, trip.id, localDay) ?? trip.expedition?.weather?.label ?? trip.place?.split(/[·(,]/)[0]?.trim() ?? undefined
 }
 
 const rise = (i: number) => ({
@@ -77,7 +77,7 @@ export default function TodayPage() {
       return today
     }
   }, [tz, today, clock])
-  const place = useMemo(() => placeOf(db, today), [db, today])
+  const place = useMemo(() => placeOf(db, today, day), [db, today, day])
 
   // 2 · 3 — the same projection as the Agenda.
   const horizon = addDays(day, HORIZON)
