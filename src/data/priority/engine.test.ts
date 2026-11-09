@@ -2,13 +2,16 @@
  * Motor de prioridade: capacidade (compromissos, trabalho, folgas, margem, energia), MoSCoW contextual,
  * essenciais nunca descartados, energia baixa, 20 % livre, interesse do dia, estudos sem dominar.
  */
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { emptyDB } from '../defaults'
 import type { CalendarEvent, DB, Goal, PetTask, Pet, Task } from '../types'
 import { CAPACITY, dayCapacity } from './capacity'
 import { interestOf, moscowOf, planDay, planFromCandidates, rankCandidates } from './engine'
 import { taskCandidates } from './sources'
 import type { Candidate, DayContext } from './contract'
+
+// The engine's own rules are tested in isolation; study candidates have their own tests (features/learning).
+vi.mock('@/features/learning/candidates', () => ({ studyCandidates: () => [] }))
 
 const AT = '2026-11-01T10:00:00.000Z'
 const ent = { createdAt: AT, updatedAt: AT }

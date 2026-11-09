@@ -73,6 +73,8 @@ function planReply(plan: DayPlan, lead: string): LumosReply {
 
 function run(input: HandlerInput): LumosReply | undefined {
   const { db, n, now } = input
+  // Anything about studying ("o que eu estudo", "não quero estudar") is the Learning Engine's to answer.
+  if (/\bestud/.test(n)) return undefined
   const free = FREE.exec(n)
   const tired = TIRED.test(n)
   const asksNow = NOW.test(n)

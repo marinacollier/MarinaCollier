@@ -19,9 +19,9 @@ import { addDays, diffDays, hmToMinutes } from '@/lib/date'
 import type { Area, DateKey, DayBlockCategory, DB, Project, Task } from '../types'
 import type { Candidate, DayContext, Energy, LifeArea } from './contract'
 
-// TODO(learning-engine): replace with `import { studyCandidates } from '@/features/learning/candidates'`
-// once src/features/learning/candidates.ts exists (same signature).
-export const studyCandidates: (db: DB, ctx: DayContext) => Candidate[] = () => []
+// Study candidates come from the Learning Engine (all domains, not only languages).
+import { studyCandidates } from '@/features/learning/candidates'
+export { studyCandidates }
 
 /** A candidate before the engine scores it (moscow/score/reasons are filled by the engine). */
 export type RawCandidate = Omit<Candidate, 'moscow' | 'score' | 'reasons'> & {

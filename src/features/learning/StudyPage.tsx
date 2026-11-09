@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowRight, ArrowUp, Library, Pencil, Play, Plus, Settings2, X } from 'lucide-react'
+import { ArrowRight, ArrowUp, GraduationCap, Library, Pencil, Play, Plus, Settings2, X } from 'lucide-react'
 import { SavedContent } from './components/SavedContent'
 import { ROUTES } from '@/app/routes'
 import { openSheet, toast } from '@/app/ui-store'
@@ -138,6 +138,9 @@ export default function StudyPage() {
         subtitle="o que estou aprendendo — e o que eu guardo pra quando quiser."
         actions={
           <>
+            <IconButton label="Aprendizagem" onClick={() => nav(ROUTES.learning)}>
+              <GraduationCap size={20} />
+            </IconButton>
             <IconButton label="Livros" onClick={() => nav(ROUTES.books)}>
               <Library size={20} />
             </IconButton>

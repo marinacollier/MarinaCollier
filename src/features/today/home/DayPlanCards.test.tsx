@@ -11,6 +11,9 @@ import TodayPage from '../TodayPage'
 import { checkinOf } from './day-checkin'
 import { showReview } from './DayPlanCards'
 
+// The engine's own rules are tested in isolation; study candidates have their own tests (features/learning).
+vi.mock('@/features/learning/candidates', () => ({ studyCandidates: () => [] }))
+
 const DATE = '2026-11-14' // Saturday
 const AT = '2026-11-01T10:00:00.000Z'
 const task = (id: string, title: string, p: Partial<Task> = {}): Task => ({

@@ -26,6 +26,8 @@ export const ROUTES = {
   ugc: '/trabalho/creator/ugc',
   ugcBrand: (id: string) => `/trabalho/creator/ugc/marca/${id}`,
   study: '/estudos',
+  /** Aprendizagem: sessões, distribuição por área, revisão espaçada, biblioteca. Tabs em ?v=. */
+  learning: '/estudos/aprendizagem',
   /** Reference content (newsletters, saved themes) — never tasks. */
   saved: '/estudos?v=salvos',
   books: '/livros',
@@ -100,6 +102,7 @@ export const routeTable: { path: string; Component: React.LazyExoticComponent<Re
   { path: '/trabalho/creator/ugc', Component: lazy(() => import('@/features/ugc/UgcPage')) },
   { path: '/trabalho/creator/ugc/marca/:id', Component: lazy(() => import('@/features/ugc/BrandPage')) },
   { path: '/estudos', Component: lazy(() => import('@/features/learning/StudyPage')) },
+  { path: '/estudos/aprendizagem', Component: lazy(() => import('@/features/learning/LearningPage')) },
   { path: '/livros', Component: lazy(() => import('@/features/learning/BooksPage')) },
   { path: '/livros/:id', Component: lazy(() => import('@/features/learning/BookPage')) },
   { path: '/biblia', Component: lazy(() => import('@/features/spiritual/BiblePage')) },

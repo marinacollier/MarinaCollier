@@ -172,6 +172,8 @@ export function emptyDB(): DB {
     meetings: [],
     studyTracks: [],
     studyItems: [],
+    studySessions: [],
+    learningErrors: [],
     books: [],
     trips: [],
     tripItems: [],

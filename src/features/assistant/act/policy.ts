@@ -38,6 +38,8 @@ export type ActionKind =
   | 'career_update'
   /** Lugares que conheci: a place she has been to (direct + Desfazer). */
   | 'place_record'
+  /** Aprendizagem: a study session / library item / review card she told Lumos about (direct + Desfazer). */
+  | 'study_record'
 
 const SENSITIVE: ReadonlySet<ActionKind> = new Set<ActionKind>([
   'plan_week',
