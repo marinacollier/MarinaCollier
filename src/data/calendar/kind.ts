@@ -76,6 +76,8 @@ export function eventKind(e: Pick<CalendarEvent, 'title'> & Partial<CalendarEven
   if (e.entryKind) return e.entryKind
   const byTitle = titleKind(e.title)
   if (byTitle) return byTitle
+  // A video-call link (Meet, Zoom, Teams) makes it a meeting whatever the title says ("Fashion Finder — Tutorial").
+  if (/meet\.google\.com|zoom\.us|teams\.microsoft\.com|whereby\.com/.test(e.url ?? '')) return 'reuniao'
   const cat = fold(e.category ?? '')
   if (/espirit|\bfe\b|igreja/.test(cat)) return 'espiritualidade'
   switch (e.kind) {

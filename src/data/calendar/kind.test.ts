@@ -59,3 +59,9 @@ describe('tipo (kind) derivation', () => {
     expect(kindOfEntry({ ...db, tasks: [task] }, e)).toBe('tarefa')
   })
 })
+
+describe('eventKind · link de videochamada', () => {
+  it('evento com link do Meet é reunião, mesmo com título "Tutorial"', () => {
+    expect(eventKind({ title: 'Fashion Finder — Tutorial', kind: 'trabalho', url: 'https://meet.google.com/hzk-uvih-qtk' })).toBe('reuniao')
+  })
+})
