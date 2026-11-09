@@ -13,7 +13,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowUp, Mic, Paperclip } from 'lucide-react'
+import { ArrowUp, Keyboard, Mic, Paperclip } from 'lucide-react'
 import { Chip } from '@/components/ui'
 import { homeSuggestions, normalizeCapture, type Now } from '@/data/intel'
 import { useDB, useStore } from '@/data/store'
@@ -100,17 +100,25 @@ export function Composer({ variant, placeholder }: { variant: 'home' | 'page'; p
   const fileRef = useRef<HTMLInputElement>(null)
   const [voiceNote, setVoiceNote] = useState<string>()
   // The iPhone's own dictation: the transcript is sent like typed text (unsure → shown to confirm).
-  const speech = useSpeech(({ text, confidence }) => {
+  // Never loses text: an interrupted take, an unsure one, or one spoken after she already typed
+  // something goes into the field (after what she typed) to check — only a clean take is sent.
+  const speech = useSpeech(({ text, confidence, partial }) => {
     const q = normalizeCapture({ kind: 'voice', transcript: text }).text?.trim()
     if (!q) return
-    if (confidence !== undefined && confidence < LOW_CONFIDENCE) {
-      setDraft(q)
-      setVoiceNote(`Entendi: “${q}” — confere e envia (ou corrige antes).`)
+    const typed = useConversation.getState().draft.trim()
+    if (partial || typed || (confidence !== undefined && confidence < LOW_CONFIDENCE)) {
+      setDraft(typed ? `${typed} ${q}` : q)
+      setVoiceNote(partial ? 'A gravação foi interrompida — guardei o que ouvi no campo. Confere e envia.' : `Entendi: “${q}” — confere e envia (ou corrige antes).`)
       return
     }
     setVoiceNote(undefined)
     ask(q)
   })
+  // No working recognizer here (iPhone app on the Home Screen…): the mic opens the keyboard, whose 🎙 dictates.
+  const keyboardDictation = () => {
+    inputRef.current?.focus()
+    setVoiceNote(speech.fallback)
+  }
 
   useEffect(() => {
     if (draft) inputRef.current?.focus()
@@ -161,9 +169,13 @@ export function Composer({ variant, placeholder }: { variant: 'home' | 'page'; p
             <Paperclip size={18} />
           </button>
         )}
-        {speech.available && (
+        {speech.available ? (
           <button type="button" onClick={() => speech.start()} aria-label="Falar com a Lumos" className="h-10 w-10 rounded-full flex items-center justify-center active:bg-surface-2 text-muted">
             <Mic size={18} />
+          </button>
+        ) : (
+          <button type="button" onClick={keyboardDictation} aria-label="Ditar pelo teclado do iPhone" className="h-10 w-10 rounded-full flex items-center justify-center active:bg-surface-2 text-muted">
+            <Keyboard size={18} />
           </button>
         )}
         <button type="submit" aria-label="Enviar" disabled={!draft.trim()} className="h-10 w-10 rounded-full bg-ink text-bg flex items-center justify-center transition active:scale-95 disabled:opacity-25">

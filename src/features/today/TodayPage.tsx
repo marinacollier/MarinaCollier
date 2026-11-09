@@ -28,7 +28,7 @@ import { areaLocked, useLockState } from '@/app/lock-store'
 import { useNow } from '@/hooks/useToday'
 import { addDays } from '@/lib/date'
 import { travelTripOn } from '@/data/travel-mode'
-import { localNow } from '@/features/travel/expedition/logic'
+import { activeDate } from './local-day'
 import { EntryDetail } from '@/features/agenda/calendar/EntryDetail'
 import { useCalendar, useEntry } from '@/features/agenda/calendar/model'
 import { homeContext } from './context'
@@ -68,15 +68,7 @@ export default function TodayPage() {
   useMarkSeenOnLeave()
 
   // While traveling, "today" is the trip's local day (the calendar stores trip times in its zone).
-  const tz = travelTripOn(db, today)?.expedition?.timeZone
-  const day = useMemo(() => {
-    if (!tz) return today
-    try {
-      return localNow(tz, clock).date
-    } catch {
-      return today
-    }
-  }, [tz, today, clock])
+  const day = useMemo(() => activeDate(db, today, clock), [db, today, clock])
   const place = useMemo(() => placeOf(db, today, day), [db, today, day])
 
   // 2 · 3 — the same projection as the Agenda.
