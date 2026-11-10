@@ -38,3 +38,14 @@ export function GcalStatusLine({ compact }: { compact?: boolean }) {
     </div>
   )
 }
+
+/** Home: silent while Google is in sync; says so — with the button — when it isn't (no fake "ok"). */
+export function GcalHomeAlert() {
+  const s = useGcal()
+  if (s.state === 'conectado' || s.state === 'sincronizando' || s.message === 'Verificando a conexão…') return null
+  return (
+    <div className="mb-3 rounded-2xl bg-surface-2 px-3 py-2.5">
+      <GcalStatusLine />
+    </div>
+  )
+}

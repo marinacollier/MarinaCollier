@@ -12,6 +12,7 @@
  * entregas, conflitos) and the expedition day live on the trip page (Hoje); the full day list, checks and
  * priorities in Agenda / Tarefas; Lumos with voice and attachments on /lumos.
  */
+import { GcalHomeAlert } from '@/features/integrations/GcalStatus'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -251,6 +252,7 @@ export default function TodayPage() {
       </motion.div>
 
       <motion.div {...rise(1)} className="mt-7">
+        <GcalHomeAlert />
         <DayBlock label="01 / Dia" title="Hoje" rows={hoje} loose={hojeLoose} onOpen={(e) => openEntry(e, day)} onLoose={openLoose} conflicts={conflictsByDay.get(day) ?? 0} conflictIds={conflictIds} onConflicts={() => setShowConflicts(day)} items={timeline} actOf={actOf(day)} onBlock={(b) => (setBlockDay(day), setBlockOpen(b))} onRoutine={setRoutineOpen} />
         <DayAssist date={day} nowMin={local.minutes} entries={cal.entries} rows={blocks.rows} onAsk={ask} />
         <BacklogPanel items={backlog} today={day} onOpen={(id) => openSheet('task', { id })} />

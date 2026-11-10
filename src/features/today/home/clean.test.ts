@@ -4,7 +4,7 @@ import type { ActionItem } from '@/data/agenda/items'
 import type { AttentionItem } from '@/data/intel'
 import type { Trip, TripItem } from '@/data/types'
 import type { TripOpsPanel } from '@/features/travel/expedition/panel'
-import { chipTone, dayHeader, dayRows, entryChip, looseRows, routineRows, timedRows, flightName, headerDate, inDays, lifeNeeds, nextDays, ROW_MAX, rowTime, shortTitle, stayPlace, tripNeeds } from './clean'
+import { chipTone, dayHeader, dayRows, entryChip, looseRows, routineComplete, routineRows, timedRows, flightName, headerDate, inDays, lifeNeeds, nextDays, ROW_MAX, rowTime, shortTitle, stayPlace, tripNeeds } from './clean'
 
 const entry = (p: Partial<CalendarEntry> & { id: string; date: string; time?: string; endDate?: string }): CalendarEntry => ({
   title: p.id,
@@ -194,5 +194,12 @@ describe('Home · rotinas', () => {
     db.occurrences = [{ id: 'o', parentType: 'routineItem', parentId: 'a', date: '2026-11-10', status: 'done', createdAt: '', updatedAt: '' }] as never
     db.profile = { ...db.profile, dayPlan: { blocks: [{ id: 'x', title: 'Milagre da Manhã', category: 'ritual', kind: 'base', start: '06:00', end: '07:00', weekdays: [0, 1, 2, 3, 4, 5, 6] }] } } as never
     expect(routineRows(db, '2026-11-10')).toEqual([{ id: 'm', name: 'Milagre da Manhã', emoji: '☀️', time: '06:00', done: 1, total: 2 }])
+  })
+
+  it('a routine is struck through only when COMPLETE', () => {
+    expect(routineComplete({ done: 1, total: 2 })).toBe(false)
+    expect(routineComplete({ done: 11, total: 12 })).toBe(false)
+    expect(routineComplete({ done: 12, total: 12 })).toBe(true)
+    expect(routineComplete({ done: 0, total: 0 })).toBe(false)
   })
 })

@@ -325,10 +325,14 @@ export function calendarEntries(db: DB, from: DateKey, to: DateKey, opts: Calend
   const sources = new Map(db.calendarSources.map((s) => [s.id, s]))
   const projectRoute = (id?: ID) => (id ? { label: 'Projeto', route: ROUTES.project(id) } : undefined)
 
+  const bookingLinked = new Set(db.tripItems.filter((i) => i.linkedExternalId && isBookingItem(i)).map((i) => i.linkedExternalId!))
   for (const date of eachDay(from, to)) {
     const modeInfo = routineModeInfo(db, date)
     // 1. Calendar events (sources, recurrence, exdates, modo viagem pause — all in eventsFor).
     for (const e of eventsFor(db, date)) {
+      // A booking she already has (flight, dive, stay) that Google also lists: the booking line (with its
+      // paid/confirmed state) is shown, not a second copy from Google.
+      if (e.external && bookingLinked.has(e.external.externalId)) continue
       const multi = !e.recurrence && !!e.endDate && e.endDate > e.date
       const o = overrideFor(db, date, 'event', e.id)
       const occ = occurrenceFor(db.occurrences, 'event', e.id, date)
@@ -609,8 +613,8 @@ export function calendarEntries(db: DB, from: DateKey, to: DateKey, opts: Calend
     const trip = tripsById.get(i.tripId)
     const status = tripItemStatus(i)
     if (status === 'cancelado' && !opts.includeCancelled) continue
-    // Represented on the calendar by its synced external event (Google) — one line, never two.
-    if (i.linkedExternalId && syncedIds.has(i.linkedExternalId)) continue
+    // Represented on the calendar by its synced external event (Google) — one line, never two (a booking keeps its own line).
+    if (i.linkedExternalId && syncedIds.has(i.linkedExternalId) && !isBookingItem(i)) continue
     // Her "Falta na escola" is shown on the class itself ("faltei"), not as a second line.
     if (isSchoolAbsence(i) && i.date && classLineOn(db, i.date)?.absent) continue
     const meta = BOOKING_STATUS_META[bookingStatusOf(i)]
@@ -1112,6 +1116,11 @@ export function dedupeEntries(list: CalendarEntry[]): CalendarEntry[] {
     }
   }
   return items
+}
+
+/** A booking (flight, stay, paid/confirmed activity): its own line wins over the same thing synced from Google. */
+function isBookingItem(i: TripItem): boolean {
+  return i.section === 'voo' || i.section === 'hospedagem' || !!i.confirmationCode || i.paymentStatus === 'pago' || ['reserva_emitida', 'reservado', 'confirmado', 'aguardando_pagamento'].includes(bookingStatusOf(i))
 }
 
 /** A trip day already full: a flight, a pickup before 08:00 or a full-day activity (no extra workout then). */

@@ -321,6 +321,9 @@ export interface RoutineRow {
 }
 
 /** Her rituals of the day, with how much is ticked — one line each on Home. */
+/** Struck through ONLY when every item of the day is ticked — 11/12 is still open. */
+export const routineComplete = (r: Pick<RoutineRow, 'done' | 'total'>): boolean => r.total > 0 && r.done >= r.total
+
 export function routineRows(db: DB, date: DateKey): RoutineRow[] {
   const blocks = dayBlocksOn(db, date)
   return db.routines

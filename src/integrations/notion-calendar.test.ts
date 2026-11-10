@@ -107,6 +107,19 @@ describe('sincronização com o Google como fonte de verdade', () => {
   })
 })
 
+describe('limite do conector', () => {
+  it('reads the window in chunks of at most 28 days (the connector refuses more than a month) without duplicating edge events', async () => {
+    const mcp = mcpOf(() => payload([ev('edge', '2026-11-12T07:00:00.000+02:00', '2026-11-12T08:00:00.000+02:00')]))
+    await syncGoogleCalendar(mcp, '2026-11-10')
+    expect(mcp.calls.length).toBeGreaterThan(1)
+    for (const c of mcp.calls as { timeMin: string; timeMax: string }[]) {
+      const days = (Date.parse(c.timeMax) - Date.parse(c.timeMin)) / 86400000
+      expect(days).toBeLessThan(31)
+    }
+    expect(getDB().events.filter((e) => e.external?.externalId === 'edge')).toHaveLength(1)
+  })
+})
+
 describe('sem duplicar o que ela já tinha', () => {
   it('adopts her local event (same Meet link) and links a trip item instead of creating copies', async () => {
     actions.create('events', { title: 'Tutorial', date: '2026-11-10', startTime: '21:00', endTime: '22:00', sourceId: 'cal-local', allDay: false, url: 'https://meet.google.com/abc-defg-hij', notes: 'nota local' })

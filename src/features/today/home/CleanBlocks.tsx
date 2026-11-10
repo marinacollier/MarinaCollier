@@ -11,7 +11,7 @@ import { useDB } from '@/data/store'
 import type { DateKey } from '@/data/types'
 import { cn } from '@/lib/cn'
 import { haptic } from '@/lib/haptics'
-import { chipTone, dayHeader, entryChip, entryLabel, rowTime, shortTitle, type ChipTone, type LooseRow, type Need, type NextDay, type RoutineRow } from './clean'
+import { chipTone, dayHeader, entryChip, entryLabel, rowTime, shortTitle, type ChipTone, type LooseRow, type Need, type NextDay, type RoutineRow, routineComplete } from './clean'
 import type { BlockRow } from './allocation'
 import { actions } from '@/data/store'
 import { routineItemsFor } from '@/data/selectors'
@@ -227,6 +227,7 @@ export function DayBlock({
                   kind="Rotina"
                   title={`${it.r.emoji ? `${it.r.emoji} ` : ''}${it.r.name}`}
                   chip={it.r.total && it.r.done >= it.r.total ? 'feito' : `${it.r.done}/${it.r.total}`}
+                  muted={routineComplete(it.r)}
                   onOpen={() => onRoutine?.(it.r.id)}
                 />
               ) : (
@@ -441,6 +442,7 @@ export function RoutineList({ rows, onOpen }: { rows: RoutineRow[]; onOpen: (id:
             left={<span className="w-[62px] shrink-0 tabular-nums text-[14px] text-ink-2 font-medium">{r.time ?? '—'}</span>}
             title={`${r.emoji ? `${r.emoji} ` : ''}${r.name}`}
             chip={r.total && r.done >= r.total ? 'feito' : `${r.done}/${r.total}`}
+            muted={routineComplete(r)}
             onOpen={() => onOpen(r.id)}
           />
         ))}

@@ -26,8 +26,10 @@ import type { RemoteEvent, SyncReport } from './types'
 export const GCAL_SOURCE_ID = 'gcal-google'
 export const GCAL_SERVER = 'Notion'
 export const GCAL_TOOL = 'notion-calendar-list-events'
-/** How far the sync reads: yesterday … +60 days (cancellations inside this window are detected). */
-export const GCAL_WINDOW = { back: 1, ahead: 60 } as const
+/** How far the sync reads: yesterday … +55 days (cancellations inside this window are detected). */
+export const GCAL_WINDOW = { back: 1, ahead: 55 } as const
+/** The connector refuses ranges over one month — the window is read in chunks of this many days. */
+export const GCAL_CHUNK_DAYS = 28
 
 // ─── Connector payload (shape observed from a real read call) ───────────────
 
@@ -85,6 +87,14 @@ const RESPONSE: Record<string, EventAttendee['responseStatus']> = { accepted: 'a
 /** Connector payload → RemoteEvent[] (Google accounts only; declined invites and auto-blocks skipped). */
 export function mapPayload(payload: NcPayload, db: Pick<DB, 'trips' | 'profile'>): RemoteEvent[] {
   const out: RemoteEvent[] = []
+  const seen = new Set<string>()
+  const push = (r: RemoteEvent) => {
+    // Reads come in 28-day chunks; an event on a chunk edge comes back twice.
+    const k = `${r.externalId}|${r.date}|${r.startTime ?? ''}`
+    if (seen.has(k)) return
+    seen.add(k)
+    out.push(r)
+  }
   for (const acc of payload.accounts ?? []) {
     if (acc.providerName !== 'google') continue
     for (const cal of acc.calendars ?? []) {
@@ -107,7 +117,7 @@ export function mapPayload(payload: NcPayload, db: Pick<DB, 'trips' | 'profile'>
           // Google's all-day end is exclusive.
           const endEx = e.period.end.date
           const endDate = endEx && endEx > date ? addDays(endEx, -1) : undefined
-          out.push({ ...base, date, endDate: endDate !== date ? endDate : undefined, allDay: true })
+          push({ ...base, date, endDate: endDate !== date ? endDate : undefined, allDay: true })
           continue
         }
         const start = new Date(e.period.start.dateTime!)
@@ -116,7 +126,7 @@ export function mapPayload(payload: NcPayload, db: Pick<DB, 'trips' | 'profile'>
         const tz = viewZoneFor(db, start)
         const s = wallTime(start, tz)
         const en = wallTime(end, tz)
-        out.push({ ...base, date: s.date, startTime: s.time, endTime: en.time, endDate: en.date !== s.date ? en.date : undefined, allDay: false, timeZone: tz })
+        push({ ...base, date: s.date, startTime: s.time, endTime: en.time, endDate: en.date !== s.date ? en.date : undefined, allDay: false, timeZone: tz })
       }
     }
   }
@@ -206,10 +216,13 @@ const ERROR_TEXT: Record<string, string> = {
 export async function syncGoogleCalendar(mcp: McpLike, today: DateKey): Promise<GcalStatus> {
   const from = addDays(today, -GCAL_WINDOW.back)
   const to = addDays(today, GCAL_WINDOW.ahead)
-  let payload: NcPayload
+  const payload: NcPayload = { accounts: [] }
   try {
-    const r = await mcp.callTool(GCAL_SERVER, GCAL_TOOL, { timeMin: `${from}T00:00:00Z`, timeMax: `${to}T23:59:59Z`, timeZone: 'UTC' }, { cache: false })
-    payload = (r.payload ?? {}) as NcPayload
+    for (let start = from; start <= to; start = addDays(start, GCAL_CHUNK_DAYS)) {
+      const end = addDays(start, GCAL_CHUNK_DAYS - 1) < to ? addDays(start, GCAL_CHUNK_DAYS - 1) : to
+      const r = await mcp.callTool(GCAL_SERVER, GCAL_TOOL, { timeMin: `${start}T00:00:00Z`, timeMax: `${end}T23:59:59Z`, timeZone: 'UTC' }, { cache: false })
+      payload.accounts!.push(...(((r.payload ?? {}) as NcPayload).accounts ?? []))
+    }
   } catch (e) {
     const code = (e as { code?: string })?.code ?? 'upstream_error'
     return { state: ERROR_TEXT[code] && code !== 'approval_required' ? 'desconectado' : 'erro', message: ERROR_TEXT[code] ?? `Não consegui ler o Google Calendar agora (${code}). Nada foi alterado.` }
