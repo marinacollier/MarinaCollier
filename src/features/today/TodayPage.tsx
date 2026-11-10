@@ -33,6 +33,7 @@ import { checkinOf } from './home/day-checkin'
 import { DayCheckinCard, DayReviewCard, showReview } from './home/DayPlanCards'
 import { applyModeOf, applyProposal, blockRows } from './home/allocation'
 import { BlockSheet, DayAssist, parseAdjust, runAdjust } from './home/DayAssist'
+import { canComplete, canPostpone, isRowDone, postponeRow, toggleDone, type RowResult, type RowTarget } from './home/row-actions'
 import { backlogOf } from './home/backlog'
 import { BacklogPanel } from './home/BacklogPanel'
 import { dayBlocksOn } from '@/data/routine-modes'
@@ -44,7 +45,7 @@ import { LumosSheet, lumosHref, type LumosRequest } from './home/lumos'
 import { useMarkSeenOnLeave } from './home/seen'
 import { homeTripOps } from './home/trip-ops'
 import { blockLabel, flightName, headerDate, inDays, lifeNeeds, looseRows, nextDays, NEEDS_MAX, routineRows, shortMoney, stayPlace, timedRows, tripNeeds, type LooseRow, type Need } from './home/clean'
-import { ConflictList, CrmLine, DayBlock, LumosLine, PrecisaList, ProximosList, RoutineChecklist, TripChips, type TLBlock, type TLItem } from './home/CleanBlocks'
+import { ConflictList, CrmLine, DayBlock, type LineAct, LumosLine, PrecisaList, ProximosList, RoutineChecklist, TripChips, type TLBlock, type TLItem } from './home/CleanBlocks'
 import { crmPulse } from '@/data/ugc/model'
 
 /** A trip shows on Home (outside it) only when it's really close. */
@@ -86,7 +87,7 @@ export default function TodayPage() {
   // Hoje and Amanhã are complete (timed lines + "Sem horário"); then the next 7 days with something.
   const tomorrow = addDays(day, 1)
   const hoje = useMemo(() => timedRows(cal.entries, day), [cal.entries, day])
-  const hojeLoose = useMemo(() => looseRows(db, cal.entries, day), [db, cal.entries, day])
+  const hojeLooseAll = useMemo(() => looseRows(db, cal.entries, day), [db, cal.entries, day])
   const amanha = useMemo(() => timedRows(cal.entries, tomorrow), [cal.entries, tomorrow])
   const amanhaLoose = useMemo(() => looseRows(db, cal.entries, tomorrow), [db, cal.entries, tomorrow])
   const looseOf = useCallback((d: DateKey) => looseRows(db, cal.entries, d), [db, cal.entries])
@@ -125,6 +126,22 @@ export default function TodayPage() {
     for (const b of blockRows(db, tomorrow, wake, cal.entries).rows) if (b.state === 'sugestao') out.push({ kind: 'block', time: b.start, b, label: blockLabel(db, b.key, b.c) })
     return out.sort((a, b) => a.time.localeCompare(b.time))
   }, [amanha, db, tomorrow, cal.entries])
+  // One tap on any line: ✓ concluir (or undo) · swipe ← amanhã. Every action persists and offers Desfazer.
+  const actOf = useCallback(
+    (date: DateKey) =>
+      (it: TLItem | { kind: 'loose'; r: LooseRow }): LineAct | undefined => {
+        const t: RowTarget | undefined = it.kind === 'entry' ? { kind: 'entry', e: it.e, date } : it.kind === 'block' ? { kind: 'block', b: it.b, date } : it.kind === 'loose' ? { kind: 'loose', r: it.r, date } : undefined
+        if (!t || !canComplete(t)) return undefined
+        const show = (r: RowResult) => toast(r.message, r.undo ? { action: { label: 'Desfazer', run: r.undo } } : {})
+        return { done: isRowDone(db, t), onDone: () => show(toggleDone(t)), onPostpone: canPostpone(t) ? () => show(postponeRow(t)) : undefined }
+      },
+    [db],
+  )
+  // A task already placed on the timeline is not listed again under "Sem horário" (one line per thing).
+  const hojeLoose = useMemo(() => {
+    const placed = new Set(blocks.rows.filter((b) => b.key.startsWith('task:')).map((b) => b.key.slice(5)))
+    return hojeLooseAll.filter((r) => !placed.has(r.open.kind === 'task' ? r.open.id : r.open.entry.sourceId))
+  }, [hojeLooseAll, blocks.rows])
   const [blockOpen, setBlockOpen] = useState<TLBlock>()
   const [blockDay, setBlockDay] = useState<DateKey>()
   const backlog = useMemo(() => backlogOf(db, day, new Set(blocks.rows.map((b) => b.key))), [db, day, blocks.rows])
@@ -234,13 +251,13 @@ export default function TodayPage() {
       </motion.div>
 
       <motion.div {...rise(1)} className="mt-7">
-        <DayBlock label="01 / Dia" title="Hoje" rows={hoje} loose={hojeLoose} onOpen={(e) => openEntry(e, day)} onLoose={openLoose} conflicts={conflictsByDay.get(day) ?? 0} conflictIds={conflictIds} onConflicts={() => setShowConflicts(day)} items={timeline} onBlock={(b) => (setBlockDay(day), setBlockOpen(b))} onRoutine={setRoutineOpen} />
+        <DayBlock label="01 / Dia" title="Hoje" rows={hoje} loose={hojeLoose} onOpen={(e) => openEntry(e, day)} onLoose={openLoose} conflicts={conflictsByDay.get(day) ?? 0} conflictIds={conflictIds} onConflicts={() => setShowConflicts(day)} items={timeline} actOf={actOf(day)} onBlock={(b) => (setBlockDay(day), setBlockOpen(b))} onRoutine={setRoutineOpen} />
         <DayAssist date={day} nowMin={local.minutes} entries={cal.entries} rows={blocks.rows} onAsk={ask} />
         <BacklogPanel items={backlog} today={day} onOpen={(id) => openSheet('task', { id })} />
       </motion.div>
 
       <motion.div {...rise(2)} className="mt-7">
-        <DayBlock label={`02 / ${headerDate(tomorrow)}`} title="Amanhã" rows={amanha} items={tomorrowItems} onBlock={(b) => (setBlockDay(tomorrow), setBlockOpen(b))} loose={amanhaLoose} onOpen={(e) => openEntry(e, tomorrow)} onLoose={openLoose} conflicts={conflictsByDay.get(tomorrow) ?? 0} conflictIds={conflictIds} onConflicts={() => setShowConflicts(tomorrow)} empty="Nada marcado" />
+        <DayBlock label={`02 / ${headerDate(tomorrow)}`} title="Amanhã" rows={amanha} items={tomorrowItems} actOf={actOf(tomorrow)} onBlock={(b) => (setBlockDay(tomorrow), setBlockOpen(b))} loose={amanhaLoose} onOpen={(e) => openEntry(e, tomorrow)} onLoose={openLoose} conflicts={conflictsByDay.get(tomorrow) ?? 0} conflictIds={conflictIds} onConflicts={() => setShowConflicts(tomorrow)} empty="Nada marcado" />
       </motion.div>
 
       <motion.div {...rise(2)} className="mt-7">

@@ -4,7 +4,8 @@
  */
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowUp, ChevronRight, TriangleAlert } from 'lucide-react'
+import { ArrowUp, ChevronRight, Redo2, TriangleAlert } from 'lucide-react'
+import { SwipeRow } from '@/components/ui/SwipeRow'
 import { CATEGORY_META, type CalendarConflict, type CalendarEntry } from '@/data/calendar/universal'
 import { useDB } from '@/data/store'
 import type { DateKey } from '@/data/types'
@@ -48,9 +49,16 @@ export function Chip({ children, tone = 'soft' }: { children: ReactNode; tone?: 
   )
 }
 
-function OneLine({ left, title, chip, onOpen, muted, label, conflict, kind, quiet }: { left?: ReactNode; title: string; chip?: string; onOpen: () => void; muted?: boolean; label?: string; conflict?: boolean; kind?: string; quiet?: boolean }) {
-  return (
-    <li>
+/** One-tap actions of a line: the round check (Concluir / desfazer) and the swipes (→ concluir · ← adiar). */
+export interface LineAct {
+  done: boolean
+  onDone: () => void
+  onPostpone?: () => void
+}
+
+function OneLine({ left, title, chip, onOpen, muted, label, conflict, kind, quiet, act }: { left?: ReactNode; title: string; chip?: string; onOpen: () => void; muted?: boolean; label?: string; conflict?: boolean; kind?: string; quiet?: boolean; act?: LineAct }) {
+  const row = (
+    <div className="flex items-center gap-2">
       <button
         type="button"
         onClick={() => {
@@ -58,7 +66,7 @@ function OneLine({ left, title, chip, onOpen, muted, label, conflict, kind, quie
           onOpen()
         }}
         aria-label={label}
-        className="w-full min-h-11 flex items-center gap-3 text-left active:opacity-70"
+        className="flex-1 min-w-0 min-h-11 flex items-center gap-3 text-left active:opacity-70"
       >
         {left}
         <span className="flex-1 min-w-0">
@@ -68,11 +76,33 @@ function OneLine({ left, title, chip, onOpen, muted, label, conflict, kind, quie
         {conflict && <Chip tone="alert">conflito</Chip>}
         {chip && <Chip tone={chipTone(chip)}>{chip}</Chip>}
       </button>
+      {act && (
+        <button
+          type="button"
+          aria-label={act.done ? `Desfazer concluído: ${title}` : `Concluir: ${title}`}
+          aria-pressed={act.done}
+          onClick={() => {
+            haptic('light')
+            act.onDone()
+          }}
+          className="h-11 w-11 -mr-2 shrink-0 inline-flex items-center justify-center active:scale-90 transition"
+        >
+          <span className={cn('h-[22px] w-[22px] rounded-full border-[1.5px] inline-flex items-center justify-center', act.done ? 'bg-sage border-sage text-bg' : 'border-line')}>{act.done && <Check size={13} strokeWidth={3} aria-hidden />}</span>
+        </button>
+      )}
+    </div>
+  )
+  if (!act) return <li>{row}</li>
+  return (
+    <li>
+      <SwipeRow onComplete={act.onDone} onDelete={act.onPostpone} completeLabel={act.done ? 'Desfazer' : 'Concluir'} deleteLabel="Amanhã" deleteIcon={<Redo2 size={18} aria-hidden />} className="rounded-none">
+        {row}
+      </SwipeRow>
     </li>
   )
 }
 
-function EntryLine({ e, onOpen, conflict }: { e: CalendarEntry; onOpen: (e: CalendarEntry) => void; conflict?: boolean }) {
+function EntryLine({ e, onOpen, conflict, act }: { e: CalendarEntry; onOpen: (e: CalendarEntry) => void; conflict?: boolean; act?: LineAct }) {
   const db = useDB()
   const chip = entryChip(db, e)
   const kind = entryLabel(db, e)
@@ -90,13 +120,14 @@ function EntryLine({ e, onOpen, conflict }: { e: CalendarEntry; onOpen: (e: Cale
       muted={e.status === 'feito' || e.status === 'cancelado'}
       conflict={conflict}
       kind={kind}
+      act={act}
       onOpen={() => onOpen(e)}
     />
   )
 }
 
 /** "Sem horário": the day's lines that have no time — never given one. */
-function LooseList({ rows, onOpen }: { rows: LooseRow[]; onOpen: (r: LooseRow) => void }) {
+function LooseList({ rows, onOpen, actOf }: { rows: LooseRow[]; onOpen: (r: LooseRow) => void; actOf?: (r: LooseRow) => LineAct | undefined }) {
   if (!rows.length) return null
   return (
     <div className="mt-2" role="group" aria-label="Sem horário">
@@ -110,6 +141,7 @@ function LooseList({ rows, onOpen }: { rows: LooseRow[]; onOpen: (r: LooseRow) =
             chip={r.chip}
             muted={r.done}
             onOpen={() => onOpen(r)}
+            act={actOf?.(r)}
           />
         ))}
       </ul>
@@ -133,6 +165,7 @@ export function DayBlock({
   items,
   onBlock,
   onRoutine,
+  actOf,
 }: {
   label: string
   title: string
@@ -150,6 +183,8 @@ export function DayBlock({
   items?: TLItem[]
   onBlock?: (b: TLBlock) => void
   onRoutine?: (id: string) => void
+  /** One-tap actions per line (concluir / adiar). */
+  actOf?: (it: TLItem | { kind: 'loose'; r: LooseRow }) => LineAct | undefined
 }) {
   return (
     <section aria-label={title}>
@@ -171,7 +206,7 @@ export function DayBlock({
           <ul className="divide-y divide-line/60" aria-label="Linha do tempo">
             {items.map((it) =>
               it.kind === 'entry' ? (
-                <EntryLine key={it.e.id} e={it.e} onOpen={onOpen} conflict={conflictIds?.has(it.e.id)} />
+                <EntryLine key={it.e.id} e={it.e} onOpen={onOpen} conflict={conflictIds?.has(it.e.id)} act={actOf?.(it)} />
               ) : it.kind === 'block' ? (
                 <OneLine
                   key={`b:${it.b.key}`}
@@ -182,6 +217,7 @@ export function DayBlock({
                   chip={it.b.state === 'feito' ? 'feito' : it.b.state === 'sugestao' ? 'sugestão' : 'planejado'}
                   muted={it.b.state === 'feito'}
                   onOpen={() => onBlock?.(it)}
+                  act={it.b.state === 'sugestao' ? undefined : actOf?.(it)}
                 />
               ) : it.kind === 'routine' ? (
                 <OneLine
@@ -210,7 +246,7 @@ export function DayBlock({
         <p className="text-[15px] text-ink-2 py-2">{empty}</p>
       ) : null}
       {routines}
-      <LooseList rows={loose} onOpen={onLoose} />
+      <LooseList rows={loose} onOpen={onLoose} actOf={actOf ? (r) => actOf({ kind: 'loose', r }) : undefined} />
     </section>
   )
 }

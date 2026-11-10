@@ -30,8 +30,8 @@ function renderHome() {
 /** [time, title] of each one-line row in a list (the timed column — not the Rotinas / Sem horário groups). */
 const rowsOf = (el: HTMLElement) =>
   [...el.querySelectorAll('li')].filter((li) => !li.closest('[aria-label="Rotinas"], [aria-label="Sem horário"]')).map((li) => {
-    const spans = li.querySelectorAll('button > span')
-    return { time: spans[0]?.textContent ?? '', title: spans[1]?.textContent ?? '', text: li.textContent ?? '' }
+    const spans = li.querySelector('button')?.querySelectorAll(':scope > span') ?? []
+    return { time: spans[0]?.textContent ?? '', title: spans[1]?.textContent ?? '', text: li.querySelector('button')?.textContent ?? '' }
   })
 
 beforeAll(() => {
@@ -71,7 +71,7 @@ describe('Início limpo', () => {
     expect(times.indexOf('dia todo') === -1 || times.lastIndexOf('dia todo') < times.findIndex((t) => t !== 'dia todo') || times.every((t) => t === 'dia todo')).toBe(true)
     // No checks, no second line under the title.
     expect(screen.getByLabelText('Hoje').querySelectorAll('[role="checkbox"]').length).toBe(0)
-    for (const li of screen.getByLabelText('Hoje').querySelectorAll('li')) expect(li.querySelectorAll('button > span').length).toBeLessThanOrEqual(3)
+    for (const li of screen.getByLabelText('Hoje').querySelectorAll('li')) expect(li.querySelector('button')!.querySelectorAll(':scope > span').length).toBeLessThanOrEqual(3)
   })
 
   it('tapping a row opens the same detail as the Agenda (full text lives there)', () => {

@@ -83,7 +83,7 @@ describe('Home limpa em viagem (Cape Town, 06/11)', () => {
     const hoje = screen.getByLabelText('Hoje')
     // Timed lines only ("Sem horário" lists the day's untimed things below, without a made-up time).
     // Commitment lines (time + quiet category word + title); planned blocks/rituals carry their own aria-label.
-    const rows = [...hoje.querySelectorAll('li')].filter((li) => !li.closest('[aria-label="Sem horário"]') && !li.querySelector('button')?.getAttribute('aria-label')).map((li) => li.textContent ?? '')
+    const rows = [...hoje.querySelectorAll('li')].filter((li) => !li.closest('[aria-label="Sem horário"]') && !li.querySelector('button')?.getAttribute('aria-label')).map((li) => li.querySelector('button')?.textContent ?? '')
     expect(rows.some((r) => /^09:00CompromissoAula · Bayswater Cape Town/.test(r))).toBe(true)
     const times = rows.map((r) => r.match(/^(\d\d:\d\d|dia todo)/)?.[1])
     expect(times.every(Boolean)).toBe(true)
@@ -99,7 +99,7 @@ describe('Home limpa em viagem (Cape Town, 06/11)', () => {
     const next = screen.getByLabelText('Próximos dias')
     const monday = within(next).getByRole('group', { name: 'Segunda, 9 nov' })
     const row = [...monday.querySelectorAll('li')].find((li) => li.textContent?.includes('Caiaque'))!
-    expect(row.textContent).toBe('13:00Vida pessoal · passeioCaiaque com focas — Hout Bayaguardando')
+    expect(row.querySelector('button')?.textContent).toBe('13:00Vida pessoal · passeioCaiaque com focas — Hout Bayaguardando')
     expect(document.body.textContent).not.toContain(CAIAQUE_1106.nextAction!)
     expect(document.body.textContent).not.toContain('grupo mínimo')
     fireEvent.click(row.querySelector('button')!)

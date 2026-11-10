@@ -56,6 +56,8 @@ const home = () =>
 
 const timeline = () => within(screen.getByLabelText('Hoje')).getByLabelText('Linha do tempo')
 const rowOf = (title: string) => [...timeline().querySelectorAll('li')].find((li) => li.textContent?.includes(title))
+/** The line itself (its main button), without the swipe labels and the round check. */
+const lineText = (li?: Element) => li?.querySelector('button')?.textContent ?? ''
 const status = () => screen.getByRole('status').textContent ?? ''
 
 describe('check-in do dia', () => {
@@ -76,7 +78,7 @@ describe('check-in do dia', () => {
     expect(screen.queryByLabelText('Check-in do dia')).toBeNull()
     expect(screen.queryByLabelText('O que faz sentido agora')).toBeNull()
     expect(c.blocks?.length).toBeGreaterThan(0)
-    expect(rowOf('Enviar proposta')?.textContent).toMatch(/^14:00.*Enviar proposta/)
+    expect(lineText(rowOf('Enviar proposta'))).toMatch(/^14:00.*Enviar proposta/)
   })
 
   it('"Pular" stores skipped and the timeline still shows the plan from the calendar', () => {
@@ -95,7 +97,7 @@ describe('uma timeline, um motor', () => {
   it('the engine places flexible blocks on the timeline (persisted), labelled and with a time', async () => {
     home()
     const row = rowOf('Enviar proposta')!
-    expect(row.textContent).toMatch(/^14:00até 14:30TarefaEnviar propostaplanejado$/)
+    expect(lineText(row)).toMatch(/^14:00até 14:30TarefaEnviar propostaplanejado$/)
     const c = checkinOf(getDB(), DATE)!
     expect(c.blocks?.map((b) => [b.key, b.start, b.end, b.by])).toContainEqual(['task:a', '14:00', '14:30', 'motor'])
     // Reopening the app shows the same plan (it is stored, not recomputed on render).
@@ -106,16 +108,16 @@ describe('uma timeline, um motor', () => {
 
   it('Concluir in the block completes the task itself (Tarefas sees it) and the row shows "feito"', () => {
     home()
-    fireEvent.click(within(rowOf('Enviar proposta')!).getByRole('button'))
+    fireEvent.click(within(rowOf('Enviar proposta')!).getAllByRole('button')[0])
     fireEvent.click(screen.getByRole('button', { name: 'Concluir' }))
     expect(getDB().tasks.find((t) => t.id === 'a')?.status).toBe('done')
     expect(checkinOf(getDB(), DATE)!.blocks!.find((b) => b.key === 'task:a')?.status).toBe('feito')
-    expect(rowOf('Enviar proposta')?.textContent).toContain('feito')
+    expect(lineText(rowOf('Enviar proposta'))).toContain('feito')
   })
 
   it('Replanejar moves the block to her time; a later replan never moves it', () => {
     home()
-    fireEvent.click(within(rowOf('Enviar proposta')!).getByRole('button'))
+    fireEvent.click(within(rowOf('Enviar proposta')!).getAllByRole('button')[0])
     fireEvent.click(screen.getByRole('button', { name: 'Replanejar' }))
     fireEvent.change(screen.getByLabelText('Início'), { target: { value: '16:00' } })
     fireEvent.click(screen.getByRole('button', { name: /Salvar 16:00–16:30/ }))
@@ -143,7 +145,7 @@ describe('uma timeline, um motor', () => {
     expect(checkinOf(getDB(), DATE)!.energy).toBe(3)
     expect(status()).toMatch(/Energia ajustada.*nada fixo foi mexido/)
     expect(getDB().events.find((e) => e.title === 'Aula fixa')).toMatchObject({ startTime: '18:00', date: DATE })
-    expect(rowOf('Aula fixa')?.textContent).toMatch(/^18:00/)
+    expect(lineText(rowOf('Aula fixa'))).toMatch(/^18:00/)
   })
 
   it('typed commands are applied: "não quero enviar proposta" takes it out and says so', () => {
@@ -157,7 +159,7 @@ describe('uma timeline, um motor', () => {
 
   it('Adiar (Mais opções) moves the task to the chosen day; Desfazer brings everything back', () => {
     home()
-    fireEvent.click(within(rowOf('Enviar proposta')!).getByRole('button'))
+    fireEvent.click(within(rowOf('Enviar proposta')!).getAllByRole('button')[0])
     fireEvent.click(screen.getByRole('button', { name: /Mais opções/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Adiar' }))
     fireEvent.change(screen.getByLabelText('Adiar para'), { target: { value: '2026-11-20' } })
@@ -172,5 +174,24 @@ describe('revisão do fim do dia', () => {
     expect(showReview(20 * 60, undefined)).toBe(true)
     expect(showReview(21 * 60, { dismissed: true })).toBe(false)
     expect(showReview(21 * 60, { at: AT })).toBe(false)
+  })
+})
+
+describe('um toque em qualquer linha', () => {
+  beforeEach(() => {
+    actions.create('dayCheckins', { date: DATE, freeMin: 60, energy: 4, changes: [] })
+  })
+  it('the round check concludes the task behind a block; tapping again undoes it', () => {
+    home()
+    fireEvent.click(screen.getByRole('button', { name: 'Concluir: Enviar proposta' }))
+    expect(getDB().tasks.find((t) => t.id === 'a')?.status).toBe('done')
+    fireEvent.click(screen.getByRole('button', { name: 'Desfazer concluído: Enviar proposta' }))
+    expect(getDB().tasks.find((t) => t.id === 'a')?.status).not.toBe('done')
+  })
+  it('an event of the day (even one she cannot edit) is concluded with one tap', () => {
+    actions.create('events', { title: 'Aula fixa', date: DATE, startTime: '18:00', endTime: '19:00', sourceId: 'cal-local', allDay: false })
+    home()
+    fireEvent.click(screen.getByRole('button', { name: 'Concluir: Aula fixa' }))
+    expect(lineText(rowOf('Aula fixa'))).toContain('feito')
   })
 })

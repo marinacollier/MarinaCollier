@@ -541,7 +541,7 @@ export function calendarEntries(db: DB, from: DateKey, to: DateKey, opts: Calend
         category: 'estudo',
         sourceType: 'school',
         sourceId: cls.trip.id,
-        status: cls.absent ? 'cancelado' : 'confirmado',
+        status: cls.absent ? 'cancelado' : occurrenceFor(db.occurrences, 'school', cls.trip.id, date)?.status === 'done' ? 'feito' : 'confirmado',
         absent: cls.absent ? true : undefined,
         location: school?.address,
         allDay: false,

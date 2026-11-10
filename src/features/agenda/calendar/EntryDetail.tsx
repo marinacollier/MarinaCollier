@@ -3,6 +3,7 @@
  * Editing is a second-level action that opens the record's own editor ("Editar") or its module.
  * No form here.
  */
+import { canComplete, canPostpone, postponeRow, toggleDone, type RowTarget } from '@/features/today/home/row-actions'
 import { useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowUpRight, CalendarClock, Check, CircleCheck, ClipboardList, Globe, Link2, Lock, MapPin, Pencil, Redo2, Tag, TriangleAlert, UserX, X, XCircle } from 'lucide-react'
@@ -86,6 +87,7 @@ export function EntryDetail({
   const [mDate, setMDate] = useState<DateKey | undefined>(entry.startAt.date)
   const [mTime, setMTime] = useState<TimeHM | undefined>(entry.startAt.time)
   const occDay = isSpan(entry) ? entry.startAt.date : date
+  const target: RowTarget = { kind: 'entry', e: entry, date: occDay }
   const open = entry.status !== 'feito' && entry.status !== 'cancelado'
 
   /** Runs a quick action, closes the detail and offers "Desfazer". */
@@ -296,11 +298,45 @@ export function EntryDetail({
         )}
       </div>
 
-      {(entry.open.module || (entry.open.edit && !entry.masked) || isClass) && (
+      {(entry.open.module || (entry.open.edit && !entry.masked) || isClass || canComplete(target)) && (
         <footer className="mt-auto px-5 pt-3 border-t border-line/70 flex flex-wrap gap-2" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 14px)' }}>
-          {isClass && (
+          {canComplete(target) && (
+            <div className="w-full flex gap-2">
+              <Button
+                variant={entry.status === 'feito' ? 'outline' : 'primary'}
+                size="md"
+                className="flex-1 whitespace-nowrap px-4"
+                icon={<CircleCheck size={16} />}
+                onClick={() => {
+                  haptic('light')
+                  const r = toggleDone(target)
+                  onClose()
+                  toast(r.message, r.undo ? { action: { label: 'Desfazer', run: r.undo } } : {})
+                }}
+              >
+                {entry.status === 'feito' ? 'Desfazer concluído' : isClass ? 'Fui à aula ✓' : 'Concluir'}
+              </Button>
+              {canPostpone(target) && entry.status !== 'feito' && (
+                <Button
+                  variant="soft"
+                  size="md"
+                  className="whitespace-nowrap px-4"
+                  icon={<Redo2 size={16} />}
+                  onClick={() => {
+                    haptic('light')
+                    const r = postponeRow(target)
+                    onClose()
+                    toast(r.message, r.undo ? { action: { label: 'Desfazer', run: r.undo } } : {})
+                  }}
+                >
+                  Amanhã
+                </Button>
+              )}
+            </div>
+          )}
+          {isClass && entry.status !== 'feito' && (
             <Button
-              variant={entry.absent ? 'outline' : 'primary'}
+              variant={entry.absent ? 'outline' : 'soft'}
               size="md"
               className="w-full whitespace-nowrap px-4"
               icon={<UserX size={16} />}

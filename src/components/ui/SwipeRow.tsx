@@ -11,13 +11,16 @@ export interface SwipeRowProps {
   /** Swipe left → delete (caller should offer undo via toast). */
   onDelete?: () => void
   completeLabel?: string
+  /** Left swipe label/icon (default "Apagar" + trash) — e.g. "Adiar". */
+  deleteLabel?: string
+  deleteIcon?: ReactNode
   className?: string
 }
 
 const THRESHOLD = 88
 
 /** Row with swipe gestures for mobile. Taps still go to children. */
-export function SwipeRow({ children, onComplete, onDelete, completeLabel = 'Concluir', className }: SwipeRowProps) {
+export function SwipeRow({ children, onComplete, onDelete, completeLabel = 'Concluir', deleteLabel = 'Apagar', deleteIcon, className }: SwipeRowProps) {
   const x = useMotionValue(0)
   const crossed = useRef(false)
   const leftOpacity = useTransform(x, [0, THRESHOLD], [0, 1])
@@ -33,8 +36,8 @@ export function SwipeRow({ children, onComplete, onDelete, completeLabel = 'Conc
       )}
       {onDelete && (
         <motion.div style={{ opacity: rightOpacity }} className="absolute inset-0 flex items-center justify-end pr-5 bg-accent text-bg rounded-2xl">
-          <span className="mr-2 text-sm font-medium">Apagar</span>
-          <Trash2 size={18} />
+          <span className="mr-2 text-sm font-medium">{deleteLabel}</span>
+          {deleteIcon ?? <Trash2 size={18} />}
         </motion.div>
       )}
       <motion.div

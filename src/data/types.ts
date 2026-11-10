@@ -154,7 +154,8 @@ export type Recurrence =
  *   a deadline — keyed by the Home item key ('waiting:<taskId>', 'opportunity:<id>', 'content:<id>'…).
  * bill: a recurring payment (FinancialCategory with `bill`) paid in that period; date = period start.
  */
-export type OccurrenceParent = 'task' | 'routineItem' | 'petTask' | 'event' | 'item' | 'bill'
+/** 'school': a class of the trip's school she attended (parentId = trip id) — "fui à aula". */
+export type OccurrenceParent = 'task' | 'routineItem' | 'petTask' | 'event' | 'item' | 'bill' | 'school'
 
 /** A single dated completion (or skip) of something recurring. Also used as TaskOccurrence / RoutineOccurrence. */
 export interface Occurrence extends Entity {
