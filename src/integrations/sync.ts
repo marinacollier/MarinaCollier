@@ -195,7 +195,7 @@ export function isHiddenBySync(item: { external?: ExternalRef }): boolean {
 
 type EventFields = Pick<
   CalendarEvent,
-  'title' | 'date' | 'startTime' | 'endTime' | 'endDate' | 'allDay' | 'location' | 'url' | 'recurrence'
+  'title' | 'date' | 'startTime' | 'endTime' | 'endDate' | 'allDay' | 'location' | 'url' | 'recurrence' | 'timeZone' | 'attendees'
 >
 
 export function eventFields(e: RemoteEvent | CalendarEvent): EventFields {
@@ -209,6 +209,8 @@ export function eventFields(e: RemoteEvent | CalendarEvent): EventFields {
     location: e.location || undefined,
     url: e.url || undefined,
     recurrence: e.recurrence,
+    timeZone: e.timeZone || undefined,
+    attendees: e.attendees?.length ? e.attendees : undefined,
   }
 }
 
@@ -226,6 +228,10 @@ export interface CalendarSyncOptions {
   /** Fetched date range: only events inside it can be deleted-on-missing. */
   range?: { from: string; to: string }
   now?: ISODateTime
+  /** The origin is the source of truth (Google): a local edit of a mirrored field never keeps an outdated copy. */
+  remoteWins?: boolean
+  /** Local-only fields for records created now (e.g. the trip, notes carried over from an adopted item). */
+  seed?: (r: RemoteEvent) => Partial<CalendarEvent> | undefined
 }
 
 export function planCalendarSync(
@@ -247,7 +253,7 @@ export function planCalendarSync(
     others,
     remote,
     hash: eventHash,
-    localHash: eventHash,
+    localHash: opts.remoteWins ? undefined : eventHash,
     fullSync: opts.fullSync,
     inScope: range ? (e) => isBetween(e.date, range.from, range.to) : undefined,
   })
@@ -262,17 +268,22 @@ export function planCalendarSync(
     lastSyncedAt: now,
     syncStatus: status,
     syncHash: hash,
-    webUrl: r.url,
+    webUrl: r.webUrl ?? r.url,
   })
 
   for (const d of decisions) {
     if (d.kind === 'create') {
-      creates.push({ sourceId, ...eventFields(d.remote), external: ref(d.remote, d.hash) })
+      creates.push({ sourceId, ...opts.seed?.(d.remote), ...eventFields(d.remote), external: ref(d.remote, d.hash) })
     } else if (d.kind === 'update') {
       // Keep local-only fields (kind, notes, projectId, tripId); replace mirrored ones.
       upserts.push({ ...d.local, ...eventFields(d.remote), updatedAt: now, external: ref(d.remote, d.hash) })
     } else if (d.kind === 'delete') {
       upserts.push({ ...d.local, updatedAt: now, external: { ...d.local.external!, syncStatus: 'deleted_remotely', lastSyncedAt: now } })
+    } else if (d.kind === 'unchanged' && opts.remoteWins && !d.remote.deleted && eventHash(d.local) !== eventHash(d.remote)) {
+      // The origin did not change, but the local copy of a mirrored field did → the origin wins.
+      upserts.push({ ...d.local, ...eventFields(d.remote), updatedAt: now, external: ref(d.remote, eventHash(d.remote)) })
+    } else if (d.kind === 'conflict' && opts.remoteWins) {
+      upserts.push({ ...d.local, ...eventFields(d.remote), updatedAt: now, external: ref(d.remote, d.hash) })
     } else if (d.kind === 'conflict') {
       // Keep Marina's version; remember the remote hash is different.
       upserts.push({ ...d.local, external: { ...d.local.external!, syncStatus: 'conflict', lastSyncedAt: now } })
@@ -365,6 +376,10 @@ export interface TransactionSyncOptions {
   /** Fetched range: imported expenses inside it that vanished remotely are marked deleted. */
   range?: { from: string; to: string }
   now?: ISODateTime
+  /** The origin is the source of truth (Google): a local edit of a mirrored field never keeps an outdated copy. */
+  remoteWins?: boolean
+  /** Local-only fields for records created now (e.g. the trip, notes carried over from an adopted item). */
+  seed?: (r: RemoteEvent) => Partial<CalendarEvent> | undefined
 }
 
 /**

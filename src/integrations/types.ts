@@ -8,7 +8,8 @@
  *   VITE_MARINA_API_URL. When it is missing, the provider reports status 'needs_config'.
  * - Corporate data (Outlook/Teams) is minimized: metadata + authorized summary + external refs.
  */
-import type { DateKey, FeatureFlags, IntegrationStatus, ISODateTime, ProviderId, Recurrence, TimeHM } from '@/data/types'
+import type {
+  EventAttendee, DateKey, FeatureFlags, IntegrationStatus, ISODateTime, ProviderId, Recurrence, TimeHM } from '@/data/types'
 
 export type ProviderKind = 'calendar' | 'mail' | 'messaging' | 'finance' | 'health' | 'tasks'
 
@@ -68,6 +69,11 @@ export interface RemoteEvent {
   deleted?: boolean
   /** Only when the source rule maps exactly onto our Recurrence (ICS import). Providers expand instances instead. */
   recurrence?: Recurrence
+  /** IANA zone the date/times above are expressed in. */
+  timeZone?: string
+  attendees?: EventAttendee[]
+  /** Provider page for the event (opens it at the origin). */
+  webUrl?: string
 }
 
 export interface CalendarProvider {

@@ -345,7 +345,7 @@ export function calendarEntries(db: DB, from: DateKey, to: DateKey, opts: Calend
         description: e.notes,
         startAt: { date: multi ? e.date : date, time: multi ? e.startTime : start },
         endAt: { date: multi ? e.endDate! : date, time: multi ? e.endTime : end },
-        timezone: homeTz,
+        timezone: e.timeZone ?? homeTz,
         category,
         sourceType: 'event',
         sourceId: e.id,
@@ -367,6 +367,8 @@ export function calendarEntries(db: DB, from: DateKey, to: DateKey, opts: Calend
         details: compact([
           { label: 'Link', value: e.url },
           { label: 'Calendário', value: src?.name },
+          { label: 'Sincronizado', value: e.external?.lastSyncedAt ? syncedLabel(e.external.lastSyncedAt) : undefined },
+          { label: 'Participantes', value: e.attendees?.filter((a) => !a.self).map((a) => `${a.name ?? a.email}${a.responseStatus && a.responseStatus !== 'accepted' ? ` (${RSVP[a.responseStatus]})` : ''}`).join(', ') || undefined },
         ]),
       })
     }
@@ -602,10 +604,13 @@ export function calendarEntries(db: DB, from: DateKey, to: DateKey, opts: Calend
       })
     }
   }
+  const syncedIds = new Set(db.events.filter((e) => e.external && e.external.syncStatus !== 'deleted_remotely').map((e) => e.external!.externalId))
   for (const i of db.tripItems) {
     const trip = tripsById.get(i.tripId)
     const status = tripItemStatus(i)
     if (status === 'cancelado' && !opts.includeCancelled) continue
+    // Represented on the calendar by its synced external event (Google) — one line, never two.
+    if (i.linkedExternalId && syncedIds.has(i.linkedExternalId)) continue
     // Her "Falta na escola" is shown on the class itself ("faltei"), not as a second line.
     if (isSchoolAbsence(i) && i.date && classLineOn(db, i.date)?.absent) continue
     const meta = BOOKING_STATUS_META[bookingStatusOf(i)]
@@ -1115,6 +1120,14 @@ function travelDayIsFull(db: DB, date: DateKey): boolean {
     if (i.date !== date || tripItemStatus(i) === 'cancelado') return false
     return i.section === 'voo' || /^voo\b/i.test(i.title) || i.schoolImpact === 'dia' || (!!i.time && i.time < '08:00')
   })
+}
+
+const RSVP: Record<string, string> = { declined: 'recusou', tentative: 'talvez', needsAction: 'sem resposta' }
+
+/** "10/11 09:42" — when an external event was last read from its origin. */
+function syncedLabel(iso: string): string {
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? iso : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
 /** A real (not cancelled) workout of this modality on the day before or after. */

@@ -109,6 +109,8 @@ export function eventsFor(db: DB, date: DateKey): CalendarEvent[] {
   return db.events
     .filter((e) => {
       if (db.calendarSources.length && !enabled.has(e.sourceId)) return false
+      // Deleted/cancelled at the origin: kept (nothing vanishes without a trace) but not shown.
+      if (e.external?.syncStatus === 'deleted_remotely') return false
       return eventOccursOn(e, date) && !eventPausedOn(db, e, date)
     })
     .sort((a, b) => (a.startTime ?? (a.period ? PERIOD_RANGES[a.period][0] : '00:00')).localeCompare(b.startTime ?? (b.period ? PERIOD_RANGES[b.period][0] : '00:00')))

@@ -820,6 +820,18 @@ export interface CalendarEvent extends Entity {
   entryKind?: EntryKind
   /** Language the meeting happens in, when she says so (StudyTrack id, e.g. 'track-ingles'). Used by Aprendizagem. */
   language?: ID
+  /** IANA zone the stored date/startTime/endTime are expressed in (synced events: the zone she lives in that day). */
+  timeZone?: string
+  /** Synced from the external calendar (mirrored; changes there are detected). */
+  attendees?: EventAttendee[]
+}
+
+export interface EventAttendee {
+  email: string
+  name?: string
+  responseStatus?: 'accepted' | 'declined' | 'tentative' | 'needsAction'
+  self?: boolean
+  organizer?: boolean
 }
 
 // ─── Body ───────────────────────────────────────────────────────────────────
@@ -2024,6 +2036,8 @@ export type TripSection =
 
 /** Generic trip item: TripReservation, TripActivity and TripPackingItem are aliases. */
 export interface TripItem extends Entity {
+  /** The external calendar event (Google eventId) that now represents this item on the calendar: the item keeps its data, the synced event is shown instead (no duplicate). */
+  linkedExternalId?: string
   tripId: ID
   section: TripSection
   /** Sub-group inside a trip, e.g. 'Cape Town', 'Johannesburg / Safari', 'Equipment'. */

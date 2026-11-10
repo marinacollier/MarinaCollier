@@ -1,3 +1,4 @@
+import { GcalStatusLine } from './GcalStatus'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { CalendarDays, CalendarSync, FileText, Mail, MessagesSquare, RefreshCw, ShieldCheck, Smartphone, Wallet } from 'lucide-react'
@@ -242,6 +243,14 @@ export default function IntegrationsPage() {
   return (
     <Page>
       <PageHeader back backTo="/ajustes" search={false} title="Integrações" subtitle="Conecte só o que facilita. O resto continua funcionando offline." />
+
+      <section className="card p-4 mb-3" aria-label="Google Calendar pelo conector">
+        <div className="font-medium text-ink text-[15px]">Google Calendar (leitura)</div>
+        <p className="text-[13px] text-ink-2 mt-1 mb-2">
+          Lido pelo teu conector Notion no claude.ai (ele acessa teu Google com tua permissão; nenhum token fica no app). O Google é a fonte de verdade: horário, duração, cancelamento e participantes vêm de lá. O app não escreve no teu Google.
+        </p>
+        <GcalStatusLine />
+      </section>
 
       <div className="card p-4 flex gap-3 items-start">
         <div className="h-10 w-10 rounded-2xl bg-sage-soft text-sage flex items-center justify-center shrink-0" aria-hidden>

@@ -1,3 +1,4 @@
+import { GcalStatusLine } from '@/features/integrations/GcalStatus'
 /**
  * Agenda — the ONE calendar of her life (route /agenda).
  * Everything with a date comes from `calendarEntries` (a projection of the records where they live):
@@ -131,6 +132,9 @@ export default function AgendaPage() {
         }
       />
 
+      <div className="mb-2">
+        <GcalStatusLine compact />
+      </div>
       <div className="sticky top-0 z-20 -mx-4 px-4 pb-2 pt-[max(env(safe-area-inset-top),8px)] bg-bg/90 backdrop-blur-md space-y-2">
         <Segmented value={view} onChange={(v) => set({ v })} options={VIEWS} />
         <div className="flex items-center gap-1">
