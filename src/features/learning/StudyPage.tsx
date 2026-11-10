@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowRight, ArrowUp, GraduationCap, Library, Pencil, Play, Plus, Settings2, X } from 'lucide-react'
 import { SavedContent } from './components/SavedContent'
-import { MarketRadar, StudyAgents, StudyNowCard } from './components/StudyHub'
+import { MarketRadar, StudyAgents, StudyDailyCard, StudyNowCard } from './components/StudyHub'
 import { activeDay } from '@/features/today/local-day'
 import { ROUTES } from '@/app/routes'
 import { openSheet, toast } from '@/app/ui-store'
@@ -168,6 +168,7 @@ export default function StudyPage() {
         }
       />
 
+      <StudyDailyCard db={db} date={local.date} />
       <StudyNowCard db={db} date={local.date} nowMin={local.minutes} />
       <StudyAgents db={db} today={local.date} />
 

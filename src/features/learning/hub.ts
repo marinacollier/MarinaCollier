@@ -8,6 +8,8 @@ import { dayCapacity, type CapacityWindow } from '@/data/priority/capacity'
 import type { DayContext } from '@/data/priority/contract'
 import { completedHistory, nextSession, sessionDoneOn } from '@/data/spiritual/model'
 import type { DateKey, DB, ID, PlannedBlock, StudySession } from '@/data/types'
+import { routineItemsFor } from '@/data/selectors'
+import { occurrenceFor } from '@/lib/recurrence'
 import { formatDayMonth, hmToMinutes, minutesToHM } from '@/lib/date'
 import { moveBlock, type Outcome } from '@/features/today/home/allocation'
 import { checkinOf, dayContextFor } from '@/features/today/home/day-checkin'
@@ -146,4 +148,44 @@ export function studyAgents(db: DB, today: DateKey, atelieLocked = false): Study
     lines: papers.length ? [`${plural(papers.length, 'newsletter', 'newsletters')} de vagas`, `última ${formatDayMonth(radarDate(papers[0]))}`] : ['nenhuma newsletter ainda'],
   })
   return out
+}
+
+// ─── Estudos do dia: her fixed minimum, in HER order ────────────────────────
+
+/** The routine that holds her daily study minimum (Inglês → IA e Produto → Faculdade → Carreira) + newsletters. */
+export const DAILY_STUDY_ROUTINE = 'marina:routine:estudos'
+
+/** Where each line starts (by item id suffix). Lines without a place just tick. */
+const DAILY_ROUTES: [RegExp, string][] = [
+  [/:ingles$/, '/estudos/aprendizagem?v=ingles'],
+  [/:ia-produto$/, '/estudos?trilha=track-produto'],
+  [/:faculdade$/, '/estudos?trilha=track-pos'],
+  [/:(carreira|newsletter-[a-z]+)$/, '#radar'],
+]
+
+export interface DailyStudyLine {
+  id: ID
+  title: string
+  emoji?: string
+  minutes?: number
+  note?: string
+  done: boolean
+  to?: string
+}
+
+/** Today's lines of the routine, in her order, with what is done; `next` = the first one still open. */
+export function dailyStudy(db: DB, date: DateKey): { lines: DailyStudyLine[]; next?: DailyStudyLine; done: number } | undefined {
+  if (!db.routines.some((r) => r.id === DAILY_STUDY_ROUTINE && r.active)) return undefined
+  const items = routineItemsFor(db, DAILY_STUDY_ROUTINE, date)
+  if (!items.length) return undefined
+  const lines = items.map((i) => ({
+    id: i.id,
+    title: i.title,
+    emoji: i.emoji,
+    minutes: i.durationMin,
+    note: i.hint,
+    done: occurrenceFor(db.occurrences, 'routineItem', i.id, date)?.status === 'done',
+    to: DAILY_ROUTES.find(([re]) => re.test(i.id))?.[1],
+  }))
+  return { lines, next: lines.find((l) => !l.done), done: lines.filter((l) => l.done).length }
 }

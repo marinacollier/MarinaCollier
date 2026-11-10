@@ -14,11 +14,73 @@ import { cn } from '@/lib/cn'
 import { haptic } from '@/lib/haptics'
 import { formatMin } from '@/features/today/home/day-checkin'
 import { KIND_LABEL, type StudyOption } from '../candidates'
-import { putInDay, startRoute, studyAgents, studyNow, subjectOf, type StudyAgent } from '../hub'
+import { dailyStudy, putInDay, startRoute, studyAgents, studyNow, subjectOf, type StudyAgent } from '../hub'
+import { actions } from '@/data/store'
 import { hotSkills, marketGaps, radarItems, RADAR_SOURCE } from '../radar'
 import { addNewsletter } from '../radar-ops'
 
 // ─── Se quiser estudar agora ────────────────────────────────────────────────
+
+/** Her daily minimum, in her order: the first open line is "agora"; ticking here = ticking on the Home. */
+export function StudyDailyCard({ db, date }: { db: DB; date: string }) {
+  const nav = useNavigate()
+  const d = dailyStudy(db, date)
+  if (!d) return null
+  const go = (to?: string) => {
+    if (!to) return
+    if (to.startsWith('#')) document.getElementById(to.slice(1))?.scrollIntoView({ behavior: 'smooth' })
+    else nav(to)
+  }
+  return (
+    <section aria-label="Estudos do dia" className="card p-5">
+      <div className="flex items-baseline justify-between gap-2">
+        <div className="eyebrow">estudos do dia · na sua ordem</div>
+        <span className="text-[12.5px] text-muted tabular-nums">{d.done}/{d.lines.length}</span>
+      </div>
+      {d.next ? (
+        <div className="mt-1.5">
+          <div className="font-display text-[22px] leading-[1.15] tracking-tight">
+            Agora: {d.next.title}
+          </div>
+          {d.next.note && <p className="text-[13.5px] text-ink-2 mt-1">{d.next.note}</p>}
+          <div className="flex flex-wrap gap-2 mt-3">
+            {d.next.to && (
+              <Button size="sm" onClick={() => go(d.next!.to)}>
+                <Play size={14} aria-hidden /> Começar
+              </Button>
+            )}
+            <Button size="sm" variant="soft" onClick={() => (haptic('light'), actions.toggleOccurrence('routineItem', d.next!.id, date))}>
+              Feito ✓
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <p className="text-[15px] mt-1.5">Tudo feito hoje ✓ — o resto (espanhol, Ateliê) é bônus.</p>
+      )}
+      <ul className="mt-4 divide-y divide-line/60">
+        {d.lines.map((l) => (
+          <li key={l.id} className="flex items-center gap-3 py-2">
+            <button
+              type="button"
+              aria-label={l.done ? `Desfazer: ${l.title}` : `Concluir: ${l.title}`}
+              onClick={() => (haptic('light'), actions.toggleOccurrence('routineItem', l.id, date))}
+              className={cn('h-6 w-6 shrink-0 rounded-full border inline-flex items-center justify-center text-[12px]', l.done ? 'bg-sage text-bg border-sage' : 'border-line')}
+            >
+              {l.done ? '✓' : ''}
+            </button>
+            <button type="button" onClick={() => go(l.to)} className="flex-1 min-w-0 text-left">
+              <span className={cn('block text-[15px] truncate', l.done && 'text-muted line-through decoration-muted/50')}>
+                {l.emoji ? `${l.emoji} ` : ''}
+                {l.title}
+              </span>
+            </button>
+            {!!l.minutes && <span className="text-[12px] text-muted tabular-nums">{l.minutes} min</span>}
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
 
 export function StudyNowCard({ db, date, nowMin }: { db: DB; date: string; nowMin: number }) {
   const nav = useNavigate()
