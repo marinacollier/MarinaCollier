@@ -165,7 +165,17 @@ export function addCapacity(date: DateKey, nowMin: number, extra: number, entrie
     }
   }
   const p = propose(getDB(), date, nowMin, entries, freeMin)
-  if (!p.blocks.length) return { message: `Agora tu tens mais ${formatMin(extra)} de capacidade. ${emptyWhy(p)}`, changed: true, undo: undoFree }
+  // The new blocks use the minutes she GAINED — never more (a +30 never turns into +90 of tasks).
+  let room = extra
+  const fitted = p.blocks.filter((b) => {
+    const m = minutesOf(b)
+    if (m > room) return false
+    room -= m
+    return true
+  })
+  if (!fitted.length && p.blocks.length) p.empty = 'sem_candidata'
+  p.blocks = fitted
+  if (!p.blocks.length) return { message: `Agora tu tens mais ${formatMin(extra)} de capacidade. ${emptyWhy(p, extra)}`, changed: true, undo: undoFree }
   const before = checkinOf(getDB(), date)?.blocks
   saveDayCheckin(date, { blocks: [...(before ?? []), ...p.blocks] })
   return {
@@ -187,8 +197,9 @@ export function lowerEnergy(date: DateKey, nowMin: number, entries?: CalendarEnt
   return { ...r, message: `Energia ajustada para ${energy <= 2 ? 'baixa' : 'média'}. ${r.message} Descansar também vale — nada fixo foi mexido.` }
 }
 
-function emptyWhy(p: Proposal): string {
+function emptyWhy(p: Proposal, extra?: number): string {
   if (p.empty === 'sem_espaco') return 'Não há uma janela livre na agenda que caiba o que faria sentido agora — não forcei nada.'
+  if (extra) return `Nenhuma atividade adequada cabe em ${formatMin(extra)} agora — não vou inventar tarefa só para preencher.`
   if (p.budget < 10) return 'Teu tempo para coisas flexíveis já está ocupado com o que está planejado.'
   return 'Não encontrei uma atividade adequada para esse tempo — não vou inventar tarefa só para preencher.'
 }

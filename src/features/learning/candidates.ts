@@ -353,8 +353,7 @@ function reviewTheme(db: DB, due: { sessionId?: string; source?: string }[]): st
   const ids = new Set(due.map((c) => c.sessionId).filter(Boolean))
   if (ids.size !== 1) return ''
   const s = (db.studySessions ?? []).find((x) => x.id === [...ids][0])
-  const label = s?.title ?? due[0].source
-  return label ? ` — ${label}` : ''
+  return s?.date ? ` da sessão de ${s.date.slice(8, 10)}/${s.date.slice(5, 7)}` : ''
 }
 
 /** For the Priority Engine: plain Candidates (contract.ts). */

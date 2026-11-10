@@ -367,7 +367,7 @@ export function planFromCandidates(db: DB, ctx: DayContext, candidates: Candidat
 
   const secondary: PlanItem[] = []
   let left = usable - (primary?.minutes ?? 0)
-  const maxSecondary = interest.rest ? 0 : lowEnergy ? 1 : 2
+  const maxSecondary = interest.rest ? 0 : lowEnergy ? 1 : 3
   for (const c of pool) {
     if (secondary.length >= maxSecondary || left < 10) break
     if (c === primary?.c) continue
