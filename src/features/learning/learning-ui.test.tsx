@@ -57,4 +57,19 @@ describe('LearningPage', () => {
     expect(c.status).toBe('em_pratica')
     expect(c.nextReview > '2026-11-09').toBe(true)
   })
+
+  it('Inglês tab: unconfirmed duration and "com ajuda" shown, never an invented time or mastery', () => {
+    const db = getDB()
+    actions.replaceDB({
+      ...db,
+      studySessions: [sess('school', { trackId: TRACK_EN, minutes: 0, minutesUnknown: true, origin: 'escola', assisted: true, title: 'Escola — dia de aula', date: '2026-11-09', content: [{ area: 'grammar', title: 'Tenses', items: ['Present perfect'] }] })],
+    })
+    renderPage('/estudos/aprendizagem?v=ingles')
+    const ev = screen.getByLabelText('Evidências recentes')
+    expect(ev.textContent).toMatch(/duração não confirmada/)
+    expect(ev.textContent).toMatch(/com ajuda/)
+    expect(ev.textContent).toMatch(/origem: escola/)
+    expect(screen.getByLabelText('Gramática').textContent).toMatch(/praticado com ajuda, ainda sem avaliação/)
+    expect(screen.getByLabelText('Nível').textContent).toMatch(/→ objetivo C1/)
+  })
 })

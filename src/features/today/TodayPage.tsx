@@ -26,7 +26,7 @@ import { dayItems } from '@/data/agenda/items'
 import { deviceTimeZone, type CalendarEntry } from '@/data/calendar/universal'
 import { areaLocked, useLockState } from '@/app/lock-store'
 import { useNow } from '@/hooks/useToday'
-import { addDays } from '@/lib/date'
+import { addDays, hmToMinutes } from '@/lib/date'
 import { travelTripOn } from '@/data/travel-mode'
 import { activeDay } from './local-day'
 import { checkinOf } from './home/day-checkin'
@@ -118,7 +118,15 @@ export default function TodayPage() {
     if (sleep) out.push({ kind: 'quiet', time: sleep, title: 'Dormir', onOpen: () => navigate(ROUTES.routineSettings) })
     return out.sort((a, b) => a.time.localeCompare(b.time))
   }, [hoje, blocks.rows, rituals, db, day, navigate])
+  // Amanhã: commitments + what the engine WOULD place (suggestions only — nothing is written for tomorrow).
+  const tomorrowItems = useMemo<TLItem[]>(() => {
+    const out: TLItem[] = amanha.map((e) => ({ kind: 'entry', time: e.startAt.time ?? '', e }))
+    const wake = hmToMinutes(db.profile.rhythm?.wakeTime ?? '06:30')
+    for (const b of blockRows(db, tomorrow, wake, cal.entries).rows) if (b.state === 'sugestao') out.push({ kind: 'block', time: b.start, b, label: blockLabel(db, b.key, b.c) })
+    return out.sort((a, b) => a.time.localeCompare(b.time))
+  }, [amanha, db, tomorrow, cal.entries])
   const [blockOpen, setBlockOpen] = useState<TLBlock>()
+  const [blockDay, setBlockDay] = useState<DateKey>()
   const backlog = useMemo(() => backlogOf(db, day, new Set(blocks.rows.map((b) => b.key))), [db, day, blocks.rows])
   // 0 — Check-in do dia → "O que faz sentido fazer agora?" (+ the optional review after 20:00).
 
@@ -226,13 +234,13 @@ export default function TodayPage() {
       </motion.div>
 
       <motion.div {...rise(1)} className="mt-7">
-        <DayBlock label="01 / Dia" title="Hoje" rows={hoje} loose={hojeLoose} onOpen={(e) => openEntry(e, day)} onLoose={openLoose} conflicts={conflictsByDay.get(day) ?? 0} conflictIds={conflictIds} onConflicts={() => setShowConflicts(day)} items={timeline} onBlock={setBlockOpen} onRoutine={setRoutineOpen} />
+        <DayBlock label="01 / Dia" title="Hoje" rows={hoje} loose={hojeLoose} onOpen={(e) => openEntry(e, day)} onLoose={openLoose} conflicts={conflictsByDay.get(day) ?? 0} conflictIds={conflictIds} onConflicts={() => setShowConflicts(day)} items={timeline} onBlock={(b) => (setBlockDay(day), setBlockOpen(b))} onRoutine={setRoutineOpen} />
         <DayAssist date={day} nowMin={local.minutes} entries={cal.entries} rows={blocks.rows} onAsk={ask} />
         <BacklogPanel items={backlog} today={day} onOpen={(id) => openSheet('task', { id })} />
       </motion.div>
 
       <motion.div {...rise(2)} className="mt-7">
-        <DayBlock label={`02 / ${headerDate(tomorrow)}`} title="Amanhã" rows={amanha} loose={amanhaLoose} onOpen={(e) => openEntry(e, tomorrow)} onLoose={openLoose} conflicts={conflictsByDay.get(tomorrow) ?? 0} conflictIds={conflictIds} onConflicts={() => setShowConflicts(tomorrow)} empty="Nada marcado" />
+        <DayBlock label={`02 / ${headerDate(tomorrow)}`} title="Amanhã" rows={amanha} items={tomorrowItems} onBlock={(b) => (setBlockDay(tomorrow), setBlockOpen(b))} loose={amanhaLoose} onOpen={(e) => openEntry(e, tomorrow)} onLoose={openLoose} conflicts={conflictsByDay.get(tomorrow) ?? 0} conflictIds={conflictIds} onConflicts={() => setShowConflicts(tomorrow)} empty="Nada marcado" />
       </motion.div>
 
       <motion.div {...rise(2)} className="mt-7">
@@ -278,7 +286,7 @@ export default function TodayPage() {
             <BlockSheet
               row={blockOpen.b}
               label={blockOpen.label}
-              date={day}
+              date={blockDay ?? day}
               nowMin={local.minutes}
               entries={cal.entries}
               onDone={(o) => {

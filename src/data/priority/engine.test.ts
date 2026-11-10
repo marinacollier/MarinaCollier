@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { emptyDB } from '../defaults'
 import type { CalendarEvent, DB, Goal, PetTask, Pet, Task } from '../types'
 import { CAPACITY, dayCapacity } from './capacity'
-import { interestOf, moscowOf, planDay, planFromCandidates, rankCandidates } from './engine'
+import { interestOf, learnedPreference, moscowOf, planDay, planFromCandidates, rankCandidates } from './engine'
 import { taskCandidates } from './sources'
 import type { Candidate, DayContext } from './contract'
 
@@ -370,5 +370,21 @@ describe('study never dominates', () => {
     const p = planFromCandidates(base(), ctx({ freeMin: 300, energy: 4 }), studies)
     const waiting = p.later.filter((l) => l.why === 'Um ou dois estudos por dia já bastam')
     expect(waiting.map((l) => l.c.key)).toEqual(['study:s3', 'study:s4'])
+  })
+})
+
+describe('preferência aprendida de horário', () => {
+  const ck = (date: string, start: string, by: 'marina' | 'motor' = 'marina') => ({ id: date, date, changes: [], createdAt: '', updatedAt: '', blocks: [{ key: 'study:lang:en', start, end: '23:59', status: 'planejado' as const, by, title: 'x', at: '' }] })
+  it('3+ days moving studies to the morning → morning first; one move or engine moves never teach', () => {
+    expect(learnedPreference({ dayCheckins: [ck('2026-11-01', '08:00'), ck('2026-11-03', '07:30'), ck('2026-11-05', '09:00')] }, '2026-11-09').study).toBe('manha')
+    expect(learnedPreference({ dayCheckins: [ck('2026-11-01', '08:00')] }, '2026-11-09').study).toBeUndefined()
+    expect(learnedPreference({ dayCheckins: [ck('2026-11-01', '08:00', 'motor'), ck('2026-11-02', '08:00', 'motor'), ck('2026-11-03', '08:00', 'motor')] }, '2026-11-09').study).toBeUndefined()
+  })
+  it('a preferred part of the day is tried first when placing', () => {
+    const c: Candidate = { key: 'study:x', title: 'Estudo', area: 'idiomas', minMin: 20, maxMin: 20, energyNeed: 2, moscow: 'should', score: 50, reasons: [] }
+    const windows = [{ start: '07:00', end: '08:00' }, { start: '15:00', end: '16:00' }]
+    const db = base()
+    expect(planFromCandidates(db, ctx({ now: '06:00' }), [c], { windows, prefer: () => 'tarde' }).primary?.slot?.start).toBe('15:00')
+    expect(planFromCandidates(db, ctx({ now: '06:00' }), [c], { windows }).primary?.slot?.start).toBe('07:00')
   })
 })

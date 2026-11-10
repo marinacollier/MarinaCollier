@@ -16,6 +16,8 @@ export interface StudyEntry {
   key: string
   date: DateKey
   minutes: number
+  /** A real session whose net duration is not confirmed: counted as a session, 0 minutes. */
+  minutesUnknown?: boolean
   domain: string
   relatedDomains: string[]
   trackId?: ID
@@ -33,12 +35,18 @@ function classTrack(name: string): ID {
   return /espanhol|spanish|espa[nñ]ol/i.test(name) ? TRACK_ES : TRACK_EN
 }
 
+/** Minutes a session adds to totals: 0 when its duration is not confirmed (`minutesUnknown`), never invented. */
+export function sessionMinutes(s: Pick<StudySession, 'minutes' | 'minutesUnknown'>): number {
+  return s.minutesUnknown ? 0 : Math.max(0, Math.round(s.minutes || 0))
+}
+
 export function sessionEntry(db: Pick<DB, 'profile' | 'studyTracks'>, s: StudySession): StudyEntry {
   const domain = s.domain || (s.trackId ? domainOfTrackId(db, s.trackId) : 'outros')
   return {
     key: `session:${s.id}`,
     date: s.date,
-    minutes: Math.max(0, Math.round(s.minutes || 0)),
+    minutes: sessionMinutes(s),
+    ...(s.minutesUnknown ? { minutesUnknown: true } : {}),
     domain,
     relatedDomains: (s.relatedDomains ?? []).filter((d) => d !== domain),
     trackId: s.trackId,
@@ -92,6 +100,7 @@ export function minutesBy<K extends string>(entries: StudyEntry[], key: (e: Stud
 export function minutesBySkill(entries: StudyEntry[]): Record<string, number> {
   const out: Record<string, number> = {}
   for (const e of entries) {
+    if (e.minutesUnknown) continue // no confirmed minutes to split (it still counts as a session elsewhere)
     if (!e.skills.length) {
       out.nao_informado = (out.nao_informado ?? 0) + e.minutes
       continue

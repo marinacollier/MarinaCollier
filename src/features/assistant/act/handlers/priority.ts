@@ -1,5 +1,6 @@
 /**
- * Lumos · motor de prioridade (só leitura — this handler never writes; the Home card stores changes):
+ * Lumos · motor de prioridade. Reads, except "tenho MAIS/MENOS N minutos", which changes the day's timeline
+ * through the same allocation the Home uses (persisted, with the sentence of what changed):
  *   "tenho 40 minutos livres" / "tenho 1 hora"           → the plan for that much time
  *   "estou cansada" / "tô sem energia"                    → the plan with low energy (rest said explicitly)
  *   "o que faço agora?" / "o que posso fazer agora?"      → the plan for the rest of the day
@@ -12,6 +13,7 @@ import type { Energy } from '@/data/priority/contract'
 import { planDay, type DayPlan, type PlanItem } from '@/data/priority/engine'
 import { minutesToHM } from '@/lib/date'
 import { activeDay } from '@/features/today/local-day'
+import { parseAdjust, runAdjust } from '@/features/today/home/adjust'
 import { dayContextFor, formatMin } from '@/features/today/home/day-checkin'
 import { NUMBER_RE, numberOf } from '../text'
 import type { Handler, HandlerInput, LumosReply, ReplyLine } from '../types'
@@ -80,9 +82,15 @@ function run(input: HandlerInput): LumosReply | undefined {
   const asksNow = NOW.test(n)
   const defer = DEFER.test(n)
   const interestMatch = INTEREST.exec(n)
+  const local = activeDay(db, now.date, new Date(now.iso ?? Date.now()), now.minutes)
+  // "tenho MAIS 30 minutos" / "menos tempo" change the day's timeline for real (same engine as the Home bar).
+  const adj = parseAdjust(n)
+  if (adj && (adj.kind === 'mais' || adj.kind === 'menos')) {
+    const r = runAdjust(adj, local.date, local.minutes)
+    return { area: AREA, text: r.message, link: { label: 'Ver no Início', to: ROUTES.today } }
+  }
   if (!free && !tired && !asksNow && !defer && !(interestMatch && /^(?:hoje )?(?:so )?(?:quero descansar|nao quero estudar)\b/.test(n))) return undefined
 
-  const local = activeDay(db, now.date, new Date(now.iso ?? Date.now()), now.minutes)
   const base = dayContextFor(db, local.date, local.minutes)
   const ctx = { ...base.ctx, now: minutesToHM(local.minutes) }
   if (free) {

@@ -14,7 +14,7 @@ import { actions, getDB } from '@/data/store'
 import type { CalendarEntry } from '@/data/calendar/universal'
 import { dayCapacity, type Capacity } from '@/data/priority/capacity'
 import type { Candidate, Energy } from '@/data/priority/contract'
-import { planDay, rankCandidates, type DayPlan } from '@/data/priority/engine'
+import { learnedPreference, planDay, rankCandidates, type DayPlan } from '@/data/priority/engine'
 import type { DateKey, DB, DayChangeAction, PlannedBlock } from '@/data/types'
 import { addDays, hmToMinutes, minutesToHM } from '@/lib/date'
 import { nowISO } from '@/lib/id'
@@ -47,7 +47,13 @@ export function propose(db: DB, date: DateKey, nowMin: number, entries?: Calenda
   for (const b of c?.blocks ?? []) skip[b.key] = b.status === 'feito' ? 'Já concluído' : b.status === 'removido' ? (skip[b.key] ?? 'Tu tirou de hoje') : 'Já está no teu dia'
   const pending = placed.filter((b) => b.status === 'planejado' && hmToMinutes(b.end) > nowMin)
   const budget = Math.max(0, (freeMin ?? ctx.freeMin) - pending.reduce((s, b) => s + Math.max(0, hmToMinutes(b.end) - Math.max(nowMin, hmToMinutes(b.start))), 0))
-  const plan = planDay(db, { ...ctx, freeMin: budget, focusMin: undefined }, { windows: cap.windows, skip, entries })
+  const pref = learnedPreference(db, date)
+  const prefer = (c: Candidate) => (c.key.startsWith('study:') ? pref.study : c.key.startsWith('task:') ? pref.task : undefined)
+  const plan = planDay(db, { ...ctx, freeMin: budget, focusMin: undefined }, { windows: cap.windows, skip, entries, prefer })
+  for (const i of [plan.primary, ...plan.secondary]) {
+    const p = i && prefer(i.c)
+    if (p) i.c.reasons.push(`Tu costumas mover ${i.c.key.startsWith('study:') ? 'estudos' : 'tarefas'} para a ${p === 'manha' ? 'manhã' : 'tarde'} — tentei esse horário primeiro`)
+  }
   const picked = [plan.primary, ...plan.secondary].filter((i): i is NonNullable<typeof i> => !!i)
   const at = nowISO()
   const blocks = picked.filter((i) => i.slot).map((i): PlannedBlock => ({ key: i.c.key, start: i.slot!.start, end: i.slot!.end, status: 'planejado', by: 'motor', title: i.c.title, at }))

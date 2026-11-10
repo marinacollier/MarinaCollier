@@ -11,7 +11,10 @@
  *        "trackId": "track-ingles",         // optional
  *        "title"?, "startTime"?, "relatedDomains"?: [], "skills"?: [], "topics"?: [], "tags"?: [],
  *        "resourceType"?, "contentLanguage"?, "learningMode"?, "tool"?, "relatedProjectId"?,
- *        "status"?, "context"?, "evidence"?, "notes"?, "learned"?, "linkedEventId"?
+ *        "status"?, "context"?, "evidence"?, "notes"?, "learned"?, "linkedEventId"?,
+ *        "minutesUnknown"?: true,           // real session, net duration not confirmed → minutes 0 (may be omitted)
+ *        "origin"?: "escola" | "independente" | "reuniao" | "conversa" | "mensagem" | "outro",
+ *        "assisted"?: true, "content"?: [{ "area": "grammar", "title": "...", "items": ["..."] }]
  *      }],
  *      "cards": [{                          // also accepted as "errors"
  *        "id": "ext-err-1",                 // required, stable
@@ -26,7 +29,7 @@
  * 2. "Importar como erros": the topics written in a study item (e.g. 'marina:inv:ingles-pratica-erros')
  *    become review cards with stable ids — one tap, idempotent.
  */
-import type { DateKey, DB, LearningError, LearningMode, LearningResourceType, LearningTool, NewItem, StudyItem, StudySession, StudySessionStatus } from '@/data/types'
+import type { DateKey, DB, LearningError, LearningMode, LearningResourceType, LearningTool, NewItem, StudyContent, StudyContentArea, StudyItem, StudySession, StudySessionOrigin, StudySessionStatus } from '@/data/types'
 import { isDateKey } from '@/lib/date'
 import { normalize } from '@/lib/text'
 import { domainOfTrackId, LANG_DOMAIN, TRACK_EN } from './model'
@@ -46,6 +49,17 @@ function clean<T extends object>(o: T): T {
   return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined && !(Array.isArray(v) && !v.length))) as T
 }
 
+const ORIGINS: StudySessionOrigin[] = ['escola', 'independente', 'reuniao', 'conversa', 'mensagem', 'outro']
+const AREAS: StudyContentArea[] = ['reading', 'speaking', 'listening', 'writing', 'grammar', 'vocabulary', 'pronunciation']
+
+function contentOf(v: unknown): StudyContent[] | undefined {
+  if (!Array.isArray(v)) return undefined
+  const out = v
+    .map((c: Record<string, unknown>) => ({ area: c?.area as StudyContentArea, title: str(c?.title) ?? '', items: strs(c?.items) ?? [] }))
+    .filter((c) => AREAS.includes(c.area) && (c.title || c.items.length))
+  return out.length ? out : undefined
+}
+
 export function previewImport(db: DB, raw: string, today: DateKey): ImportPreview {
   const out: ImportPreview = { sessions: [], cards: [], skipped: [], invalid: [] }
   let data: unknown
@@ -62,11 +76,12 @@ export function previewImport(db: DB, raw: string, today: DateKey): ImportPrevie
   rows.forEach((r: Record<string, unknown>, i) => {
     const id = str(r?.id)
     const date = str(r?.date)
-    const minutes = typeof r?.minutes === 'number' ? Math.round(r.minutes) : NaN
+    const minutesUnknown = r?.minutesUnknown === true
+    const minutes = minutesUnknown ? 0 : typeof r?.minutes === 'number' ? Math.round(r.minutes) : NaN
     const trackId = str(r?.trackId)
     const domain = str(r?.domain) ?? (trackId ? domainOfTrackId(db, trackId) : undefined)
-    if (!id || !date || !isDateKey(date) || !(minutes > 0) || !domain) {
-      out.invalid.push(`Sessão ${i + 1}: precisa de id, date (AAAA-MM-DD), minutes > 0 e domain (ou trackId).`)
+    if (!id || !date || !isDateKey(date) || !(minutes > 0 || minutesUnknown) || !domain) {
+      out.invalid.push(`Sessão ${i + 1}: precisa de id, date (AAAA-MM-DD), minutes > 0 (ou minutesUnknown) e domain (ou trackId).`)
       return
     }
     if (haveS.has(id) || out.sessions.some((s) => s.id === id)) {
@@ -97,6 +112,10 @@ export function previewImport(db: DB, raw: string, today: DateKey): ImportPrevie
         notes: str(r.notes),
         learned: str(r.learned),
         linkedEventId: str(r.linkedEventId),
+        minutesUnknown: minutesUnknown || undefined,
+        origin: ORIGINS.includes(r.origin as StudySessionOrigin) ? (r.origin as StudySessionOrigin) : undefined,
+        assisted: r.assisted === true || undefined,
+        content: contentOf(r.content),
         source: 'importado' as const,
       }) as NewItem<'studySessions'>,
     )

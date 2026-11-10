@@ -1752,6 +1752,28 @@ export interface StudySession extends Entity {
   source: 'app' | 'retroativo' | 'importado' | 'aula' | 'lumos'
   notes?: string
   learned?: string
+  /**
+   * A real session whose NET duration is not confirmed (e.g. a school day). It counts as a session but adds
+   * 0 minutes to every total (`minutes` stays 0); the UI says "duração não confirmada", never an invented time.
+   */
+  minutesUnknown?: boolean
+  /**
+   * Where the practice happened (Inglês: escola, estudo independente, reunião real, conversa, mensagem).
+   * Named `origin` because `source` already says how the RECORD was created (app / retroativo / importado…).
+   */
+  origin?: StudySessionOrigin
+  /** Exercises done with help (teacher, colleague, ChatGPT…). Practice, NEVER "independent mastery". */
+  assisted?: boolean
+  /** What was practised, exactly as given (no inference). */
+  content?: StudyContent[]
+}
+
+export type StudySessionOrigin = 'escola' | 'independente' | 'reuniao' | 'conversa' | 'mensagem' | 'outro'
+export type StudyContentArea = 'reading' | 'speaking' | 'listening' | 'writing' | 'grammar' | 'vocabulary' | 'pronunciation'
+export interface StudyContent {
+  area: StudyContentArea
+  title: string
+  items: string[]
 }
 
 export type ReviewCardStatus = 'novo' | 'em_pratica' | 'consolidando' | 'dominado_provisorio' | 'revisar'

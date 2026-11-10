@@ -195,7 +195,7 @@ export function studyOptions(db: DB, ctx: DayContext, ask: StudyAsk = {}): Study
       }
       const skillMin = new Map<string, number>()
       for (const e of entries.filter((x) => x.trackId === t)) for (const s of e.skills) skillMin.set(s, (skillMin.get(s) ?? 0) + e.minutes / e.skills.length)
-      const least = (['speaking', 'listening', 'writing', 'grammar', 'reading'] as const).find((s) => !skillMin.get(s))
+      const least = (['speaking', 'listening', 'writing', 'grammar', 'reading'] as const).find((s) => !skillMin.has(s)) // a session with unconfirmed duration still shows the skill appeared
       let shape = languageShape(cap, ctx.energy, least, tools, lang)
       if (ask.tool === 'cambly' && tools.includes('cambly') && cap >= 25) {
         const purpose = commit ? `preparar “${commit.title}”` : least ? `praticar ${SKILL_LABEL[least as keyof typeof SKILL_LABEL].toLowerCase()} (ainda não apareceu nesta semana)` : 'trabalhar seus erros recorrentes'

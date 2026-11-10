@@ -10,11 +10,13 @@ import { classLineOn } from '@/data/travel-mode'
 import { useNow } from '@/hooks/useToday'
 import { addDays, formatDayMonth, minutesToHM } from '@/lib/date'
 import { KIND_LABEL, studyOptions, type StudyOption } from './candidates'
-import { studyEntries } from './engine/minutes'
+import { studyEntries, type StudyEntry } from './engine/minutes'
+import { UNKNOWN_DURATION } from './engine/english'
 import { domainLabel, domainsOf, goalLabel, LANG_DOMAIN, languageTracks, levelLabel, MODE_LABEL, RESOURCE_LABEL, skillLabel, trackName } from './engine/model'
 import { learningStats, weekOf, type Period } from './engine/stats'
 import { inProgressItems } from './engine/progress'
 import { recurring } from './engine/srs'
+import { EnglishCoach } from './components/EnglishCoach'
 import { ImportPanel } from './components/ImportPanel'
 import { LibraryPanel } from './components/LibraryPanel'
 import { LocalSheet } from './components/LocalSheet'
@@ -22,18 +24,22 @@ import { ReviewPanel } from './components/ReviewPanel'
 import { SessionLogger, type LoggerDefaults } from './components/SessionLogger'
 import { SessionTimer } from './components/SessionTimer'
 
-type Tab = 'visao' | 'revisar' | 'biblioteca' | 'sessoes'
+type Tab = 'visao' | 'ingles' | 'revisar' | 'biblioteca' | 'sessoes'
 type PeriodKey = 'semana' | 'mes' | 'tudo'
 type Panel = { kind: 'log'; defaults?: LoggerDefaults } | { kind: 'timer'; template?: string } | { kind: 'import' } | null
 
 const TABS: { value: Tab; label: string }[] = [
   { value: 'visao', label: 'Visão' },
+  { value: 'ingles', label: 'Inglês' },
   { value: 'revisar', label: 'Revisar' },
   { value: 'biblioteca', label: 'Biblioteca' },
   { value: 'sessoes', label: 'Sessões' },
 ]
 
 const hm = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? String(m % 60).padStart(2, '0') : ''}` : `${m} min`)
+
+/** Entry duration: never an invented time for a session whose duration is not confirmed. */
+const dur = (e: Pick<StudyEntry, 'minutes' | 'minutesUnknown'>) => (e.minutesUnknown ? UNKNOWN_DURATION : hm(e.minutes))
 
 function periodOf(key: PeriodKey, today: string): Period {
   if (key === 'semana') return weekOf(today)
@@ -118,7 +124,8 @@ export default function LearningPage() {
                 <div className="font-display text-[30px] leading-tight mt-0.5">{hm(stats.total)}</div>
                 <div className="text-[13.5px] text-muted">
                   {stats.sessions} {stats.sessions === 1 ? 'sessão' : 'sessões'}
-                  {stats.classes ? ` · ${stats.classes} ${stats.classes === 1 ? 'aula' : 'aulas'}` : ''} · {stats.pendingReviews} revisões pendentes
+                  {stats.classes ? ` · ${stats.classes} ${stats.classes === 1 ? 'aula' : 'aulas'}` : ''}
+                  {stats.unknownDuration ? ` · ${stats.unknownDuration} com duração não confirmada` : ''} · {stats.pendingReviews} revisões pendentes
                 </div>
               </Card>
               <NextCard options={next} db={db} onStart={(o) => setPanel(o.domain === LANG_DOMAIN && o.maxMin >= 45 ? { kind: 'timer', template: o.trackId === languageTracks(db)[1] ? 'tpl-espanhol-60' : 'tpl-ingles-60' } : { kind: 'log', defaults: { domain: o.domain, trackId: o.trackId, minutes: o.maxMin } })} />
@@ -179,6 +186,12 @@ export default function LearningPage() {
               <WeeklyReview db={db} now={now} />
             </div>
           </div>
+        </div>
+      )}
+
+      {tab === 'ingles' && (
+        <div className="mt-4">
+          <EnglishCoach db={db} now={now} />
         </div>
       )}
 
@@ -245,7 +258,7 @@ function LanguageCard({ db, trackId, now, next }: { db: DB; trackId: string; now
   const split = week.split.find((s) => s.trackId === trackId)
   const mine = studyEntries(db, weekOf(now.date).from, now.date, now).filter((e) => e.trackId === trackId)
   const skillMin: Record<string, number> = {}
-  for (const e of mine) for (const s of e.skills) skillMin[s] = (skillMin[s] ?? 0) + Math.round(e.minutes / e.skills.length)
+  for (const e of mine.filter((x) => !x.minutesUnknown)) for (const s of e.skills) skillMin[s] = (skillMin[s] ?? 0) + Math.round(e.minutes / e.skills.length)
   const classes = Array.from({ length: 7 }, (_, i) => addDays(now.date, i)).map((d) => ({ d, c: classLineOn(db, d) })).filter((x) => x.c && !x.c.absent)
   const top = recurring(cards, 2)
   const name = trackName(db, trackId)
@@ -272,7 +285,7 @@ function LanguageCard({ db, trackId, now, next }: { db: DB; trackId: string; now
         </div>
       )}
       <dl className="text-[13px] mt-3 space-y-1">
-        <Row label="Última sessão" value={last ? `${formatDayMonth(last.date)} · ${hm(last.minutes)}${last.source === 'aula' ? ' (aula)' : ''}` : '—'} />
+        <Row label="Última sessão" value={last ? `${formatDayMonth(last.date)} · ${dur(last)}${last.source === 'aula' ? ' (aula)' : ''}` : '—'} />
         <Row label="Próxima revisão" value={nextReview ? `${formatDayMonth(nextReview.nextReview)} · ${nextReview.front}` : '—'} />
         {top.length > 0 && <Row label="Erros recorrentes" value={top.map((e) => `${e.front} (${e.count}×)`).join(' · ')} />}
         {classes.length > 0 && <Row label="Próximas aulas" value={classes.slice(0, 3).map((x) => `${formatDayMonth(x.d)} ${x.c!.start}`).join(' · ')} />}
@@ -324,7 +337,7 @@ function RecentSessions({ db, period, now, domain, all }: { db: DB; period: Peri
         <div key={e.key} className="py-1.5 flex items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="text-[14px] truncate">
-              {e.title ?? (e.trackId && e.domain === LANG_DOMAIN ? trackName(db, e.trackId) : domainLabel(db, e.domain))} · {hm(e.minutes)}
+              {e.title ?? (e.trackId && e.domain === LANG_DOMAIN ? trackName(db, e.trackId) : domainLabel(db, e.domain))} · {dur(e)}
             </div>
             <div className="text-[12.5px] text-muted truncate">
               {[formatDayMonth(e.date), e.skills.map(skillLabel).join(', '), e.session?.learningMode ? MODE_LABEL[e.session.learningMode] : undefined, e.relatedDomains.length ? `também: ${e.relatedDomains.map((d) => domainLabel(db, d)).join(', ')}` : undefined, e.session?.context]
@@ -350,7 +363,7 @@ function WeeklyReview({ db, now }: { db: DB; now: { date: string; minutes: numbe
   return (
     <Card aria-label="Revisão da semana">
       <div className="eyebrow mb-1">revisão da semana</div>
-      {st.total === 0 ? (
+      {st.sessions + st.classes === 0 ? (
         <p className="text-[13.5px] text-muted">Semana sem sessões registradas — tudo bem. Se estudou e não anotou, conte à Lumos.</p>
       ) : (
         <ul className="text-[13.5px] space-y-1">

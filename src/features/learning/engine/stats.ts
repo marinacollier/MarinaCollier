@@ -39,6 +39,8 @@ export interface LearningStats {
   period: Period
   total: number
   sessions: number
+  /** Sessions counted with 0 minutes because their duration is not confirmed. */
+  unknownDuration: number
   classes: number
   byDomain: DomainRow[]
   /** Language minutes per language track (inside 'idiomas'). */
@@ -90,6 +92,7 @@ export function learningStats(db: DB, period: Period, now: { date: DateKey; minu
     period,
     total: totalMinutes(entries),
     sessions: entries.filter((e) => e.source === 'sessao').length,
+    unknownDuration: entries.filter((e) => e.minutesUnknown).length,
     classes: entries.filter((e) => e.source === 'aula').length,
     byDomain: domainReport(entries),
     byTrack,

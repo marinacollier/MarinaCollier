@@ -54,7 +54,7 @@ const home = () =>
     </MemoryRouter>,
   )
 
-const timeline = () => screen.getByLabelText('Linha do tempo')
+const timeline = () => within(screen.getByLabelText('Hoje')).getByLabelText('Linha do tempo')
 const rowOf = (title: string) => [...timeline().querySelectorAll('li')].find((li) => li.textContent?.includes(title))
 const status = () => screen.getByRole('status').textContent ?? ''
 

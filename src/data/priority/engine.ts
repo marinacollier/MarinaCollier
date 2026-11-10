@@ -161,6 +161,31 @@ export interface PlanOptions {
   skip?: Record<string, string>
   /** Calendar entries already read (avoids reading them twice). */
   entries?: CalendarEntry[]
+  /** Learned time preference per candidate (from her repeated moves): try those windows first. */
+  prefer?: (c: Candidate) => 'manha' | 'tarde' | undefined
+}
+
+/**
+ * Learned time preference: when SHE moved blocks of a kind (studies / tasks) to the morning (or afternoon)
+ * on 3+ different days in the last 21, new blocks of that kind try that part of the day first. Never from a
+ * single move; never moves anything already placed; shown as a reason.
+ */
+export function learnedPreference(db: Pick<DB, 'dayCheckins'>, date: DateKey): { study?: 'manha' | 'tarde'; task?: 'manha' | 'tarde'; days: Record<string, number> } {
+  const from = addDays(date, -21)
+  const days: Record<string, Set<string>> = {}
+  for (const d of db.dayCheckins ?? []) {
+    if (d.date < from || d.date >= date) continue
+    for (const b of d.blocks ?? []) {
+      if (b.by !== 'marina' || b.status === 'removido') continue
+      const kind = b.key.startsWith('study:') ? 'study' : b.key.startsWith('task:') ? 'task' : undefined
+      if (!kind) continue
+      const part = hmToMinutes(b.start) < 12 * 60 ? 'manha' : 'tarde'
+      ;(days[`${kind}:${part}`] ??= new Set()).add(d.date)
+    }
+  }
+  const n = (k: string) => days[k]?.size ?? 0
+  const pick = (kind: string) => (n(`${kind}:manha`) >= 3 && n(`${kind}:manha`) > n(`${kind}:tarde`) ? 'manha' : n(`${kind}:tarde`) >= 3 && n(`${kind}:tarde`) > n(`${kind}:manha`) ? 'tarde' : undefined)
+  return { study: pick('study'), task: pick('task'), days: Object.fromEntries(Object.entries(days).map(([k, v]) => [k, v.size])) }
 }
 
 // ─── MoSCoW + score ─────────────────────────────────────────────────────────
@@ -291,9 +316,12 @@ function withHistory(db: DB, c: Candidate, date: DateKey): Candidate {
 
 const round5 = (n: number) => Math.max(0, Math.floor(n / 5) * 5)
 
-/** First window (from now) long enough for `minutes`, as a suggested slot. */
-function slotFor(windows: CapacityWindow[], used: Map<number, number>, minutes: number, nowMin: number): CapacityWindow | undefined {
-  for (let i = 0; i < windows.length; i++) {
+/** First window (from now) long enough for `minutes`, as a suggested slot (a preferred part of the day first). */
+function slotFor(windows: CapacityWindow[], used: Map<number, number>, minutes: number, nowMin: number, prefer?: 'manha' | 'tarde'): CapacityWindow | undefined {
+  const isMorning = (w: CapacityWindow) => hmToMinutes(w.start) < 12 * 60
+  const order = windows.map((_, i) => i)
+  if (prefer) order.sort((a, b) => Number((prefer === 'manha') !== isMorning(windows[a])) - Number((prefer === 'manha') !== isMorning(windows[b])) || a - b)
+  for (const i of order) {
     const w = windows[i]
     const start = Math.max(hmToMinutes(w.start), nowMin) + (used.get(i) ?? 0)
     if (hmToMinutes(w.end) - start >= minutes) {
@@ -355,7 +383,7 @@ export function planFromCandidates(db: DB, ctx: DayContext, candidates: Candidat
   const take = (c: Candidate, budget: number): PlanItem | undefined => {
     if (!fitsEnergy(c) || c.minMin > Math.min(budget, cap)) return undefined
     const minutes = Math.min(c.maxMin, budget, cap)
-    return { c, minutes, slot: slotFor(windows, used, minutes, nowMin) }
+    return { c, minutes, slot: slotFor(windows, used, minutes, nowMin, opts.prefer?.(c)) }
   }
 
   let primary: PlanItem | undefined
