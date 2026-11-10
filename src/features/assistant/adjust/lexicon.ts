@@ -95,7 +95,8 @@ export function modalityWords(m: Modality): string[] {
   const label = normalize(m.label)
     .split(/[^a-z0-9]+/)
     .filter((w) => w.length >= 3 && !LABEL_STOP.has(w))
-  return [...new Set([m.id, ...label, ...(MODALITY_WORDS[m.id] ?? [])])]
+  // An id that is a plain word ("outro") never names a modality: "os outros dois" is not a workout.
+  return [...new Set([...(LABEL_STOP.has(m.id) ? [] : [m.id]), ...label, ...(MODALITY_WORDS[m.id] ?? [])])]
 }
 
 function stem(w: string): string {
@@ -215,7 +216,7 @@ function period(tokens: string[]): Lexed['period'] {
 
 function modalityMentions(db: DB, tokens: string[]): ModMention[] {
   const mods = db.profile.modalities.filter((m) => m.active)
-  const words = mods.map((m) => ({ m, own: [m.id, ...normalize(m.label).split(/[^a-z0-9]+/)], all: modalityWords(m) }))
+  const words = mods.map((m) => ({ m, own: [m.id, ...normalize(m.label).split(/[^a-z0-9]+/)].filter((w) => !LABEL_STOP.has(w)), all: modalityWords(m) }))
   const out: ModMention[] = []
   tokens.forEach((tok, pos) => {
     const s = stem(tok)
