@@ -7,6 +7,7 @@ import { useToday } from '@/hooks/useToday'
 import { haptic } from '@/lib/haptics'
 import { bookLibraryStatus, LIBRARY_ORDER, libraryDistribution, libraryMarks, libraryStatusOf, markLibraryPatch } from '../engine/library'
 import { domainLabel, LIBRARY_LABEL, RESOURCE_LABEL, trackDomain } from '../engine/model'
+import { isRadarItem } from '../radar'
 
 /** Biblioteca: study items + books, with statuses that are not equivalent (concluir ≠ aplicar). */
 export function LibraryPanel({ domain }: { domain?: string }) {
@@ -14,7 +15,7 @@ export function LibraryPanel({ domain }: { domain?: string }) {
   const today = useToday()
   const [status, setStatus] = useState<LibraryStatus | undefined>()
   const itemDomain = (i: StudyItem) => i.domain ?? trackDomain(db.studyTracks.find((t) => t.id === i.trackId), db)
-  const items = db.studyItems.filter((i) => !domain || itemDomain(i) === domain || i.relatedDomains?.includes(domain))
+  const items = db.studyItems.filter((i) => !isRadarItem(i)).filter((i) => !domain || itemDomain(i) === domain || i.relatedDomains?.includes(domain))
   const books = domain && domain !== 'literatura_escrita_cultura' ? [] : db.books
   const dist = libraryDistribution(items, books)
   const shown = status ? items.filter((i) => libraryMarks(i).has(status)) : items

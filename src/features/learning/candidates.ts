@@ -10,6 +10,9 @@
  * Time × energy matrix (any domain): ≤20 min or low energy → light (review, podcast, pleasant reading);
  * ~30 min medium → focused concept / conversation / listening / targeted grammar; 45–60 high → deep,
  * structured study (reading + workbook, writing, product case, technical). Pure.
+ *
+ * Radar de vagas (radar.ts): skills the job-market newsletters mention give matching options a modest,
+ * explained bonus ("Aparece em N vagas das newsletters"). It only re-ranks; it never creates an option.
  */
 import { calendarEntries } from '@/data/calendar/universal'
 import type { Candidate, DayContext, Energy, LifeArea } from '@/data/priority/contract'
@@ -21,6 +24,7 @@ import { domainLabel, domainOfTrackId, isLanguageSkill, LANG_DOMAIN, languageTra
 import { dueCards, DEFAULT_MAX_REVIEWS } from './engine/srs'
 import { weekOf } from './engine/stats'
 import { isInProgress, itemDomain } from './engine/progress'
+import { applyMarketBoost } from './radar'
 
 export type StudyOptionKind = 'prioritaria' | 'complementar' | 'livre'
 
@@ -345,6 +349,8 @@ export function studyOptions(db: DB, ctx: DayContext, ask: StudyAsk = {}): Study
   }
 
   // Low energy: what needs effort sinks; nothing is removed by judgement of "productivity".
+  // Market calibration (Radar de vagas): options about a skill the newsletters ask for rise a little — re-rank only.
+  applyMarketBoost(db, out)
   return out.filter((o) => o.minMin <= budget).sort((a, b) => b.score - a.score || a.key.localeCompare(b.key))
 }
 

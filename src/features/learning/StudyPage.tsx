@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowRight, ArrowUp, GraduationCap, Library, Pencil, Play, Plus, Settings2, X } from 'lucide-react'
 import { SavedContent } from './components/SavedContent'
+import { MarketRadar, StudyAgents, StudyNowCard } from './components/StudyHub'
+import { activeDay } from '@/features/today/local-day'
 import { ROUTES } from '@/app/routes'
 import { openSheet, toast } from '@/app/ui-store'
 import { removeWithUndo } from '@/app/undo'
@@ -22,7 +24,7 @@ import {
   SwipeRow,
   TONE,
 } from '@/components/ui'
-import { useToday } from '@/hooks/useToday'
+import { useNow } from '@/hooks/useToday'
 import { formatShortDate } from '@/lib/date'
 import { haptic } from '@/lib/haptics'
 import { SubmitIcon } from './components/SubmitIcon'
@@ -95,13 +97,17 @@ function cycleTrackStatus(track: StudyTrack) {
 
 export default function StudyPage() {
   const nav = useNavigate()
-  const today = useToday()
+  const db = useDB()
+  const { today, minutes, now: clock } = useNow()
+  const local = useMemo(() => activeDay(db, today, clock, minutes), [db, today, clock, minutes])
   const [params] = useSearchParams()
-  const items = useDB((db) => db.studyItems)
-  const allTracks = useDB((db) => db.studyTracks)
-  const books = useDB((db) => db.books)
+  const items = db.studyItems
+  const allTracks = db.studyTracks
+  const books = db.books
   const [view, setView] = useState<BacklogView>('backlog')
-  const [trackId, setTrackId] = useState<string | undefined>()
+  // /estudos?trilha=<id> (from an agent card) → that track selected, scrolled into view
+  const [trackId, setTrackId] = useState<string | undefined>(() => params.get('trilha') ?? undefined)
+  const tracksRef = useRef<HTMLDivElement>(null)
   const [panel, setPanel] = useState<Panel>(null)
   const savedRef = useRef<HTMLElement>(null)
 
@@ -120,6 +126,17 @@ export default function StudyPage() {
   useEffect(() => {
     if (wantsSaved) savedRef.current?.scrollIntoView({ block: 'start' })
   }, [wantsSaved])
+  const wantsTrack = params.get('trilha')
+  useEffect(() => {
+    if (wantsTrack) {
+      setTrackId(wantsTrack)
+      tracksRef.current?.scrollIntoView({ block: 'start' })
+    }
+  }, [wantsTrack])
+  // /estudos#radar (Carreira & mercado) → the newsletter radar
+  useEffect(() => {
+    if (window.location.hash === '#radar') document.getElementById('radar')?.scrollIntoView({ block: 'start' })
+  }, [])
 
   const finish = (item: StudyItem) => {
     actions.update('studyItems', item.id, finishStudyPatch(today))
@@ -135,7 +152,7 @@ export default function StudyPage() {
       <PageHeader
         eyebrow="aprender"
         title="Estudos"
-        subtitle="o que estou aprendendo — e o que eu guardo pra quando quiser."
+        subtitle="o que estudar, quando — e tudo o que estou aprendendo."
         actions={
           <>
             <IconButton label="Aprendizagem" onClick={() => nav(ROUTES.learning)}>
@@ -151,9 +168,12 @@ export default function StudyPage() {
         }
       />
 
+      <StudyNowCard db={db} date={local.date} nowMin={local.minutes} />
+      <StudyAgents db={db} today={local.date} />
+
       {studying.length > 0 && (
         <>
-          <SectionTitle className="mt-1">Agora estou estudando</SectionTitle>
+          <SectionTitle>Agora estou estudando</SectionTitle>
           <div className="space-y-2.5">
             {studying.map((it, i) => (
               <motion.div key={it.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
@@ -171,8 +191,8 @@ export default function StudyPage() {
         </>
       )}
 
+      <div ref={tracksRef} className="scroll-mt-4" />
       <SectionTitle
-        className={studying.length || next ? undefined : 'mt-1'}
         action={
           <button type="button" onClick={() => setPanel({ kind: 'tracks' })} className="text-[13px] text-muted h-8 -mb-1.5 px-1 inline-flex items-center gap-1">
             <Settings2 size={14} /> editar
@@ -285,6 +305,8 @@ export default function StudyPage() {
           </div>
         </>
       )}
+
+      <MarketRadar db={db} today={local.date} />
 
       <section ref={savedRef} id="salvos" className="scroll-mt-4">
         <SectionTitle>Conteúdos salvos</SectionTitle>

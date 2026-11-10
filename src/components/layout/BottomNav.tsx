@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { cn } from '@/lib/cn'
 import { activeTab, TABS } from './nav'
 
-/** The five places: a bottom bar on the phone, a quiet rail on the left from tablet width up. */
+/** The six places: a bottom bar on the phone, a quiet rail on the left from tablet width up. */
 export function BottomNav() {
   const { pathname } = useLocation()
   const current = activeTab(pathname)
@@ -14,13 +14,14 @@ export function BottomNav() {
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         aria-label="Navegação principal"
       >
-        <div className="mx-auto max-w-[640px] grid grid-cols-5 h-[60px]">
+        <div className="mx-auto max-w-[640px] grid grid-cols-6 h-[60px]">
           {TABS.map(({ to, label, icon: Icon }) => {
             const isActive = current === to
             return (
               <NavLink key={to} to={to} aria-current={isActive ? 'page' : undefined} className="relative flex flex-col items-center justify-center gap-0.5 min-w-0">
                 <Icon size={21} strokeWidth={isActive ? 2.1 : 1.6} className={cn('transition-colors', isActive ? 'text-ink' : 'text-muted')} />
-                <span className={cn('font-sport uppercase text-[11px] tracking-[0.08em] transition-colors truncate max-w-full px-0.5', isActive ? 'text-ink' : 'text-muted')}>{label}</span>
+                {/* six tabs on a 390px iPhone: ~65px each — narrow tracking so the longest label (MINHA VIDA) fits whole */}
+                <span className={cn('font-sport uppercase text-[10.5px] tracking-[0.03em] leading-none whitespace-nowrap transition-colors', isActive ? 'text-ink' : 'text-muted')}>{label}</span>
                 {isActive && <motion.span layoutId="nav-dot" className="absolute top-1.5 h-1 w-1 rounded-full bg-accent" />}
               </NavLink>
             )

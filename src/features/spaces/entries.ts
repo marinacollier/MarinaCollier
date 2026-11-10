@@ -13,6 +13,7 @@ import type { DateKey, DB, ModuleId, Tone } from '@/data/types'
 import { addDays, diffDays } from '@/lib/date'
 import { nextSession } from '@/data/spiritual/model'
 import { collection, FRAGRANCE_CATEGORIES } from '@/data/universe/model'
+import { isRadarItem } from '@/features/learning/radar'
 
 export interface SpaceEntry {
   key: string
@@ -101,7 +102,7 @@ function aprender(db: DB): SpaceEntry[] {
     const done = db.books.filter((b) => b.status === 'finalizado').length
     out.push({ key: 'livros', label: 'Livros', emoji: '📖', to: ROUTES.books, tone: 'plum', module: 'livros', hint: reading ? `lendo: ${reading.title}` : done ? plural(done, 'lido', 'lidos') : undefined })
   }
-  const refs = db.studyItems.filter((s) => s.reference || s.kind === 'newsletter')
+  const refs = db.studyItems.filter((s) => (s.reference || s.kind === 'newsletter') && !isRadarItem(s))
   if (refs.length) out.push({ key: 'salvos', label: 'Conteúdos salvos', emoji: '🔖', to: ROUTES.saved, tone: 'sand', module: 'estudos', hint: refs.map((r) => r.source || r.title).slice(0, 2).join(' · ') })
   // Ateliê Literário: private writing. The hint is a count only (never a title or a line of text); nothing when locked.
   const works = db.literaryWorks ?? []

@@ -68,7 +68,8 @@ export default function LearningPage() {
   const tab = (TABS.find((t) => t.value === params.get('v'))?.value ?? 'visao') as Tab
   const setTab = (v: Tab) => setParams(v === 'visao' ? {} : { v }, { replace: true })
   const [periodKey, setPeriodKey] = useState<PeriodKey>('semana')
-  const [domain, setDomain] = useState<string | undefined>()
+  // ?area=ia (from the Estudos hub's agent cards) → opens already filtered by that domain
+  const [domain, setDomain] = useState<string | undefined>(() => params.get('area') ?? undefined)
   const [topic, setTopic] = useState<string | undefined>()
   const [format, setFormat] = useState<LearningResourceType | undefined>()
   const [panel, setPanel] = useState<Panel>(null)

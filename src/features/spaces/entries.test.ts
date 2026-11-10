@@ -12,8 +12,9 @@ const seed = buildSeed(TODAY)
 const keys = (db: DB) => spaceGroups(db, TODAY).flatMap((g) => g.entries.map((e) => e.key))
 
 describe('navigation (MARINA OS 2.0)', () => {
-  it('has exactly five places: Hoje · Agenda · Minha Vida · Projetos · Finanças', () => {
-    expect(TABS.map((t) => t.label)).toEqual(['Hoje', 'Agenda', 'Minha Vida', 'Projetos', 'Finanças'])
+  it('has exactly six places: Hoje · Agenda · Minha Vida · Estudos · Projetos · Finanças', () => {
+    expect(TABS.map((t) => t.label)).toEqual(['Hoje', 'Agenda', 'Minha Vida', 'Estudos', 'Projetos', 'Finanças'])
+    expect(TABS.find((t) => t.label === 'Estudos')!.to).toBe(ROUTES.study)
   })
 
   it('each page keeps its hub lit; Lumos and Ajustes belong to Hoje', () => {
@@ -24,7 +25,8 @@ describe('navigation (MARINA OS 2.0)', () => {
     expect(activeTab('/semana')).toBe(ROUTES.agenda)
     for (const p of ['/projetos', '/trabalho', '/trabalho/projeto/x', '/trabalho/creator/ugc', '/carreira/posts']) expect(activeTab(p)).toBe(ROUTES.projects)
     expect(activeTab('/dinheiro')).toBe(ROUTES.money)
-    for (const p of ['/minha-vida', '/livros', '/viagens/x', '/vida/luna', '/inbox', '/atelie']) expect(activeTab(p)).toBe(ROUTES.spaces)
+    for (const p of ['/minha-vida', '/viagens/x', '/vida/luna', '/inbox', '/cuidar']) expect(activeTab(p)).toBe(ROUTES.spaces)
+    for (const p of ['/estudos', '/estudos/aprendizagem', '/livros', '/livros/x', '/biblia', '/biblia/plano/x', '/atelie', '/atelie/obra/x']) expect(activeTab(p)).toBe(ROUTES.study)
   })
 })
 
