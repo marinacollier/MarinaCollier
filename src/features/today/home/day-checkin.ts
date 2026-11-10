@@ -35,7 +35,6 @@ export const REVIEW_FROM_MIN = 20 * 60
 export const SKIP_REASON: Partial<Record<DayChangeAction, string>> = {
   hoje_nao: 'Tu tirou de hoje',
   trocar: 'Trocado por outra coisa',
-  mais_tarde: 'Mais tarde',
   adiar: 'Adiado',
   concluir: 'Já concluído',
   dividir: 'Dividido em etapas',

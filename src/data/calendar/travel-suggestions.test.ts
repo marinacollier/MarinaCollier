@@ -26,4 +26,10 @@ describe('modo viagem · treino da semana modelo como sugestão', () => {
     const list = calendarEntries(db, '2026-11-10', '2026-11-10', { today: '2026-11-09' }).filter((e) => e.sourceType === 'workout')
     expect(list.map((e) => e.title)).toEqual(['Natação'])
   })
+  it('nunca sugere corrida no dia antes/depois de uma corrida real do plano (joelho)', () => {
+    const db = trip()
+    db.workouts = [{ createdAt: '', updatedAt: '', id: 'qua', date: '2026-11-11', modality: 'corrida', status: 'planejado', order: 0, title: 'Corrida leve' }]
+    const list = calendarEntries(db, '2026-11-10', '2026-11-11', { today: '2026-11-09' }).filter((e) => e.sourceType === 'workout')
+    expect(list.map((e) => [e.startAt.date, e.title])).toEqual([['2026-11-11', 'Corrida leve']])
+  })
 })

@@ -76,7 +76,8 @@ describe('Início limpo', () => {
 
   it('tapping a row opens the same detail as the Agenda (full text lives there)', () => {
     renderHome()
-    const first = screen.getByLabelText('Hoje').querySelector('li button') as HTMLButtonElement
+    // A commitment row (planned blocks and rituals open their own sheets).
+    const first = [...screen.getByLabelText('Hoje').querySelectorAll('li button')].find((b) => !b.getAttribute('aria-label')) as HTMLButtonElement
     fireEvent.click(first)
     const dialog = screen.getByRole('dialog', { name: 'Detalhe do compromisso' })
     expect(within(dialog).getByRole('article')).toBeTruthy()

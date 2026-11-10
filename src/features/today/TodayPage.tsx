@@ -12,7 +12,7 @@
  * entregas, conflitos) and the expedition day live on the trip page (Hoje); the full day list, checks and
  * priorities in Agenda / Tarefas; Lumos with voice and attachments on /lumos.
  */
-import { Suspense, useCallback, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ROUTES } from '@/app/routes'
@@ -30,15 +30,21 @@ import { addDays } from '@/lib/date'
 import { travelTripOn } from '@/data/travel-mode'
 import { activeDay } from './local-day'
 import { checkinOf } from './home/day-checkin'
-import { DayCheckinCard, DayReviewCard, NowPlanCard, showReview } from './home/DayPlanCards'
+import { DayCheckinCard, DayReviewCard, showReview } from './home/DayPlanCards'
+import { applyModeOf, applyProposal, blockRows } from './home/allocation'
+import { BlockSheet, DayAssist, parseAdjust, runAdjust } from './home/DayAssist'
+import { backlogOf } from './home/backlog'
+import { BacklogPanel } from './home/BacklogPanel'
+import { dayBlocksOn } from '@/data/routine-modes'
+import { toast } from '@/app/ui-store'
 import { EntryDetail } from '@/features/agenda/calendar/EntryDetail'
 import { useCalendar, useEntry } from '@/features/agenda/calendar/model'
 import { homeContext } from './context'
 import { LumosSheet, lumosHref, type LumosRequest } from './home/lumos'
 import { useMarkSeenOnLeave } from './home/seen'
 import { homeTripOps } from './home/trip-ops'
-import { flightName, headerDate, inDays, lifeNeeds, looseRows, nextDays, NEEDS_MAX, routineRows, shortMoney, stayPlace, timedRows, tripNeeds, type LooseRow, type Need } from './home/clean'
-import { ConflictList, CrmLine, DayBlock, LumosLine, PrecisaList, ProximosList, RoutineChecklist, RoutineList, TripChips } from './home/CleanBlocks'
+import { blockLabel, flightName, headerDate, inDays, lifeNeeds, looseRows, nextDays, NEEDS_MAX, routineRows, shortMoney, stayPlace, timedRows, tripNeeds, type LooseRow, type Need } from './home/clean'
+import { ConflictList, CrmLine, DayBlock, LumosLine, PrecisaList, ProximosList, RoutineChecklist, TripChips, type TLBlock, type TLItem } from './home/CleanBlocks'
 import { crmPulse } from '@/data/ugc/model'
 
 /** A trip shows on Home (outside it) only when it's really close. */
@@ -86,10 +92,35 @@ export default function TodayPage() {
   const looseOf = useCallback((d: DateKey) => looseRows(db, cal.entries, d), [db, cal.entries])
   const proximos = useMemo(() => nextDays(cal.entries, tomorrow, undefined, undefined, undefined, (d) => looseOf(d).length > 0), [cal.entries, tomorrow, looseOf])
   const conflictIds = useMemo(() => new Set(cal.marks.keys()), [cal.marks])
+  const dayCheckin = checkinOf(db, day)
   const rituals = useMemo(() => routineRows(db, day), [db, day])
   const [routineOpen, setRoutineOpen] = useState<string>()
+
+  // ONE timeline: fixed commitments + the day's planned blocks (tasks, studies, prep) + rituals, by time.
+  const blocks = useMemo(() => blockRows(db, day, local.minutes, cal.entries), [db, day, local.minutes, cal.entries])
+  const mode = applyModeOf(db)
+  // Auto mode: the first time she opens a day, the engine's proposal is placed (once; persisted; undoable).
+  const applied = useRef<DateKey | undefined>(undefined)
+  useEffect(() => {
+    if (mode !== 'auto' || applied.current === day || dayCheckin?.blocks !== undefined || !cal.entries.length) return
+    applied.current = day
+    const r = applyProposal(day, local.minutes, cal.entries)
+    if (r.changed && r.undo) toast(r.message, { action: { label: 'Desfazer', run: r.undo } })
+  }, [mode, day, dayCheckin?.blocks, cal.entries, local.minutes])
+  const timeline = useMemo<TLItem[]>(() => {
+    const out: TLItem[] = hoje.map((e) => ({ kind: 'entry', time: e.startAt.time ?? '', e }))
+    for (const b of blocks.rows) out.push({ kind: 'block', time: b.start, b, label: blockLabel(db, b.key, b.c) })
+    for (const r of rituals) out.push({ kind: 'routine', time: r.time ?? '99:99', r })
+    for (const q of dayBlocksOn(db, day)) {
+      if (q.kind === 'base' && (q.category === 'almoco' || q.category === 'descanso')) out.push({ kind: 'quiet', time: q.start, title: q.title, onOpen: () => navigate(ROUTES.routineSettings) })
+    }
+    const sleep = db.profile.rhythm?.sleepTime
+    if (sleep) out.push({ kind: 'quiet', time: sleep, title: 'Dormir', onOpen: () => navigate(ROUTES.routineSettings) })
+    return out.sort((a, b) => a.time.localeCompare(b.time))
+  }, [hoje, blocks.rows, rituals, db, day, navigate])
+  const [blockOpen, setBlockOpen] = useState<TLBlock>()
+  const backlog = useMemo(() => backlogOf(db, day, new Set(blocks.rows.map((b) => b.key))), [db, day, blocks.rows])
   // 0 — Check-in do dia → "O que faz sentido fazer agora?" (+ the optional review after 20:00).
-  const dayCheckin = checkinOf(db, day)
 
   const conflicts = useMemo(() => {
     const until = addDays(day, CONFLICT_DAYS)
@@ -151,10 +182,17 @@ export default function TodayPage() {
   const [lumos, setLumos] = useState<LumosRequest>()
   const ask = useCallback(
     (text: string) => {
+      // "tenho mais 30 minutos", "estou cansada", "não quero idiomas"… change the day's timeline for real.
+      const adj = parseAdjust(text)
+      if (adj) {
+        const r = runAdjust(adj, day, local.minutes, cal.entries)
+        toast(r.message, r.undo ? { action: { label: 'Desfazer', run: r.undo } } : {})
+        return
+      }
       if (LumosSheet) setLumos((c) => ({ text, n: (c?.n ?? 0) + 1 }))
       else navigate(lumosHref(text))
     },
-    [navigate],
+    [navigate, day, local.minutes, cal.entries],
   )
 
   const openNeed = (n: Need) => {
@@ -183,12 +221,14 @@ export default function TodayPage() {
       </header>
 
       <motion.div {...rise(1)} className="mt-5 grid gap-4">
-        {!dayCheckin ? <DayCheckinCard key={day} date={day} nowMin={local.minutes} entries={cal.entries} /> : <NowPlanCard date={day} nowMin={local.minutes} entries={cal.entries} />}
+        {!dayCheckin?.energy && !dayCheckin?.skipped && <DayCheckinCard key={day} date={day} nowMin={local.minutes} entries={cal.entries} />}
         {dayCheckin && showReview(local.minutes, dayCheckin.review) && <DayReviewCard date={day} />}
       </motion.div>
 
       <motion.div {...rise(1)} className="mt-7">
-        <DayBlock label="01 / Dia" title="Hoje" rows={hoje} loose={hojeLoose} onOpen={(e) => openEntry(e, day)} onLoose={openLoose} conflicts={conflictsByDay.get(day) ?? 0} conflictIds={conflictIds} onConflicts={() => setShowConflicts(day)} routines={<RoutineList rows={rituals} onOpen={setRoutineOpen} />} />
+        <DayBlock label="01 / Dia" title="Hoje" rows={hoje} loose={hojeLoose} onOpen={(e) => openEntry(e, day)} onLoose={openLoose} conflicts={conflictsByDay.get(day) ?? 0} conflictIds={conflictIds} onConflicts={() => setShowConflicts(day)} items={timeline} onBlock={setBlockOpen} onRoutine={setRoutineOpen} />
+        <DayAssist date={day} nowMin={local.minutes} entries={cal.entries} rows={blocks.rows} onAsk={ask} />
+        <BacklogPanel items={backlog} today={day} onOpen={(id) => openSheet('task', { id })} />
       </motion.div>
 
       <motion.div {...rise(2)} className="mt-7">
@@ -231,6 +271,21 @@ export default function TodayPage() {
         {detail && sel && (
           <SheetFrame key="detail" onClose={() => setSel(undefined)} label="Detalhe do compromisso" maxHeight="86dvh">
             <EntryDetail entry={detail} date={sel.date} conflicts={cal.marks.get(detail.id)} device={device} onClose={() => setSel(undefined)} onEdited={() => setSel(undefined)} />
+          </SheetFrame>
+        )}
+        {blockOpen && (
+          <SheetFrame key="block" onClose={() => setBlockOpen(undefined)} label="Bloco do dia">
+            <BlockSheet
+              row={blockOpen.b}
+              label={blockOpen.label}
+              date={day}
+              nowMin={local.minutes}
+              entries={cal.entries}
+              onDone={(o) => {
+                setBlockOpen(undefined)
+                toast(o.message, o.undo ? { action: { label: 'Desfazer', run: o.undo } } : {})
+              }}
+            />
           </SheetFrame>
         )}
         {routineOpen && (

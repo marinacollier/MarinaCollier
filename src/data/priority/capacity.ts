@@ -97,14 +97,16 @@ export function busyIntervals(db: DB, date: DateKey, entries: CalendarEntry[]): 
 }
 
 /** Free flexible minutes today from `nowMin` until sleep. */
-export function dayCapacity(db: DB, date: DateKey, nowMin: number, energy?: Energy, entries?: CalendarEntry[]): Capacity {
+export function dayCapacity(db: DB, date: DateKey, nowMin: number, energy?: Energy, entries?: CalendarEntry[], extraBusy: CapacityWindow[] = []): Capacity {
   const list = entries ?? calendarEntries(db, date, date, { today: date })
   const wake = hmToMinutes(db.profile.rhythm?.wakeTime ?? '06:30')
   const from = Math.max(nowMin, wake)
   const to = sleepMinutes(db)
   const windows: Interval[] = []
   let cursor = from
-  for (const b of busyIntervals(db, date, list)) {
+  // Blocks already placed on the day (her plan) are busy too — a replan never stacks things on them.
+  const placed = extraBusy.map((w) => ({ start: hmToMinutes(w.start), end: hmToMinutes(w.end) }))
+  for (const b of merge([...busyIntervals(db, date, list), ...placed])) {
     if (b.end <= cursor) continue
     if (b.start >= to) break
     if (b.start > cursor) windows.push({ start: cursor, end: Math.min(b.start, to) })

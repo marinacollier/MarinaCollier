@@ -438,6 +438,8 @@ export interface UserProfile {
   routineModes?: RoutineModesConfig
   /** The base day: editable background blocks shown in the calendar (never conflicts, never on Home). */
   dayPlan?: { blocks: DayBlock[] }
+  /** Flexible blocks: the engine places them on the day ('auto', default) or shows them for approval ('preview'). Fixed commitments are never moved either way. */
+  planApply?: 'auto' | 'preview'
   /** Aprendizagem: language split, weekly target, reviews per day. Missing = defaults (70% inglês / 30% espanhol). */
   learningPlan?: LearningPlan
   /** Aprendizagem: session templates (missing = defaults). */
@@ -1153,6 +1155,26 @@ export interface DayCheckin extends Entity {
   changes: { at: ISODateTime; key: string; action: DayChangeAction; reason?: string }[]
   /** End-of-day review (optional, after 20:00). */
   review?: { aconteceu?: string; pendente?: string; mudou?: string; amanha?: string; at?: ISODateTime; dismissed?: boolean }
+  /**
+   * The day's ALLOCATION: flexible things placed on the timeline. Each block points at an existing entity by
+   * its candidate key ('task:<id>', 'study:review', 'prep:event:<id>'…) — never a copy of it. Undefined =
+   * nothing applied yet (the timeline then shows the engine's proposal).
+   */
+  blocks?: PlannedBlock[]
+}
+
+export type PlannedBlockStatus = 'planejado' | 'feito' | 'removido'
+
+export interface PlannedBlock {
+  key: string
+  start: TimeHM
+  end: TimeHM
+  status: PlannedBlockStatus
+  /** The engine placed it, or she did (her blocks are never moved by a replan). */
+  by: 'motor' | 'marina'
+  /** Title when placed — display fallback only; the entity stays the source of truth. */
+  title: string
+  at: ISODateTime
 }
 
 /** One per day (id is free, `date` is unique). Holds check-in, simple habits and the daily closing. */

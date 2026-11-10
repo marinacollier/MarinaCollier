@@ -8,7 +8,9 @@
 import type { ActionItem } from '@/data/agenda/items'
 import type { AttentionItem } from '@/data/intel'
 import type { CalendarEntry } from '@/data/calendar/universal'
-import type { DateKey, DB, TripItem } from '@/data/types'
+import type { DateKey, DB, EntryKind, TripItem } from '@/data/types'
+import type { Candidate, LifeArea } from '@/data/priority/contract'
+import { kindOfEntry } from '@/data/calendar/kind'
 import { addDays, MONTHS, WEEKDAY_LONG, weekday } from '@/lib/date'
 import { bookingStatusOf } from '@/features/travel/expedition/command'
 import { formatMoney } from '@/features/travel/expedition/logic'
@@ -330,4 +332,58 @@ export function routineRows(db: DB, date: DateKey): RoutineRow[] {
       const { done, total } = routineProgress(db, r.id, date)
       return [{ id: r.id, name: r.name, emoji: r.emoji, time: block?.start ?? r.startTime, done, total }]
     })
+}
+
+// ─── Category labels (the existing taxonomy — never parsed from titles' brackets) ─
+
+const KIND_SHORT: Record<EntryKind, string> = {
+  reuniao: 'Reunião',
+  aula: 'Aula',
+  treino: 'Treino',
+  tarefa: 'Tarefa',
+  trabalho: 'Trabalho',
+  estudo: 'Estudo',
+  ugc: 'UGC',
+  reserva: 'Passeio · reserva',
+  pessoal: 'Vida pessoal',
+  espiritualidade: 'Espiritualidade',
+}
+
+/** "Aula" · "Reunião" · "Treino" · "Voo" — one quiet word over each timeline row. */
+export function entryLabel(db: DB, e: CalendarEntry): string {
+  if (e.sourceType === 'tripItem') {
+    const i = db.tripItems.find((x) => x.id === e.sourceId)
+    if (i?.section === 'voo') return 'Voo'
+    if (i?.section === 'hospedagem') return 'Hospedagem'
+    if (i?.section === 'transporte') return 'Transporte'
+    if (i && !BOOKED.has(bookingStatusOf(i)) && i.paymentStatus !== 'pago') return 'Vida pessoal · passeio'
+  }
+  if (e.sourceType === 'school') return 'Compromisso'
+  return KIND_SHORT[kindOfEntry(db, e)] ?? 'Compromisso'
+}
+
+const AREA_LABEL: Record<LifeArea, string> = {
+  trabalho: 'Trabalho',
+  voluntariado: 'Voluntariado',
+  idiomas: 'Estudo',
+  faculdade: 'Estudo · Pós',
+  estudos: 'Estudo',
+  esportes: 'Treino',
+  luna: 'Luna',
+  autocuidado: 'Autocuidado',
+  criatividade: 'Criatividade',
+  financas: 'Finanças',
+  social: 'Vida pessoal',
+}
+
+/** "Trabalho · Fashion Finder" · "Estudo · Inglês" · "Preparação" for a planned block. */
+export function blockLabel(db: DB, key: string, c?: Candidate): string {
+  if (key.startsWith('prep:')) return 'Preparação'
+  const task = key.startsWith('task:') ? db.tasks.find((t) => t.id === key.slice(5)) : undefined
+  const project = task?.projectId ? db.projects.find((p) => p.id === task.projectId)?.name : undefined
+  // A task without any area/context/project is just "Tarefa" (the engine's default area is not a fact about it).
+  const known = !task || !!(task.lifeArea || task.context || task.area || task.projectId)
+  const base = c && known ? AREA_LABEL[c.area] : task ? 'Tarefa' : 'Atividade'
+  const sub = c?.subject ?? project
+  return sub && !base.includes(sub) ? `${base} · ${sub}` : base
 }

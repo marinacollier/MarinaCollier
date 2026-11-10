@@ -10,7 +10,8 @@ import { useDB } from '@/data/store'
 import type { DateKey } from '@/data/types'
 import { cn } from '@/lib/cn'
 import { haptic } from '@/lib/haptics'
-import { chipTone, dayHeader, entryChip, rowTime, shortTitle, type ChipTone, type LooseRow, type Need, type NextDay, type RoutineRow } from './clean'
+import { chipTone, dayHeader, entryChip, entryLabel, rowTime, shortTitle, type ChipTone, type LooseRow, type Need, type NextDay, type RoutineRow } from './clean'
+import type { BlockRow } from './allocation'
 import { actions } from '@/data/store'
 import { routineItemsFor } from '@/data/selectors'
 import { occurrenceFor } from '@/lib/recurrence'
@@ -47,7 +48,7 @@ export function Chip({ children, tone = 'soft' }: { children: ReactNode; tone?: 
   )
 }
 
-function OneLine({ left, title, chip, onOpen, muted, label, conflict }: { left?: ReactNode; title: string; chip?: string; onOpen: () => void; muted?: boolean; label?: string; conflict?: boolean }) {
+function OneLine({ left, title, chip, onOpen, muted, label, conflict, kind, quiet }: { left?: ReactNode; title: string; chip?: string; onOpen: () => void; muted?: boolean; label?: string; conflict?: boolean; kind?: string; quiet?: boolean }) {
   return (
     <li>
       <button
@@ -60,7 +61,10 @@ function OneLine({ left, title, chip, onOpen, muted, label, conflict }: { left?:
         className="w-full min-h-11 flex items-center gap-3 text-left active:opacity-70"
       >
         {left}
-        <span className={cn('flex-1 min-w-0 truncate text-[15px]', muted ? 'text-muted line-through decoration-muted/50' : 'text-ink')}>{title}</span>
+        <span className="flex-1 min-w-0">
+          {kind && <span className="block text-[10.5px] leading-[14px] uppercase tracking-[0.06em] text-muted truncate">{kind}</span>}
+          <span className={cn('block truncate', quiet ? 'text-[14px] text-ink-2' : 'text-[15px]', muted ? 'text-muted line-through decoration-muted/50' : !quiet && 'text-ink')}>{title}</span>
+        </span>
         {conflict && <Chip tone="alert">conflito</Chip>}
         {chip && <Chip tone={chipTone(chip)}>{chip}</Chip>}
       </button>
@@ -71,6 +75,7 @@ function OneLine({ left, title, chip, onOpen, muted, label, conflict }: { left?:
 function EntryLine({ e, onOpen, conflict }: { e: CalendarEntry; onOpen: (e: CalendarEntry) => void; conflict?: boolean }) {
   const db = useDB()
   const chip = entryChip(db, e)
+  const kind = entryLabel(db, e)
   const time = rowTime(e)
   return (
     <OneLine
@@ -84,6 +89,7 @@ function EntryLine({ e, onOpen, conflict }: { e: CalendarEntry; onOpen: (e: Cale
       chip={chip}
       muted={e.status === 'feito' || e.status === 'cancelado'}
       conflict={conflict}
+      kind={kind}
       onOpen={() => onOpen(e)}
     />
   )
@@ -124,6 +130,9 @@ export function DayBlock({
   onConflicts,
   empty = 'Dia livre',
   routines,
+  items,
+  onBlock,
+  onRoutine,
 }: {
   label: string
   title: string
@@ -137,6 +146,10 @@ export function DayBlock({
   empty?: string
   /** Her rituals of the day (Hoje only). */
   routines?: ReactNode
+  /** ONE chronological timeline (commitments + planned blocks + rituals). When given, replaces `rows`. */
+  items?: TLItem[]
+  onBlock?: (b: TLBlock) => void
+  onRoutine?: (id: string) => void
 }) {
   return (
     <section aria-label={title}>
@@ -153,13 +166,47 @@ export function DayBlock({
       >
         {title}
       </Eyebrow>
-      {rows.length ? (
+      {items ? (
+        items.length ? (
+          <ul className="divide-y divide-line/60" aria-label="Linha do tempo">
+            {items.map((it) =>
+              it.kind === 'entry' ? (
+                <EntryLine key={it.e.id} e={it.e} onOpen={onOpen} conflict={conflictIds?.has(it.e.id)} />
+              ) : it.kind === 'block' ? (
+                <OneLine
+                  key={`b:${it.b.key}`}
+                  label={`${it.label}: ${it.b.title}, ${it.b.start}–${it.b.end}`}
+                  left={<TimeCell time={it.b.start} end={it.b.end} />}
+                  kind={it.label}
+                  title={shortTitle(it.b.title, 60)}
+                  chip={it.b.state === 'feito' ? 'feito' : it.b.state === 'sugestao' ? 'sugestão' : 'planejado'}
+                  muted={it.b.state === 'feito'}
+                  onOpen={() => onBlock?.(it)}
+                />
+              ) : it.kind === 'routine' ? (
+                <OneLine
+                  key={`r:${it.r.id}`}
+                  label={`${it.r.name}: ${it.r.done} de ${it.r.total}`}
+                  left={<TimeCell time={it.r.time} />}
+                  kind="Rotina"
+                  title={`${it.r.emoji ? `${it.r.emoji} ` : ''}${it.r.name}`}
+                  chip={it.r.total && it.r.done >= it.r.total ? 'feito' : `${it.r.done}/${it.r.total}`}
+                  onOpen={() => onRoutine?.(it.r.id)}
+                />
+              ) : (
+                <OneLine key={`q:${it.title}`} left={<TimeCell time={it.time} />} kind="Rotina" title={it.title} quiet onOpen={it.onOpen} />
+              ),
+            )}
+          </ul>
+        ) : null
+      ) : rows.length ? (
         <ul className="divide-y divide-line/60">
           {rows.map((e) => (
             <EntryLine key={e.id} e={e} onOpen={onOpen} conflict={conflictIds?.has(e.id)} />
           ))}
         </ul>
-      ) : !loose.length && !routines ? (
+      ) : null}
+      {(items ? !items.length : !rows.length) && !loose.length && !routines ? (
         <p className="text-[15px] text-ink-2 py-2">{empty}</p>
       ) : null}
       {routines}
@@ -401,5 +448,23 @@ export function RoutineChecklist({ routineId, date }: { routineId: string; date:
         })}
       </ul>
     </div>
+  )
+}
+
+// ─── Timeline items ─────────────────────────────────────────────────────────
+
+export type TLBlock = { kind: 'block'; time: string; b: BlockRow; label: string }
+export type TLItem =
+  | { kind: 'entry'; time: string; e: CalendarEntry }
+  | TLBlock
+  | { kind: 'routine'; time: string; r: RoutineRow }
+  | { kind: 'quiet'; time: string; title: string; onOpen: () => void }
+
+function TimeCell({ time, end }: { time?: string; end?: string }) {
+  return (
+    <span className="w-[62px] shrink-0 flex flex-col leading-tight tabular-nums">
+      <span className="text-[14px] text-ink-2 font-medium">{time ?? '—'}</span>
+      {end && <span className="text-[11px] text-muted">até {end}</span>}
+    </span>
   )
 }

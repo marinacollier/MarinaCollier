@@ -249,7 +249,7 @@ export function studyOptions(db: DB, ctx: DayContext, ask: StudyAsk = {}): Study
     const top = due[0]
     out.push({
       key: 'study:review',
-      title: `Revisar ${due.length} ${due.length === 1 ? 'cartão' : 'cartões'}`,
+      title: `Revisar ${due.length} ${due.length === 1 ? 'flashcard' : 'flashcards'}${reviewTheme(db, due)}`,
       area: areaFor(top.domain ?? LANG_DOMAIN, top.trackId),
       minMin: 5,
       maxMin: Math.min(budget, Math.max(5, due.length * 2)),
@@ -257,7 +257,7 @@ export function studyOptions(db: DB, ctx: DayContext, ask: StudyAsk = {}): Study
       moscow: 'should',
       score: clamp(40 + due.length * 4 + Math.min(15, top.count * 3)),
       reasons: [`${due.length} para revisar hoje (limite ${cap}/dia).`, `Mais importante: “${top.front}” → “${top.back}” (${top.count}×).`],
-      nextStep: 'Mostre a frente, tente lembrar, veja a resposta e marque acertei/errei.',
+      nextStep: 'Abrir a revisão: ver a frente, lembrar, conferir a resposta e marcar acertei/errei.',
       open: { kind: 'route', to: '/estudos/aprendizagem?v=revisar' },
       kind: 'prioritaria',
       domain: top.domain ?? LANG_DOMAIN,
@@ -348,14 +348,23 @@ export function studyOptions(db: DB, ctx: DayContext, ask: StudyAsk = {}): Study
   return out.filter((o) => o.minMin <= budget).sort((a, b) => b.score - a.score || a.key.localeCompare(b.key))
 }
 
+/** " — da sessão Bluemoon (09/11)" when the due cards came from one real session; nothing otherwise. */
+function reviewTheme(db: DB, due: { sessionId?: string; source?: string }[]): string {
+  const ids = new Set(due.map((c) => c.sessionId).filter(Boolean))
+  if (ids.size !== 1) return ''
+  const s = (db.studySessions ?? []).find((x) => x.id === [...ids][0])
+  const label = s?.title ?? due[0].source
+  return label ? ` — ${label}` : ''
+}
+
 /** For the Priority Engine: plain Candidates (contract.ts). */
 export function studyCandidates(db: DB, ctx: DayContext): Candidate[] {
   return studyOptions(db, ctx).map((o) => {
     const { kind, domain, trackId, tool, ...c } = o
-    void domain
-    void trackId
     void tool
-    return { ...c, reasons: [`${KIND_LABEL[kind]}.`, ...c.reasons] }
+    const track = trackId ? db.studyTracks.find((t) => t.id === trackId) : undefined
+    const subject = track?.name ?? (domain ? domainLabel(db, domain) : undefined)
+    return { ...c, subject, study: domain ? { domain, trackId } : undefined, reasons: [`${KIND_LABEL[kind]}.`, ...c.reasons] }
   })
 }
 

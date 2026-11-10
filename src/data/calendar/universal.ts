@@ -420,6 +420,9 @@ export function calendarEntries(db: DB, from: DateKey, to: DateKey, opts: Calend
     if (date >= today && isTravelDay(db, date) && !db.workouts.some((w) => w.date === date) && !travelDayIsFull(db, date)) {
       for (const t of db.weekTemplate) {
         if (!t.active || t.choice !== 'fixed' || t.weekday !== weekdayOf(date) || !t.modalities[0]) continue
+        // The sports plan is the source of truth: never a suggestion of the same modality the day before or
+        // after a real session (two runs in a row only when her plan says so — knee history).
+        if (sameModalityNear(db, date, t.modalities[0])) continue
         const o = overrideFor(db, date, 'weekTemplate', t.id)
         if (o?.cancelled) continue
         const m = modalityOf(db, t.modalities[0])
@@ -1112,6 +1115,12 @@ function travelDayIsFull(db: DB, date: DateKey): boolean {
     if (i.date !== date || tripItemStatus(i) === 'cancelado') return false
     return i.section === 'voo' || /^voo\b/i.test(i.title) || i.schoolImpact === 'dia' || (!!i.time && i.time < '08:00')
   })
+}
+
+/** A real (not cancelled) workout of this modality on the day before or after. */
+function sameModalityNear(db: DB, date: DateKey, modality: string): boolean {
+  const near = new Set([addDays(date, -1), addDays(date, 1)])
+  return db.workouts.some((w) => near.has(w.date) && w.modality === modality && w.status !== 'pulado')
 }
 
 const weekdayOf = (date: DateKey) => new Date(`${date}T12:00:00Z`).getUTCDay()

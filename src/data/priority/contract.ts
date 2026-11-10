@@ -61,6 +61,10 @@ export interface Candidate {
   /** Essential = never dropped by ranking (Luna, sleep, meals, minimum routines). */
   essential?: boolean
   deadline?: DateKey
+  /** What it is about, for the timeline label ("Inglês", "IA", "Fashion Finder"). */
+  subject?: string
+  /** Study candidates: the Learning domain/track a finished block is recorded in (one StudySession). */
+  study?: { domain: string; trackId?: string }
   /** What to open/do when she taps "Começar agora". */
   open?: { kind: 'task' | 'study' | 'route' | 'routine'; id?: ID; to?: string }
 }

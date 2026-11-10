@@ -54,113 +54,115 @@ const home = () =>
     </MemoryRouter>,
   )
 
+const timeline = () => screen.getByLabelText('Linha do tempo')
+const rowOf = (title: string) => [...timeline().querySelectorAll('li')].find((li) => li.textContent?.includes(title))
+const status = () => screen.getByRole('status').textContent ?? ''
+
 describe('check-in do dia', () => {
-  it('shows a compact card on the first open of the day and persists her answers', async () => {
+  it('shows a compact card on the first open of the day, persists her answers and plans the day with them', async () => {
     home()
     const card = screen.getByLabelText('Check-in do dia')
     expect(card.textContent).toContain('Quanto tempo livre tu tem hoje para atividades flexíveis?')
     fireEvent.click(within(card).getByRole('button', { name: '1h' }))
     fireEvent.click(within(card).getByRole('button', { name: 'Baixa' }))
-    fireEvent.change(within(card).getByLabelText('Interesse de hoje'), {
-      target: { value: 'política' },
-    })
+    fireEvent.change(within(card).getByLabelText('Interesse de hoje'), { target: { value: 'política' } })
     fireEvent.click(within(card).getByRole('button', { name: 'Pronto' }))
     const c = checkinOf(getDB(), DATE)!
-    expect(c).toMatchObject({
-      freeMin: 60,
-      energy: 2,
-      interest: 'política',
-      changes: [],
-    })
+    expect(c).toMatchObject({ freeMin: 60, energy: 2, interest: 'política' })
     await flushNow()
     const saved = (await storage.load()) as { dayCheckins: unknown[] }
     expect(saved.dayCheckins).toHaveLength(1)
-    // The card is replaced by the plan.
+    // No second planner: the card leaves and the day's blocks are on the ONE timeline.
     expect(screen.queryByLabelText('Check-in do dia')).toBeNull()
-    expect(screen.getByLabelText('O que faz sentido agora')).toBeTruthy()
+    expect(screen.queryByLabelText('O que faz sentido agora')).toBeNull()
+    expect(c.blocks?.length).toBeGreaterThan(0)
+    expect(rowOf('Enviar proposta')?.textContent).toMatch(/^14:00.*Enviar proposta/)
   })
 
-  it('"Pular" stores skipped and still shows the plan from the calendar', () => {
+  it('"Pular" stores skipped and the timeline still shows the plan from the calendar', () => {
     home()
     fireEvent.click(screen.getByRole('button', { name: 'Pular' }))
     expect(checkinOf(getDB(), DATE)?.skipped).toBe(true)
-    expect(screen.getByLabelText('O que faz sentido agora')).toBeTruthy()
+    expect(rowOf('Enviar proposta')).toBeTruthy()
   })
 })
 
-describe('O que faz sentido fazer agora?', () => {
+describe('uma timeline, um motor', () => {
   beforeEach(() => {
-    actions.create('dayCheckins', {
-      date: DATE,
-      freeMin: 60,
-      energy: 4,
-      changes: [],
-    })
+    actions.create('dayCheckins', { date: DATE, freeMin: 60, energy: 4, changes: [] })
   })
 
-  it('primary with reason, time and slot; essentials, espaço livre, podem esperar collapsed', () => {
+  it('the engine places flexible blocks on the timeline (persisted), labelled and with a time', async () => {
     home()
-    const card = screen.getByLabelText('O que faz sentido agora')
-    const primary = within(card).getByLabelText('Principal')
-    expect(primary.textContent).toContain('Enviar proposta')
-    expect(primary.textContent).toMatch(/~30 min · sugestão 14:00–14:30 · Prazo: vence hoje/)
-    expect(within(card).getByLabelText('Essenciais').textContent).toContain('Dormir às')
-    expect(card.textContent).toMatch(/Espaço livre: \d+ min/)
-    expect(within(card).queryByLabelText('Podem esperar')).toBeNull()
-  })
-
-  it('"Hoje não" logs the change, recomputes and offers a reason field', () => {
-    home()
-    fireEvent.click(screen.getByRole('button', { name: 'Hoje não: Enviar proposta' }))
+    const row = rowOf('Enviar proposta')!
+    expect(row.textContent).toMatch(/^14:00até 14:30TarefaEnviar propostaplanejado$/)
     const c = checkinOf(getDB(), DATE)!
-    expect(c.changes.map((x) => [x.key, x.action])).toEqual([['task:a', 'hoje_nao']])
-    const card = screen.getByLabelText('O que faz sentido agora')
-    expect(within(card).getByLabelText('Principal').textContent).toContain('Revisar slides')
-    fireEvent.change(screen.getByLabelText('Motivo (opcional)'), {
-      target: { value: 'cliente pediu sexta' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Salvar' }))
-    expect(checkinOf(getDB(), DATE)!.changes[0].reason).toBe('cliente pediu sexta')
+    expect(c.blocks?.map((b) => [b.key, b.start, b.end, b.by])).toContainEqual(['task:a', '14:00', '14:30', 'motor'])
+    // Reopening the app shows the same plan (it is stored, not recomputed on render).
+    await flushNow()
+    const saved = (await storage.load()) as { dayCheckins: { blocks?: unknown[] }[] }
+    expect(saved.dayCheckins[0].blocks).toEqual(c.blocks)
   })
 
-  it('"Estou sem energia" and "Tenho mais tempo" change the check-in and are logged', () => {
+  it('Concluir in the block completes the task itself (Tarefas sees it) and the row shows "feito"', () => {
     home()
-    fireEvent.click(screen.getByRole('button', { name: 'Estou sem energia' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Tenho mais tempo' }))
-    const c = checkinOf(getDB(), DATE)!
-    expect(c.energy).toBe(3)
-    expect(c.freeMin).toBe(90)
-    expect(c.changes.map((x) => x.action)).toEqual(['sem_energia', 'mais_tempo'])
-  })
-
-  it('"Já concluí" marks the task done through the task action', () => {
-    home()
-    fireEvent.click(screen.getByRole('button', { name: 'Já concluí: Enviar proposta' }))
+    fireEvent.click(within(rowOf('Enviar proposta')!).getByRole('button'))
+    fireEvent.click(screen.getByRole('button', { name: 'Concluir' }))
     expect(getDB().tasks.find((t) => t.id === 'a')?.status).toBe('done')
+    expect(checkinOf(getDB(), DATE)!.blocks!.find((b) => b.key === 'task:a')?.status).toBe('feito')
+    expect(rowOf('Enviar proposta')?.textContent).toContain('feito')
   })
 
-  it('"Adiar" moves the task to the chosen date', () => {
+  it('Replanejar moves the block to her time; a later replan never moves it', () => {
     home()
-    fireEvent.click(screen.getByRole('button', { name: 'Adiar: Enviar proposta' }))
+    fireEvent.click(within(rowOf('Enviar proposta')!).getByRole('button'))
+    fireEvent.click(screen.getByRole('button', { name: 'Replanejar' }))
+    fireEvent.change(screen.getByLabelText('Início'), { target: { value: '16:00' } })
+    fireEvent.click(screen.getByRole('button', { name: /Salvar 16:00–16:30/ }))
+    expect(checkinOf(getDB(), DATE)!.blocks!.find((b) => b.key === 'task:a')).toMatchObject({ start: '16:00', end: '16:30', by: 'marina' })
+    fireEvent.click(screen.getByRole('button', { name: 'Replanejar o resto' }))
+    expect(checkinOf(getDB(), DATE)!.blocks!.find((b) => b.key === 'task:a')).toMatchObject({ start: '16:00', by: 'marina' })
+  })
+
+  it('"Tenho mais 30 min" has a visible consequence: a new block, or the reason there is none', () => {
+    home()
+    const before = checkinOf(getDB(), DATE)!.blocks!.filter((b) => b.status === 'planejado').length
+    fireEvent.click(screen.getByRole('button', { name: 'Tenho mais 30 min' }))
+    const c = checkinOf(getDB(), DATE)!
+    expect(c.freeMin).toBe(90)
+    expect(c.changes.at(-1)).toMatchObject({ key: 'day', action: 'mais_tempo' })
+    const after = c.blocks!.filter((b) => b.status === 'planejado').length
+    if (after > before) expect(status()).toMatch(/Reorganizei teu planejamento: \+30 min disponíveis e encaixei .+ às \d\d:\d\d/)
+    else expect(status()).toMatch(/mais 30 min de capacidade\. (Não há uma janela|Não encontrei|Teu tempo)/)
+  })
+
+  it('"Estou cansada" lowers the energy and replans without touching fixed commitments', () => {
+    actions.create('events', { title: 'Aula fixa', date: DATE, startTime: '18:00', endTime: '19:00', sourceId: 'cal-local', allDay: false })
+    home()
+    fireEvent.click(screen.getByRole('button', { name: 'Estou cansada' }))
+    expect(checkinOf(getDB(), DATE)!.energy).toBe(3)
+    expect(status()).toMatch(/Energia ajustada.*nada fixo foi mexido/)
+    expect(getDB().events.find((e) => e.title === 'Aula fixa')).toMatchObject({ startTime: '18:00', date: DATE })
+    expect(rowOf('Aula fixa')?.textContent).toMatch(/^18:00/)
+  })
+
+  it('typed commands are applied: "não quero enviar proposta" takes it out and says so', () => {
+    home()
+    fireEvent.change(screen.getByLabelText('Ajustar o dia (texto)'), { target: { value: 'não quero enviar proposta hoje' } })
+    fireEvent.submit(screen.getByLabelText('Ajustar o dia (texto)').closest('form')!)
+    expect(checkinOf(getDB(), DATE)!.interest).toContain('não quero enviar proposta')
+    expect(status()).toMatch(/Anotei/)
+    expect(checkinOf(getDB(), DATE)!.blocks!.some((b) => b.key === 'task:a' && b.status === 'planejado')).toBe(false)
+  })
+
+  it('Adiar (Mais opções) moves the task to the chosen day; Desfazer brings everything back', () => {
+    home()
+    fireEvent.click(within(rowOf('Enviar proposta')!).getByRole('button'))
+    fireEvent.click(screen.getByRole('button', { name: /Mais opções/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Adiar' }))
-    expect(getDB().tasks.find((t) => t.id === 'a')).toMatchObject({
-      date: '2026-11-15',
-      postponedFrom: DATE,
-    })
-  })
-
-  it('"Dividir" creates steps only from her text', () => {
-    home()
-    fireEvent.click(screen.getByRole('button', { name: 'Dividir: Enviar proposta' }))
-    fireEvent.change(screen.getByLabelText('Etapas'), {
-      target: { value: 'rascunho\nrevisar' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Criar etapas' }))
-    expect(
-      getDB()
-        .tasks.filter((t) => t.origin?.id === 'a')
-        .map((t) => t.title),
-    ).toEqual(['Etapa 1/2: rascunho', 'Etapa 2/2: revisar'])
+    fireEvent.change(screen.getByLabelText('Adiar para'), { target: { value: '2026-11-20' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Adiar para 20/11' }))
+    expect(getDB().tasks.find((t) => t.id === 'a')?.date).toBe('2026-11-20')
   })
 })
 

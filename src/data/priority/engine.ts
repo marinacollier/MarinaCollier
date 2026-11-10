@@ -21,8 +21,8 @@
  *   "quero descansar" → no study, nothing extra beyond a real must, rest proposed explicitly.
  */
 import type { CalendarEntry } from '../calendar/universal'
-import { diffDays, hmToMinutes, minutesToHM } from '@/lib/date'
-import type { DB, Task } from '../types'
+import { addDays, diffDays, hmToMinutes, minutesToHM } from '@/lib/date'
+import type { DateKey, DB, Task } from '../types'
 import type { Candidate, DayContext, Energy, MoSCoW } from './contract'
 import { energyFactor, type CapacityWindow } from './capacity'
 import { essentialsFor, gatherCandidates, type RawCandidate } from './sources'
@@ -123,7 +123,7 @@ export function interestOf(text: string | undefined): Interest {
 const isStudy = (c: Candidate) => c.key.startsWith('study:') || c.open?.kind === 'study'
 const matches = (c: Candidate, list: string[]) => {
   if (!list.length) return false
-  const hay = fold(`${c.title} ${c.area} ${c.key} ${(c.contributesTo ?? []).join(' ')}`)
+  const hay = fold(`${c.title} ${c.area} ${c.key} ${c.subject ?? ''} ${(c.contributesTo ?? []).join(' ')}`)
   return list.some((w) => hay.includes(w))
 }
 
@@ -266,7 +266,25 @@ export function rankCandidates(db: DB, ctx: DayContext, entries?: CalendarEntry[
       reasons: [m.why, ...s.reasons, ...pre],
     }
   })
-  return out.sort((a, b) => BAND[a.moscow] - BAND[b.moscow] || b.score - a.score || a.key.localeCompare(b.key))
+  return out.map((c) => withHistory(db, c, ctx.date)).sort((a, b) => BAND[a.moscow] - BAND[b.moscow] || b.score - a.score || a.key.localeCompare(b.key))
+}
+
+/**
+ * Learns from her decisions, gently: something she took out of her day (hoje não · trocar · adiar) on 2+
+ * different days in the last 14 sinks a little, with the reason shown. One single decision never changes
+ * anything, and a must (deadline, real commitment) never sinks below its band.
+ */
+export const HISTORY = { days: 14, minDays: 2, penalty: 15 } as const
+function withHistory(db: DB, c: Candidate, date: DateKey): Candidate {
+  const from = addDays(date, -HISTORY.days)
+  const days = new Set(
+    (db.dayCheckins ?? [])
+      .filter((d) => d.date >= from && d.date < date)
+      .filter((d) => d.changes.some((ch) => ch.key === c.key && (ch.action === 'hoje_nao' || ch.action === 'trocar' || ch.action === 'adiar')))
+      .map((d) => d.date),
+  )
+  if (days.size < HISTORY.minDays) return c
+  return { ...c, score: Math.max(0, c.score - HISTORY.penalty), reasons: [...c.reasons, `Tu tiraste isso do dia ${days.size}× nas últimas 2 semanas — fica mais abaixo (−${HISTORY.penalty})`] }
 }
 
 // ─── Plan ───────────────────────────────────────────────────────────────────

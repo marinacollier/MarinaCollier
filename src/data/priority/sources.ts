@@ -114,6 +114,7 @@ export function taskCandidates(db: DB, ctx: DayContext): RawCandidate[] {
       nextStep: t.nextStep,
       deadline: t.dueDate,
       contributesTo: [...(t.goalIds ?? []), ...(t.goalId ? [t.goalId] : []), ...(t.projectId ? [t.projectId] : [])],
+      subject: t.projectId ? projects.get(t.projectId)?.name : undefined,
       open: { kind: 'task', id: t.id },
       task: t,
       reasons: m.estimated ? ['Tempo estimado (sem duração definida)'] : [],
