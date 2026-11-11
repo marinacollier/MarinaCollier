@@ -18,6 +18,8 @@ describe('fixo × flexível', () => {
   it('meetings/classes/flights are fixed; tasks, studies and flexible plans are not', () => {
     expect(fixityOf(DAY[0])).toBe('fixo')
     expect(fixityOf(DAY[1])).toBe('flexivel')
+    expect(fixityOf(ev('Estudar - Marina OS definir o que', '19:00', '20:00'))).toBe('flexivel')
+    expect(fixityOf(ev('Prova da faculdade', '09:00', '10:00'))).toBe('fixo')
     expect(fixityOf(ev('Tarefa', '10:00', undefined, { sourceType: 'task' }))).toBe('flexivel')
     expect(fixityOf(ev('Aula', '09:00', '15:10', { sourceType: 'school' }))).toBe('fixo')
     expect(fixityOf(ev('Robben', '09:00', undefined, { sourceType: 'tripItem', status: 'planejado' }))).toBe('flexivel')

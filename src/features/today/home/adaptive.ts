@@ -16,6 +16,7 @@ import { normalize } from '@/lib/text'
 export type Fixity = 'fixo' | 'flexivel' | 'rotina'
 
 const FIXED_SOURCES = new Set(['event', 'school', 'meeting', 'tripItem'])
+const STUDY_BLOCK = /^(estudar|estudo|revisar|revisao|leitura|ler|treino|treinar)\b/
 const BOOKED = /\b(reservad|confirmad|emitid|pago|voo|flight)/
 
 /** What kind of line this is for the reorganizer. */
@@ -23,6 +24,8 @@ export function fixityOf(e: CalendarEntry): Fixity {
   if (e.sourceType === 'dayBlock' || e.base) return 'rotina'
   if (e.flexible || e.suggested || e.optional || e.light || e.approx) return 'flexivel'
   if (!FIXED_SOURCES.has(e.sourceType)) return 'flexivel'
+  // A study/reading/training block she put on the calendar is hers to slide ("Estudar - Marina OS"); an exam is not.
+  if (e.sourceType === 'event' && STUDY_BLOCK.test(normalize(e.title))) return 'flexivel'
   if (e.sourceType === 'tripItem') {
     const words = normalize(`${e.statusLabel ?? ''} ${e.status} ${e.title}`)
     return e.status === 'confirmado' || BOOKED.test(words) ? 'fixo' : 'flexivel'
