@@ -224,7 +224,7 @@ export function DayBlock({
                   key={`r:${it.r.id}`}
                   label={`${it.r.name}: ${it.r.done} de ${it.r.total}`}
                   left={<TimeCell time={it.r.time} />}
-                  kind="Rotina"
+                  kind={it.r.note ? `Rotina · ${it.r.note}` : 'Rotina'}
                   title={`${it.r.emoji ? `${it.r.emoji} ` : ''}${it.r.name}`}
                   chip={it.r.total && it.r.done >= it.r.total ? 'feito' : `${it.r.done}/${it.r.total}`}
                   muted={routineComplete(it.r)}

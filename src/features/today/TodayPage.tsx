@@ -12,7 +12,9 @@
  * entregas, conflitos) and the expedition day live on the trip page (Hoje); the full day list, checks and
  * priorities in Agenda / Tarefas; Lumos with voice and attachments on /lumos.
  */
+import { routineItemsFor } from '@/data/selectors'
 import { GcalHomeAlert } from '@/features/integrations/GcalStatus'
+import { eveningPlan, fixedSignature, isAdaptiveRoutine } from './home/adaptive'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -32,7 +34,7 @@ import { travelTripOn } from '@/data/travel-mode'
 import { activeDay } from './local-day'
 import { checkinOf } from './home/day-checkin'
 import { DayCheckinCard, DayReviewCard, showReview } from './home/DayPlanCards'
-import { applyModeOf, applyProposal, blockRows } from './home/allocation'
+import { applyModeOf, applyProposal, blockRows, replanRest } from './home/allocation'
 import { BlockSheet, DayAssist, parseAdjust, runAdjust } from './home/DayAssist'
 import { canComplete, canPostpone, isRowDone, postponeRow, toggleDone, type RowResult, type RowTarget } from './home/row-actions'
 import { backlogOf } from './home/backlog'
@@ -109,17 +111,42 @@ export default function TodayPage() {
     const r = applyProposal(day, local.minutes, cal.entries)
     if (r.changed && r.undo) toast(r.message, { action: { label: 'Desfazer', run: r.undo } })
   }, [mode, day, dayCheckin?.blocks, cal.entries, local.minutes])
+  // Contextual replanning (auto mode): when a FIXED commitment of today changes (added, cancelled, moved, done),
+  // the engine's flexible blocks are recalculated — never a fixed one — and it says so, with Desfazer.
+  const fixedSig = useMemo(() => fixedSignature(cal.entries, day), [cal.entries, day])
+  const lastSig = useRef<{ day: DateKey; sig: string } | undefined>(undefined)
+  useEffect(() => {
+    const prev = lastSig.current
+    lastSig.current = { day, sig: fixedSig }
+    if (!prev || prev.day !== day || prev.sig === fixedSig || mode !== 'auto' || dayCheckin?.blocks === undefined) return
+    const r = replanRest(day, local.minutes, cal.entries)
+    if (r.changed) toast(`A agenda mudou — reorganizei o resto do dia: ${r.message}`, r.undo ? { action: { label: 'Desfazer', run: r.undo } } : {})
+  }, [fixedSig, day, mode, dayCheckin?.blocks, local.minutes, cal.entries])
   const timeline = useMemo<TLItem[]>(() => {
     const out: TLItem[] = hoje.map((e) => ({ kind: 'entry', time: e.startAt.time ?? '', e }))
     for (const b of blocks.rows) out.push({ kind: 'block', time: b.start, b, label: blockLabel(db, b.key, b.c) })
-    for (const r of rituals) out.push({ kind: 'routine', time: r.time ?? '99:99', r })
-    for (const q of dayBlocksOn(db, day)) {
-      if (q.kind === 'base' && (q.category === 'almoco' || q.category === 'descanso')) out.push({ kind: 'quiet', time: q.start, title: q.title, onOpen: () => navigate(ROUTES.routineSettings) })
-    }
+    // Adaptive evening: the closing routine (and sleep) follow the LAST fixed commitment, said out loud.
+    const closing = rituals.find((r) => isAdaptiveRoutine(r.name) && r.time)
+    const closingMin = closing ? routineItemsFor(db, closing.id, day).reduce((s, i) => s + (i.durationMin ?? 0), 0) || 30 : 30
     const sleep = db.profile.rhythm?.sleepTime
-    if (sleep) out.push({ kind: 'quiet', time: sleep, title: 'Dormir', onOpen: () => navigate(ROUTES.routineSettings) })
+    const evening = eveningPlan(cal.entries, day, { closingAt: closing?.time, closingMin, sleepAt: sleep, wakeAt: db.profile.rhythm?.wakeTime })
+    for (const r of rituals) {
+      const shift = r.id === closing?.id ? evening.closing : undefined
+      out.push({ kind: 'routine', time: shift?.to ?? r.time ?? '99:99', r: shift ? { ...r, time: shift.to, note: `era ${shift.from} · ${shift.reason}` } : r })
+    }
+    for (const q of dayBlocksOn(db, day)) {
+      if (q.kind !== 'base' || (q.category !== 'almoco' && q.category !== 'descanso')) continue
+      // "Desacelerar" before a later commitment slides with the closing routine instead of overlapping it.
+      const slid = q.category === 'descanso' && evening.closing && q.start < evening.closing.to ? evening.closing.to : undefined
+      out.push({ kind: 'quiet', time: slid ?? q.start, title: slid ? `${q.title} · era ${q.start}` : q.title, onOpen: () => navigate(ROUTES.routineSettings) })
+    }
+    if (sleep) {
+      const s = evening.sleep
+      const title = s ? `Dormir · era ${s.from}${s.tight ? ` — sono curto (${String(s.hours).replace('.', ',')} h)` : ''}` : 'Dormir'
+      out.push({ kind: 'quiet', time: s?.to ?? sleep, title, onOpen: () => navigate(ROUTES.routineSettings) })
+    }
     return out.sort((a, b) => a.time.localeCompare(b.time))
-  }, [hoje, blocks.rows, rituals, db, day, navigate])
+  }, [hoje, blocks.rows, rituals, db, day, navigate, cal.entries])
   // Amanhã: commitments + what the engine WOULD place (suggestions only — nothing is written for tomorrow).
   const tomorrowItems = useMemo<TLItem[]>(() => {
     const out: TLItem[] = amanha.map((e) => ({ kind: 'entry', time: e.startAt.time ?? '', e }))

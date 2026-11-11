@@ -110,7 +110,7 @@ export function DayAssist({ date, nowMin, entries, rows, onAsk }: { date: DateKe
           Estou cansada
         </button>
         <button type="button" className={chip} onClick={() => run(replanRest(date, nowMin, entries))}>
-          Replanejar o resto
+          Reorganizar meu dia
         </button>
       </div>
       <form onSubmit={submit} className="mt-2">

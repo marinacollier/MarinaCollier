@@ -318,6 +318,8 @@ export interface RoutineRow {
   time?: string
   done: number
   total: number
+  /** Why its time is not the usual one today ("era 21:00 · depois de Entrevista (até 22:15)"). */
+  note?: string
 }
 
 /** Her rituals of the day, with how much is ticked — one line each on Home. */

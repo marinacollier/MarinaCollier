@@ -1,7 +1,7 @@
 /** Home · check-in do dia → "O que faz sentido fazer agora?" (persistence, render, actions recompute, review). */
 import 'fake-indexeddb/auto'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { actions, flushNow, getDB, hydrate } from '@/data/store'
 import { createMemoryAdapter } from '@/data/storage'
@@ -106,6 +106,31 @@ describe('uma timeline, um motor', () => {
     expect(saved.dayCheckins[0].blocks).toEqual(c.blocks)
   })
 
+  it('replanejamento contextual: a meeting added on top of a planned task moves the task (not the meeting), with Desfazer', () => {
+    home()
+    expect(checkinOf(getDB(), DATE)!.blocks!.find((b) => b.key === 'task:a')?.start).toBe('14:00')
+    act(() => {
+      actions.create('events', { title: 'Reunião nova', date: DATE, startTime: '14:00', endTime: '15:00', allDay: false } as never)
+    })
+    const moved = checkinOf(getDB(), DATE)!.blocks!.find((b) => b.key === 'task:a' && b.status === 'planejado')
+    expect(moved?.start).not.toBe('14:00')
+    expect(getDB().events.find((e) => e.title === 'Reunião nova')?.startTime).toBe('14:00')
+    expect(lineText(rowOf('Reunião nova'))).toContain('14:00')
+  })
+
+  it('encerramento inteligente: "Encerrar o dia" goes after a later meeting, and says why', () => {
+    act(() => {
+      actions.create('routines', { id: 'enc', name: 'Encerrar o dia', period: 'noite', order: 1, active: true, startTime: '21:00' } as never)
+      actions.create('routineItems', { routineId: 'enc', title: 'Desacelerar', order: 0, active: true, recurrence: { kind: 'daily' }, durationMin: 30 } as never)
+      actions.create('events', { title: 'Entrevista Técnica', date: DATE, startTime: '21:30', endTime: '22:15', allDay: false } as never)
+    })
+    home()
+    const row = rowOf('Encerrar o dia')!
+    expect(lineText(row)).toContain('22:15')
+    expect(lineText(row)).toMatch(/era 21:00/i)
+    expect(lineText(row)).toMatch(/depois de Entrevista Técnica/i)
+  })
+
   it('Concluir in the block completes the task itself (Tarefas sees it) and the row shows "feito"', () => {
     home()
     fireEvent.click(within(rowOf('Enviar proposta')!).getAllByRole('button')[0])
@@ -122,7 +147,7 @@ describe('uma timeline, um motor', () => {
     fireEvent.change(screen.getByLabelText('Início'), { target: { value: '16:00' } })
     fireEvent.click(screen.getByRole('button', { name: /Salvar 16:00–16:30/ }))
     expect(checkinOf(getDB(), DATE)!.blocks!.find((b) => b.key === 'task:a')).toMatchObject({ start: '16:00', end: '16:30', by: 'marina' })
-    fireEvent.click(screen.getByRole('button', { name: 'Replanejar o resto' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Reorganizar meu dia' }))
     expect(checkinOf(getDB(), DATE)!.blocks!.find((b) => b.key === 'task:a')).toMatchObject({ start: '16:00', by: 'marina' })
   })
 
