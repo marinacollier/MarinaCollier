@@ -40,7 +40,7 @@ import { canComplete, canPostpone, isRowDone, postponeRow, toggleDone, type RowR
 import { backlogOf } from './home/backlog'
 import { BacklogPanel } from './home/BacklogPanel'
 import { dayBlocksOn } from '@/data/routine-modes'
-import { toast } from '@/app/ui-store'
+import { dismissToast, toast, useUI } from '@/app/ui-store'
 import { EntryDetail } from '@/features/agenda/calendar/EntryDetail'
 import { useCalendar, useEntry } from '@/features/agenda/calendar/model'
 import { homeContext } from './context'
@@ -120,7 +120,14 @@ export default function TodayPage() {
     lastSig.current = { day, sig: fixedSig }
     if (!prev || prev.day !== day || prev.sig === fixedSig || mode !== 'auto' || dayCheckin?.blocks === undefined) return
     const r = replanRest(day, local.minutes, cal.entries)
-    if (r.changed) toast(`A agenda mudou — reorganizei o resto do dia: ${r.message}`, r.undo ? { action: { label: 'Desfazer', run: r.undo } } : {})
+    if (!r.changed) return
+    // Right after her own action (which already offers Desfazer), ONE toast undoes both — hers is never hidden.
+    const mine = useUI.getState().toasts.at(-1)
+    if (mine?.action) {
+      dismissToast(mine.id)
+      const own = mine.action.run
+      toast(`${mine.message} · o resto do dia foi reorganizado`, { action: { label: mine.action.label, run: () => (r.undo?.(), own()) } })
+    } else toast(`A agenda mudou — ${r.message}`, r.undo ? { action: { label: 'Desfazer', run: r.undo } } : {})
   }, [fixedSig, day, mode, dayCheckin?.blocks, local.minutes, cal.entries])
   const timeline = useMemo<TLItem[]>(() => {
     const out: TLItem[] = hoje.map((e) => ({ kind: 'entry', time: e.startAt.time ?? '', e }))

@@ -117,13 +117,14 @@ export function eveningPlan(entries: CalendarEntry[], date: string, p: { closing
 }
 
 /**
- * Fingerprint of the day's FIXED commitments (what, when, state). When it changes — a meeting added, cancelled,
- * moved or done — the flexible plan around it is recalculated; flexible and routine lines do not count.
+ * Fingerprint of the day's FIXED commitments (what and when). When it changes — a meeting added, cancelled (it
+ * leaves the day) or moved — the flexible plan around it is recalculated. Marking one done/absent is not a change of
+ * the agenda (her own action already has its Desfazer); flexible and routine lines do not count.
  */
 export function fixedSignature(entries: CalendarEntry[], date: string): string {
   return entries
-    .filter((e) => e.startAt.date === date && !e.allDay && !!e.startAt.time && fixityOf(e) === 'fixo')
-    .map((e) => `${e.id}@${e.startAt.time}-${e.endAt?.time ?? ''}:${e.status}`)
+    .filter((e) => e.startAt.date === date && !e.allDay && !!e.startAt.time && e.status !== 'cancelado' && fixityOf(e) === 'fixo')
+    .map((e) => `${e.id}@${e.startAt.time}-${e.endAt?.time ?? ''}`)
     .sort()
     .join('|')
 }
