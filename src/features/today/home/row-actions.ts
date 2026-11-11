@@ -16,8 +16,10 @@ import { occurrenceFor } from '@/lib/recurrence'
 import { isTaskDoneOn } from '@/data/selectors'
 import { setTaskDone } from '@/features/tasks/ops'
 import { bookingStatusOf, bookingStatusPatch } from '@/features/travel/expedition/command'
-import { markDone, moveEntry, patchWithUndo, quickSource } from '@/features/agenda/calendar/quick'
-import { completeBlock, dropBlock, type BlockRow } from './allocation'
+import { canMove, markDone, moveEntry, patchWithUndo, quickSource } from '@/features/agenda/calendar/quick'
+import { setTimeOn } from '@/data/schedule'
+import { completeBlock, dropBlock, moveBlock, type BlockRow } from './allocation'
+import type { DropSlot } from './drag'
 import { checkinOf, postpone, saveDayCheckin } from './day-checkin'
 import type { LooseRow } from './clean'
 
@@ -150,4 +152,57 @@ export function postponeRow(t: RowTarget): RowResult {
 export function canPostpone(t: RowTarget): boolean {
   if (t.kind !== 'entry') return true
   return !['school', 'meeting'].includes(t.e.sourceType) && !t.e.absent
+}
+
+// ─── Arrastar (mudar o horário no mesmo dia) ────────────────────────────────
+
+/**
+ * What dropping a line at a new time does:
+ *  - move: hers to move → `run()` writes it (with undo);
+ *  - confirm: a fixed commitment (a booking, a flight, a meeting) → only after "mover mesmo assim";
+ *  - blocked: can't be moved from here (Google is read-only here, a class follows the school) → a sentence, nothing written.
+ */
+export type MovePlan = { kind: 'move'; run: () => RowResult } | { kind: 'confirm'; message: string; run: () => RowResult } | { kind: 'blocked'; message: string }
+
+export const GOOGLE_READ_ONLY = 'Evento do Google Calendar: mude no Google — aqui atualiza sozinho.'
+export const FIXED_CONFIRM = 'É uma reserva/compromisso fixo — mover mesmo assim?'
+const CANT_MOVE = 'Esse item não pode ser movido por aqui.'
+const FIXED_SECTIONS = new Set(['voo', 'hospedagem'])
+
+export function planMove(t: Exclude<RowTarget, { kind: 'loose' }>, slot: DropSlot): MovePlan {
+  const say = (title: string, undo: () => void): RowResult => ({ message: `${title} → ${slot.start}`, undo })
+  if (t.kind === 'block') {
+    const b = t.b
+    return { kind: 'move', run: () => say(b.title, moveBlock(t.date, b, slot.start, b.minutes).undo ?? (() => {})) }
+  }
+  const e = t.e
+  if (!e.startAt.time || e.allDay) return { kind: 'blocked', message: 'Esse item não tem horário para mudar.' }
+  if (e.masked) return { kind: 'blocked', message: CANT_MOVE }
+  const db = getDB()
+  if (e.sourceType === 'event') {
+    const rec = db.events.find((x) => x.id === e.sourceId)
+    const src = rec && db.calendarSources.find((s) => s.id === rec.sourceId)
+    if (!rec || rec.external || (src && src.provider !== 'local')) return { kind: 'blocked', message: GOOGLE_READ_ONLY }
+    // Recurring: only that day changes (an override); the rule keeps its time.
+    if (rec.recurrence) return { kind: 'move', run: () => say(e.title, setTimeOn(t.date, { type: 'event', id: rec.id }, slot.start)) }
+  }
+  if (e.sourceType === 'school') return { kind: 'blocked', message: 'Aula segue o horário da escola — se mudou, ajuste na escola da viagem.' }
+  // Tasks and workouts: the schedule engine (a one-off record gets its time; a recurring one, that day only).
+  if (e.sourceType === 'task') return { kind: 'move', run: () => say(e.title, setTimeOn(t.date, { type: 'task', id: e.sourceId }, slot.start)) }
+  if (e.sourceType === 'workout') {
+    const ref = e.sourceId.startsWith('template:') ? ({ type: 'weekTemplate', id: e.sourceId.split(':')[1] } as const) : ({ type: 'workout', id: e.sourceId } as const)
+    return { kind: 'move', run: () => say(e.title, setTimeOn(t.date, ref, slot.start)) }
+  }
+  const src = quickSource(db, e)
+  if (!src) return { kind: 'blocked', message: CANT_MOVE }
+  if (src.key === 'tripItems') {
+    const i = src.rec
+    const fixed = FIXED_SECTIONS.has(i.section) || BOOKED.has(bookingStatusOf(i)) || BOOKED.has(i.bookingStatus ?? '') || i.paymentStatus === 'pago'
+    // A stay spans days: only its check-in time changes (the check-out stays as it is).
+    const run = i.section === 'hospedagem' ? () => say(e.title, patchWithUndo('tripItems', i.id, { time: slot.start })) : () => say(e.title, moveEntry(src, t.date, slot.start))
+    return fixed ? { kind: 'confirm', message: FIXED_CONFIRM, run } : { kind: 'move', run }
+  }
+  if (!canMove(src)) return { kind: 'blocked', message: CANT_MOVE }
+  const run = () => say(e.title, moveEntry(src, t.date, slot.start))
+  return src.key === 'meetings' ? { kind: 'confirm', message: FIXED_CONFIRM, run } : { kind: 'move', run }
 }

@@ -84,7 +84,7 @@ describe('Home limpa em viagem (Cape Town, 06/11)', () => {
     // Timed lines only ("Sem horário" lists the day's untimed things below, without a made-up time).
     // Commitment lines (time + quiet category word + title); planned blocks/rituals carry their own aria-label.
     const rows = [...hoje.querySelectorAll('li')].filter((li) => !li.closest('[aria-label="Sem horário"]') && !li.querySelector('button')?.getAttribute('aria-label')).map((li) => li.querySelector('button')?.textContent ?? '')
-    expect(rows.some((r) => /^09:00CompromissoAula · Bayswater Cape Town/.test(r))).toBe(true)
+    expect(rows.some((r) => /^09:00Compromisso( · fixo)?Aula · Bayswater Cape Town/.test(r))).toBe(true)
     const times = rows.map((r) => r.match(/^(\d\d:\d\d|dia todo)/)?.[1])
     expect(times.every(Boolean)).toBe(true)
     const timed = times.filter((t) => t !== 'dia todo')

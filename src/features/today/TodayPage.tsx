@@ -47,8 +47,9 @@ import { homeContext } from './context'
 import { LumosSheet, lumosHref, type LumosRequest } from './home/lumos'
 import { useMarkSeenOnLeave } from './home/seen'
 import { homeTripOps } from './home/trip-ops'
+import { routineComplete } from './home/clean'
 import { blockLabel, flightName, headerDate, inDays, lifeNeeds, looseRows, nextDays, NEEDS_MAX, routineRows, shortMoney, stayPlace, timedRows, tripNeeds, type LooseRow, type Need } from './home/clean'
-import { ConflictList, CrmLine, DayBlock, type LineAct, LumosLine, PrecisaList, ProximosList, RoutineChecklist, TripChips, type TLBlock, type TLItem } from './home/CleanBlocks'
+import { ConflictList, CrmLine, DayBlock, type LineAct, LumosLine, moveOnTimeline, PrecisaList, ProximosList, RoutineChecklist, TripChips, type TLBlock, type TLItem } from './home/CleanBlocks'
 import { crmPulse } from '@/data/ugc/model'
 
 /** A trip shows on Home (outside it) only when it's really close. */
@@ -145,7 +146,7 @@ export default function TodayPage() {
       if (q.kind !== 'base' || (q.category !== 'almoco' && q.category !== 'descanso')) continue
       // "Desacelerar" before a later commitment slides with the closing routine instead of overlapping it.
       const slid = q.category === 'descanso' && evening.closing && q.start < evening.closing.to ? evening.closing.to : undefined
-      out.push({ kind: 'quiet', time: slid ?? q.start, title: slid ? `${q.title} · era ${q.start}` : q.title, onOpen: () => navigate(ROUTES.routineSettings) })
+      out.push({ kind: 'quiet', time: slid ?? q.start, end: slid ? undefined : q.end, title: slid ? `${q.title} · era ${q.start}` : q.title, onOpen: () => navigate(ROUTES.routineSettings) })
     }
     if (sleep) {
       const s = evening.sleep
@@ -154,6 +155,18 @@ export default function TodayPage() {
     }
     return out.sort((a, b) => a.time.localeCompare(b.time))
   }, [hoje, blocks.rows, rituals, db, day, navigate, cal.entries])
+  // Done lines that are already behind her fold away (still one tap to see) — the day reads as what is left.
+  const [showDone, setShowDone] = useState(false)
+  const pastDone = useCallback(
+    (it: TLItem): boolean => {
+      const end = it.kind === 'entry' ? (it.e.endAt?.time ?? it.e.startAt.time) : it.kind === 'block' ? it.b.end : it.kind === 'routine' ? it.r.time : undefined
+      const done = it.kind === 'entry' ? it.e.status === 'feito' : it.kind === 'block' ? it.b.state === 'feito' : it.kind === 'routine' ? routineComplete(it.r) : false
+      return done && !!end && hmToMinutes(end) <= local.minutes
+    },
+    [local.minutes],
+  )
+  const doneHidden = useMemo(() => timeline.filter(pastDone).length, [timeline, pastDone])
+  const timelineShown = useMemo(() => (showDone ? timeline : timeline.filter((it) => !pastDone(it))), [timeline, showDone, pastDone])
   // Amanhã: commitments + what the engine WOULD place (suggestions only — nothing is written for tomorrow).
   const tomorrowItems = useMemo<TLItem[]>(() => {
     const out: TLItem[] = amanha.map((e) => ({ kind: 'entry', time: e.startAt.time ?? '', e }))
@@ -287,7 +300,12 @@ export default function TodayPage() {
 
       <motion.div {...rise(1)} className="mt-7">
         <GcalHomeAlert />
-        <DayBlock label="01 / Dia" title="Hoje" rows={hoje} loose={hojeLoose} onOpen={(e) => openEntry(e, day)} onLoose={openLoose} conflicts={conflictsByDay.get(day) ?? 0} conflictIds={conflictIds} onConflicts={() => setShowConflicts(day)} items={timeline} actOf={actOf(day)} onBlock={(b) => (setBlockDay(day), setBlockOpen(b))} onRoutine={setRoutineOpen} />
+        <DayBlock label="01 / Dia" title="Hoje" rows={hoje} loose={hojeLoose} onOpen={(e) => openEntry(e, day)} onLoose={openLoose} conflicts={conflictsByDay.get(day) ?? 0} conflictIds={conflictIds} onConflicts={() => setShowConflicts(day)} items={timelineShown} actOf={actOf(day)} onMove={moveOnTimeline(day)} onBlock={(b) => (setBlockDay(day), setBlockOpen(b))} onRoutine={setRoutineOpen} />
+        {doneHidden > 0 && (
+          <button type="button" onClick={() => setShowDone((v) => !v)} aria-expanded={showDone} className="mt-1 h-9 text-[12.5px] text-muted active:opacity-70">
+            {showDone ? 'Recolher concluídos' : `✓ ${doneHidden} ${doneHidden === 1 ? 'concluído' : 'concluídos'} · mostrar`}
+          </button>
+        )}
         <DayAssist date={day} nowMin={local.minutes} entries={cal.entries} rows={blocks.rows} onAsk={ask} />
         <BacklogPanel items={backlog} today={day} onOpen={(id) => openSheet('task', { id })} />
       </motion.div>

@@ -2,7 +2,7 @@
  * Home limpa — the blocks Home is made of (picks in ./clean.ts). Every row is ONE line; tapping opens the
  * existing detail (the Agenda's entry detail, the booking sheet, the quick-edit sheet) where the full text lives.
  */
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useId, useMemo, useRef, useState, type FormEvent, type LiHTMLAttributes, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowUp, ChevronRight, Redo2, TriangleAlert } from 'lucide-react'
 import { SwipeRow } from '@/components/ui/SwipeRow'
@@ -11,12 +11,20 @@ import { useDB } from '@/data/store'
 import type { DateKey } from '@/data/types'
 import { cn } from '@/lib/cn'
 import { haptic } from '@/lib/haptics'
+import { fixityOf } from './adaptive'
 import { chipTone, dayHeader, entryChip, entryLabel, rowTime, shortTitle, type ChipTone, type LooseRow, type Need, type NextDay, type RoutineRow, routineComplete } from './clean'
 import type { BlockRow } from './allocation'
 import { actions } from '@/data/store'
 import { routineItemsFor } from '@/data/selectors'
 import { occurrenceFor } from '@/lib/recurrence'
 import { Check } from 'lucide-react'
+import { AnimatePresence } from 'framer-motion'
+import { SheetFrame } from '@/components/ui/Sheet'
+import { Button } from '@/components/ui/Button'
+import { toast } from '@/app/ui-store'
+import { dropTime, type DragRow, type DropSlot } from './drag'
+import { useLongPressDrag } from './useLongPressDrag'
+import { planMove, type MovePlan, type RowResult } from './row-actions'
 
 /** Section header on Home: small olive label ("01 / Agora") over a Bodoni title — the site's pattern. */
 export function Eyebrow({ children, label, action }: { children: ReactNode; label?: ReactNode; action?: ReactNode }) {
@@ -56,7 +64,9 @@ export interface LineAct {
   onPostpone?: () => void
 }
 
-function OneLine({ left, title, chip, onOpen, muted, label, conflict, kind, quiet, act }: { left?: ReactNode; title: string; chip?: string; onOpen: () => void; muted?: boolean; label?: string; conflict?: boolean; kind?: string; quiet?: boolean; act?: LineAct }) {
+type LiProps = LiHTMLAttributes<HTMLLIElement> & { 'data-drag-index'?: number }
+
+function OneLine({ left, title, chip, onOpen, muted, label, conflict, kind, quiet, act, hint, li }: { left?: ReactNode; title: string; chip?: string; onOpen: () => void; muted?: boolean; label?: string; conflict?: boolean; kind?: string; quiet?: boolean; act?: LineAct; hint?: string; li?: LiProps }) {
   const row = (
     <div className="flex items-center gap-2">
       <button
@@ -66,6 +76,7 @@ function OneLine({ left, title, chip, onOpen, muted, label, conflict, kind, quie
           onOpen()
         }}
         aria-label={label}
+        aria-describedby={hint}
         className="flex-1 min-w-0 min-h-11 flex items-center gap-3 text-left active:opacity-70"
       >
         {left}
@@ -92,9 +103,9 @@ function OneLine({ left, title, chip, onOpen, muted, label, conflict, kind, quie
       )}
     </div>
   )
-  if (!act) return <li>{row}</li>
+  if (!act) return <li {...li}>{row}</li>
   return (
-    <li>
+    <li {...li}>
       <SwipeRow onComplete={act.onDone} onDelete={act.onPostpone} completeLabel={act.done ? 'Desfazer' : 'Concluir'} deleteLabel="Amanhã" deleteIcon={<Redo2 size={18} aria-hidden />} className="rounded-none">
         {row}
       </SwipeRow>
@@ -102,7 +113,7 @@ function OneLine({ left, title, chip, onOpen, muted, label, conflict, kind, quie
   )
 }
 
-function EntryLine({ e, onOpen, conflict, act }: { e: CalendarEntry; onOpen: (e: CalendarEntry) => void; conflict?: boolean; act?: LineAct }) {
+function EntryLine({ e, onOpen, conflict, act, hint, li }: { e: CalendarEntry; onOpen: (e: CalendarEntry) => void; conflict?: boolean; act?: LineAct; hint?: string; li?: LiProps }) {
   const db = useDB()
   const chip = entryChip(db, e)
   const kind = entryLabel(db, e)
@@ -119,8 +130,10 @@ function EntryLine({ e, onOpen, conflict, act }: { e: CalendarEntry; onOpen: (e:
       chip={chip}
       muted={e.status === 'feito' || e.status === 'cancelado'}
       conflict={conflict}
-      kind={kind}
+      kind={!e.allDay && e.startAt.time && e.status !== 'feito' && fixityOf(e) === 'fixo' ? `${kind} · fixo` : kind}
       act={act}
+      hint={hint}
+      li={li}
       onOpen={() => onOpen(e)}
     />
   )
@@ -166,6 +179,7 @@ export function DayBlock({
   onBlock,
   onRoutine,
   actOf,
+  onMove,
 }: {
   label: string
   title: string
@@ -185,6 +199,8 @@ export function DayBlock({
   onRoutine?: (id: string) => void
   /** One-tap actions per line (concluir / adiar). */
   actOf?: (it: TLItem | { kind: 'loose'; r: LooseRow }) => LineAct | undefined
+  /** Long-press + drag a timed line to another time (Hoje). See `moveOnTimeline`. */
+  onMove?: TimelineMove
 }) {
   return (
     <section aria-label={title}>
@@ -203,38 +219,7 @@ export function DayBlock({
       </Eyebrow>
       {items ? (
         items.length ? (
-          <ul className="divide-y divide-line/60" aria-label="Linha do tempo">
-            {items.map((it) =>
-              it.kind === 'entry' ? (
-                <EntryLine key={it.e.id} e={it.e} onOpen={onOpen} conflict={conflictIds?.has(it.e.id)} act={actOf?.(it)} />
-              ) : it.kind === 'block' ? (
-                <OneLine
-                  key={`b:${it.b.key}`}
-                  label={`${it.label}: ${it.b.title}, ${it.b.start}–${it.b.end}`}
-                  left={<TimeCell time={it.b.start} end={it.b.end} />}
-                  kind={it.label}
-                  title={shortTitle(it.b.title, 60)}
-                  chip={it.b.state === 'feito' ? 'feito' : it.b.state === 'sugestao' ? 'sugestão' : 'planejado'}
-                  muted={it.b.state === 'feito'}
-                  onOpen={() => onBlock?.(it)}
-                  act={it.b.state === 'sugestao' ? undefined : actOf?.(it)}
-                />
-              ) : it.kind === 'routine' ? (
-                <OneLine
-                  key={`r:${it.r.id}`}
-                  label={`${it.r.name}: ${it.r.done} de ${it.r.total}`}
-                  left={<TimeCell time={it.r.time} />}
-                  kind={it.r.note ? `Rotina · ${it.r.note}` : 'Rotina'}
-                  title={`${it.r.emoji ? `${it.r.emoji} ` : ''}${it.r.name}`}
-                  chip={it.r.total && it.r.done >= it.r.total ? 'feito' : `${it.r.done}/${it.r.total}`}
-                  muted={routineComplete(it.r)}
-                  onOpen={() => onRoutine?.(it.r.id)}
-                />
-              ) : (
-                <OneLine key={`q:${it.title}`} left={<TimeCell time={it.time} />} kind="Rotina" title={it.title} quiet onOpen={it.onOpen} />
-              ),
-            )}
-          </ul>
+          <Timeline items={items} onOpen={onOpen} conflictIds={conflictIds} actOf={actOf} onBlock={onBlock} onRoutine={onRoutine} onMove={onMove} />
         ) : null
       ) : rows.length ? (
         <ul className="divide-y divide-line/60">
@@ -496,7 +481,7 @@ export type TLItem =
   | { kind: 'entry'; time: string; e: CalendarEntry }
   | TLBlock
   | { kind: 'routine'; time: string; r: RoutineRow }
-  | { kind: 'quiet'; time: string; title: string; onOpen: () => void }
+  | { kind: 'quiet'; time: string; end?: string; title: string; onOpen: () => void }
 
 function TimeCell({ time, end }: { time?: string; end?: string }) {
   return (
@@ -504,5 +489,163 @@ function TimeCell({ time, end }: { time?: string; end?: string }) {
       <span className="text-[14px] text-ink-2 font-medium">{time ?? '—'}</span>
       {end && <span className="text-[11px] text-muted">até {end}</span>}
     </span>
+  )
+}
+
+// ─── Arrastar na linha do tempo ─────────────────────────────────────────────
+
+export type TimelineMove = (it: TLItem, slot: DropSlot) => MovePlan | undefined
+
+/** Hers to move on that day: commitments and planned blocks (routines and quiet lines never move). */
+export const moveOnTimeline =
+  (date: DateKey): TimelineMove =>
+  (it, slot) =>
+    it.kind === 'entry' ? planMove({ kind: 'entry', e: it.e, date }, slot) : it.kind === 'block' ? planMove({ kind: 'block', b: it.b, date }, slot) : undefined
+
+function canDragItem(it: TLItem): boolean {
+  if (it.kind === 'entry') return !!it.e.startAt.time && !it.e.allDay
+  if (it.kind === 'block') return it.b.state !== 'sugestao'
+  return false
+}
+
+function dragRowOf(it: TLItem): DragRow {
+  switch (it.kind) {
+    case 'entry':
+      return { start: it.e.startAt.time, end: it.e.endAt?.date === it.e.startAt.date ? it.e.endAt.time : undefined }
+    case 'block':
+      return { start: it.b.start, end: it.b.end }
+    case 'routine':
+      return { start: it.r.time }
+    case 'quiet':
+      return { start: it.time, end: it.end }
+  }
+}
+
+const showResult = (r: RowResult) => toast(r.message, r.undo ? { action: { label: 'Desfazer', run: r.undo } } : {})
+
+function Timeline({
+  items,
+  onOpen,
+  conflictIds,
+  actOf,
+  onBlock,
+  onRoutine,
+  onMove,
+}: {
+  items: TLItem[]
+  onOpen: (e: CalendarEntry) => void
+  conflictIds?: ReadonlySet<string>
+  actOf?: (it: TLItem | { kind: 'loose'; r: LooseRow }) => LineAct | undefined
+  onBlock?: (b: TLBlock) => void
+  onRoutine?: (id: string) => void
+  onMove?: TimelineMove
+}) {
+  const listRef = useRef<HTMLUListElement>(null)
+  const hintId = useId()
+  const rows = useMemo(() => items.map(dragRowOf), [items])
+  const [confirm, setConfirm] = useState<{ message: string; run: () => RowResult }>()
+  const canDrag = useCallback((i: number) => !!onMove && !!items[i] && canDragItem(items[i]), [onMove, items])
+  const onDrop = useCallback(
+    (from: number, to: number) => {
+      const it = items[from]
+      const slot = dropTime(rows, from, to)
+      const plan = it && slot ? onMove?.(it, slot) : undefined
+      if (!plan) return
+      haptic('light')
+      if (plan.kind === 'move') showResult(plan.run())
+      else if (plan.kind === 'confirm') setConfirm({ message: plan.message, run: plan.run })
+      else toast(plan.message)
+    },
+    [items, rows, onMove],
+  )
+  const { view, onPointerDown, onContextMenu } = useLongPressDrag({ listRef, canDrag, onDrop })
+  const slot = view && view.to !== view.from ? dropTime(rows, view.from, view.to) : undefined
+
+  const liOf = (i: number): LiProps => {
+    if (!canDrag(i)) return { 'data-drag-index': i }
+    const lifted = view?.from === i
+    return {
+      'data-drag-index': i,
+      onPointerDown: (e) => onPointerDown(i, e),
+      onContextMenu,
+      className: cn('select-none [-webkit-touch-callout:none]', lifted && 'relative z-20 rounded-xl bg-surface shadow-[0_12px_32px_-10px_rgba(0,0,0,0.35)]'),
+      style: lifted ? { transform: `translateY(${view.dy}px) scale(1.02)`, touchAction: 'none' } : undefined,
+    }
+  }
+  const hint = onMove ? hintId : undefined
+
+  return (
+    <div className="relative">
+      <ul ref={listRef} className="divide-y divide-line/60" aria-label="Linha do tempo">
+        {items.map((it, i) =>
+          it.kind === 'entry' ? (
+            <EntryLine key={it.e.id} e={it.e} onOpen={onOpen} conflict={conflictIds?.has(it.e.id)} act={actOf?.(it)} hint={canDrag(i) ? hint : undefined} li={liOf(i)} />
+          ) : it.kind === 'block' ? (
+            <OneLine
+              key={`b:${it.b.key}`}
+              label={`${it.label}: ${it.b.title}, ${it.b.start}–${it.b.end}`}
+              left={<TimeCell time={it.b.start} end={it.b.end} />}
+              kind={it.label}
+              title={shortTitle(it.b.title, 60)}
+              chip={it.b.state === 'feito' ? 'feito' : it.b.state === 'sugestao' ? 'sugestão' : 'planejado'}
+              muted={it.b.state === 'feito'}
+              onOpen={() => onBlock?.(it)}
+              act={it.b.state === 'sugestao' ? undefined : actOf?.(it)}
+              hint={canDrag(i) ? hint : undefined}
+              li={liOf(i)}
+            />
+          ) : it.kind === 'routine' ? (
+            <OneLine
+              key={`r:${it.r.id}`}
+              label={`${it.r.name}: ${it.r.done} de ${it.r.total}`}
+              left={<TimeCell time={it.r.time} />}
+              kind={it.r.note ? `Rotina · ${it.r.note}` : "Rotina"}
+              title={`${it.r.emoji ? `${it.r.emoji} ` : ''}${it.r.name}`}
+              chip={it.r.total && it.r.done >= it.r.total ? 'feito' : `${it.r.done}/${it.r.total}`}
+              muted={routineComplete(it.r)}
+              onOpen={() => onRoutine?.(it.r.id)}
+              li={liOf(i)}
+            />
+          ) : (
+            <OneLine key={`q:${it.title}`} left={<TimeCell time={it.time} />} kind="Rotina" title={it.title} quiet onOpen={it.onOpen} li={liOf(i)} />
+          ),
+        )}
+      </ul>
+      {view && view.to !== view.from && (
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 z-10 flex items-center" style={{ top: view.lineY - 1 }} data-testid="drop-line">
+          <span className="h-0.5 flex-1 rounded-full bg-accent" />
+          {slot && <span className="ml-2 -my-3 h-6 px-2 rounded-full bg-accent text-bg text-[12px] leading-6 tabular-nums">→ {slot.start}</span>}
+        </div>
+      )}
+      {onMove && (
+        <span id={hintId} className="sr-only">
+          Arrastar para mudar o horário: toque e segure a linha
+        </span>
+      )}
+      <AnimatePresence>
+        {confirm && (
+          <SheetFrame key="move-confirm" onClose={() => setConfirm(undefined)} label="Mover compromisso fixo">
+            <div className="px-5 pb-6 pt-1">
+              <p className="text-[15px] text-ink mb-4">{confirm.message}</p>
+              <div className="flex gap-2">
+                <Button variant="soft" block onClick={() => setConfirm(undefined)}>
+                  Cancelar
+                </Button>
+                <Button
+                  block
+                  onClick={() => {
+                    const r = confirm.run()
+                    setConfirm(undefined)
+                    showResult(r)
+                  }}
+                >
+                  Mover mesmo assim
+                </Button>
+              </div>
+            </div>
+          </SheetFrame>
+        )}
+      </AnimatePresence>
+    </div>
   )
 }
