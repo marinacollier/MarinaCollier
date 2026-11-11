@@ -62,9 +62,22 @@ export interface LineAct {
   done: boolean
   onDone: () => void
   onPostpone?: () => void
+  /** The day's state besides "concluído" (shown as the chip and in the round button). */
+  state?: 'parcial' | 'faltei' | 'replanejado'
+  /** Opens the status menu (concluído · parcial · faltei · replanejar · editar · excluir). */
+  onMenu?: () => void
 }
 
 type LiProps = LiHTMLAttributes<HTMLLIElement> & { 'data-drag-index'?: number }
+
+/** The round button: ✓ done · ◐ parcial · ✕ faltei · ↻ replanejado · ○ to do. */
+function StatusDot({ done, state }: { done: boolean; state?: LineAct['state'] }) {
+  if (done) return <span className="h-[22px] w-[22px] rounded-full border-[1.5px] bg-sage border-sage text-bg inline-flex items-center justify-center"><Check size={13} strokeWidth={3} aria-hidden /></span>
+  if (state === 'parcial') return <span aria-hidden className="h-[22px] w-[22px] rounded-full border-[1.5px] border-sand" style={{ background: 'linear-gradient(90deg, var(--sand) 50%, transparent 50%)' }} />
+  if (state === 'faltei') return <span className="h-[22px] w-[22px] rounded-full border-[1.5px] border-plum text-plum inline-flex items-center justify-center text-[12px] leading-none">✕</span>
+  if (state === 'replanejado') return <span className="h-[22px] w-[22px] rounded-full border-[1.5px] border-ocean text-ocean inline-flex items-center justify-center text-[12px] leading-none">↻</span>
+  return <span className="h-[22px] w-[22px] rounded-full border-[1.5px] border-line" />
+}
 
 function OneLine({ left, title, chip, onOpen, muted, label, conflict, kind, quiet, act, hint, li }: { left?: ReactNode; title: string; chip?: string; onOpen: () => void; muted?: boolean; label?: string; conflict?: boolean; kind?: string; quiet?: boolean; act?: LineAct; hint?: string; li?: LiProps }) {
   const row = (
@@ -85,20 +98,21 @@ function OneLine({ left, title, chip, onOpen, muted, label, conflict, kind, quie
           <span className={cn('block truncate', quiet ? 'text-[14px] text-ink-2' : 'text-[15px]', muted ? 'text-muted line-through decoration-muted/50' : !quiet && 'text-ink')}>{title}</span>
         </span>
         {conflict && <Chip tone="alert">conflito</Chip>}
-        {chip && <Chip tone={chipTone(chip)}>{chip}</Chip>}
+        {(act?.state && !act.done ? act.state : chip) && <Chip tone={chipTone(act?.state && !act.done ? act.state : chip!)}>{act?.state && !act.done ? act.state : chip}</Chip>}
       </button>
       {act && (
         <button
           type="button"
-          aria-label={act.done ? `Desfazer concluído: ${title}` : `Concluir: ${title}`}
-          aria-pressed={act.done}
+          aria-label={act.onMenu ? `Status: ${title}` : act.done ? `Desfazer concluído: ${title}` : `Concluir: ${title}`}
+          aria-haspopup={act.onMenu ? 'dialog' : undefined}
+          aria-pressed={act.onMenu ? undefined : act.done}
           onClick={() => {
             haptic('light')
-            act.onDone()
+            ;(act.onMenu ?? act.onDone)()
           }}
           className="h-11 w-11 -mr-2 shrink-0 inline-flex items-center justify-center active:scale-90 transition"
         >
-          <span className={cn('h-[22px] w-[22px] rounded-full border-[1.5px] inline-flex items-center justify-center', act.done ? 'bg-sage border-sage text-bg' : 'border-line')}>{act.done && <Check size={13} strokeWidth={3} aria-hidden />}</span>
+          <StatusDot done={act.done} state={act.state} />
         </button>
       )}
     </div>
@@ -604,6 +618,7 @@ function Timeline({
               chip={it.r.total && it.r.done >= it.r.total ? 'feito' : `${it.r.done}/${it.r.total}`}
               muted={routineComplete(it.r)}
               onOpen={() => onRoutine?.(it.r.id)}
+              act={actOf?.(it)}
               li={liOf(i)}
             />
           ) : (

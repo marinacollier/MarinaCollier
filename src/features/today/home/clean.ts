@@ -156,7 +156,7 @@ export type ChipTone = 'soft' | 'warn' | 'done' | 'ok' | 'plan' | 'alert'
 /** How a chip looks: done/paid green, confirmed blue, ideas outlined, open things sand, conflicts plum. */
 export function chipTone(c: string): ChipTone {
   if (c === 'feito' || c === 'pago') return 'done'
-  if (c === 'confirmado') return 'ok'
+  if (c === 'confirmado' || c === 'replanejado') return 'ok'
   if (c === 'planejado' || c === 'opcional' || c === 'sugestão') return 'plan'
   if (c === 'cancelado' || c === 'faltei' || /^\d+\/\d+$/.test(c)) return 'soft'
   if (c === 'conflito') return 'alert'

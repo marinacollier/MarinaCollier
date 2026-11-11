@@ -202,21 +202,76 @@ describe('revisão do fim do dia', () => {
   })
 })
 
-describe('um toque em qualquer linha', () => {
+describe('um toque em qualquer linha: concluído · parcial · faltei · replanejar · editar · excluir', () => {
   beforeEach(() => {
     actions.create('dayCheckins', { date: DATE, freeMin: 60, energy: 4, changes: [] })
   })
-  it('the round check concludes the task behind a block; tapping again undoes it', () => {
+  const menuOf = (title: string) => {
+    fireEvent.click(screen.getByRole('button', { name: `Status: ${title}` }))
+    return within(screen.getAllByRole('dialog', { name: 'Status do item' }).find((d) => d.textContent?.includes(title) && d.querySelector('[aria-label="Fechar"]'))!)
+  }
+
+  it('Concluído concludes the task behind a block and it STAYS on the day (struck), with Desfazer', () => {
     home()
-    fireEvent.click(screen.getByRole('button', { name: 'Concluir: Enviar proposta' }))
+    fireEvent.click(menuOf('Enviar proposta').getByRole('button', { name: 'Concluído' }))
     expect(getDB().tasks.find((t) => t.id === 'a')?.status).toBe('done')
-    fireEvent.click(screen.getByRole('button', { name: 'Desfazer concluído: Enviar proposta' }))
+    expect(lineText(rowOf('Enviar proposta'))).toContain('feito')
+    // Again → back to do.
+    fireEvent.click(menuOf('Enviar proposta').getByRole('button', { name: 'Concluído ✓' }))
     expect(getDB().tasks.find((t) => t.id === 'a')?.status).not.toBe('done')
   })
-  it('an event of the day (even one she cannot edit) is concluded with one tap', () => {
+
+  it('an event of the day is concluded from the same menu', () => {
     actions.create('events', { title: 'Aula fixa', date: DATE, startTime: '18:00', endTime: '19:00', sourceId: 'cal-local', allDay: false })
     home()
-    fireEvent.click(screen.getByRole('button', { name: 'Concluir: Aula fixa' }))
+    fireEvent.click(menuOf('Aula fixa').getByRole('button', { name: 'Concluído' }))
     expect(lineText(rowOf('Aula fixa'))).toContain('feito')
+  })
+
+  it('Parcial and Faltei mark the day (chip), persist, and choosing again clears it', () => {
+    actions.create('events', { title: 'Missa', date: DATE, startTime: '18:00', endTime: '19:00', sourceId: 'cal-local', allDay: false })
+    home()
+    fireEvent.click(menuOf('Missa').getByRole('button', { name: 'Parcial' }))
+    expect(lineText(rowOf('Missa'))).toContain('parcial')
+    fireEvent.click(menuOf('Missa').getByRole('button', { name: 'Faltei' }))
+    expect(lineText(rowOf('Missa'))).toContain('faltei')
+    expect(lineText(rowOf('Missa'))).not.toContain('parcial')
+    expect(getDB().occurrences.filter((o) => o.parentType === 'item' && o.date === DATE)).toHaveLength(1)
+    fireEvent.click(menuOf('Missa').getByRole('button', { name: 'Faltei' }))
+    expect(lineText(rowOf('Missa'))).not.toContain('faltei')
+  })
+
+  it('Replanejar → Amanhã moves the task to tomorrow, marked "replanejado" there; Desfazer brings it back', () => {
+    home()
+    const m = menuOf('Enviar proposta')
+    fireEvent.click(m.getByRole('button', { name: 'Replanejar' }))
+    fireEvent.click(m.getByRole('button', { name: /^Amanhã/ }))
+    expect(getDB().tasks.find((t) => t.id === 'a')?.date).toBe('2026-11-15')
+    expect(getDB().occurrences.some((o) => o.parentId === 'task:a' && o.date === '2026-11-15' && o.status === 'moved')).toBe(true)
+  })
+
+  it('Excluir asks first, then removes a task (Desfazer restores it); a Google event is never deleted from here', () => {
+    actions.create('events', { title: 'Do Google', date: DATE, startTime: '18:00', endTime: '19:00', sourceId: 'gcal-google', allDay: false, external: { provider: 'google', externalId: 'g1', syncStatus: 'synced' } } as never)
+    home()
+    let m = menuOf('Enviar proposta')
+    fireEvent.click(m.getByRole('button', { name: 'Excluir' }))
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Sim' }))
+    expect(getDB().tasks.some((t) => t.id === 'a')).toBe(false)
+    m = menuOf('Do Google')
+    fireEvent.click(m.getByRole('button', { name: 'Excluir' }))
+    expect(m.getByRole('status').textContent).toMatch(/Google/)
+    expect(getDB().events.some((e) => e.title === 'Do Google')).toBe(true)
+  })
+
+  it('a routine: Concluído ticks every item of the day; it stays on the timeline, struck', () => {
+    act(() => {
+      actions.create('routines', { id: 'mm', name: 'Milagre da Manhã', period: 'manha', order: 0, active: true, startTime: '06:00' } as never)
+      actions.create('routineItems', { routineId: 'mm', title: 'Despertar', order: 0, active: true, recurrence: { kind: 'daily' } } as never)
+      actions.create('routineItems', { routineId: 'mm', title: 'Meditar', order: 1, active: true, recurrence: { kind: 'daily' } } as never)
+    })
+    home()
+    fireEvent.click(menuOf('Milagre da Manhã').getByRole('button', { name: 'Concluído' }))
+    expect(lineText(rowOf('Milagre da Manhã'))).toContain('feito')
+    expect(getDB().occurrences.filter((o) => o.parentType === 'routineItem' && o.status === 'done')).toHaveLength(2)
   })
 })

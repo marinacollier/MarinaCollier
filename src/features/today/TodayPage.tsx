@@ -14,6 +14,8 @@
  */
 import { routineItemsFor } from '@/data/selectors'
 import { GcalHomeAlert } from '@/features/integrations/GcalStatus'
+import { LineMenu, type MenuTarget } from './home/LineMenu'
+import { lineKey, lineStateOf, routineDone } from './home/line-status'
 import { eveningPlan, fixedSignature, isAdaptiveRoutine } from './home/adaptive'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -155,18 +157,6 @@ export default function TodayPage() {
     }
     return out.sort((a, b) => a.time.localeCompare(b.time))
   }, [hoje, blocks.rows, rituals, db, day, navigate, cal.entries])
-  // Done lines that are already behind her fold away (still one tap to see) — the day reads as what is left.
-  const [showDone, setShowDone] = useState(false)
-  const pastDone = useCallback(
-    (it: TLItem): boolean => {
-      const end = it.kind === 'entry' ? (it.e.endAt?.time ?? it.e.startAt.time) : it.kind === 'block' ? it.b.end : it.kind === 'routine' ? it.r.time : undefined
-      const done = it.kind === 'entry' ? it.e.status === 'feito' : it.kind === 'block' ? it.b.state === 'feito' : it.kind === 'routine' ? routineComplete(it.r) : false
-      return done && !!end && hmToMinutes(end) <= local.minutes
-    },
-    [local.minutes],
-  )
-  const doneHidden = useMemo(() => timeline.filter(pastDone).length, [timeline, pastDone])
-  const timelineShown = useMemo(() => (showDone ? timeline : timeline.filter((it) => !pastDone(it))), [timeline, showDone, pastDone])
   // Amanhã: commitments + what the engine WOULD place (suggestions only — nothing is written for tomorrow).
   const tomorrowItems = useMemo<TLItem[]>(() => {
     const out: TLItem[] = amanha.map((e) => ({ kind: 'entry', time: e.startAt.time ?? '', e }))
@@ -175,13 +165,36 @@ export default function TodayPage() {
     return out.sort((a, b) => a.time.localeCompare(b.time))
   }, [amanha, db, tomorrow, cal.entries])
   // One tap on any line: ✓ concluir (or undo) · swipe ← amanhã. Every action persists and offers Desfazer.
+  // Every line: tap the round button → concluído · parcial · faltei · replanejar · editar · excluir (one menu).
+  const [menu, setMenu] = useState<MenuTarget>()
+  const show = (r: RowResult) => toast(r.message, r.undo ? { action: { label: 'Desfazer', run: r.undo } } : {})
   const actOf = useCallback(
     (date: DateKey) =>
       (it: TLItem | { kind: 'loose'; r: LooseRow }): LineAct | undefined => {
+        if (it.kind === 'routine') {
+          const items = routineItemsFor(db, it.r.id, date)
+          const done = routineComplete(it.r)
+          const state = lineStateOf(db, `routine:${it.r.id}`, date)
+          const open = () => setRoutineOpen(it.r.id)
+          return {
+            done,
+            state,
+            onDone: () => show(routineDone(items.map((i) => i.id), date, !done)),
+            onMenu: () => setMenu({ kind: 'routine', id: it.r.id, date, title: it.r.name, when: it.r.time, itemIds: items.map((i) => i.id), done, onEdit: open }),
+          }
+        }
         const t: RowTarget | undefined = it.kind === 'entry' ? { kind: 'entry', e: it.e, date } : it.kind === 'block' ? { kind: 'block', b: it.b, date } : it.kind === 'loose' ? { kind: 'loose', r: it.r, date } : undefined
-        if (!t || !canComplete(t)) return undefined
-        const show = (r: RowResult) => toast(r.message, r.undo ? { action: { label: 'Desfazer', run: r.undo } } : {})
-        return { done: isRowDone(db, t), onDone: () => show(toggleDone(t)), onPostpone: canPostpone(t) ? () => show(postponeRow(t)) : undefined }
+        if (!t || (t.kind === 'entry' && (t.e.masked || t.e.allDay && !canComplete(t)))) return undefined
+        const title = it.kind === 'entry' ? it.e.title : it.kind === 'block' ? it.b.title : it.kind === 'loose' ? it.r.title : ''
+        const when = it.kind === 'entry' ? it.e.startAt.time : it.kind === 'block' ? `${it.b.start}–${it.b.end}` : undefined
+        const onEdit = it.kind === 'entry' ? () => openEntry(it.e, date) : it.kind === 'block' ? () => (setBlockDay(date), setBlockOpen(it)) : it.kind === 'loose' ? () => openLoose(it.r) : undefined
+        return {
+          done: isRowDone(db, t),
+          state: lineStateOf(db, lineKey(t), date),
+          onDone: () => (canComplete(t) ? show(toggleDone(t)) : setMenu({ kind: 'line', t, title, when, onEdit })),
+          onPostpone: canPostpone(t) ? () => show(postponeRow(t)) : undefined,
+          onMenu: () => setMenu({ kind: 'line', t, title, when, onEdit }),
+        }
       },
     [db],
   )
@@ -300,12 +313,7 @@ export default function TodayPage() {
 
       <motion.div {...rise(1)} className="mt-7">
         <GcalHomeAlert />
-        <DayBlock label="01 / Dia" title="Hoje" rows={hoje} loose={hojeLoose} onOpen={(e) => openEntry(e, day)} onLoose={openLoose} conflicts={conflictsByDay.get(day) ?? 0} conflictIds={conflictIds} onConflicts={() => setShowConflicts(day)} items={timelineShown} actOf={actOf(day)} onMove={moveOnTimeline(day)} onBlock={(b) => (setBlockDay(day), setBlockOpen(b))} onRoutine={setRoutineOpen} />
-        {doneHidden > 0 && (
-          <button type="button" onClick={() => setShowDone((v) => !v)} aria-expanded={showDone} className="mt-1 h-9 text-[12.5px] text-muted active:opacity-70">
-            {showDone ? 'Recolher concluídos' : `✓ ${doneHidden} ${doneHidden === 1 ? 'concluído' : 'concluídos'} · mostrar`}
-          </button>
-        )}
+        <DayBlock label="01 / Dia" title="Hoje" rows={hoje} loose={hojeLoose} onOpen={(e) => openEntry(e, day)} onLoose={openLoose} conflicts={conflictsByDay.get(day) ?? 0} conflictIds={conflictIds} onConflicts={() => setShowConflicts(day)} items={timeline} actOf={actOf(day)} onMove={moveOnTimeline(day)} onBlock={(b) => (setBlockDay(day), setBlockOpen(b))} onRoutine={setRoutineOpen} />
         <DayAssist date={day} nowMin={local.minutes} entries={cal.entries} rows={blocks.rows} onAsk={ask} />
         <BacklogPanel items={backlog} today={day} onOpen={(id) => openSheet('task', { id })} />
       </motion.div>
@@ -347,6 +355,11 @@ export default function TodayPage() {
       )}
 
       <AnimatePresence>
+        {menu && (
+          <SheetFrame key={`menu:${menu.title}`} onClose={() => setMenu(undefined)} label="Status do item">
+            <LineMenu target={menu} onClose={() => setMenu(undefined)} nowMin={local.minutes} />
+          </SheetFrame>
+        )}
         {detail && sel && (
           <SheetFrame key="detail" onClose={() => setSel(undefined)} label="Detalhe do compromisso" maxHeight="86dvh">
             <EntryDetail entry={detail} date={sel.date} conflicts={cal.marks.get(detail.id)} device={device} onClose={() => setSel(undefined)} onEdited={() => setSel(undefined)} />

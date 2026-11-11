@@ -162,7 +162,8 @@ export interface Occurrence extends Entity {
   parentType: OccurrenceParent
   parentId: ID
   date: DateKey
-  status: 'done' | 'skipped'
+  /** done · skipped ("faltei") · partial ("parcial") · moved ("replanejado": the line came here from another day/time). */
+  status: 'done' | 'skipped' | 'partial' | 'moved'
   /** Free text written on that day (e.g. journaling inside the morning routine). */
   note?: string
   /** Indexes of RoutineItem.steps checked that day. */
